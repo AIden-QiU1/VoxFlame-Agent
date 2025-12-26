@@ -1,0 +1,76 @@
+{
+  "type": "extension",
+  "name": "cosyvoice_tts_python",
+  "version": "0.1.0",
+  "language": "python",
+  "dependencies": [],
+  "api": {
+    "property": {
+      "api_url": {
+        "type": "string"
+      },
+      "model": {
+        "type": "string"
+      },
+      "voice_id": {
+        "type": "string"
+      },
+      "sample_rate": {
+        "type": "int32"
+      },
+      "streaming": {
+        "type": "bool"
+      },
+      "speed": {
+        "type": "float32"
+      }
+    },
+    "data_in": [
+      {
+        "name": "text_data",
+        "property": {
+          "text": {
+            "type": "string"
+          },
+          "is_final": {
+            "type": "bool"
+          },
+          "end_of_segment": {
+            "type": "bool"
+          },
+          "stream_id": {
+            "type": "int64"
+          }
+        }
+      }
+    ],
+    "data_out": [
+      {
+        "name": "pcm_frame",
+        "property": {
+          "bytes": {
+            "type": "buf"
+          },
+          "sample_rate": {
+            "type": "int32"
+          },
+          "channels": {
+            "type": "int32"
+          },
+          "timestamp": {
+            "type": "int64"
+          }
+        }
+      }
+    ],
+    "cmd_in": [
+      {
+        "name": "flush"
+      },
+      {
+        "name": "interrupt"
+      }
+    ],
+    "cmd_out": []
+  }
+}

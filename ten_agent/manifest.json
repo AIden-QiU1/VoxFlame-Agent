@@ -1,0 +1,16 @@
+{
+  "type": "app",
+  "name": "voxflame_agent",
+  "version": "1.0.0",
+  "description": "燃言 VoxFlame - 构音障碍语音助手",
+  "author": "VoxFlame Team",
+  "language": "python",
+  "api": {
+    "property": {
+      "greeting": {
+        "type": "string",
+        "default": "您好，我是燃言语音助手，有什么可以帮您的吗？"
+      }
+    }
+  }
+}

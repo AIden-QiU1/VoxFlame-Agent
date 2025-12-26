@@ -4,6 +4,7 @@ import dotenv from 'dotenv'
 import { createServer } from 'http'
 import { WebSocketServer } from 'ws'
 import { ASRController } from './controllers/asr.controller'
+import { agentRouter } from './controllers/agent.controller'
 import { errorHandler } from './middlewares/error.middleware'
 
 // 加载环境变量
@@ -27,6 +28,9 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: '语音识别服务运行正常' })
 })
 
+// Agent API 路由 (TEN Webhook)
+app.use('/api/agent', agentRouter)
+
 // WebSocket 连接处理 - 使用控制器
 wss.on('connection', ASRController.handleConnection)
 
@@ -35,10 +39,17 @@ app.use(errorHandler)
 
 // 启动服务器
 server.listen(PORT, () => {
-  console.log(`\n🚀 语音服务已启动`)
+  console.log(`\n🚀 VoxFlame Backend 已启动`)
   console.log(`📡 HTTP 服务地址: http://localhost:${PORT}`)
   console.log(`🔌 WebSocket 地址: ws://localhost:${PORT}/ws/asr`)
   console.log(`🏥 健康检查: http://localhost:${PORT}/health`)
+  console.log(`\n🤖 Agent API 端点:`)
+  console.log(`   - GET  /api/agent/profile/:userId`)
+  console.log(`   - PUT  /api/agent/profile/:userId`)
+  console.log(`   - POST /api/agent/session/log`)
+  console.log(`   - GET  /api/agent/session/:userId/:sessionId`)
+  console.log(`   - POST /api/agent/tool/execute`)
+  console.log(`   - GET  /api/agent/hotwords/:userId`)
   
   const provider = process.env.ASR_PROVIDER === 'alibaba' ? '阿里云 (Alibaba Cloud)' : '火山引擎 (Volcengine)'
   console.log(`\n🎙️  当前使用的语音引擎: ${provider}\n`)
