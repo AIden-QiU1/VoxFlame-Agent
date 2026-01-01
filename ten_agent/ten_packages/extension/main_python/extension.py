@@ -41,6 +41,8 @@ from .memory import (
     MemoryStore,
     PowerMemSdkMemoryStore,
     PowerMemSdkUserMemoryStore,
+    LocalPowerMemStore,
+    LocalPowerMemStore,
 )
 
 
@@ -89,11 +91,12 @@ class MainControlExtension(AsyncExtension):
         if self.config and self.config.enable_memorization and self.config.powermem_config:
             try:
                 if not self.config.enable_user_memory:
-                    self.memory_store = PowerMemSdkMemoryStore(
-                        config=self.config.powermem_config, env=ten_env)
+                    self.memory_store = LocalPowerMemStore(
+                        config={"db_path": "/root/VoxFlame-Agent/data/powermem.db"}, env=ten_env)
                 else:
-                    self.memory_store = PowerMemSdkUserMemoryStore(
-                        config=self.config.powermem_config, env=ten_env)
+##                    self.memory_store = PowerMemSdkUserMemoryStore(
+                    pass  # User memory not yet implemented with LocalPowerMemStore
+##                        config={"db_path": "/root/VoxFlame-Agent/data/powermem.db"}, env=ten_env)
                 ten_env.log_info(
                     "[MainControlExtension] PowerMem memory store initialized successfully"
                 )

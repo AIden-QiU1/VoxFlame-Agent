@@ -1,0 +1,62 @@
+{
+  "type": "extension",
+  "name": "dashscope_tts_python",
+  "version": "1.0.0",
+  "language": "python",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.4"
+    }
+  ],
+  "api": {
+    "property": {
+      "api_key": {
+        "type": "string"
+      },
+      "model": {
+        "type": "string",
+        "default": "cosyvoice-v3-flash"
+      },
+      "voice": {
+        "type": "string",
+        "default": "longanyang"
+      },
+      "sample_rate": {
+        "type": "int32",
+        "default": 22050
+      },
+      "format": {
+        "type": "string",
+        "default": "pcm"
+      }
+    },
+    "data_in": [
+      {
+        "name": "text_data",
+        "property": {
+          "text": {"type": "string"},
+          "is_final": {"type": "bool"},
+          "end_of_segment": {"type": "bool"},
+          "stream_id": {"type": "int64"}
+        }
+      }
+    ],
+    "data_out": [
+      {
+        "name": "pcm_frame",
+        "property": {
+          "bytes": {"type": "buf"},
+          "sample_rate": {"type": "int32"},
+          "channels": {"type": "int32"},
+          "timestamp": {"type": "int64"}
+        }
+      }
+    ],
+    "cmd_in": [
+      {"name": "flush"},
+      {"name": "interrupt"}
+    ]
+  }
+}

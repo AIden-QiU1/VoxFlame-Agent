@@ -305,3 +305,4 @@ class PowerMemSdkUserMemoryStore(MemoryStore):
                 f"[PowerMemSdkUserMemoryStore] get_user_profile traceback: {traceback.format_exc()}"
             )
             raise
+from .memory_local import LocalPowerMemStore

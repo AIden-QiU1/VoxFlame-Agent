@@ -56,7 +56,7 @@ class PowerMemSQLiteBackend:
             print(f"✅ Loaded FAISS index with {self.faiss_index.ntotal} vectors")
         else:
             # 创建新的FAISS索引（384维，DashScope text-embedding-v1）
-            self.faiss_index = faiss.IndexFlatL2(384)
+            self.faiss_index = faiss.IndexFlatL2(512)
             self.id_mapping = {}  # {faiss_id: db_id}
             print("✅ Created new FAISS index")
     

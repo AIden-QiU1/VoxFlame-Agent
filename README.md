@@ -98,58 +98,27 @@ ASR/LLM:   DashScope API (阿里云灵积)
 
 ## ✅ 当前进度
 
-### Phase 1-4: 后端核心 (已完成 ✅)
+### 已完成 ✅
 
-**集成测试结果**:
-```
-✅ PASS - Health Checks (Backend + TEN Agent)
-✅ PASS - Session Lifecycle (Start → Stop)
-✅ PASS - Hotwords Reload (动态更新)
-```
+| Phase | 功能 | 描述 |
+|-------|------|------|
+| 1-4 | 后端核心 | Express API + TEN Agent + SQLite + FAISS |
+| 5 | ASR集成 | DashScope paraformer-realtime-v2 |
+| 6 | DashScope扩展 | dashscope_asr_python + dashscope_tts_python |
+| 7 | Supabase同步 | 云端 sessions, memories, profiles 同步 |
+| 8 | 前端WebSocket | /chat 对话页面 + useAgent Hook |
 
-**已实现组件**:
+### 下一步 ⏳
 
-1. **SQLite Backend存储层** ✅
-   - 文件: `ten_agent/storage/sqlite_backend.py`
-   - 功能: SQLite + FAISS向量索引
-   - 性能: 插入<0.1秒, 检索<1ms
-   - 并发: WAL模式支持多读单写
+- [ ] **Phase 9**: 端到端集成测试
+- [ ] **Phase 10**: 部署优化与文档完善
 
-2. **TEN Agent HTTP API Server** ✅
-   - 目录: `ten_agent/ten_packages/extension/http_api_server_python/`
-   - 端点: /start, /stop, /reload-hotwords, /health
-   - 框架: aiohttp
+### 技术亮点
 
-3. **Backend Session API** ✅
-   - 文件: `backend/src/controllers/session.controller.ts`
-   - 端点: POST /start, POST /stop, GET /:sessionId, POST /reload-hotwords
-   - 集成: axios → TEN Agent HTTP Client
-
-4. **集成测试** ✅
-   - 文件: `test_integration.py`
-   - 覆盖: 健康检查、会话生命周期、热词更新
-
-### Phase 5-8: AI能力集成 (进行中 ⏳)
-
-5. **ASR集成** ⏳ (预计2小时)
-   - API模式: DashScope Paraformer API
-   - 本地模式: FunASR模型 (预留接口)
-   - 实时流式识别
-
-6. **PowerMem集成** ⏳ (预计1.5小时)
-   - DashScope text-embedding-v1 (384维向量)
-   - 上下文召回 (Top-K=5)
-   - 实时记忆更新
-
-7. **Supabase持久化** ⏳ (预计1小时)
-   - Sessions表 (会话元数据)
-   - Users表 (用户配置、热词)
-   - Memories表 (可选，分析用)
-
-8. **前端WebSocket** ⏳ (预计2小时)
-   - Audio录制 (MediaRecorder API)
-   - WebSocket双向流
-   - 实时转写显示
+- **DashScope全栈**: ASR (paraformer) + TTS (cosyvoice) + Embedding (text-embedding-v3)
+- **本地+云端混合**: SQLite+FAISS 本地存储 + Supabase 云端同步
+- **PWA支持**: 离线可用，支持安装到桌面
+- **无障碍设计**: 大字体、高对比度、键盘快捷键
 
 ---
 
@@ -239,12 +208,11 @@ python test_integration.py
 - [x] Memory API实现
 - [x] Agent API实现
 - [x] Supabase Service集成
+- [x] Supabase Sessions/Memories/Profiles CRUD
 - [x] 集成测试脚本
 
 **进行中** ⏳:
-- [ ] Supabase Sessions表CRUD
-- [ ] Supabase Users表CRUD
-- [ ] WebSocket连接管理
+- [ ] WebSocket连接管理优化
 - [ ] 错误处理优化
 - [ ] API文档生成 (Swagger)
 
@@ -268,12 +236,13 @@ python test_integration.py
 - [x] TailwindCSS配置
 - [x] PWA配置 (Service Worker)
 - [x] 基础UI组件
+- [x] Audio录制组件 (MediaRecorder API)
+- [x] WebSocket Hook (`useAgent`)
+- [x] /chat 对话页面
+- [x] ChatInterface 对话组件
 
 **进行中** ⏳:
-- [ ] Audio录制组件 (MediaRecorder API)
-- [ ] WebSocket Hook (`useVoiceChat`)
-- [ ] 实时转写显示UI
-- [ ] 会话管理页面
+- [ ] 会话历史页面
 - [ ] 用户设置页面 (热词管理)
 
 **技术栈**:
@@ -287,62 +256,25 @@ python test_integration.py
 - `frontend/src/components/AudioRecorder.tsx` (待实现)
 - `frontend/src/app/chat/page.tsx`
 
-**示例代码** (useVoiceChat Hook):
-```typescript
-// frontend/src/hooks/useVoiceChat.ts
-export const useVoiceChat = (sessionId: string) => {
-  const [transcript, setTranscript] = useState('');
-  const ws = useRef<WebSocket>();
-  
-  useEffect(() => {
-    // 1. 创建会话
-    const startSession = async () => {
-      const res = await fetch('/api/session/start', {
-        method: 'POST',
-        body: JSON.stringify({ userId: 'user_001', hotwords: [] })
-      });
-      const { websocketUrl } = await res.json();
-      
-      // 2. 建立WebSocket连接
-      ws.current = new WebSocket(websocketUrl);
-      ws.current.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'asr_result') {
-          setTranscript(prev => prev + data.text);
-        }
-      };
-    };
-    
-    startSession();
-    
-    return () => ws.current?.close();
-  }, [sessionId]);
-  
-  const sendAudio = (audioBlob: Blob) => {
-    ws.current?.send(audioBlob);
-  };
-  
-  return { sendAudio, transcript };
-};
-```
-
 ---
 
 ### AI工程师任务
 
 **已完成** ✅:
 - [x] SQLite Backend存储层 (PowerMemSQLiteBackend)
-- [x] FAISS向量索引集成
+- [x] FAISS向量索引集成 (512维)
 - [x] TEN Agent HTTP API Server
 - [x] 会话管理逻辑
+- [x] DashScope ASR API集成 (paraformer-realtime-v2)
+- [x] DashScope TTS API集成 (cosyvoice-v3-flash)
+- [x] DashScope Embedding API集成 (text-embedding-v3, 512维)
+- [x] PowerMem上下文召回逻辑
+- [x] Supabase云端同步模块
 
 **进行中** ⏳:
-- [ ] DashScope ASR API集成
-- [ ] DashScope Embedding API集成
-- [ ] PowerMem上下文召回逻辑
 - [ ] FunASR本地模型接口 (预留)
 - [ ] GLM LLM集成
-- [ ] CosyVoice TTS集成
+- [ ] 端到端调试
 
 **技术栈**:
 - TEN Framework (Python)
@@ -356,30 +288,6 @@ export const useVoiceChat = (sessionId: string) => {
 - `ten_agent/ten_packages/extension/http_api_server_python/extension.py`
 - `ten_agent/ten_packages/extension/main_python/extension.py` (待扩展)
 - `ten_agent/ten_packages/extension/funasr_asr_python/extension.py` (待实现)
-
-**示例代码** (ASR API Client):
-```python
-# ten_agent/services/asr_api_client.py
-import dashscope
-
-class DashScopeASRClient:
-    def __init__(self, api_key: str):
-        dashscope.api_key = api_key
-    
-    async def transcribe_audio(self, audio_bytes: bytes) -> str:
-        """
-        调用DashScope Paraformer API进行语音识别
-        """
-        response = await dashscope.audio.asr.AsyncTranscription.call(
-            model='paraformer-realtime-v1',
-            format='pcm',
-            sample_rate=16000,
-            audio=audio_bytes
-        )
-        return response.output.text
-```
-
----
 
 ## 📊 技术亮点
 
@@ -420,8 +328,10 @@ PRAGMA synchronous=NORMAL;    -- 平衡安全与性能
 
 ### V0.1 - MVP (当前, Week 1-6)
 - [x] 后端核心架构 (Phase 1-4)
-- [ ] ASR/LLM/TTS API集成 (Phase 5-8)
-- [ ] 前端基础UI + WebSocket
+- [x] ASR/TTS/Embedding API集成 (Phase 5-6)
+- [x] Supabase云端同步 (Phase 7)
+- [x] 前端WebSocket对话 (Phase 8)
+- [ ] 端到端集成测试 (Phase 9)
 - [ ] 5用户内测
 
 ### V0.2 - 动态热词 (Week 7-12)

@@ -11,3 +11,17 @@ dist/
 build/
 *.egg-info/
 coverage/
+ten-framework/
+# TEN Framework (large external dependency)
+ten-framework/
+
+# Test data files
+data/*.db
+data/*.faiss_index
+data/*.faiss_mapping.pkl
+
+# Supabase temp
+supabase/.temp/
+
+# Memory files (project-specific)
+.serena/
