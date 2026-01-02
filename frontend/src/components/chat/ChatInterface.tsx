@@ -39,6 +39,59 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
   const [textInput, setTextInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Audio player ref for TTS playback
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null)
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false)
+
+  // Initialize audio player
+  useEffect(() => {
+    const audio = new Audio()
+    audio.addEventListener('ended', () => setIsPlayingAudio(false))
+    audio.addEventListener('error', (e) => {
+      console.error('Audio playback error:', e)
+      setIsPlayingAudio(false)
+    })
+    audioPlayerRef.current = audio
+    
+    return () => {
+      audio.pause()
+      audio.src = ''
+      audio.removeEventListener('ended', () => setIsPlayingAudio(false))
+      audio.removeEventListener('error', () => setIsPlayingAudio(false))
+    }
+  }, [])
+
+  // Play TTS audio from response
+  const playAudio = (audioData: Blob | string) => {
+    if (!audioPlayerRef.current) return
+    
+    const audio = audioPlayerRef.current
+    
+    // Stop current playback
+    audio.pause()
+    
+    // Set new source
+    if (audioData instanceof Blob) {
+      const url = URL.createObjectURL(audioData)
+      audio.src = url
+    } else if (typeof audioData === 'string') {
+      audio.src = audioData
+    }
+    
+    // Play audio
+    audio.play()
+      .then(() => setIsPlayingAudio(true))
+      .catch(err => console.error('Failed to play audio:', err))
+  }
+
+  // Stop audio playback
+  const stopAudio = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause()
+      setIsPlayingAudio(false)
+    }
+  }
+
   // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -77,12 +130,40 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
       <header className="bg-white/80 backdrop-blur-md border-b border-amber-100 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🔥</span>
+            <span className="text-2xl"></span>
             <span className="text-xl font-bold text-gray-900">燃言助手</span>
             {sessionId && (
               <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
                 已连接
               </span>
+            )}
+            
+            {/* Audio control button */}
+            {isConnected && isPlayingAudio && (
+              <button
+                onClick={stopAudio}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full text-sm font-medium transition-colors flex items-center gap-2"
+                aria-label="停止音频"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+                停止播放
+              </button>
+            )}
+            
+            {/* Audio control button */}
+            {isConnected && isPlayingAudio && (
+              <button
+                onClick={stopAudio}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full text-sm font-medium transition-colors flex items-center gap-2"
+                aria-label="停止音频"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+                停止播放
+              </button>
             )}
           </div>
           
@@ -112,7 +193,7 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
           {/* Welcome message */}
           {messages.length === 0 && !currentResponseText && (
             <div className="text-center py-12">
-              <div className="text-6xl mb-4">🔥</div>
+              <div className="text-6xl mb-4"></div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 你好！我是燃言助手
               </h2>

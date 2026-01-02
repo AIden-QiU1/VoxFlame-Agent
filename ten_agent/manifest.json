@@ -1,56 +1,40 @@
 {
   "type": "app",
   "name": "voxflame_agent",
-  "version": "1.0.0",
-  "description": "燃言 VoxFlame - 构音障碍AI会话支持人（带PowerMem记忆管理）",
-  "author": "VoxFlame Team",
-  "language": "python",
+  "version": "0.11.0",
   "dependencies": [
     {
-      "type": "extension",
-      "name": "websocket_server_python",
-      "version": "^1.0.0"
+      "type": "system",
+      "name": "ten_runtime_go",
+      "version": "0.11"
+    },
+    {
+      "type": "system",
+      "name": "ten_ai_base",
+      "version": "0.7"
     },
     {
       "type": "extension",
-      "name": "funasr_asr_python",
-      "version": "^1.0.0"
+      "name": "websocket_server",
+      "version": "0.0.1"
     },
     {
       "type": "extension",
-      "name": "main_python",
-      "version": "^1.0.0"
+      "name": "aliyun_asr_bigmodel_python",
+      "version": "0.2.5"
     },
     {
       "type": "extension",
-      "name": "glm_llm_python",
-      "version": "^1.0.0"
+      "name": "openai_llm2_python",
+      "version": "0.3.0"
     },
     {
       "type": "extension",
-      "name": "cosyvoice_tts_python",
-      "version": "^1.0.0"
-    },
-    {
-      "type": "extension",
-      "name": "text_webhook_python",
-      "version": "^1.0.0"
+      "name": "cosy_tts_python",
+      "version": "0.4.0"
     }
   ],
-  "api": {
-    "property": {
-      "greeting": {
-        "type": "string",
-        "default": "你好！我是燃言，你的AI会话支持人。"
-      },
-      "enable_memorization": {
-        "type": "boolean",
-        "default": true
-      },
-      "memory_save_interval_turns": {
-        "type": "int",
-        "default": 5
-      }
-    }
+  "scripts": {
+    "start": "scripts/start.sh"
   }
 }

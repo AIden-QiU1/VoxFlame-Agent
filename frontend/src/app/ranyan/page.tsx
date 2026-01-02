@@ -53,7 +53,7 @@ export default function RanyanPage() {
       >
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2" aria-label="燃言首页">
-            <span className="text-2xl" aria-hidden="true">🔥</span>
+            <span className="text-2xl" aria-hidden="true"></span>
             <span className="text-xl font-bold text-amber-600 hover:text-amber-700 transition-colors">燃言</span>
           </Link>
           <div className="flex items-center gap-6">
@@ -101,7 +101,7 @@ export default function RanyanPage() {
               href="/contribute" 
               className="px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white text-lg rounded-full font-bold transition-all shadow-xl shadow-amber-200 hover:shadow-amber-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-amber-300"
             >
-              🎤 贡献我的声音
+               贡献我的声音
             </Link>
             <a 
               href={GITHUB_URL}
@@ -149,7 +149,7 @@ export default function RanyanPage() {
 
           <div className="grid md:grid-cols-2 gap-6 md:gap-8">
             <article className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 md:p-8 rounded-2xl">
-              <div className="text-4xl mb-4" aria-hidden="true">💬</div>
+              <div className="text-4xl mb-4" aria-hidden="true"></div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">被误解的痛苦</h3>
               <p className="text-gray-600 leading-relaxed">
                 &ldquo;每次说话，别人都皱眉头、摇头，或者直接忽略我。
@@ -159,7 +159,7 @@ export default function RanyanPage() {
             </article>
 
             <article className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 md:p-8 rounded-2xl">
-              <div className="text-4xl mb-4" aria-hidden="true">🤖</div>
+              <div className="text-4xl mb-4" aria-hidden="true"></div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">AI 也听不懂</h3>
               <p className="text-gray-600 leading-relaxed">
                 现有的语音识别系统几乎都是为&ldquo;标准发音&rdquo;训练的。
@@ -169,7 +169,7 @@ export default function RanyanPage() {
             </article>
 
             <article className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 md:p-8 rounded-2xl">
-              <div className="text-4xl mb-4" aria-hidden="true">🌍</div>
+              <div className="text-4xl mb-4" aria-hidden="true"></div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">1% 的人口</h3>
               <p className="text-gray-600 leading-relaxed">
                 全球约 7500 万人患有构音障碍。
@@ -180,7 +180,7 @@ export default function RanyanPage() {
             </article>
 
             <article className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 md:p-8 rounded-2xl">
-              <div className="text-4xl mb-4" aria-hidden="true">🔥</div>
+              <div className="text-4xl mb-4" aria-hidden="true"></div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">燃言的解决方案</h3>
               <p className="text-gray-600 leading-relaxed">
                 收集构音障碍语音数据 → 训练专属 AI 模型 → 
@@ -205,7 +205,7 @@ export default function RanyanPage() {
           <div className="grid md:grid-cols-3 gap-6">
             <article className="bg-white p-6 md:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-amber-100">
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center text-3xl mb-6" aria-hidden="true">
-                🎤
+                
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">贡献声音</h3>
               <p className="text-gray-600 mb-4">
@@ -222,7 +222,7 @@ export default function RanyanPage() {
 
             <article className="bg-white p-6 md:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-blue-100">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-3xl mb-6" aria-hidden="true">
-                💻
+                
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">贡献代码</h3>
               <p className="text-gray-600 mb-4">
@@ -241,7 +241,7 @@ export default function RanyanPage() {
 
             <article className="bg-white p-6 md:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-green-100">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-3xl mb-6" aria-hidden="true">
-                📢
+                
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">传播分享</h3>
               <p className="text-gray-600 mb-4">

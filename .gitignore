@@ -25,3 +25,14 @@ supabase/.temp/
 
 # Memory files (project-specific)
 .serena/
+
+# TEN Agent compiled binaries
+ten_agent/bin/
+*.so
+
+# TEN system packages (downloaded via tman install)
+ten_agent/ten_packages/system/
+ten_agent/ten_packages/addon_loader/
+
+# Compiled manifest lock (generated)
+ten_agent/manifest-lock.json

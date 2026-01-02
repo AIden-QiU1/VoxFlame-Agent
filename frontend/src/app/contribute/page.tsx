@@ -183,7 +183,7 @@ export default function ContributePage() {
       >
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/ranyan" className="flex items-center gap-2" aria-label="燃言项目首页">
-            <span className="text-2xl" aria-hidden="true">🔥</span>
+            <span className="text-2xl" aria-hidden="true"></span>
             <span className="font-bold text-gray-900">燃言</span>
           </Link>
           
@@ -213,7 +213,7 @@ export default function ContributePage() {
                 {/* 无 AI 时的欢迎界面 */}
                 {chatMessages.length === 0 && !isAIConnected && (
                   <div className="flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="text-6xl mb-4" aria-hidden="true">👋</div>
+                    <div className="text-6xl mb-4" aria-hidden="true"></div>
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">你好！</h1>
                     <p className="text-gray-500 mb-6">
                       感谢你来帮助我们收集语音数据。
@@ -225,14 +225,14 @@ export default function ContributePage() {
                       className="px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-bold transition-all focus:outline-none focus:ring-4 focus:ring-amber-300"
                       aria-label="开始贡献声音"
                     >
-                      开始贡献声音 🎤
+                      开始贡献声音 
                     </button>
                   </div>
                 )}
                 {/* 有 AI 但未开始对话 */}
                 {chatMessages.length === 0 && isAIConnected && !isAIListening && (
                   <div className="flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="text-6xl mb-4" aria-hidden="true">🎙️</div>
+                    <div className="text-6xl mb-4" aria-hidden="true">🎙</div>
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">准备好了吗？</h1>
                     <p className="text-gray-500 mb-6">
                       点击下方按钮，我会先和你聊聊天，
@@ -243,7 +243,7 @@ export default function ContributePage() {
                       onClick={startChat}
                       className="px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-bold transition-all focus:outline-none focus:ring-4 focus:ring-amber-300"
                     >
-                      开始对话 ✨
+                      开始对话 
                     </button>
                   </div>
                 )}

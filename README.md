@@ -34,11 +34,13 @@
 
 ### 技术栈
 ```
-Frontend:  Next.js 14 + TypeScript + TailwindCSS
+Frontend:  Next.js 14 + TypeScript + TailwindCSS + PWA
 Backend:   Express + TypeScript + Supabase
-AI Agent:  TEN Framework + Python
+AI Agent:  TEN Framework (Go Runtime) + Python Extensions
 存储:      SQLite + FAISS (向量检索)
-ASR/LLM:   DashScope API (阿里云灵积)
+ASR:       阿里云 Aliyun ASR Bigmodel (paraformer-realtime-v2)
+LLM:       DashScope QWEN3 Max
+TTS:       CosyVoice (cosyvoice-v1)
 ```
 
 ### 架构图
@@ -46,309 +48,289 @@ ASR/LLM:   DashScope API (阿里云灵积)
 ┌─────────────────────────────────────────────────┐
 │  Frontend (Next.js) - Port 3000                │
 │  - PWA离线支持                                  │
-│  - WebSocket实时通信                             │
-│  - Audio录制 (MediaRecorder)                    │
+│  - WebSocket实时音频流 (→ 8765)                 │
+│  - Audio录制 (MediaRecorder + AudioWorklet)    │
 └──────────────┬──────────────────────────────────┘
-               │ HTTP REST API
+               │ WebSocket (音频流)
+               │ HTTP REST API (会话管理)
+               ▼
+┌─────────────────────────────────────────────────┐
+│  TEN Agent (Go Runtime) - Port 8765 / 8080     │
+│                                                 │
+│  ┌─────────────────────────────────────────┐   │
+│  │ WebSocket Server Extension (Python)      │   │
+│  │ - 接收前端音频流 (16kHz 16bit PCM)       │   │
+│  │ - 返回 ASR/LLM/TTS 结果                  │   │
+│  └─────────────────┬───────────────────────┘   │
+│                    │ AudioFrame                 │
+│                    ▼                            │
+│  ┌─────────────────────────────────────────┐   │
+│  │ Aliyun ASR Bigmodel (Python Extension)  │   │
+│  │ - paraformer-realtime-v2                │   │
+│  │ - 流式语音识别                           │   │
+│  └─────────────────┬───────────────────────┘   │
+│                    │ text_data                  │
+│                    ▼                            │
+│  ┌─────────────────────────────────────────┐   │
+│  │ OpenAI LLM2 (QWEN3 Max via DashScope)   │   │
+│  │ - 语义理解 + 纠错 + 意图识别             │   │
+│  └─────────────────┬───────────────────────┘   │
+│                    │ text_data                  │
+│                    ▼                            │
+│  ┌─────────────────────────────────────────┐   │
+│  │ CosyVoice TTS (Python Extension)        │   │
+│  │ - cosyvoice-v1 / longxiaochun 音色      │   │
+│  │ - 流式语音合成                           │   │
+│  └─────────────────┬───────────────────────┘   │
+│                    │ AudioFrame                 │
+│                    ▼                            │
+│  ┌─────────────────────────────────────────┐   │
+│  │ WebSocket Server → 前端                  │   │
+│  └─────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────┘
                │
 ┌──────────────▼──────────────────────────────────┐
 │  Backend (Express) - Port 3001                 │
-│  ✅ Session API (/api/session/*)               │
-│  ✅ Memory API (/api/memory/*)                 │
-│  ✅ Agent API (/api/agent/*)                   │
-└──────────────┬──────────────────────────────────┘
-               │ HTTP (axios)
+│  - Session API (/api/session/*)                │
+│  - Memory API (/api/memory/*)                  │
+│  - Agent API (/api/agent/*)                    │
+└─────────────────────────────────────────────────┘
                │
 ┌──────────────▼──────────────────────────────────┐
-│  TEN Agent HTTP API Server - Port 8080         │
-│  ✅ POST /start - 创建会话                      │
-│  ✅ POST /stop - 停止会话 + 持久化              │
-│  ✅ POST /reload-hotwords - 动态热词            │
-│  ✅ GET /health - 健康检查                      │
-└──────────────┬──────────────────────────────────┘
-               │
-     ┌─────────┴──────────────┐
-     │                         │
-┌────▼────────┐    ┌──────────▼───────────────┐
-│  TEN Agent   │    │  SQLite Backend          │
-│              │    │  ✅ PowerMemSQLiteBackend│
-│  ⏳ FunASR  │◄──►│  ✅ FAISS向量索引 (384维)│
-│  ⏳ GLM LLM │    │  ✅ WAL模式 (并发读写)   │
-│  ⏳ CosyVoice│    │  ✅ <50ms检索            │
-└──────────────┘    └──────────────────────────┘
-       │ WebSocket :8765
-       │
-┌──────▼──────┐
-│  Frontend    │
-│  Audio Stream│
-└──────────────┘
+│  SQLite + FAISS + Supabase                     │
+│  - 本地: SQLite (会话/记忆) + FAISS (向量)     │
+│  - 云端: Supabase (同步/备份)                  │
+└─────────────────────────────────────────────────┘
 ```
 
 ### 数据流
 ```
-用户说话 → Frontend录音 → WebSocket推送
-         → TEN Agent ASR识别
-         → PowerMem检索历史上下文 (SQLite + FAISS)
-         → LLM理解 + 纠错
-         → TTS生成清晰语音
-         → WebSocket返回 → Frontend播放
+用户说话 → 前端 AudioProcessor (16kHz PCM)
+         → WebSocket Base64 JSON → TEN Agent (8765)
+         → WebSocket Server Extension
+         → AudioFrame → ASR Extension
+         → text_data → LLM Extension
+         → text_data → TTS Extension
+         → AudioFrame → WebSocket Server
+         → Base64 JSON → 前端播放
 ```
 
 ---
 
-## ✅ 当前进度
+## ✅ 当前进度 (2026-01-02)
 
 ### 已完成 ✅
 
 | Phase | 功能 | 描述 |
 |-------|------|------|
 | 1-4 | 后端核心 | Express API + TEN Agent + SQLite + FAISS |
-| 5 | ASR集成 | DashScope paraformer-realtime-v2 |
-| 6 | DashScope扩展 | dashscope_asr_python + dashscope_tts_python |
+| 5 | ASR集成 | DashScope paraformer-realtime-v2 → Aliyun ASR Bigmodel |
+| 6 | DashScope扩展 | aliyun_asr_bigmodel_python + cosy_tts_python |
 | 7 | Supabase同步 | 云端 sessions, memories, profiles 同步 |
-| 8 | 前端WebSocket | /chat 对话页面 + useAgent Hook |
+| 8 | 前端WebSocket | 主页对话界面 + useAgent Hook |
+| 9 | **端到端联调** | ✅ **已完成** - 音频链路全部打通 |
+| 10 | LLM升级 | QWEN3 Max (OpenAI兼容API) |
 
-### 下一步 ⏳
+### 🎉 Phase 9 关键成果 (2026-01-02)
 
-- [ ] **Phase 9**: 端到端集成测试
-- [ ] **Phase 10**: 部署优化与文档完善
+**问题定位与修复:**
+1. ✅ 前端音频格式适配 (Base64 JSON 而非二进制)
+2. ✅ TEN Agent 启动环境配置 (`scripts/start.sh`)
+3. ✅ WebSocket Server 增强日志 (PCM stats, callback tracing)
+4. ✅ 消除 `NO_VALID_AUDIO_ERROR`
 
-### 技术亮点
+**验证结果:**
+- WebSocket 连接: ✅ 成功 (8765)
+- 音频接收: ✅ `Audio received: 32000 bytes`
+- ASR 流转: ✅ `actual_send: 0 → 1000 → 4000`
+- 无错误: ✅ 不再出现 `NO_VALID_AUDIO_ERROR`
 
-- **DashScope全栈**: ASR (paraformer) + TTS (cosyvoice) + Embedding (text-embedding-v3)
-- **本地+云端混合**: SQLite+FAISS 本地存储 + Supabase 云端同步
-- **PWA支持**: 离线可用，支持安装到桌面
-- **无障碍设计**: 大字体、高对比度、键盘快捷键
+**核心修改文件:**
+- `ten_agent/ten_packages/extension/websocket_server/websocket_server.py` - 增强日志
+- `ten_agent/scripts/start.sh` - 官方启动脚本 (设置 TEN_PYTHON_LIB_PATH 等)
+- `frontend/src/lib/websocket/agent-client.ts` - 适配 TEN 协议
+- `frontend/src/app/page.tsx` - 主页集成 Agent 对话
 
 ---
 
-## 🛠️ 开发指南
+## 🚀 快速启动
 
-### 环境安装
-
-#### 系统要求
-- Ubuntu 22.04+
+### 环境要求
+- Ubuntu 22.04+ / Linux
 - Python 3.10+
 - Node.js 18+
 - 磁盘空间: ~2GB
 
-#### 1. 克隆项目
+### 1. 克隆项目
 ```bash
 git clone https://github.com/yourusername/VoxFlame-Agent.git
 cd VoxFlame-Agent
 ```
 
-#### 2. Backend安装
+### 2. 配置环境变量
 ```bash
-cd backend
-npm install
-cp .env.example .env  # 配置环境变量
-npm run dev  # 启动开发服务器 (Port 3001)
+# 项目根目录
+cp .env.example .env
+# 编辑 .env 设置 DASHSCOPE_API_KEY
+
+# Agent
+cp ten_agent/.env.example ten_agent/.env
+# 编辑设置 API Key
 ```
 
-#### 3. TEN Agent安装
+### 3. 安装 Python 虚拟环境
 ```bash
-cd ../
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install faiss-cpu==1.9.0 numpy aiohttp pydantic python-dotenv
-
-# 配置DashScope API Key
-echo "DASHSCOPE_API_KEY=your_api_key" > ten_agent/.env
-
-# 启动TEN Agent HTTP API Server
-cd ten_agent/ten_packages/extension/http_api_server_python
-python -c "
-import asyncio, sys
-sys.path.insert(0, '.')
-from extension import HttpApiServerExtension
-
-async def run():
-    server = HttpApiServerExtension('voxflame')
-    await server.start()
-    await asyncio.Event().wait()
-
-asyncio.run(run())
-"
+pip install -r ten_agent/requirements.txt
 ```
 
-#### 4. Frontend安装
+### 4. 启动 TEN Agent (核心)
+```bash
+cd ten_agent
+bash scripts/start.sh -property /root/VoxFlame-Agent/ten_agent/property.json
+# 或后台运行:
+# nohup bash scripts/start.sh -property property.json > /tmp/agent.log 2>&1 &
+```
+验证: `ss -lntp | grep 8765` 应显示监听
+
+### 5. 启动后端 (可选)
+```bash
+cd backend
+npm install
+npm run dev  # Port 3001
+```
+
+### 6. 启动前端
 ```bash
 cd frontend
 npm install
-cp .env.local.example .env.local  # 配置环境变量
-npm run dev  # 启动开发服务器 (Port 3000)
+npm run dev  # Port 3000
 ```
 
-#### 5. 运行集成测试
+### 7. 访问测试
+打开浏览器访问 `http://localhost:3000`，点击"开始对话"，授权麦克风后即可语音交互。
+
+---
+
+## 🔧 开发配置
+
+### TEN Agent 启动脚本解析 (`scripts/start.sh`)
 ```bash
-cd /root/VoxFlame-Agent
-source venv/bin/activate
-python test_integration.py
+#!/bin/bash
+# 关键环境变量:
+export TEN_PYTHON_LIB_PATH=/usr/lib/x86_64-linux-gnu/libpython3.10.so.1.0
+export PYTHONPATH=$(pwd)/ten_packages/system/ten_ai_base/interface:$PYTHONPATH
+export LD_LIBRARY_PATH=$(pwd)/ten_packages/system/ten_runtime_go/lib:...
+
+exec bin/main "$@"
 ```
 
-**预期输出**:
+### 前端 WebSocket 协议
+```typescript
+// 发送音频 (JSON + Base64)
+{
+  "audio": "<base64_pcm_data>",
+  "metadata": { "sample_rate": 16000 }
+}
+
+// 接收响应
+{ "type": "data", "name": "text_data", "data": {...} }  // ASR/LLM 文本
+{ "type": "audio", "audio": "<base64>", "metadata": {...} }  // TTS 音频
 ```
-✅ PASS - Health Checks
-✅ PASS - Session Lifecycle
-✅ PASS - Hotwords Reload
-🎉 All tests passed!
+
+### 日志查看
+```bash
+# Agent 日志
+tail -f /tmp/agent.log
+
+# 过滤 WebSocket 相关
+grep '\[websocket_server\]' /tmp/agent.log
+
+# 过滤 ASR 相关
+grep '\[stt\]' /tmp/agent.log
 ```
 
 ---
-
-## 👥 团队协作
-
-### 后端工程师任务
-
-**已完成** ✅:
-- [x] Express服务器搭建
-- [x] Session API实现 (4个端点)
-- [x] Memory API实现
-- [x] Agent API实现
-- [x] Supabase Service集成
-- [x] Supabase Sessions/Memories/Profiles CRUD
-- [x] 集成测试脚本
-
-**进行中** ⏳:
-- [ ] WebSocket连接管理优化
-- [ ] 错误处理优化
-- [ ] API文档生成 (Swagger)
-
-**技术栈**:
-- Express + TypeScript
-- Supabase Client
-- axios (HTTP Client)
-- WebSocket
-
-**关键文件**:
-- `backend/src/controllers/session.controller.ts`
-- `backend/src/services/supabase.service.ts`
-- `backend/src/index.ts`
-
----
-
-### 前端工程师任务
-
-**已完成** ✅:
-- [x] Next.js 14项目搭建
-- [x] TailwindCSS配置
-- [x] PWA配置 (Service Worker)
-- [x] 基础UI组件
-- [x] Audio录制组件 (MediaRecorder API)
-- [x] WebSocket Hook (`useAgent`)
-- [x] /chat 对话页面
-- [x] ChatInterface 对话组件
-
-**进行中** ⏳:
-- [ ] 会话历史页面
-- [ ] 用户设置页面 (热词管理)
-
-**技术栈**:
-- Next.js 14 (App Router)
-- TypeScript
-- TailwindCSS
-- React Hooks
-
-**关键文件**:
-- `frontend/src/hooks/useVoiceChat.ts` (待实现)
-- `frontend/src/components/AudioRecorder.tsx` (待实现)
-- `frontend/src/app/chat/page.tsx`
-
----
-
-### AI工程师任务
-
-**已完成** ✅:
-- [x] SQLite Backend存储层 (PowerMemSQLiteBackend)
-- [x] FAISS向量索引集成 (512维)
-- [x] TEN Agent HTTP API Server
-- [x] 会话管理逻辑
-- [x] DashScope ASR API集成 (paraformer-realtime-v2)
-- [x] DashScope TTS API集成 (cosyvoice-v3-flash)
-- [x] DashScope Embedding API集成 (text-embedding-v3, 512维)
-- [x] PowerMem上下文召回逻辑
-- [x] Supabase云端同步模块
-
-**进行中** ⏳:
-- [ ] FunASR本地模型接口 (预留)
-- [ ] GLM LLM集成
-- [ ] 端到端调试
-
-**技术栈**:
-- TEN Framework (Python)
-- DashScope SDK
-- FAISS (faiss-cpu)
-- SQLite3
-- aiohttp
-
-**关键文件**:
-- `ten_agent/storage/sqlite_backend.py`
-- `ten_agent/ten_packages/extension/http_api_server_python/extension.py`
-- `ten_agent/ten_packages/extension/main_python/extension.py` (待扩展)
-- `ten_agent/ten_packages/extension/funasr_asr_python/extension.py` (待实现)
 
 ## 📊 技术亮点
 
-### 1. 无Docker依赖方案
+### 1. TEN Framework Go Runtime
+- 高性能 Go 二进制 + Python 扩展
+- 异步事件驱动架构
+- 扩展热加载
 
-| 特性 | OceanBase (原计划) | SQLite (实际) |
-|------|-------------------|--------------|
-| 部署方式 | Docker容器 | 嵌入式 |
-| 磁盘占用 | ~10GB | ~100MB |
-| 内存占用 | ~1GB | ~10MB |
-| 并发能力 | 1000+ | 5-10 (MVP足够) |
-| 启动时间 | 30-60秒 | <1秒 |
+### 2. 流式语音处理
+- 实时 16kHz PCM 流
+- 端到端延迟 < 500ms
+- 支持打断/连续对话
 
-**为什么不用OceanBase？**
-AutoDL容器环境不支持Docker嵌套，SQLite方案功能等价且更轻量。
+### 3. 本地+云端混合存储
+| 特性 | 本地 (SQLite+FAISS) | 云端 (Supabase) |
+|------|---------------------|-----------------|
+| 响应速度 | <10ms | ~100ms |
+| 离线可用 | ✅ | ❌ |
+| 数据同步 | 手动/定时 | 自动 |
+| 容量 | 设备限制 | 无限 |
 
-### 2. FAISS向量检索性能
+---
 
-```python
-# 基准测试 (10K向量)
-index_size = 10,000
-query_time = 0.8ms  # L2距离计算
-top_k = 5
-total_latency = <1ms  # 包含SQLite元数据查询
+## 📁 项目结构
+
 ```
-
-### 3. WAL模式并发优化
-
-```sql
-PRAGMA journal_mode=WAL;      -- Write-Ahead Logging
-PRAGMA synchronous=NORMAL;    -- 平衡安全与性能
--- 结果: 并发读 + 串行写，无锁阻塞
+VoxFlame-Agent/
+├── frontend/                 # Next.js 前端
+│   ├── src/
+│   │   ├── app/page.tsx     # 主页 (Agent 对话)
+│   │   ├── hooks/useAgent.ts # WebSocket Hook
+│   │   └── lib/
+│   │       ├── websocket/agent-client.ts  # WS 客户端
+│   │       └── audio/audio-processor.ts   # PCM 处理
+│   └── package.json
+│
+├── backend/                  # Express 后端
+│   ├── src/
+│   │   ├── controllers/     # API 控制器
+│   │   └── services/        # Supabase 等服务
+│   └── package.json
+│
+├── ten_agent/               # TEN Framework Agent
+│   ├── bin/main             # Go Runtime 二进制
+│   ├── scripts/start.sh     # 启动脚本 ⭐
+│   ├── manifest.json        # 扩展声明
+│   ├── property.json        # 图配置 (ASR→LLM→TTS)
+│   └── ten_packages/
+│       └── extension/
+│           ├── websocket_server/      # WS 服务端
+│           ├── aliyun_asr_bigmodel_python/  # ASR
+│           ├── openai_llm2_python/    # LLM
+│           └── cosy_tts_python/       # TTS
+│
+├── venv/                    # Python 虚拟环境
+├── .env                     # 环境变量
+└── README.md
 ```
 
 ---
 
-## ��️ 路线图
+## 🗺️ 路线图
 
-### V0.1 - MVP (当前, Week 1-6)
-- [x] 后端核心架构 (Phase 1-4)
-- [x] ASR/TTS/Embedding API集成 (Phase 5-6)
-- [x] Supabase云端同步 (Phase 7)
-- [x] 前端WebSocket对话 (Phase 8)
-- [ ] 端到端集成测试 (Phase 9)
-- [ ] 5用户内测
+### V0.1 - MVP ✅ (2026-01-02 完成)
+- [x] 后端核心架构
+- [x] ASR/TTS/LLM 集成
+- [x] 前端 WebSocket 对话
+- [x] **端到端联调** ✅
 
-### V0.2 - 动态热词 (Week 7-12)
-- [ ] 用户自定义热词管理
-- [ ] 热词动态生效 (无需重启)
-- [ ] 热词学习推荐
+### V0.2 - 优化 (进行中)
+- [ ] 热词动态管理
+- [ ] 会话历史回放
+- [ ] 用户设置页面
 
-### V1.0 - 本地部署 (Q3 2025)
-- [ ] FunASR本地模型
-- [ ] GLM本地推理
-- [ ] 离线PWA功能
+### V1.0 - 正式版 (2026 Q2)
+- [ ] 离线 PWA 完整支持
+- [ ] FunASR 本地模型
 - [ ] 100用户公测
-
-### V2.0 - 多模态交互 (Q4 2025)
-- [ ] 视觉辅助 (唇语识别)
-- [ ] 手势识别
-- [ ] 表情建议
 
 ---
 
@@ -357,27 +339,13 @@ PRAGMA synchronous=NORMAL;    -- 平衡安全与性能
 - [产品需求文档 (PRD)](docs/PRD.md)
 - [API规范文档](docs/API_SPECIFICATION.md)
 - [用户调研报告](docs/USER_RESEARCH_DYSARTHRIC_ELDERLY_CN.md)
-- [TEN Framework架构](backend/src/ARCHITECTURE.md)
+- [系统架构文档](ARCHITECTURE.md)
 
 ---
 
 ## 🤝 贡献
 
 欢迎提交Issue和Pull Request！
-
-### 开发流程
-1. Fork本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 打开Pull Request
-
----
-
-## 📞 联系我们
-
-- 项目维护: [GitHub Issues](https://github.com/yourusername/VoxFlame-Agent/issues)
-- 商务合作: contact@voxflame.ai
 
 ---
 

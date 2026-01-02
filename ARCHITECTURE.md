@@ -15,7 +15,7 @@
 └── ten_packages/extension/      # ★ TEN Framework扩展层
     ├── http_api_server_python/  # HTTP API Server (Session管理)
     ├── funasr_asr_python/       # FunASR本地ASR扩展 (未使用)
-    ├── glm_llm_python/          # GLM-4 LLM扩展 (未使用)
+    ├── dashscope_llm_python/          # DashScope QWEN3 LLM扩展
     ├── cosyvoice_tts_python/    # CosyVoice本地TTS扩展 (未使用)
     └── main_python/             # 主Extension (下一步要实现)
 ```

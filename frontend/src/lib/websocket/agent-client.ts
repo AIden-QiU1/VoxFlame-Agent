@@ -122,9 +122,17 @@ export class AgentClient {
           reject(error)
         }
 
-        this.ws.onclose = () => {
-          console.log('[AgentClient] Connection closed')
+        this.ws.onclose = (event) => {
+          console.log('[AgentClient] Connection closed', event.code, event.reason)
           this.callbacks.onClose?.()
+          
+          // Auto-reconnect if not a clean close
+          if (!event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
+            console.log('[AgentClient] Attempting auto-reconnect...')
+            this.reconnect(callbacks).catch(err => {
+              console.error('[AgentClient] Auto-reconnect failed:', err)
+            })
+          }
         }
       } catch (error) {
         console.error('[AgentClient] Connection failed:', error)
@@ -136,6 +144,10 @@ export class AgentClient {
   /**
    * 处理接收到的消息
    */
+  /**
+   * 处理接收到的消息
+   * 支持 TEN Framework websocket_server 的消息格式
+   */
   private handleMessage(event: MessageEvent) {
     // Binary message (audio response)
     if (event.data instanceof ArrayBuffer) {
@@ -145,10 +157,41 @@ export class AgentClient {
 
     // Text message (JSON)
     try {
-      const message: AgentMessage = JSON.parse(event.data)
-      console.log('[AgentClient] Received:', message.type)
+      const message = JSON.parse(event.data)
+      console.log('[AgentClient] Received:', message.type, message)
 
+      // TEN Framework 消息格式处理
       switch (message.type) {
+        // TEN Framework: data 消息（包含 ASR 结果、LLM 响应等）
+        case 'data':
+          this.handleTenDataMessage(message)
+          break
+
+        // TEN Framework: audio 消息（TTS 音频）
+        case 'audio':
+          if (message.audio) {
+            // Decode base64 audio
+            const binaryString = atob(message.audio)
+            const bytes = new Uint8Array(binaryString.length)
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i)
+            }
+            this.handleAudioResponse(bytes.buffer)
+          }
+          break
+
+        // TEN Framework: cmd 消息
+        case 'cmd':
+          console.log('[AgentClient] TEN command:', message.name, message.data)
+          break
+
+        // TEN Framework: error 消息
+        case 'error':
+          console.error('[AgentClient] TEN error:', message.error)
+          this.callbacks.onError?.({ type: 'error', error: { message: message.error, code: 'TEN_ERROR' } } as ErrorMessage)
+          break
+
+        // 原有消息格式（向后兼容）
         case 'session_started':
           this.sessionId = message.session_id
           this.callbacks.onSessionStarted?.(message as SessionStartedMessage)
@@ -174,15 +217,46 @@ export class AgentClient {
           this.callbacks.onMemoryStored?.(message as MemoryStoredMessage)
           break
 
-        case 'error':
-          this.callbacks.onError?.(message as ErrorMessage)
-          break
-
         default:
-          console.log('[AgentClient] Unknown message type:', message.type)
+          console.log('[AgentClient] Unknown message type:', message.type, message)
       }
     } catch (error) {
       console.error('[AgentClient] Failed to parse message:', error)
+    }
+  }
+
+  /**
+   * 处理 TEN Framework data 消息
+   */
+  private handleTenDataMessage(message: any) {
+    const { name, data } = message
+
+    switch (name) {
+      case 'text_data':
+        // ASR 结果或 LLM 响应
+        if (data.text) {
+          // 判断是 ASR 还是 LLM 响应
+          if (data.is_final !== undefined) {
+            // ASR 结果
+            this.callbacks.onASRResult?.({
+              type: 'asr_result',
+              text: data.text,
+              is_final: data.is_final
+            } as ASRResultMessage)
+          } else {
+            // LLM 响应
+            this.callbacks.onResponseText?.({
+              type: 'response_text',
+              delta: data.text,
+              is_final: true,
+              full_text: data.text
+            } as ResponseTextMessage)
+          }
+        }
+        break
+
+      default:
+        console.log('[AgentClient] Unknown TEN data name:', name, data)
     }
   }
 
@@ -248,29 +322,53 @@ export class AgentClient {
   /**
    * 开始会话
    */
+  /**
+   * 开始会话
+   * TEN Framework 通过 property.json 配置，连接即启动
+   * 保留此方法以兼容原有接口
+   */
   startSession(options: {
     agentType?: string
     enableTTS?: boolean
     ttsVoice?: string
     userId?: string
   } = {}) {
-    this.send({
-      type: 'start_session',
-      agent_type: options.agentType || 'voice_assistant',
-      options: {
-        enable_tts: options.enableTTS ?? true,
-        tts_voice: options.ttsVoice || 'longanyang',  // DashScope voice
-        user_id: options.userId
-      }
-    })
+    // TEN Framework 不需要显式启动会话
+    // 连接成功后自动开始处理
+    console.log('[AgentClient] Session auto-started with TEN Framework')
+    
+    // 模拟会话启动回调
+    this.sessionId = `ten_${Date.now()}`
+    this.callbacks.onSessionStarted?.({
+      type: 'session_started',
+      session_id: this.sessionId
+    } as SessionStartedMessage)
   }
 
   /**
    * 发送音频数据 (PCM 16kHz)
    */
+  /**
+   * 发送音频数据 (PCM 16kHz)
+   * TEN Framework websocket_server 期望 base64 编码的 JSON 格式
+   */
   sendAudio(audioData: ArrayBuffer | Uint8Array) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(audioData)
+      // Convert ArrayBuffer/Uint8Array to base64
+      const bytes = audioData instanceof ArrayBuffer 
+        ? new Uint8Array(audioData) 
+        : audioData
+      const base64 = btoa(String.fromCharCode(...bytes))
+      
+      // Send as JSON with audio field
+      this.ws.send(JSON.stringify({
+        audio: base64,
+        metadata: {
+          sample_rate: 16000,
+          channels: 1,
+          format: 'pcm_s16le'
+        }
+      }))
     }
   }
 
@@ -325,6 +423,47 @@ export class AgentClient {
       this.ws = null
     }
     this.sessionId = null
+  }
+
+  /**
+   * Disconnect from the WebSocket server
+   * Alias for close() method
+   */
+  disconnect() {
+    console.log('[AgentClient] Disconnecting...')
+    this.close()
+  }
+
+  /**
+   * Reconnect to the WebSocket server with exponential backoff
+   */
+  async reconnect(callbacks: AgentClientCallbacks): Promise<void> {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('[AgentClient] Max reconnect attempts reached')
+      throw new Error('Max reconnect attempts reached')
+    }
+
+    this.reconnectAttempts++
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
+    
+    console.log(`[AgentClient] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+    
+    await new Promise(resolve => setTimeout(resolve, delay))
+    
+    try {
+      await this.connect(callbacks)
+      console.log('[AgentClient] Reconnected successfully')
+    } catch (error) {
+      console.error('[AgentClient] Reconnect failed:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Get current connection state
+   */
+  getConnectionState(): number | null {
+    return this.ws?.readyState || null
   }
 
   /**
