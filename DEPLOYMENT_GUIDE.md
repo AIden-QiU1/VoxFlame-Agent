@@ -1,6 +1,6 @@
 # VoxFlame Agent 部署指南
 
-## 🎯 系统要求
+##  系统要求
 
 - Python 3.10.x
 - Node.js 14+  
@@ -8,27 +8,27 @@
 - 4GB+ RAM
 - Linux/macOS (推荐)
 
-## 📦 已完成的配置升级
+##  已完成的配置升级
 
 ### 1. TEN Framework 标准化 (2026-01-02)
 
 所有配置文件已升级到 TEN Framework 0.11.48 标准：
 
 **主配置** (2个):
-- `ten_agent/manifest.json` ✅
-- `ten_agent/property.json` ✅
+- `ten_agent/manifest.json` 
+- `ten_agent/property.json` 
 
 **扩展配置** (10个):
-- backend_webhook_python ✅
-- cosyvoice_tts_python ✅
-- dashscope_asr_python ✅
-- dashscope_llm_python ✅
-- dashscope_tts_python ✅
-- funasr_asr_python ✅
-- http_api_server_python ✅
-- main_python ✅
-- text_webhook ✅
-- websocket_server_python ✅
+- backend_webhook_python 
+- cosyvoice_tts_python 
+- dashscope_asr_python 
+- dashscope_llm_python 
+- dashscope_tts_python 
+- funasr_asr_python 
+- http_api_server_python 
+- main_python 
+- text_webhook 
+- websocket_server_python 
 
 ### 2. LLM 迁移 GLM-4 → QWEN3-Max
 
@@ -39,11 +39,11 @@
 
 ### 3. 前端改进 (100% 测试通过)
 
-- **chat 页面**: 响应式 + 无障碍设计 (5/5 ✅)
-- **ChatInterface**: TTS 音频播放功能 (8/8 ✅)
-- **agent-client**: 连接管理 + 重连机制 (8/8 ✅)
+- **chat 页面**: 响应式 + 无障碍设计 (5/5 )
+- **ChatInterface**: TTS 音频播放功能 (8/8 )
+- **agent-client**: 连接管理 + 重连机制 (8/8 )
 
-## 🚀 快速开始
+##  快速开始
 
 ### 步骤 1: 安装 TEN Manager
 
@@ -66,7 +66,7 @@ tman install
 
 预期输出:
 ```
-🏆 Install successfully in 2 seconds
+ Install successfully in 2 seconds
 ```
 
 ### 步骤 3: 配置环境变量
@@ -107,7 +107,7 @@ python3 start_agent.py
 - HTTP API: 8080
 - WebSocket: 8765
 
-## 📋 验证清单
+##  验证清单
 
 ### TEN Agent 依赖
 
@@ -134,7 +134,7 @@ curl http://localhost:8080/health
 # {"status": "ok", "active_sessions": 0}
 ```
 
-## 🔧 故障排除
+##  故障排除
 
 ### 问题 1: tman 未找到
 
@@ -172,22 +172,22 @@ ss -tuln | grep -E "3000|8080|8765"
 kill $(lsof -t -i:8080)
 ```
 
-## 📊 测试结果
+## 测试结果
 
 ### 配置验证
 
-- ✅ manifest.json: 所有 12 个文件通过 schema 验证
-- ✅ 依赖安装: ten_runtime 0.11.48 + ten_runtime_python 0.11.48
-- ✅ 扩展识别: 10 个本地扩展全部识别
+-  manifest.json: 所有 12 个文件通过 schema 验证
+-  依赖安装: ten_runtime 0.11.48 + ten_runtime_python 0.11.48
+-  扩展识别: 10 个本地扩展全部识别
 
 ### 前端测试
 
-- ✅ 代码测试: 21/21 通过 (100%)
-- ✅ 页面渲染: 所有页面正常加载
-- ✅ 响应式设计: 移动端/桌面端适配
-- ✅ 无障碍: ARIA 标签完整
+-  代码测试: 21/21 通过 (100%)
+-  页面渲染: 所有页面正常加载
+-  响应式设计: 移动端/桌面端适配
+-  无障碍: ARIA 标签完整
 
-## 📝 下一步
+##  下一步
 
 ### 短期任务
 
@@ -207,7 +207,7 @@ kill $(lsof -t -i:8080)
 8. 性能优化和监控
 9. 生产环境配置
 
-## 🔗 相关文档
+##  相关文档
 
 - [TEN Framework 官方文档](https://theten.ai/docs)
 - [DashScope API 文档](https://help.aliyun.com/zh/dashscope/)

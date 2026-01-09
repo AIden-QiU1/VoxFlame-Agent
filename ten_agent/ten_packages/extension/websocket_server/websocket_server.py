@@ -1,12 +1,13 @@
 """
 WebSocket Server Manager for receiving audio data
+支持多客户端连接（每个客户端有独立的 ASR→LLM→TTS 会话）
 """
 
 import asyncio
 import json
 import base64
 import traceback
-from typing import Callable, Optional, Any
+from typing import Callable, Optional, Any, Dict
 from dataclasses import dataclass
 import websockets
 from ten_runtime.async_ten_env import AsyncTenEnv
@@ -22,7 +23,7 @@ class AudioData:
 
 
 class WebSocketServerManager:
-    """Manages WebSocket server and client connections"""
+    """Manages WebSocket server and multiple client connections"""
 
     def __init__(
         self,
@@ -31,63 +32,34 @@ class WebSocketServerManager:
         ten_env: AsyncTenEnv,
         on_audio_callback: Optional[Callable[[AudioData], None]] = None,
     ):
-        """
-        Initialize WebSocket server manager
-
-        Args:
-            host: Server host address
-            port: Server port
-            ten_env: TEN environment for logging
-            on_audio_callback: Callback when audio data is received
-        """
         self.host = host
         self.port = port
         self.ten_env = ten_env
         self.on_audio_callback = on_audio_callback
 
         self.server = None
-        self.current_client: Optional[Any] = None
+        # 改为支持多客户端
+        self.clients: Dict[str, Any] = {}  # client_id -> websocket
         self.running = False
         self._server_task: Optional[asyncio.Task] = None
-        # Protects access to current_client during accept/cleanup
         self._client_lock = asyncio.Lock()
 
     async def _monitor_server(self) -> None:
         """Periodically log server health while running."""
         while self.running:
             try:
-                await asyncio.sleep(2)
+                await asyncio.sleep(10)
                 if not self.running:
                     break
-
-                if self.server is None:
-                    self.ten_env.log_error(
-                        "WebSocket server monitor: server is None while running"
-                    )
-                    continue
-
-                sockets = getattr(self.server, "sockets", None)
-                if not sockets:
-                    self.ten_env.log_error(
-                        "WebSocket server monitor: server has no sockets (may have stopped listening)"
-                    )
-                else:
-                    try:
-                        addr = sockets[0].getsockname()
-                    except Exception:
-                        addr = "<unknown>"
-                    self.ten_env.log_debug(
-                        f"WebSocket server monitor: listening on {addr}"
-                    )
-            except Exception as e:
-                self.ten_env.log_error(
-                    f"WebSocket server monitor error: {e}\n{traceback.format_exc()}"
+                self.ten_env.log_info(
+                    f"WebSocket server: {len(self.clients)} clients connected"
                 )
+            except Exception as e:
+                self.ten_env.log_error(f"Monitor error: {e}")
 
     async def start(self) -> None:
         """Start the WebSocket server"""
         if self.running:
-            self.ten_env.log_warn("WebSocket server already running")
             return
 
         self.running = True
@@ -96,15 +68,11 @@ class WebSocketServerManager:
                 self._handle_client, self.host, self.port
             )
             self.ten_env.log_info(
-                f"WebSocket server started on ws://{self.host}:{self.port}"
+                f"WebSocket server started on ws://{self.host}:{self.port} (multi-client enabled)"
             )
-
-            # Start a lightweight monitor task to catch unexpected stops.
             self._server_task = asyncio.create_task(self._monitor_server())
         except Exception as e:
-            self.ten_env.log_error(
-                f"Failed to start WebSocket server: {e}\n{traceback.format_exc()}"
-            )
+            self.ten_env.log_error(f"Failed to start: {e}")
             self.running = False
             raise
 
@@ -114,18 +82,19 @@ class WebSocketServerManager:
             return
 
         self.running = False
-        self.ten_env.log_info("Stopping WebSocket server...")
-
         if self._server_task:
             self._server_task.cancel()
             self._server_task = None
 
-        # Close client connection
-        if self.current_client:
-            await self._close_client(self.current_client)
-            self.current_client = None
+        # Close all client connections
+        async with self._client_lock:
+            for client_id, ws in list(self.clients.items()):
+                try:
+                    await ws.close()
+                except:
+                    pass
+            self.clients.clear()
 
-        # Close server
         if self.server:
             self.server.close()
             await self.server.wait_closed()
@@ -133,41 +102,19 @@ class WebSocketServerManager:
         self.ten_env.log_info("WebSocket server stopped")
 
     async def _handle_client(self, websocket: Any) -> None:
-        """
-        Handle a single WebSocket client connection
-
-        Args:
-            websocket: WebSocket connection
-        """
-        client_id = (
-            f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
-        )
-
-        # Reject connection if one already exists (protect with lock)
-        reject = False
+        """Handle a WebSocket client connection"""
+        client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
+        
+        # 添加到客户端列表
         async with self._client_lock:
-            if self.current_client is not None:
-                reject = True
-            else:
-                self.current_client = websocket
-
-        if reject:
-            self.ten_env.log_warn(
-                f"Rejecting new connection from {client_id} - only one connection allowed"
-            )
-            await self._send_error(
-                websocket,
-                "Connection rejected: server only accepts one connection at a time",
-            )
-            await websocket.close(1008, "Only one connection allowed")
-            return
-        self.ten_env.log_info(f"Client connected: {client_id}")
+            self.clients[client_id] = websocket
+        
+        self.ten_env.log_info(f"Client connected: {client_id} (total: {len(self.clients)})")
 
         try:
             async for message in websocket:
                 if not self.running:
                     break
-
                 await self._process_message(message, websocket, client_id)
 
         except websockets.exceptions.ConnectionClosed:
@@ -177,191 +124,93 @@ class WebSocketServerManager:
             await self._send_error(websocket, f"Server error: {str(e)}")
         finally:
             async with self._client_lock:
-                if self.current_client == websocket:
-                    self.current_client = None
-            self.ten_env.log_info(f"Client removed: {client_id}")
+                self.clients.pop(client_id, None)
+            self.ten_env.log_info(f"Client removed: {client_id} (remaining: {len(self.clients)})")
 
     async def _process_message(
         self, message: str, websocket: Any, client_id: str
     ) -> None:
-        """
-        Process incoming message from client
-
-        Args:
-            message: Raw message string
-            websocket: Client WebSocket connection
-            client_id: Client identifier
-        """
+        """Process incoming message from client"""
         try:
-            # Parse JSON message
-            self.ten_env.log_info(
-                f"Processing message from {client_id}: len={len(message)} preview={message[:100]}..."
-            )
+            self.ten_env.log_debug(f"Message from {client_id}: len={len(message)}")
             data = json.loads(message)
 
-            # Validate message format
             if "audio" not in data:
-                await self._send_error(
-                    websocket,
-                    'Missing required field: "audio" with base64 data',
-                )
+                await self._send_error(websocket, 'Missing "audio" field')
                 return
 
-            # Decode base64 audio
             try:
-                audio_base64 = data["audio"]
-                pcm_data = base64.b64decode(audio_base64)
+                pcm_data = base64.b64decode(data["audio"])
             except Exception as e:
-                await self._send_error(
-                    websocket, f"Invalid base64 audio data: {e}"
-                )
+                await self._send_error(websocket, f"Invalid base64: {e}")
                 return
 
-            # Extract metadata
             metadata = data.get("metadata", {})
             metadata["client_id"] = client_id
 
-            # Create audio data container
             audio_data = AudioData(
                 pcm_data=pcm_data, client_id=client_id, metadata=metadata
             )
 
-            # Call callback to process audio
             if self.on_audio_callback:
                 try:
                     await self.on_audio_callback(audio_data)
                 except Exception as e:
-                    self.ten_env.log_error(f"Error in audio callback: {e}")
-                    await self._send_error(
-                        websocket, f"Processing error: {str(e)}"
-                    )
+                    self.ten_env.log_error(f"Audio callback error: {e}")
+                    await self._send_error(websocket, f"Processing error: {str(e)}")
 
         except json.JSONDecodeError as e:
             await self._send_error(websocket, f"Invalid JSON: {e}")
         except Exception as e:
-            self.ten_env.log_error(
-                f"Error processing message from {client_id}: {e}"
-            )
-            await self._send_error(websocket, f"Processing error: {str(e)}")
+            self.ten_env.log_error(f"Error processing: {e}")
 
     async def _send_error(self, websocket: Any, error: str) -> None:
-        """
-        Send error message to client
-
-        Args:
-            websocket: Client WebSocket connection
-            error: Error message
-        """
+        """Send error message to client"""
         try:
-            error_msg = json.dumps({"type": "error", "error": error})
-            await websocket.send(error_msg)
-        except Exception as e:
-            self.ten_env.log_error(f"Failed to send error to client: {e}")
+            await websocket.send(json.dumps({"type": "error", "error": error}))
+        except:
+            pass
 
     async def broadcast(self, message: dict[str, Any]) -> None:
-        """
-        Broadcast message to connected client
-
-        Args:
-            message: Message dictionary to send
-        """
-        if not self.current_client:
-            return
-
+        """Broadcast message to all connected clients"""
         message_str = json.dumps(message)
-        await self._send_to_client(self.current_client, message_str)
+        async with self._client_lock:
+            for client_id, ws in list(self.clients.items()):
+                try:
+                    await ws.send(message_str)
+                except:
+                    pass
 
     async def send_audio_to_clients(
         self, pcm_data: bytes, metadata: Optional[dict[str, Any]] = None
     ) -> None:
-        """
-        Send audio data to connected WebSocket client
-
-        Args:
-            pcm_data: Raw PCM audio bytes
-            metadata: Optional metadata to include with the audio
-        """
-        if not self.current_client:
-            self.ten_env.log_debug("No client connected, skipping audio send")
+        """Send audio to all connected clients"""
+        if not self.clients:
             return
 
         try:
-            # Encode PCM to base64
             audio_base64 = base64.b64encode(pcm_data).decode("utf-8")
-
-            # Build message
             message = {"type": "audio", "audio": audio_base64}
-
             if metadata:
                 message["metadata"] = metadata
-
-            # Send to client
             await self.broadcast(message)
-
-            self.ten_env.log_debug(
-                f"Sent {len(pcm_data)} bytes of audio to client"
-            )
-
         except Exception as e:
-            self.ten_env.log_error(f"Error sending audio to client: {e}")
+            self.ten_env.log_error(f"Error sending audio: {e}")
 
     async def send_to_client(
         self, client_id: str, message: dict[str, Any]
     ) -> bool:
-        """
-        Send message to a specific client
-
-        Args:
-            client_id: Client identifier
-            message: Message dictionary to send
-
-        Returns:
-            True if sent successfully, False otherwise
-        """
-        if not self.current_client:
-            self.ten_env.log_warn("No client connected")
-            return False
-
-        current_client_id = f"{self.current_client.remote_address[0]}:{self.current_client.remote_address[1]}"
-        if current_client_id != client_id:
-            self.ten_env.log_warn(
-                f"Client {client_id} not found (current: {current_client_id})"
-            )
-            return False
-
-        message_str = json.dumps(message)
-        return await self._send_to_client(self.current_client, message_str)
-
-    async def _send_to_client(self, websocket: Any, message: str) -> bool:
-        """
-        Send message to a WebSocket client
-
-        Args:
-            websocket: Client WebSocket connection
-            message: Message string
-
-        Returns:
-            True if sent successfully, False otherwise
-        """
-        try:
-            await websocket.send(message)
-            return True
-        except Exception as e:
-            self.ten_env.log_error(f"Failed to send message to client: {e}")
-            return False
-
-    async def _close_client(self, websocket: Any) -> None:
-        """
-        Close a client connection gracefully
-
-        Args:
-            websocket: Client WebSocket connection
-        """
-        try:
-            await websocket.close()
-        except Exception as e:
-            self.ten_env.log_error(f"Error closing client connection: {e}")
+        """Send message to a specific client"""
+        async with self._client_lock:
+            ws = self.clients.get(client_id)
+            if not ws:
+                return False
+            try:
+                await ws.send(json.dumps(message))
+                return True
+            except:
+                return False
 
     def get_client_count(self) -> int:
-        """Get number of connected clients (0 or 1)"""
-        return 1 if self.current_client else 0
+        """Get number of connected clients"""
+        return len(self.clients)

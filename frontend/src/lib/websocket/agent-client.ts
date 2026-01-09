@@ -358,7 +358,7 @@ export class AgentClient {
       const bytes = audioData instanceof ArrayBuffer 
         ? new Uint8Array(audioData) 
         : audioData
-      const base64 = btoa(String.fromCharCode(...bytes))
+      const base64 = btoa(Array.from(bytes).map(b => String.fromCharCode(b)).join(''))
       
       // Send as JSON with audio field
       this.ws.send(JSON.stringify({
