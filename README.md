@@ -150,66 +150,28 @@ exec bin/main "$@"
 ssh -L 3000:localhost:3000 -L 3001:localhost:3001 -L 8766:localhost:8766 user@server
 ```
 
----
-
-## 常见问题
-
-### TEN Agent 启动失败: Failed to load libpython3.10.so
-
-```bash
-# 查找 Python 库位置
-find /usr -name "libpython*.so*"
-
-# 设置环境变量
-export TEN_PYTHON_LIB_PATH=/usr/lib/x86_64-linux-gnu/libpython3.10.so.1.0
-```
-
-### venv 不存在
-
-```bash
-python3 -m venv /root/VoxFlame-Agent/venv
-source /root/VoxFlame-Agent/venv/bin/activate
-```
-
-### 前端无法连接 Agent
-
-1. 确认 TEN Agent 正在运行: `ss -tlnp | grep 8766`
-2. 确认端口转发已配置 (VSCode 用户)
-
----
-
-## License
-
-**CC BY-NC 4.0** - 禁止商业用途
-
----
-
-**让每个声音都被听见**
-
----
-
 ## 产品路线图
 
-### v1.0 - 基础语音助手 (已完成) ✅
+### v1.0 - 基础语音助手 (已完成) 
 
 | 功能 | 描述 | 状态 |
 |------|------|------|
-| TEN Framework集成 | Go Runtime + Python Extensions | ✅ 完成 |
-| 阿里云ASR | Paraformer-realtime-v2 实时识别 | ✅ 完成 |
-| 通义千问LLM | Qwen3-max 对话生成 | ✅ 完成 |
-| CosyVoice TTS | 语音合成 (longxiaochun) | ✅ 完成 |
-| WebSocket通信 | 实时双向通信（直连模式） | ✅ 完成 |
-| PWA基础支持 | Service Worker + manifest.json | ✅ 完成 |
-| Docker配置 | docker-compose.yml + Dockerfile | ✅ 完成 |
+| TEN Framework集成 | Go Runtime + Python Extensions | 完成 |
+| 阿里云ASR | Paraformer-realtime-v2 实时识别 | 完成 |
+| 通义千问LLM | Qwen3-max 对话生成 | 完成 |
+| CosyVoice TTS | 语音合成 (longxiaochun) | 完成 |
+| WebSocket通信 | 实时双向通信（直连模式） | 完成 |
+| PWA基础支持 | Service Worker + manifest.json | 完成 |
+| Docker配置 | docker-compose.yml + Dockerfile | 完成 |
 
 **当前运行状态：**
-- Frontend: Port 3000 ✅
-- Backend: Port 3001 ✅
-- TEN Agent: Port 8766 ✅
+- Frontend: Port 3000 
+- Backend: Port 3001 
+- TEN Agent: Port 8766 
 
 ---
 
-### v1.1 - WebSocket 代理修复 (进行中) 🔧
+### v1.1 - WebSocket 代理修复 (进行中) 
 
 **问题：** VSCode Remote SSH 环境下，端口转发不支持 WebSocket 协议升级，导致前端无法直连 TEN Agent (8766)
 
@@ -217,10 +179,10 @@ source /root/VoxFlame-Agent/venv/bin/activate
 
 | 任务 | 描述 | 状态 | 优先级 |
 |------|------|------|--------|
-| 后端代理实现 | http-proxy-middleware 代理 /ws 路径 | ❌ 待实施 | P0 |
-| 前端配置更新 | agentWsUrl 改为 ws://host:3001/ws | ❌ 待实施 | P0 |
-| 连接测试 | 验证音频流正常传输 | ❌ 待测试 | P0 |
-| 文档更新 | 更新连接说明文档 | ❌ 待完成 | P1 |
+| 后端代理实现 | http-proxy-middleware 代理 /ws 路径 | 待实施 | P0 |
+| 前端配置更新 | agentWsUrl 改为 ws://host:3001/ws | 待实施 | P0 |
+| 连接测试 | 验证音频流正常传输 | 待测试 | P0 |
+| 文档更新 | 更新连接说明文档 | 待完成 | P1 |
 
 **实施计划：**
 ```typescript
@@ -243,24 +205,24 @@ const agentWsUrl = `${protocol}//${window.location.host}/ws`;
 
 ---
 
-### v1.2 - PWA 功能增强 (短期规划) 🚀
+### v1.2 - PWA 功能增强 (短期规划) 
 
 **目标：** 实现完整的 PWA 离线支持与性能优化
 
 | 任务 | 描述 | 状态 | 优先级 | 工作量 |
 |------|------|------|--------|--------|
-| 音频数据缓存 | IndexedDB 存储音频块 | ❌ 待实施 | P1 | 2h |
-| 离线回退页面 | pages/_offline.tsx 友好提示 | ❌ 待实施 | P1 | 1h |
-| 更新提示组件 | Service Worker 更新检测与刷新 | ❌ 待实施 | P2 | 1h |
-| 自定义缓存策略 | API Network-First, 图片 Cache-First | ❌ 待实施 | P2 | 2h |
-| 安装提示横幅 | 引导用户安装 PWA | ❌ 待实施 | P3 | 1h |
-| Lighthouse 审计 | PWA 分数 > 90 | ❌ 待测试 | P3 | 1h |
+| 音频数据缓存 | IndexedDB 存储音频块 | 待实施 | P1 | 2h |
+| 离线回退页面 | pages/_offline.tsx 友好提示 | 待实施 | P1 | 1h |
+| 更新提示组件 | Service Worker 更新检测与刷新 | 待实施 | P2 | 1h |
+| 自定义缓存策略 | API Network-First, 图片 Cache-First | 待实施 | P2 | 2h |
+| 安装提示横幅 | 引导用户安装 PWA | 待实施 | P3 | 1h |
+| Lighthouse 审计 | PWA 分数 > 90 | 待测试 | P3 | 1h |
 
 **当前状态：**
-- ✅ @ducanh2912/next-pwa 已安装
-- ✅ Service Worker 自动生成 (sw.js, workbox.js)
-- ✅ manifest.json 已配置
-- ⚠️ 缺少高级功能（音频缓存、离线页面、更新提示）
+- @ducanh2912/next-pwa 已安装
+- Service Worker 自动生成 (sw.js, workbox.js)
+- manifest.json 已配置
+- 缺少高级功能（音频缓存、离线页面、更新提示）
 
 **详细实施指南：** [docs/PWA_IMPLEMENTATION_GUIDE.md](docs/PWA_IMPLEMENTATION_GUIDE.md)
 
@@ -268,7 +230,7 @@ const agentWsUrl = `${protocol}//${window.location.host}/ws`;
 
 ---
 
-### v2.0 - LLM 语音纠错 (开发中) 📝
+### v2.0 - LLM 语音纠错 (开发中) 
 
 **目标：** 为构音障碍患者提供实时语音纠错功能
 
@@ -276,11 +238,11 @@ const agentWsUrl = `${protocol}//${window.location.host}/ws`;
 
 | Phase | 内容 | 状态 | 预计时间 |
 |-------|------|------|----------|
-| Phase 0 | 技术调研（ASR/TTS/VAD/扩展生态） | ✅ 完成 | - |
-| Phase 1 | 基础 LLM 纠错扩展 (dysarthric_correction) | ❌ 待开始 | 2 周 |
-| Phase 2 | VAD/Turn Detection 优化（构音障碍参数调整） | ❌ 计划中 | 1 周 |
-| Phase 3 | 个性化纠错（用户词库、上下文记忆） | ❌ 计划中 | 2 周 |
-| Phase 4 | N-best 重排序 (Fun-ASR-Nano) | ❌ 可选 | 1 周 |
+| Phase 0 | 技术调研（ASR/TTS/VAD/扩展生态） | 完成 | - |
+| Phase 1 | 基础 LLM 纠错扩展 (dysarthric_correction) | 待开始 | 2 周 |
+| Phase 2 | VAD/Turn Detection 优化（构音障碍参数调整） | 计划中 | 1 周 |
+| Phase 3 | 个性化纠错（用户词库、上下文记忆） | 计划中 | 2 周 |
+| Phase 4 | N-best 重排序 (Fun-ASR-Nano) | 可选 | 1 周 |
 
 **关键技术洞察：**
 - VAD 阈值: 0.3-0.4 (降低误触发)
@@ -293,19 +255,19 @@ const agentWsUrl = `${protocol}//${window.location.host}/ws`;
 
 ---
 
-### v2.5 - 部署与运维 (短期规划) 🌐
+### v2.5 - 部署与运维 (短期规划) 
 
 **目标：** 从开发环境过渡到生产环境，支持 HTTPS + 负载均衡
 
 | 任务 | 描述 | 状态 | 优先级 | 工作量 |
 |------|------|------|--------|--------|
-| Nginx 配置文件 | 反向代理 + WebSocket 升级 + SSL | ❌ 待创建 | P1 | 2h |
-| SSL/HTTPS 支持 | Let's Encrypt 自动续期 | ❌ 待配置 | P1 | 1h |
-| Docker Nginx 集成 | docker-compose 添加 Nginx 服务 | ❌ 待实施 | P1 | 2h |
-| 环境配置管理 | dev/test/prod 配置分离 | ❌ 待实施 | P2 | 2h |
-| 日志收集 | 集中日志管理（文件 + 数据库） | ❌ 待实施 | P2 | 2h |
-| 部署脚本 | 一键部署脚本（启动/停止/重启） | ✅ 已完成 | - | - |
-| 健康检查 | 服务监控与自动重启 | ❌ 待实施 | P3 | 2h |
+| Nginx 配置文件 | 反向代理 + WebSocket 升级 + SSL | 待创建 | P1 | 2h |
+| SSL/HTTPS 支持 | Let's Encrypt 自动续期 | 待配置 | P1 | 1h |
+| Docker Nginx 集成 | docker-compose 添加 Nginx 服务 | 待实施 | P1 | 2h |
+| 环境配置管理 | dev/test/prod 配置分离 | 待实施 | P2 | 2h |
+| 日志收集 | 集中日志管理（文件 + 数据库） | 待实施 | P2 | 2h |
+| 部署脚本 | 一键部署脚本（启动/停止/重启） | 已完成 | - | - |
+| 健康检查 | 服务监控与自动重启 | 待实施 | P3 | 2h |
 
 **Nginx 架构：**
 ```
@@ -323,7 +285,7 @@ Nginx 反向代理
 
 ---
 
-### v3.0 - RTC 实时通信 (中期规划) 📡
+### v3.0 - RTC 实时通信 (中期规划) 
 
 **目标：** 接入 Agora RTC 实现低延迟实时音视频通信
 
@@ -331,11 +293,11 @@ Nginx 反向代理
 
 | 功能 | 描述 | 状态 | 预计时间 |
 |------|------|------|----------|
-| Agora RTC SDK | 实时音视频传输 (UDP + RTP) | ❌ 规划中 | 1 周 |
-| 多用户房间 | 支持多人同时对话 | ❌ 规划中 | 1 周 |
-| 音视频质量优化 | 弱网适配、回声消除、自适应码率 | ❌ 规划中 | 2 周 |
-| 屏幕共享 | 支持屏幕内容分享 | ❌ 规划中 | 1 周 |
-| 云录制 | 对话录音存档 | ❌ 规划中 | 1 周 |
+| Agora RTC SDK | 实时音视频传输 (UDP + RTP) | 规划中 | 1 周 |
+| 多用户房间 | 支持多人同时对话 | 规划中 | 1 周 |
+| 音视频质量优化 | 弱网适配、回声消除、自适应码率 | 规划中 | 2 周 |
+| 屏幕共享 | 支持屏幕内容分享 | 规划中 | 1 周 |
+| 云录制 | 对话录音存档 | 规划中 | 1 周 |
 
 **成本估算：**
 - 免费额度: 0-100 用户/月
@@ -348,25 +310,25 @@ Nginx 反向代理
 | 协议 | TCP | UDP + RTP |
 | 延迟 | 100-300ms | 50-150ms |
 | 并发支持 | < 1000 | 10,000+ |
-| 弱网适配 | ❌ 容易断连 | ✅ FEC + NACK |
+| 弱网适配 | 容易断连 | FEC + NACK |
 | 开发时间 | 已完成 | 4-6 小时 |
 
 **预计完成时间：** v3.0 - 2 个月
 
 ---
 
-### v4.0 - 高并发与扩展 (长期规划) ⚡
+### v4.0 - 高并发与扩展 (长期规划) 
 
 **目标：** 支持大规模用户同时在线，实现企业级可扩展性
 
 | 功能 | 描述 | 状态 | 预计时间 |
 |------|------|------|----------|
-| 负载均衡 | Nginx/K8s 负载分发 | ❌ 规划中 | 2 周 |
-| Agent 集群 | 多 TEN Agent 实例 + 会话保持 | ❌ 规划中 | 2 周 |
-| 消息队列 | Redis/RabbitMQ 异步处理 | ❌ 规划中 | 1 周 |
-| 数据库优化 | Supabase 连接池、读写分离 | ❌ 规划中 | 1 周 |
-| 监控告警 | Prometheus + Grafana + Alertmanager | ❌ 规划中 | 2 周 |
-| 自动扩缩容 | K8s HPA 根据负载自动扩容 | ❌ 规划中 | 1 周 |
+| 负载均衡 | Nginx/K8s 负载分发 |  规划中 | 2 周 |
+| Agent 集群 | 多 TEN Agent 实例 + 会话保持 |  规划中 | 2 周 |
+| 消息队列 | Redis/RabbitMQ 异步处理 |  规划中 | 1 周 |
+| 数据库优化 | Supabase 连接池、读写分离 |  规划中 | 1 周 |
+| 监控告警 | Prometheus + Grafana + Alertmanager |  规划中 | 2 周 |
+| 自动扩缩容 | K8s HPA 根据负载自动扩容 |  规划中 | 1 周 |
 
 **架构演进：**
 ```
@@ -396,17 +358,17 @@ Phase 4: 容器编排 (v4.0+)
 
 ---
 
-### v5.0 - 移动端与生态 (远期规划) 📱
+### v5.0 - 移动端与生态 (远期规划) 
 
 **目标：** 构建完整的多端生态系统
 
 | 功能 | 描述 | 状态 | 预计时间 |
 |------|------|------|----------|
-| iOS/Android App | React Native 原生应用 | ❌ 远期 | 2 个月 |
-| 智能穿戴 | Apple Watch/WearOS 支持 | ❌ 远期 | 1 个月 |
-| 智能音箱 | 接入小度/天猫精灵/小爱同学 | ❌ 远期 | 1 个月 |
-| 医疗机构平台 | 康复机构管理后台 | ❌ 远期 | 2 个月 |
-| 多语言支持 | 方言/多语言/国际化 | ❌ 远期 | 1 个月 |
+| iOS/Android App | React Native 原生应用 | 远期 | 2 个月 |
+| 智能穿戴 | Apple Watch/WearOS 支持 | 远期 | 1 个月 |
+| 智能音箱 | 接入小度/天猫精灵/小爱同学 | 远期 | 1 个月 |
+| 医疗机构平台 | 康复机构管理后台 |  远期 | 2 个月 |
+| 多语言支持 | 方言/多语言/国际化 |  远期 | 1 个月 |
 
 **预计完成时间：** v5.0 - 6 个月+
 
@@ -477,3 +439,44 @@ Phase 4: 容器编排 (v4.0+)
 ### 相关项目
 - [CLEAR-VOX-MODEL](https://github.com/AIden-QiU1/CLEAR-VOX-MODEL) - 构音障碍语音研究
 - [TEN-Agent](https://github.com/TEN-framework/TEN-Agent) - 实时语音 Agent 框架
+
+
+
+
+---
+
+## 常见问题
+
+### TEN Agent 启动失败: Failed to load libpython3.10.so
+
+```bash
+# 查找 Python 库位置
+find /usr -name "libpython*.so*"
+
+# 设置环境变量
+export TEN_PYTHON_LIB_PATH=/usr/lib/x86_64-linux-gnu/libpython3.10.so.1.0
+```
+
+### venv 不存在
+
+```bash
+python3 -m venv /root/VoxFlame-Agent/venv
+source /root/VoxFlame-Agent/venv/bin/activate
+```
+
+### 前端无法连接 Agent
+
+1. 确认 TEN Agent 正在运行: `ss -tlnp | grep 8766`
+2. 确认端口转发已配置 (VSCode 用户)
+
+---
+
+## License
+
+**CC BY-NC 4.0** - 禁止商业用途
+
+---
+
+**让每个声音都被听见**
+
+---
