@@ -12,7 +12,7 @@
               "addon": "websocket_server",
               "extension_group": "default",
               "property": {
-                "port": 8765,
+                "port": 8766,
                 "host": "0.0.0.0",
                 "sample_rate": 16000,
                 "channels": 1,

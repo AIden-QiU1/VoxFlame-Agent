@@ -2,8 +2,11 @@
  * VoxFlame 应用配置
  * 
  * 单一 Agent 架构 - 只需要两个地址：
- * 1. TEN Agent WebSocket (8765) - 语音对话
+ * 1. TEN Agent WebSocket - 通过后端代理 (3001/ws/agent) 连接
  * 2. 后端 API (3001) - 用户配置、记忆管理
+ * 
+ * 注意：由于 VSCode Remote 不支持 WebSocket 端口转发，
+ * 我们通过后端 3001 端口代理 WebSocket 连接到 TEN Agent (8766)
  */
 
 // 获取当前主机名用于动态配置
@@ -35,17 +38,19 @@ export const config = {
   api: {
     /**
      * TEN Agent WebSocket 地址
-     * 用于语音识别、LLM 对话、语音合成
+     * 通过后端 3001 端口的 /ws/agent 路径代理
+     * 解决 VSCode Remote 不支持 WebSocket 端口转发的问题
      */
     get agentWsUrl(): string {
       const envUrl = process.env.NEXT_PUBLIC_AGENT_WS_URL
+      // 如果环境变量指定了非 localhost 地址，使用它
       if (envUrl && !envUrl.includes('localhost')) {
         return envUrl
       }
-      // 自动检测：使用当前页面的主机名
+      // 使用后端代理：ws://host:3001/ws/agent
       const host = getHost()
       const protocol = getWsProtocol()
-      return \`\${protocol}://\${host}:8765\`
+      return `${protocol}://${host}:3001/ws/agent`
     },
     
     /**
@@ -60,7 +65,7 @@ export const config = {
       // 自动检测
       const host = getHost()
       const protocol = getHttpProtocol()
-      return \`\${protocol}//\${host}:3001\`
+      return `${protocol}//${host}:3001`
     },
   },
   

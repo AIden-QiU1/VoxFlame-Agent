@@ -1,6 +1,6 @@
 # VoxFlame Agent
 
-**燃言 · Ignite Your Voice**
+**燃言 - Ignite Your Voice**
 
 *专为2000万构音障碍者打造的AI语音助手*
 
@@ -8,12 +8,7 @@
 
 ## 重要提示 (非商业许可)
 
-**本项目采用 CC BY-NC 4.0 许可证**
-
-- 禁止商业使用
-- 仅限个人研究和非商业目的
-- **违反许可将追究法律责任**
-- 如有商业需求，请联系作者
+**本项目采用 CC BY-NC 4.0 许可证** - 禁止商业使用
 
 详见 [LICENSE](LICENSE)
 
@@ -21,62 +16,20 @@
 
 ## 项目简介
 
-**VoxFlame 燃言** 是一个为构音障碍患者打造的开源AI语音助手。
-
-### 解决的问题
-
-构音障碍患者因"言语含糊"长期被语音识别技术遗忘，无法正常使用语音助手。
-
-- **识别难**: 普通ASR对构音障碍语音识别率 < 30%
-- **交互难**: 常规语音助手无法理解患者意图
-- **获取难**: 专业辅助设备价格昂贵，普通家庭难以承受
-
-### 我们的方案
-
-通过热词增强、上下文记忆、个性化AI助手三大技术，让每个声音都被听见。
-
-### 目标人群
-
-中国约2000万构音障碍患者及其家庭
+**VoxFlame 燃言** 是一个为构音障碍患者打造的开源AI语音助手。通过热词增强、上下文记忆、个性化AI助手三大技术，让每个声音都被听见。
 
 ---
 
-## 系统架构 (V2.0 单Agent架构)
-
-```
-+-----------------------------------------------------------+
-|                     用户设备(浏览器)                           |
-+----------------------------+------------------------------+
-                             |
-        +--------------------+--------------------+
-        |                    |                    |
-        v                    v                    v
-+---------------+    +---------------+    +---------------+
-| 前端 (3000)   |    | TEN Agent     |    | 后端 (3001)   |
-| Next.js       |    | (8765)        |    | Express       |
-|               |    |               |    |               |
-| - 语音采集 UI  |    | - ASR 识别    |    | - 用户配置    |
-| - 实时波形    |--->| - LLM 对话    |    | - 记忆系统    |
-| - 对话展示    |<---| - TTS 合成    |    | - 工具调用    |
-+---------------+    +---------------+    +---------------+
-                                               |
-                                          +----+----+
-                                          | 数据库  |
-                                          | Supabase|
-                                          +---------+
-```
-
-### 技术栈
+## 系统架构
 
 | 模块 | 技术 | 端口 |
 |------|------|------|
 | 前端 | Next.js 14 + TypeScript + TailwindCSS + PWA | 3000 |
 | 后端 | Express + TypeScript | 3001 |
-| Agent | TEN Framework (Go Runtime + Python Extensions) | 8765 |
+| Agent | TEN Framework (Go Runtime + Python Extensions) | 8766 |
 | ASR | 阿里云 Paraformer-realtime-v2 | - |
 | LLM | QWEN3 Max via DashScope | - |
 | TTS | CosyVoice v3 | - |
-| 存储 | SQLite + FAISS + Supabase | - |
 
 ---
 
@@ -85,153 +38,239 @@
 ### 环境要求
 
 - Node.js 18+
-- Python 3.10+
+- Python 3.10+ (需要创建 venv 环境)
 - Go 1.21+
 - 阿里云 DashScope API Key
 
-### 一键启动
+### 环境准备
 
 ```bash
-cd /root/VoxFlame-Agent
+# 1. 创建 Python 虚拟环境 (TEN Agent 需要)
+python3 -m venv venv
+source venv/bin/activate
+
+# 2. 安装前后端依赖
+cd frontend && npm install && cd ..
+cd backend && npm install && cd ..
+
+# 3. 配置环境变量
+# - ten_agent/.env      (DashScope API Key)
+# - backend/.env        (Supabase 配置)
+# - frontend/.env.local (前端配置)
+```
+
+---
+
+## 启动服务
+
+### 方式一: 一键启动 (推荐)
+
+```bash
+# 启动所有服务 (后台运行，日志输出到 logs 目录)
 ./start_services.sh
+
+# 重启所有服务
+./start_services.sh --restart
+
+# 停止所有服务
+./start_services.sh --stop
+
+# 查看服务状态
+./start_services.sh --status
 ```
 
-### 手动启动
+日志文件:
+- logs/ten_agent_*.log - TEN Agent
+- logs/backend_*.log - 后端
+- logs/frontend_*.log - 前端
+
+### 方式二: 手动逐个启动 (调试用)
+
+在三个独立的终端中分别执行:
+
+**终端 1 - TEN Agent:**
+```bash
+./scripts/start_agent.sh
+```
+
+**终端 2 - 后端服务:**
+```bash
+./scripts/start_backend.sh
+```
+
+**终端 3 - 前端服务:**
+```bash
+./scripts/start_frontend.sh
+```
+
+**停止所有服务:**
+```bash
+./scripts/stop_services.sh
+```
+
+---
+
+## TEN Agent 启动说明
+
+TEN Agent 需要特定的环境配置，`ten_agent/scripts/start.sh` 已配置好:
 
 ```bash
-# 1. 启动 TEN Agent
-cd ten_agent && ./bin/main -property property.json &
+# 激活 venv
+source /root/VoxFlame-Agent/venv/bin/activate
 
-# 2. 启动后端
-cd backend && npm run dev &
+# 设置 Python 库路径
+export TEN_PYTHON_LIB_PATH=/usr/lib/x86_64-linux-gnu/libpython3.10.so.1.0
 
-# 3. 启动前端
-cd frontend && npm run dev &
+# 设置环境变量
+export PYTHONPATH=$(pwd)/ten_packages/system/ten_ai_base/interface:$PYTHONPATH
+export LD_LIBRARY_PATH=$(pwd)/ten_packages/system/ten_runtime_go/lib:...
+
+# 启动
+exec bin/main "$@"
 ```
 
-### 访问地址
+---
 
-- 本地访问: http://localhost:3000
-- 局域网访问: http://YOUR_IP:3000 (需开放 3000/3001/8765 端口)
+## 访问地址
+
+### 本地访问
+- 前端: http://localhost:3000
+- 后端: http://localhost:3001
+- Agent WebSocket: ws://localhost:8766
+
+### VSCode Remote SSH 用户
+
+1. 打开 VSCode 端口面板: View -> Terminal -> Ports
+2. 添加端口转发: 3000, 3001, 8766
+3. 浏览器访问: http://localhost:3000
+
+### SSH 手动端口转发
+
+```bash
+ssh -L 3000:localhost:3000 -L 3001:localhost:3001 -L 8766:localhost:8766 user@server
+```
 
 ---
 
-## 开发路线图 (Roadmap)
+## 常见问题
 
-### Phase 1: MVP 核心功能 (已完成)
+### TEN Agent 启动失败: Failed to load libpython3.10.so
 
-- [x] 语音识别 (ASR)
-- [x] LLM 对话 (QWEN3)
-- [x] 语音合成 (CosyVoice)
-- [x] 基础对话 UI
-- [x] 单一 Agent 架构
-- [x] 多客户端 WebSocket 支持
+```bash
+# 查找 Python 库位置
+find /usr -name "libpython*.so*"
 
-### Phase 2: 增强功能 (进行中)
+# 设置环境变量
+export TEN_PYTHON_LIB_PATH=/usr/lib/x86_64-linux-gnu/libpython3.10.so.1.0
+```
 
-- [ ] 热词增强 (Hotwords) - 提高专业词汇识别率
-- [ ] 记忆系统 (Memory) - 个性化对话体验
-- [ ] 工具调用 (Tools) - 扩展Agent能力
-- [ ] text_webhook - 文字输入备选方案
+### venv 不存在
 
-### Phase 3: 核心技术 (规划中)
+```bash
+python3 -m venv /root/VoxFlame-Agent/venv
+source /root/VoxFlame-Agent/venv/bin/activate
+```
 
-- [ ] WavRAG - 基于原始音频的检索增强
-- [ ] 语音克隆 - 个性化合成音色
-- [ ] 多模态识别 - 图片/手势 fallback
-- [ ] 离线模式支持
+### 前端无法连接 Agent
 
-### Phase 4: 规模化 (远期)
-
-- [ ] Agora RTC 集成 - 更稳定的实时通信
-- [ ] Kubernetes 部署 - 云原生弹性扩展
-- [ ] 移动端 App
-
----
-
-## PWA 渐进式Web应用 开发进度
-
-VoxFlame 采用 PWA 技术，提供类原生应用体验。
-
-### 已实现功能
-
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| Web App Manifest | 已完成 | 完整的应用清单配置 |
-| Service Worker | 已完成 | 基于 Workbox 的缓存策略 |
-| 多尺寸图标 | 已完成 | 192x192, 512x512 及各种Apple图标 |
-| Maskable 图标 | 已完成 | 自适应图标支持 |
-| 应用快捷方式 | 已完成 | "开始录音"、"贡献声音" |
-| 离线缓存 | 已完成 | 静态资源、字体、图片缓存 |
-| 添加到主屏幕 | 已完成 | standalone 显示模式 |
-
-### 待开发功能
-
-| 功能 | 优先级 | 说明 |
-|------|--------|------|
-| 推送通知 (Push) | P1 | 用于提醒用户、健康检查通知 |
-| 后台同步 (Background Sync) | P1 | 断网时缓存对话，恢复后自动同步 |
-| 离线语音识别 | P2 | 本地ASR模型，无网络时可用 |
-| 文件处理器 (File Handler) | P2 | 处理音频文件分享 |
-| 分享目标 (Share Target) | P2 | 接收其他应用分享的内容 |
-| 截图美化 | P3 | 完善应用商店展示截图 |
-| Widget 支持 | P3 | Windows/macOS 桌面小组件 |
-| 协议处理器 (Protocol Handler) | P3 | 自定义 voxflame:// 协议 |
-
-### PWA 技术规范参考
-
-基于 [PWABuilder](https://github.com/pwa-builder/pwabuilder) 官方文档:
-
-1. **推送通知实现**
-   - 注册 Service Worker push 事件监听
-   - 使用 Web Push API 发送通知
-   - 支持自定义图标和操作按钮
-
-2. **后台同步实现**
-   - 使用 Background Sync API
-   - 离线时缓存用户输入
-   - 网络恢复后自动发送
-
-3. **分享目标配置**
-   - manifest.json 添加 share_target 配置
-   - 支持接收文本、URL、文件
-
----
-
-## 文档目录
-
-- [产品需求文档 (PRD)](docs/PRD.md)
-- [系统架构设计](docs/ARCHITECTURE.md)
-- [API 规范](docs/API_SPECIFICATION.md)
-- [Agent 开发指南](docs/agent.md)
-- [技术研究文档](docs/VoxFlame_Complete.md)
-- [用户调研报告](docs/USER_RESEARCH_DYSARTHRIC_ELDERLY_CN.md)
-
----
-
-## 贡献指南
-
-欢迎提交 Issue 和 Pull Request
+1. 确认 TEN Agent 正在运行: `ss -tlnp | grep 8766`
+2. 确认端口转发已配置 (VSCode 用户)
 
 ---
 
 ## License
 
-本项目采用 **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)** 许可证。
-
-**禁止任何商业用途**
-
-详见 [LICENSE](LICENSE)
-
----
-
-## 致谢
-
-- [TEN Framework](https://github.com/TEN-framework/TEN-framework) - 实时 Agent 框架
-- [阿里云 DashScope](https://dashscope.aliyun.com/) - ASR/LLM/TTS 服务
-- [Supabase](https://supabase.com/) - 数据库服务
-- [PWABuilder](https://pwabuilder.com/) - PWA 开发指南
+**CC BY-NC 4.0** - 禁止商业用途
 
 ---
 
 **让每个声音都被听见**
+
+---
+
+## 开发路线图
+
+### 技术研究报告 (已完成)
+
+为v2.0开发完成了全面的Voice Agent技术调研:
+
+| 报告 | 内容 |
+|------|------|
+| 2025 ASR/TTS模型研究 | Alibaba FunAudio-ASR, ByteDance Doubao-ASR-2.0, NVIDIA Canary/Parakeet - 详见 docs/LATEST_ASR_TTS_MODELS_REPORT.md |
+| TEN VAD 深度分析 | 语音活动检测、状态机、构音障碍场景适配 - 详见 docs/TEN_VAD_ANALYSIS.md |
+| TEN Turn Detection 分析 | 轮次检测、Qwen2.5-7B语义分析 - 详见 docs/TEN_TURN_DETECTION_ANALYSIS.md |
+| TEN 扩展生态分析 | message_collector, glue, webhook等核心扩展 - 详见 docs/TEN_EXTENSIONS_ANALYSIS.md |
+
+关键发现:
+- 2025 Voice Agent趋势: 端到端S2S模型 (Moshi 200ms延迟)、全双工对话
+- 开源模型推荐: Fun-ASR-Nano (0.8B, N-best支持, 可微调)
+- 构音障碍优化: VAD阈值降至0.3-0.4, 静默时间延长至1500-2000ms
+
+---
+
+### v2.0 - LLM 语音纠错功能 (开发中)
+
+目标: 为构音障碍患者提供实时语音纠错功能
+
+核心流程: 用户说话 -> ASR识别 -> LLM纠错 -> 清晰文字 + 正常语音
+
+基于最新研究: Bridging ASR and LLMs for Dysarthric Speech (Interspeech 2025) - WER 从 0.38 降至 0.21
+
+#### 开发阶段
+
+| Phase | 内容 | 状态 |
+|-------|------|------|
+| Phase 0 | 技术调研 | 完成 |
+| Phase 1 | 基础LLM纠错扩展 (dysarthric_correction) | 待开始 |
+| Phase 2 | VAD/Turn Detection优化 | 计划中 |
+| Phase 3 | 个性化纠错 (用户词库、记忆) | 计划中 |
+| Phase 4 | N-best重排序 (可选升级Fun-ASR-Nano) | 可选 |
+
+详细计划: docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md
+
+#### 核心架构
+
+数据流: 麦克风 -> TEN VAD -> 阿里云ASR -> dysarthric_correction扩展 -> Qwen3-max纠错 -> 实时字幕 + LLM对话 + TTS
+
+dysarthric_correction扩展职责:
+1. 接收ASR文本 (is_final=true)
+2. 结合用户词库和对话历史调用LLM纠错
+3. 输出纠正后的文本给LLM和TTS
+
+---
+
+### 已完成功能 (v1.0)
+
+- TEN Framework 语音助手基础架构
+- 阿里云 Paraformer 实时语音识别
+- 通义千问 LLM 对话
+- CosyVoice TTS 语音合成
+- WebSocket 实时通信
+- PWA 支持
+- 完整技术调研报告
+
+---
+
+## 技术文档
+
+研究报告:
+- docs/LATEST_ASR_TTS_MODELS_REPORT.md - 2025年最新ASR/TTS模型研究
+- docs/TEN_VAD_ANALYSIS.md - TEN VAD深度分析
+- docs/TEN_TURN_DETECTION_ANALYSIS.md - TEN Turn Detection分析
+- docs/TEN_EXTENSIONS_ANALYSIS.md - TEN核心扩展生态分析
+
+开发文档:
+- docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md - LLM纠错扩展开发计划
+- docs/API_SPECIFICATION.md - API规范
+
+---
+
+## 参考资料
+### 论文
+- [Bridging ASR and LLMs for Dysarthric Speech Recognition](https://arxiv.org/abs/2508.08027) - Interspeech 2025
+- [Zero-shot MLLM for Dysarthric ASR](https://arxiv.org/abs/2406.00639) - Interspeech 2024
+- [Generative Error Correction with LLMs](https://arxiv.org/abs/2409.09554) - 2024
+
+### 相关项目
+- [CLEAR-VOX-MODEL](https://github.com/AIden-QiU1/CLEAR-VOX-MODEL) - 构音障碍语音研究
+- [TEN-Agent](https://github.com/TEN-framework/TEN-Agent) - 实时语音 Agent 框架

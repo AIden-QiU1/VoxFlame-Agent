@@ -33,6 +33,7 @@ ten_agent/bin/
 # TEN system packages (downloaded via tman install)
 ten_agent/ten_packages/system/
 ten_agent/ten_packages/addon_loader/
+logs/
 
 # Compiled manifest lock (generated)
 ten_agent/manifest-lock.json

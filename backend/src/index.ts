@@ -6,14 +6,16 @@
  * 2. 工具执行（电话、智能家居）
  * 3. 记忆系统（FAISS + Supabase）
  * 4. 会话日志
+ * 5. WebSocket 代理 (解决 VSCode 端口转发限制)
  * 
- * 语音处理（ASR/LLM/TTS）完全由 TEN Agent (8765) 负责
+ * 语音处理（ASR/LLM/TTS）完全由 TEN Agent (8766) 负责
  */
 
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import { createServer } from 'http'
+import { WebSocket, WebSocketServer } from 'ws'
 import { agentRouter } from './controllers/agent.controller'
 import sessionRouter from './controllers/session.controller'
 import { memoryController } from './controllers/memory.controller'
@@ -24,6 +26,7 @@ dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 3001
+const TEN_AGENT_WS_URL = process.env.TEN_AGENT_WS_URL || 'ws://localhost:8766'
 
 // 中间件
 app.use(cors())
@@ -32,13 +35,93 @@ app.use(express.json())
 // 创建 HTTP 服务器
 const server = createServer(app)
 
+// ========================================
+// WebSocket 代理服务器
+// 解决 VSCode Remote 不支持 WebSocket 端口转发的问题
+// 前端连接 ws://localhost:3001 -> 代理到 -> ws://localhost:8766 (TEN Agent)
+// ========================================
+const wss = new WebSocketServer({ server, path: '/ws/agent' })
+
+wss.on('connection', (clientWs, req) => {
+  console.log('[WS Proxy] 新客户端连接，正在代理到 TEN Agent...')
+  
+  // 连接到 TEN Agent
+  const agentWs = new WebSocket(TEN_AGENT_WS_URL)
+  
+  let isAgentConnected = false
+  const pendingMessages: string[] = []
+  
+  agentWs.on('open', () => {
+    console.log('[WS Proxy] 已连接到 TEN Agent')
+    isAgentConnected = true
+    
+    // 发送排队的消息
+    pendingMessages.forEach(msg => {
+      agentWs.send(msg)
+    })
+    pendingMessages.length = 0
+  })
+  
+  agentWs.on('message', (data) => {
+    // 将 TEN Agent 的消息转发给客户端
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.send(data.toString())
+    }
+  })
+  
+  agentWs.on('close', (code, reason) => {
+    console.log(`[WS Proxy] TEN Agent 连接关闭: ${code} ${reason}`)
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.close(code, reason.toString())
+    }
+  })
+  
+  agentWs.on('error', (err) => {
+    console.error('[WS Proxy] TEN Agent 连接错误:', err.message)
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.close(1011, 'Agent connection error')
+    }
+  })
+  
+  clientWs.on('message', (data) => {
+    // 将客户端消息转发给 TEN Agent
+    if (isAgentConnected && agentWs.readyState === WebSocket.OPEN) {
+      agentWs.send(data.toString())
+    } else {
+      // 如果还没连接上，先排队
+      pendingMessages.push(data.toString())
+    }
+  })
+  
+  clientWs.on('close', (code, reason) => {
+    console.log(`[WS Proxy] 客户端断开连接: ${code}`)
+    if (agentWs.readyState === WebSocket.OPEN) {
+      agentWs.close()
+    }
+  })
+  
+  clientWs.on('error', (err) => {
+    console.error('[WS Proxy] 客户端连接错误:', err.message)
+    if (agentWs.readyState === WebSocket.OPEN) {
+      agentWs.close()
+    }
+  })
+})
+
+console.log('[WS Proxy] WebSocket 代理服务器已配置在 /ws/agent 路径')
+
 // 健康检查
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'VoxFlame Backend 运行正常',
-    version: '2.0.0',
-    architecture: 'Single Agent (TEN Framework)'
+    version: '2.1.0',
+    architecture: 'Single Agent (TEN Framework)',
+    wsProxy: {
+      enabled: true,
+      path: '/ws/agent',
+      target: TEN_AGENT_WS_URL
+    }
   })
 })
 
@@ -62,9 +145,7 @@ app.use('/api/memory', memoryRouter)
 // Webhook 端点 - 接收 TEN Agent 的 text_webhook 回调
 app.post('/api/webhook/conversation', (req, res) => {
   const { text, is_final, data_type, conversation_id, message_id } = req.body
-  
   console.log('[Webhook] ' + (data_type || 'message') + ': ' + (text?.substring(0, 50) || '') + '...')
-  
   res.json({ success: true, received: true })
 })
 
@@ -74,14 +155,20 @@ app.use(errorHandler)
 // 启动服务器
 server.listen(PORT, () => {
   console.log('')
-  console.log('🔥 VoxFlame Backend v2.0 已启动')
+  console.log('🔥 VoxFlame Backend v2.1 已启动')
   console.log('📡 HTTP 服务地址: http://localhost:' + PORT)
+  console.log('🔌 WebSocket 代理: ws://localhost:' + PORT + '/ws/agent')
   console.log('🏥 健康检查: http://localhost:' + PORT + '/health')
   
   console.log('')
   console.log('🏗️ 单一 Agent 架构:')
-  console.log('   - TEN Agent (8765): 语音识别 + LLM + 语音合成')
-  console.log('   - 本服务 (' + PORT + '): 用户配置 + 工具执行 + 记忆管理')
+  console.log('   - TEN Agent (8766): 语音识别 + LLM + 语音合成')
+  console.log('   - 本服务 (' + PORT + '): 用户配置 + 工具执行 + 记忆管理 + WS代理')
+  console.log('')
+  console.log('📝 WebSocket 代理说明:')
+  console.log('   前端连接 ws://localhost:' + PORT + '/ws/agent')
+  console.log('   -> 代理到 -> ' + TEN_AGENT_WS_URL)
+  console.log('   (解决 VSCode Remote 不支持 WebSocket 端口转发的问题)')
   
   console.log('')
   console.log('🤖 Agent API 端点:')

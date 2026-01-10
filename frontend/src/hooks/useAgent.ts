@@ -16,6 +16,7 @@ import {
   MemoryStoredMessage
 } from '@/lib/websocket/agent-client'
 import { AudioProcessor } from '@/lib/audio/audio-processor'
+import { config } from '@/lib/config'
 
 export interface ConversationMessage {
   id: string
@@ -76,12 +77,20 @@ export function useAgent(options: UseAgentOptions = {}) {
     try {
       setState(prev => ({ ...prev, error: null }))
 
+      // 添加调试日志
+      const wsUrl = config.api.agentWsUrl
+      console.log('[useAgent] ========== 连接调试信息 ==========')
+      console.log('[useAgent] WebSocket URL:', wsUrl)
+      console.log('[useAgent] window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'SSR')
+      console.log('[useAgent] window.location.protocol:', typeof window !== 'undefined' ? window.location.protocol : 'SSR')
+      console.log('[useAgent] =====================================')
+
       const client = new AgentClient()
       agentClientRef.current = client
 
       const callbacks: AgentClientCallbacks = {
         onOpen: () => {
-          console.log('[useAgent] Connected')
+          console.log('[useAgent] Connected successfully!')
           setState(prev => ({ ...prev, isConnected: true }))
           
           // Start session
@@ -109,6 +118,7 @@ export function useAgent(options: UseAgentOptions = {}) {
         },
 
         onASRResult: (data: ASRResultMessage) => {
+          console.log('[useAgent] ASR result:', data.text, 'is_final:', data.is_final)
           setState(prev => ({
             ...prev,
             currentASRText: data.text,
@@ -133,6 +143,7 @@ export function useAgent(options: UseAgentOptions = {}) {
         },
 
         onResponseText: (data: ResponseTextMessage) => {
+          console.log('[useAgent] Response text:', data.delta, 'is_final:', data.is_final)
           setState(prev => {
             const newState = {
               ...prev,
@@ -185,10 +196,12 @@ export function useAgent(options: UseAgentOptions = {}) {
         }
       }
 
+      console.log('[useAgent] Calling client.connect()...')
       await client.connect(callbacks)
+      console.log('[useAgent] client.connect() returned successfully')
     } catch (error) {
       console.error('[useAgent] Connection failed:', error)
-      setState(prev => ({ ...prev, error: '连接失败' }))
+      setState(prev => ({ ...prev, error: '连接失败: ' + (error instanceof Error ? error.message : String(error)) }))
     }
   }, [enableTTS, userId])
 
@@ -292,6 +305,7 @@ export function useAgent(options: UseAgentOptions = {}) {
   // Auto connect
   useEffect(() => {
     if (autoConnect) {
+      console.log('[useAgent] Auto-connecting...')
       connect()
     }
   }, [autoConnect, connect])
