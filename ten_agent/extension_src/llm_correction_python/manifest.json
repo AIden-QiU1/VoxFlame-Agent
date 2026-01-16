@@ -1,0 +1,80 @@
+{
+  "type": "extension",
+  "name": "llm_correction_python",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.11"
+    }
+  ],
+  "api": {
+    "data_in": [
+      {
+        "name": "asr_result",
+        "property": {
+          "text": {
+            "type": "string"
+          },
+          "final": {
+            "type": "bool"
+          },
+          "start_ms": {
+            "type": "int64"
+          },
+          "duration_ms": {
+            "type": "int64"
+          },
+          "language": {
+            "type": "string"
+          }
+        }
+      }
+    ],
+    "data_out": [
+      {
+        "name": "text_data",
+        "property": {
+          "text": {
+            "type": "string"
+          },
+          "end_of_segment": {
+            "type": "bool"
+          }
+        }
+      },
+      {
+        "name": "corrected_text",
+        "property": {
+          "original": {
+            "type": "string"
+          },
+          "corrected": {
+            "type": "string"
+          },
+          "is_corrected": {
+            "type": "bool"
+          }
+        }
+      },
+      {
+        "name": "interim_text",
+        "property": {
+          "text": {
+            "type": "string"
+          },
+          "is_interim": {
+            "type": "bool"
+          }
+        }
+      }
+    ],
+    "cmd_in": [
+      {
+        "name": "flush"
+      }
+    ],
+    "cmd_out": []
+  }
+}

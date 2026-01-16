@@ -11,6 +11,9 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   },
 });
 
-const nextConfig = {};
+const nextConfig = {
+  // Generate standalone output for Docker runtime
+  output: 'standalone',
+};
 
 module.exports = withPWA(nextConfig);

@@ -44,17 +44,19 @@ export default function RanyanPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 via-white to-orange-50">
+    <div className="min-h-screen bg-white">
       {/* 导航栏 */}
       <nav 
-        className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-amber-100"
+        className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100"
         role="navigation"
         aria-label="主导航"
       >
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2" aria-label="燃言首页">
-            <span className="text-2xl" aria-hidden="true"></span>
-            <span className="text-xl font-bold text-amber-600 hover:text-amber-700 transition-colors">燃言</span>
+            <span className="text-xl font-bold">
+              <span className="text-amber-500">燃</span>
+              <span className="text-orange-500">言</span>
+            </span>
           </Link>
           <div className="flex items-center gap-6">
             <Link 
@@ -193,7 +195,7 @@ export default function RanyanPage() {
       </section>
 
       {/* 参与方式 */}
-      <section id="how-to-help" className="py-20 px-6 bg-gradient-to-b from-amber-50 to-white" aria-labelledby="help-title">
+      <section id="how-to-help" className="py-20 px-6 bg-gray-50" aria-labelledby="help-title">
         <div className="max-w-4xl mx-auto">
           <h2 id="help-title" className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-4 text-gray-900">
             如何参与建设？
@@ -293,7 +295,7 @@ export default function RanyanPage() {
       </section>
 
       {/* 底部 CTA */}
-      <section className="py-20 px-6 bg-gradient-to-r from-amber-500 to-orange-500" aria-labelledby="cta-title">
+      <section className="py-20 px-6 bg-amber-500" aria-labelledby="cta-title">
         <div className="max-w-4xl mx-auto text-center text-white">
           <h2 id="cta-title" className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4">
             一起建设

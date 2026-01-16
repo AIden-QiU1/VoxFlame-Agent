@@ -73,6 +73,6 @@ export const config = {
   audio: {
     sampleRate: 16000,
     bufferSize: 4096,
-    ttsSampleRate: 22050,
+    ttsSampleRate: 16000,  // 与后端 TTS 一致
   }
 }

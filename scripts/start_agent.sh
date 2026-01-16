@@ -1,7 +1,7 @@
 #!/bin/bash
 # TEN Agent 手动启动 (前台模式)
 set -e
-PROJECT_ROOT="/root/VoxFlame-Agent"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOGS_DIR="${PROJECT_ROOT}/logs"
 mkdir -p "${LOGS_DIR}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")

@@ -1,0 +1,70 @@
+{
+  "type": "extension",
+  "name": "voxflame_main_python",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.11"
+    }
+  ],
+  "api": {
+    "cmd_in": [
+      {
+        "name": "on_user_connected",
+        "description": "Called when a user connects via WebSocket"
+      },
+      {
+        "name": "on_user_disconnected",
+        "description": "Called when a user disconnects"
+      },
+      {
+        "name": "flush",
+        "description": "Interrupt current TTS playback"
+      }
+    ],
+    "cmd_out": [
+      {
+        "name": "flush",
+        "description": "Send flush command to TTS"
+      }
+    ],
+    "data_in": [
+      {
+        "name": "asr_result",
+        "description": "ASR recognition result from STT extension"
+      },
+      {
+        "name": "corrected_text",
+        "description": "Corrected text from LLM corrector"
+      },
+      {
+        "name": "interim_text",
+        "description": "Interim ASR text for real-time display"
+      },
+      {
+        "name": "tts_audio_start",
+        "description": "TTS playback started"
+      },
+      {
+        "name": "tts_audio_end",
+        "description": "TTS playback ended"
+      }
+    ],
+    "data_out": [
+      {
+        "name": "text_data",
+        "description": "Text to send to TTS for synthesis"
+      },
+      {
+        "name": "asr_result",
+        "description": "Forward ASR result to corrector"
+      },
+      {
+        "name": "transcript",
+        "description": "Transcript data for WebSocket display"
+      }
+    ]
+  }
+}

@@ -12,6 +12,33 @@
 6. [VoxFlame 选型建议](#voxflame-选型建议)
 
 ---
+## Websocket开发指南
+https://theten.ai/cn/blog/building-real-time-voice-ai-with-websockets
+
+、 核心要点：用 WebSocket 搭建 Agent 的数据流转流程
+如果你要动手搭一个，你会发现数据流转就像一条流水线（Pipeline）：
+
+输入端 (Ingress)：
+
+WebSocket on_message 收到 Binary。
+
+关键点：你需要一个 Buffer（缓冲区）。因为网络发来的包可能很大，也可能很小，但你的 ASR 模型通常需要固定长度（比如 160ms）的音频块。
+
+处理链 (Pipeline)：
+
+PCM -> VAD（静音检测，判断用户是否说话结束）。
+
+VAD 触发 -> ASR（转文字）。
+
+文字 -> LLM（思考，流式输出文字）。
+
+文字流 -> TTS（合成音频流）。
+
+输出端 (Egress)：
+
+将 TTS 产出的 pcm_data 封装进 JSON 或直接作为二进制，通过 ws.send() 发回。
+
+关键点：打断机制（Interruption）。如果用户在 Agent 说话时突然插话，你需要通过 WebSocket 发一个“清理指令”，让客户端立刻停止播放旧音频。
 
 ## 核心观点
 

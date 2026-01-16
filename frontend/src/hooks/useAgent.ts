@@ -100,8 +100,10 @@ export function useAgent(options: UseAgentOptions = {}) {
           })
         },
 
-        onSessionStarted: (data) => {
+        onSessionStarted: async (data) => {
           console.log('[useAgent] Session started:', data.session_id)
+          // Initialize AudioContext for TTS playback (after user gesture)
+          await client.initAudio()
           setState(prev => ({
             ...prev,
             sessionId: data.session_id,
@@ -229,6 +231,9 @@ export function useAgent(options: UseAgentOptions = {}) {
 
     try {
       setState(prev => ({ ...prev, currentASRText: '', error: null }))
+
+      // Initialize AudioContext for TTS playback (must be after user gesture)
+      await agentClientRef.current.initAudio()
 
       if (audioProcessorRef.current) {
         const analyser = await audioProcessorRef.current.start(

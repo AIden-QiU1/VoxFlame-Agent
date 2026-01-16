@@ -85,8 +85,11 @@ export class AgentClient {
   private sessionId: string | null = null
   private reconnectAttempts: number = 0
   private maxReconnectAttempts: number = 3
-  private audioQueue: ArrayBuffer[] = []
+  private audioMetadataQueue: Array<{ data: ArrayBuffer; metadata?: { sample_rate?: number } }> = []
   private isProcessingAudio: boolean = false
+  private audioContext: AudioContext | null = null
+  private audioQueue: AudioBuffer[] = []
+  private isPlaying: boolean = false
 
   constructor(url?: string) {
     this.url = url || config.api.agentWsUrl || 'ws://localhost:8080/ws/agent'
@@ -169,6 +172,10 @@ export class AgentClient {
 
         // TEN Framework: audio 消息（TTS 音频）
         case 'audio':
+          console.log('[AgentClient] *** AUDIO MESSAGE RECEIVED ***')
+          console.log('[AgentClient] audio field exists:', !!message.audio)
+          console.log('[AgentClient] audio length:', message.audio?.length)
+          console.log('[AgentClient] metadata:', JSON.stringify(message.metadata))
           if (message.audio) {
             // Decode base64 audio
             const binaryString = atob(message.audio)
@@ -176,7 +183,10 @@ export class AgentClient {
             for (let i = 0; i < binaryString.length; i++) {
               bytes[i] = binaryString.charCodeAt(i)
             }
-            this.handleAudioResponse(bytes.buffer)
+            console.log('[AgentClient] Decoded bytes:', bytes.length)
+            this.handleAudioResponse(bytes.buffer, message.metadata)
+          } else {
+            console.error('[AgentClient] Audio message missing audio field!')
           }
           break
 
@@ -187,6 +197,11 @@ export class AgentClient {
 
         // TEN Framework: error 消息
         case 'error':
+          // 忽略 "Missing audio field" 错误，这是 TEN Agent 的正常行为
+          if (message.error?.includes?.('Missing') && message.error?.includes?.('audio')) {
+            console.log('[AgentClient] Ignoring audio field warning')
+            break
+          }
           console.error('[AgentClient] TEN error:', message.error)
           this.callbacks.onError?.({ type: 'error', error: { message: message.error, code: 'TEN_ERROR' } } as ErrorMessage)
           break
@@ -233,26 +248,19 @@ export class AgentClient {
 
     switch (name) {
       case 'text_data':
-        // ASR 结果或 LLM 响应
-        if (data.text) {
-          // 判断是 ASR 还是 LLM 响应
-          if (data.is_final !== undefined) {
-            // ASR 结果
-            this.callbacks.onASRResult?.({
-              type: 'asr_result',
-              text: data.text,
-              is_final: data.is_final
-            } as ASRResultMessage)
-          } else {
-            // LLM 响应
-            this.callbacks.onResponseText?.({
-              type: 'response_text',
-              delta: data.text,
-              is_final: true,
-              full_text: data.text
-            } as ResponseTextMessage)
-          }
-        }
+        this.handleTextData(data)
+        break
+
+      case 'interim_text':
+        this.handleInterimText(data)
+        break
+
+      case 'corrected_text':
+        this.handleCorrectedText(data)
+        break
+
+      case 'transcript':
+        this.handleTranscript(data)
         break
 
       default:
@@ -260,26 +268,140 @@ export class AgentClient {
     }
   }
 
+  private handleTextData(data: any) {
+    if (!data?.text) return
+
+    // ASR 结果或 LLM 响应
+    if (data.is_final !== undefined) {
+      this.callbacks.onASRResult?.({
+        type: 'asr_result',
+        text: data.text,
+        is_final: data.is_final
+      } as ASRResultMessage)
+      return
+    }
+
+    this.callbacks.onResponseText?.({
+      type: 'response_text',
+      delta: data.text,
+      is_final: true,
+      full_text: data.text
+    } as ResponseTextMessage)
+  }
+
+  private handleInterimText(data: any) {
+    if (!data?.text) return
+
+    this.callbacks.onASRResult?.({
+      type: 'asr_result',
+      text: data.text,
+      is_final: false
+    } as ASRResultMessage)
+  }
+
+  private handleCorrectedText(data: any) {
+    const correctedText = data?.corrected_text || data?.text
+    if (!correctedText) return
+
+    this.callbacks.onResponseText?.({
+      type: 'response_text',
+      delta: correctedText,
+      is_final: true,
+      full_text: correctedText
+    } as ResponseTextMessage)
+  }
+
+  private handleTranscript(data: any) {
+    if (!data?.text) return
+
+    if (data.role === 'user') {
+      this.callbacks.onASRResult?.({
+        type: 'asr_result',
+        text: data.text,
+        is_final: data.is_final !== false
+      } as ASRResultMessage)
+      return
+    }
+
+    this.callbacks.onResponseText?.({
+      type: 'response_text',
+      delta: data.text,
+      is_final: data.is_final !== false,
+      full_text: data.text
+    } as ResponseTextMessage)
+  }
+
+  /**
+   * Initialize AudioContext (must be called after user gesture)
+   */
+  async initAudio(): Promise<void> {
+    if (!this.audioContext) {
+      try {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+        console.log('[AgentClient] AudioContext initialized:', this.audioContext.sampleRate)
+      } catch (e) {
+        console.error('[AgentClient] Failed to initialize AudioContext:', e)
+      }
+    }
+
+    // Resume if suspended
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume()
+        console.log('[AgentClient] AudioContext resumed')
+      } catch (e) {
+        console.error('[AgentClient] Failed to resume AudioContext:', e)
+      }
+    }
+  }
+
   /**
    * 处理音频响应
    */
-  private handleAudioResponse(audioData: ArrayBuffer) {
+  private async handleAudioResponse(audioData: ArrayBuffer, metadata?: { sample_rate?: number }) {
+    console.log('[AgentClient] handleAudioResponse called')
+    console.log('[AgentClient] Audio bytes:', audioData.byteLength)
+    console.log('[AgentClient] Sample rate from metadata:', metadata?.sample_rate)
+    console.log('[AgentClient] AudioContext state:', this.audioContext?.state)
+
     // Queue audio for playback
-    this.audioQueue.push(audioData)
-    this.processAudioQueue()
+    this.audioMetadataQueue.push({ data: audioData, metadata })
+    await this.processAudioQueue()
   }
 
   /**
    * 处理音频播放队列
    */
   private async processAudioQueue() {
-    if (this.isProcessingAudio || this.audioQueue.length === 0) return
+    if (this.isProcessingAudio || this.audioMetadataQueue.length === 0) return
 
     this.isProcessingAudio = true
 
-    while (this.audioQueue.length > 0) {
-      const audioData = this.audioQueue.shift()!
-      await this.playAudio(audioData)
+    // Initialize AudioContext if needed (must be done after user gesture)
+    if (!this.audioContext) {
+      try {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+        console.log('[AgentClient] AudioContext created:', this.audioContext.sampleRate)
+      } catch (e) {
+        console.error('[AgentClient] Failed to create AudioContext:', e)
+        this.isProcessingAudio = false
+        return
+      }
+    }
+
+    // Resume AudioContext if suspended (browser autoplay policy)
+    if (this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume()
+        console.log('[AgentClient] AudioContext resumed')
+      } catch (e) {
+        console.error('[AgentClient] Failed to resume AudioContext:', e)
+      }
+    }
+
+    while (this.audioMetadataQueue.length > 0) {
+      const queued = this.audioMetadataQueue.shift()!
+      await this.playAudio(queued.data, queued.metadata)
     }
 
     this.isProcessingAudio = false
@@ -288,27 +410,39 @@ export class AgentClient {
   /**
    * 播放音频
    */
-  private async playAudio(audioData: ArrayBuffer): Promise<void> {
+  private async playAudio(
+    audioData: ArrayBuffer,
+    metadata?: { sample_rate?: number }
+  ): Promise<void> {
+    if (!this.audioContext) {
+      console.warn('[AgentClient] AudioContext not initialized')
+      return
+    }
+
+    const ctx = this.audioContext // 保存引用避免 null 检查问题
+
     return new Promise((resolve) => {
       try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-        
+        const sampleRate = metadata?.sample_rate || 16000
+
+        console.log('[AgentClient] Playing audio:', audioData.byteLength, 'bytes at', sampleRate, 'Hz')
+
         // Convert PCM to AudioBuffer
         const pcmData = new Int16Array(audioData)
         const floatData = new Float32Array(pcmData.length)
-        
+
         for (let i = 0; i < pcmData.length; i++) {
           floatData[i] = pcmData[i] / 32768.0
         }
-        
-        const audioBuffer = audioContext.createBuffer(1, floatData.length, 22050) // TTS sample rate
+
+        const audioBuffer = ctx.createBuffer(1, floatData.length, sampleRate)
         audioBuffer.getChannelData(0).set(floatData)
-        
-        const source = audioContext.createBufferSource()
+
+        const source = ctx.createBufferSource()
         source.buffer = audioBuffer
-        source.connect(audioContext.destination)
+        source.connect(ctx.destination)
         source.onended = () => {
-          audioContext.close()
+          console.log('[AgentClient] Audio chunk finished')
           resolve()
         }
         source.start()
@@ -421,6 +555,11 @@ export class AgentClient {
     if (this.ws) {
       this.ws.close()
       this.ws = null
+    }
+    // Clean up AudioContext
+    if (this.audioContext) {
+      this.audioContext.close().catch(e => console.error('[AgentClient] Error closing AudioContext:', e))
+      this.audioContext = null
     }
     this.sessionId = null
   }

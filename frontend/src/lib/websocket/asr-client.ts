@@ -5,7 +5,7 @@ export class ASRClient {
   private ws: WebSocket | null = null
   private url: string
 
-  constructor(url: string = config.api.wsUrl) {
+  constructor(url: string = config.api.agentWsUrl) {
     this.url = url
   }
 

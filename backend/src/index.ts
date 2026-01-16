@@ -54,42 +54,62 @@ wss.on('connection', (clientWs, req) => {
   agentWs.on('open', () => {
     console.log('[WS Proxy] 已连接到 TEN Agent')
     isAgentConnected = true
-    
+
     // 发送排队的消息
     pendingMessages.forEach(msg => {
       agentWs.send(msg)
     })
     pendingMessages.length = 0
   })
-  
-  agentWs.on('message', (data) => {
-    // 将 TEN Agent 的消息转发给客户端
+
+  // 转发 TEN Agent 消息到客户端
+  agentWs.on('message', (data, isBinary) => {
+    const messageStr = data.toString()
+
+    // 简洁日志
+    try {
+      const msg = JSON.parse(messageStr)
+      if (msg.type === 'audio') {
+        console.log(`[WS Proxy] <- Agent: audio (${msg.audio?.length || 0} chars)`)
+      } else if (msg.type === 'data') {
+        console.log(`[WS Proxy] <- Agent: data/${msg.name}`)
+      } else {
+        console.log(`[WS Proxy] <- Agent: ${msg.type}`)
+      }
+    } catch {
+      console.log(`[WS Proxy] <- Agent: raw (${messageStr.length} bytes)`)
+    }
+
+    // 转发到客户端
     if (clientWs.readyState === WebSocket.OPEN) {
-      clientWs.send(data.toString())
+      clientWs.send(messageStr)
     }
   })
-  
+
   agentWs.on('close', (code, reason) => {
-    console.log(`[WS Proxy] TEN Agent 连接关闭: ${code} ${reason}`)
+    console.log(`[WS Proxy] Agent 连接关闭: ${code}`)
     if (clientWs.readyState === WebSocket.OPEN) {
       clientWs.close(code, reason.toString())
     }
   })
-  
+
   agentWs.on('error', (err) => {
-    console.error('[WS Proxy] TEN Agent 连接错误:', err.message)
+    console.error('[WS Proxy] Agent 错误:', err.message)
     if (clientWs.readyState === WebSocket.OPEN) {
       clientWs.close(1011, 'Agent connection error')
     }
   })
   
   clientWs.on('message', (data) => {
-    // 将客户端消息转发给 TEN Agent
+    // 转发客户端消息到 TEN Agent
+    const msgStr = data.toString()
+    console.log(`[WS Proxy] -> Agent: ${msgStr.length} bytes`)
+
     if (isAgentConnected && agentWs.readyState === WebSocket.OPEN) {
-      agentWs.send(data.toString())
+      agentWs.send(msgStr)
     } else {
-      // 如果还没连接上，先排队
-      pendingMessages.push(data.toString())
+      pendingMessages.push(msgStr)
+      console.log('[WS Proxy] Queued (Agent not ready)')
     }
   })
   

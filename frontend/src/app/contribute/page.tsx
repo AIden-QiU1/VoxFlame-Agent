@@ -174,17 +174,19 @@ export default function ContributePage() {
     setMode(recordMode)
   }
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 via-white to-orange-50">
+    <div className="min-h-screen bg-white">
       {/* 顶部导航 */}
       <nav 
-        className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-amber-100"
+        className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100"
         role="navigation"
         aria-label="主导航"
       >
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/ranyan" className="flex items-center gap-2" aria-label="燃言项目首页">
-            <span className="text-2xl" aria-hidden="true"></span>
-            <span className="font-bold text-gray-900">燃言</span>
+          <Link href="/" className="flex items-center gap-2" aria-label="燃言项目首页">
+            <span className="text-xl font-bold">
+              <span className="text-amber-500">燃</span>
+              <span className="text-orange-500">言</span>
+            </span>
           </Link>
           
           <div className="flex items-center gap-4">

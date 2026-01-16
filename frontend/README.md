@@ -1,117 +1,145 @@
-# 前端开发指南 (Frontend)
+# VoxFlame Frontend
+
+**燃言前端 - 语音转换助手界面**
 
 ## 技术栈
 
 - **框架**: Next.js 14 (App Router)
-- **UI 库**: React 18 + Tailwind CSS
-- **状态管理**: Zustand
-- **PWA**: next-pwa
-- **音频处理**: Web Audio API
+- **UI**: React 18 + Tailwind CSS
+- **PWA**: @ducanh2912/next-pwa
+- **音频**: Web Audio API + AudioWorklet
+
+## 当前功能 (v1.2)
+
+- Google 风格简洁 UI
+- 点击式录音交互
+- 实时字幕显示 (LLM 纠正后)
+- TTS 音频播放
+- WebSocket 连接 (通过后端代理)
 
 ## 目录结构
 
 ```
 frontend/
 ├── src/
-│   ├── app/                    # Next.js App Router
-│   │   ├── page.tsx            # 首页/实时转录
-│   │   ├── history/            # 历史记录
-│   │   ├── assistant/          # 语音主持人
-│   │   ├── training/           # 个性化训练
-│   │   └── settings/           # 设置
-│   ├── components/
-│   │   ├── audio/              # 音频相关组件
-│   │   │   ├── AudioRecorder.tsx
-│   │   │   ├── VoiceVisualizer.tsx
-│   │   │   └── StreamingPlayer.tsx
-│   │   ├── transcript/         # 转录相关组件
-│   │   └── ui/                 # 通用 UI 组件
+│   ├── app/
+│   │   ├── page.tsx           # 主页 - 语音转换
+│   │   ├── ranyan/            # 关于燃言
+│   │   └── contribute/        # 贡献声音
+│   ├── hooks/
+│   │   └── useAgent.ts        # Agent 连接 Hook
 │   ├── lib/
-│   │   ├── api/                # API 客户端
-│   │   ├── audio/              # 音频处理工具
-│   │   └── websocket/          # WebSocket 客户端
-│   ├── hooks/                  # React Hooks
-│   └── stores/                 # Zustand 状态管理
+│   │   ├── websocket/
+│   │   │   └── agent-client.ts # WebSocket 客户端
+│   │   ├── audio/
+│   │   │   └── audio-processor.ts # 音频处理
+│   │   └── config.ts          # 配置
+│   └── components/
+│       └── pwa/               # PWA 组件
 ├── public/
-│   ├── manifest.json           # PWA 配置
-│   └── sw.js                   # Service Worker
-├── package.json
-└── next.config.js
+│   ├── manifest.json          # PWA 配置
+│   └── sw.js                  # Service Worker
+└── Dockerfile
 ```
 
 ## 快速开始
 
+### Docker (推荐)
+
+```bash
+# 从项目根目录
+sudo docker-compose up -d frontend
+```
+
+### 本地开发
+
 ```bash
 cd frontend
-
-# 安装依赖
 npm install
-
-# 开发模式
 npm run dev
-
-# 构建
-npm run build
-
-# 生产模式
-npm start
 ```
+
+访问 http://localhost:3000
+
+## 核心组件
+
+### useAgent Hook
+
+管理 WebSocket 连接和录音状态：
+
+```typescript
+const {
+  isConnected,      // 连接状态
+  isRecording,      // 录音状态
+  currentResponseText, // 当前响应文字
+  messages,         // 消息历史
+  toggleRecording,  // 切换录音
+} = useAgent({ enableTTS: true, autoConnect: true })
+```
+
+### AgentClient
+
+WebSocket 客户端，处理：
+- 音频发送 (PCM 16kHz Base64)
+- 消息接收 (ASR/LLM/TTS)
+- 音频播放 (AudioContext)
+
+```typescript
+// 连接到后端代理
+const client = new AgentClient()
+await client.connect(callbacks)
+
+// 发送音频
+client.sendAudio(pcmData)
+```
+
+## 音频格式
+
+| 参数 | 值 |
+|------|-----|
+| 格式 | PCM |
+| 采样率 | 16000 Hz |
+| 位深 | 16-bit |
+| 声道 | Mono |
 
 ## 环境变量
 
-创建 `.env.local` 文件：
-
 ```bash
-# API 地址
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
+# .env.local
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_AGENT_WS_URL=ws://localhost:3001/ws/agent
 ```
 
-## 与后端交互
+## 开发经验
 
-### HTTP API
+### 浏览器自动播放策略
 
-参考 `docs/API_SPECIFICATION.md` 获取完整 API 文档。
-
-主要 API 端点：
-- `POST /api/v1/asr/transcribe` - 语音转文字
-- `POST /api/v1/agent/chat` - 对话交互
-- `GET /api/v1/sessions` - 获取会话列表
-
-### WebSocket
-
-实时转录使用 WebSocket 连接：
+AudioContext 必须在用户交互后初始化：
 
 ```typescript
-const ws = new WebSocket('ws://localhost:8000/ws/asr');
-
-// 发送音频数据
-ws.send(audioBuffer);
-
-// 接收转录结果
-ws.onmessage = (event) => {
-  const result = JSON.parse(event.data);
-  console.log(result.text);
-};
+// 在用户点击后调用
+await client.initAudio()
 ```
 
-## PWA 配置
+### WebSocket 代理
 
-项目使用 PWA 支持离线功能：
+前端通过后端代理连接 TEN Agent：
 
-1. **Service Worker** - 缓存静态资源
-2. **manifest.json** - 定义应用元数据
-3. **离线存储** - IndexedDB 存储历史记录
+```
+Frontend (3000) → Backend (3001/ws/agent) → TEN Agent (8766)
+```
 
-## 开发规范
+### Docker 缓存问题
 
-- 组件使用 TypeScript
-- 遵循 ESLint 规则
-- 使用 Prettier 格式化
-- 组件测试使用 Jest + React Testing Library
+代码更新后需要重新构建：
+
+```bash
+sudo docker-compose build frontend --no-cache
+sudo docker-compose up -d frontend
+```
 
 ## 相关文档
 
-- [API 规范](../docs/API_SPECIFICATION.md)
-- [架构设计](../docs/ARCHITECTURE.md)
 - [主项目 README](../README.md)
+- [后端 README](../backend/README.md)
+- [Agent README](../ten_agent/README.md)
