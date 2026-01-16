@@ -6,14 +6,6 @@
 
 ---
 
-## 重要提示 (非商业许可)
-
-**本项目采用 CC BY-NC 4.0 许可证** - 禁止商业使用
-
-详见 [LICENSE](LICENSE)
-
----
-
 ## 项目愿景
 
 **VoxFlame 燃言** 是一个为构音障碍患者打造的开源AI语音助手。
@@ -39,7 +31,7 @@
 | 前端 | Next.js 14 + TypeScript + TailwindCSS + PWA | 3000 |
 | 后端 | Express + TypeScript + WebSocket Proxy | 3001 |
 | Agent | TEN Framework (Go Runtime + Python Extensions) | 8766 |
-| ASR | 阿里云 Paraformer-realtime-v2 | - |
+| ASR | 阿里云 funasr-nano
 | LLM | QWEN3 Max via DashScope | - |
 | TTS | CosyVoice v3 | - |
 
@@ -77,21 +69,21 @@ sudo docker-compose ps
 
 ## 产品路线图
 
-### v1.0 - 基础语音助手 ✅ 已完成
+### v1.0 - 基础语音助手 (已完成)
 
 | 功能 | 描述 | 状态 |
 |------|------|------|
-| TEN Framework 集成 | Go Runtime + Python Extensions | ✅ |
-| 阿里云 ASR | Paraformer-realtime-v2 实时识别 | ✅ |
-| 通义千问 LLM | Qwen3-max 对话生成 | ✅ |
-| CosyVoice TTS | 语音合成 (longxiaochun) | ✅ |
-| WebSocket 通信 | 实时双向通信（直连模式） | ✅ |
-| PWA 基础支持 | Service Worker + manifest.json | ✅ |
-| Docker 配置 | docker-compose.yml + Dockerfile | ✅ |
+| TEN Framework 集成 | Go Runtime + Python Extensions | Done |
+| 阿里云 ASR | Paraformer-realtime-v2 实时识别 | Done |
+| 通义千问 LLM | Qwen3-max 对话生成 | Done |
+| CosyVoice TTS | 语音合成 (longxiaochun) | Done |
+| WebSocket 通信 | 实时双向通信（直连模式） | Done |
+| PWA 基础支持 | Service Worker + manifest.json | Done |
+| Docker 配置 | docker-compose.yml + Dockerfile | Done |
 
 ---
 
-### v1.1 - WebSocket 代理 ✅ 已完成
+### v1.1 - WebSocket 代理 (已完成)
 
 **问题**：VSCode Remote SSH 环境下，端口转发不支持 WebSocket 协议升级
 
@@ -99,28 +91,28 @@ sudo docker-compose ps
 
 | 功能 | 描述 | 状态 |
 |------|------|------|
-| 后端代理实现 | ws 库实现双向代理 | ✅ |
-| 前端配置更新 | agentWsUrl 改为 ws://host:3001/ws/agent | ✅ |
-| 连接状态管理 | 消息队列处理连接延迟 | ✅ |
-| 音频流转发 | Base64 音频正常传输 | ✅ |
+| 后端代理实现 | ws 库实现双向代理 | Done |
+| 前端配置更新 | agentWsUrl 改为 ws://host:3001/ws/agent | Done |
+| 连接状态管理 | 消息队列处理连接延迟 | Done |
+| 音频流转发 | Base64 音频正常传输 | Done |
 
 ---
 
-### v1.2 - UI 改进 ✅ 已完成
+### v1.2 - UI 改进 (已完成)
 
 **目标**：Google 风格简洁界面，优化录音交互
 
 | 功能 | 描述 | 状态 |
 |------|------|------|
-| Google 风格 UI | 白色简洁主题 | ✅ |
-| 字幕显示 | LLM 纠正后的文字实时显示 | ✅ |
-| 点击式录音 | 点击开始/结束，替代长按 | ✅ |
-| 空格键控制 | 空格键切换录音状态 | ✅ |
-| 页面风格统一 | ranyan/contribute 页面同步更新 | ✅ |
+| Google 风格 UI | 白色简洁主题 | Done |
+| 字幕显示 | LLM 纠正后的文字实时显示 | Done |
+| 点击式录音 | 点击开始/结束，替代长按 | Done |
+| 空格键控制 | 空格键切换录音状态 | Done |
+| 页面风格统一 | ranyan/contribute 页面同步更新 | Done |
 
 ---
 
-### v2.0 - LLM 语音纠错 🚧 开发中
+### v2.0 - LLM 语音纠错 (开发中)
 
 **目标**：为构音障碍患者提供专业的实时语音纠错功能
 
@@ -128,11 +120,11 @@ sudo docker-compose ps
 
 | Phase | 内容 | 状态 |
 |-------|------|------|
-| Phase 0 | 技术调研（ASR/TTS/VAD/扩展生态） | ✅ 完成 |
-| Phase 1 | 基础 LLM 纠错扩展 (dysarthric_correction) | 🚧 进行中 |
-| Phase 2 | VAD/Turn Detection 优化（构音障碍参数调整） | 📋 计划中 |
-| Phase 3 | 个性化纠错（用户词库、上下文记忆） | 📋 计划中 |
-| Phase 4 | N-best 重排序 (Fun-ASR-Nano) | 📋 可选 |
+| Phase 0 | 技术调研（ASR/TTS/VAD/扩展生态） | Done |
+| Phase 1 | 基础 LLM 纠错扩展 (dysarthric_correction) | WIP |
+| Phase 2 | VAD/Turn Detection 优化（构音障碍参数调整） | Planned |
+| Phase 3 | 个性化纠错（用户词库、上下文记忆） | Planned |
+| Phase 4 | N-best 重排序 (Fun-ASR-Nano) | Optional |
 
 **关键技术参数**：
 - VAD 阈值: 0.3-0.4 (降低误触发)
@@ -143,7 +135,7 @@ sudo docker-compose ps
 
 ---
 
-### v2.5 - 部署与运维 📋 计划中
+### v2.5 - 部署与运维 (计划中)
 
 **目标**：从开发环境过渡到生产环境，支持 HTTPS + 负载均衡
 
@@ -168,7 +160,23 @@ Nginx 反向代理
 
 ---
 
-### v3.0 - RTC 实时通信 📋 计划中
+### v2.6 - PWA 增强 (计划中)
+
+**目标**：完整的 PWA 离线支持与移动端体验优化
+
+| 任务 | 描述 | 优先级 |
+|------|------|--------|
+| 离线回退页面 | 无网络时友好提示 | P1 |
+| 音频数据缓存 | IndexedDB 存储音频块 | P1 |
+| 更新提示组件 | Service Worker 更新检测与刷新 | P2 |
+| 安装提示横幅 | 引导用户安装 PWA | P2 |
+| Lighthouse 审计 | PWA 分数 > 90 | P3 |
+
+**详细实施指南**：[docs/PWA_IMPLEMENTATION_GUIDE.md](docs/PWA_IMPLEMENTATION_GUIDE.md)
+
+---
+
+### v3.0 - RTC 实时通信 (计划中)
 
 **目标**：接入 Agora RTC 实现低延迟实时音视频通信
 
@@ -191,7 +199,7 @@ Nginx 反向代理
 
 ---
 
-### v4.0 - 高并发与扩展 📋 计划中
+### v4.0 - 高并发与扩展 (计划中)
 
 **目标**：支持大规模用户同时在线，实现企业级可扩展性
 
@@ -220,7 +228,7 @@ Phase 4: 容器编排 (v4.0+)
 
 ---
 
-### v5.0 - 移动端与生态 📋 远期规划
+### v5.0 - 移动端与生态 (远期规划)
 
 **目标**：构建完整的多端生态系统
 
@@ -316,7 +324,7 @@ sudo docker-compose up -d frontend
 
 ## License
 
-**CC BY-NC 4.0** - 禁止商业用途
+**CC BY-NC 4.0** - 禁止商业用途，详见 [LICENSE](LICENSE)
 
 ---
 
