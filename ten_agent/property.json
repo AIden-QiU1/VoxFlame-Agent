@@ -1,0 +1,252 @@
+{
+  "ten": {
+    "predefined_graphs": [
+      {
+        "name": "voxflame_voice_assistant",
+        "auto_start": true,
+        "graph": {
+          "nodes": [
+            {
+              "type": "extension",
+              "name": "websocket_server",
+              "addon": "websocket_server",
+              "extension_group": "default",
+              "property": {
+                "port": 8766,
+                "host": "0.0.0.0",
+                "sample_rate": 16000,
+                "channels": 1,
+                "bytes_per_sample": 2
+              }
+            },
+            {
+              "type": "extension",
+              "name": "stt",
+              "addon": "aliyun_asr_bigmodel_python",
+              "extension_group": "stt",
+              "property": {
+                "params": {
+                  "api_key": "${env:DASHSCOPE_API_KEY}",
+                  "model": "fun-asr-realtime",
+                  "language_hints": [
+                    "zh"
+                  ],
+                  "sample_rate": 16000
+                }
+              }
+            },
+            {
+              "type": "extension",
+              "name": "main_control",
+              "addon": "voxflame_main_python",
+              "extension_group": "control",
+              "property": {
+                "greeting": "您好，我是燃言语音助手，请说话",
+                "enable_greeting": true,
+                "enable_correction": true,
+                "enable_interrupt": true,
+                "interrupt_threshold_ms": 200
+              }
+            },
+            {
+              "type": "extension",
+              "name": "corrector",
+              "addon": "llm_correction_python",
+              "extension_group": "correction",
+              "property": {
+                "api_key": "${env:DASHSCOPE_API_KEY}",
+                "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                "model": "${env:DASHSCOPE_CORRECTION_MODEL}",
+                "max_tokens": 1024,
+                "temperature": 0.3,
+                "user_profile": "",
+                "vocabulary": [],
+                "max_context_length": 5
+              }
+            },
+            {
+              "type": "extension",
+              "name": "tts",
+              "addon": "cosy_tts_python",
+              "extension_group": "tts",
+              "property": {
+                "params": {
+                  "api_key": "${env:DASHSCOPE_API_KEY}",
+                  "model": "cosyvoice-v3-plus",
+                  "sample_rate": 16000,
+                  "voice": "longanyang"
+                }
+              }
+            }
+          ],
+          "connections": [
+            {
+              "extension": "websocket_server",
+              "cmd": [
+                {
+                  "name": "on_user_connected",
+                  "dest": [
+                    {
+                      "extension": "main_control"
+                    }
+                  ]
+                },
+                {
+                  "name": "on_user_disconnected",
+                  "dest": [
+                    {
+                      "extension": "main_control"
+                    }
+                  ]
+                }
+              ],
+              "audio_frame": [
+                {
+                  "name": "pcm_frame",
+                  "dest": [
+                    {
+                      "extension": "stt"
+                    }
+                  ]
+                },
+                {
+                  "name": "pcm_frame",
+                  "source": [
+                    {
+                      "extension": "tts"
+                    }
+                  ]
+                }
+              ],
+              "data": [
+                {
+                  "name": "transcript",
+                  "source": [
+                    {
+                      "extension": "main_control"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "main_control",
+              "cmd": [
+                {
+                  "name": "flush",
+                  "dest": [
+                    {
+                      "extension": "tts"
+                    }
+                  ]
+                }
+              ],
+              "data": [
+                {
+                  "name": "asr_result",
+                  "source": [
+                    {
+                      "extension": "stt"
+                    }
+                  ]
+                },
+                {
+                  "name": "corrected_text",
+                  "source": [
+                    {
+                      "extension": "corrector"
+                    }
+                  ]
+                },
+                {
+                  "name": "interim_text",
+                  "source": [
+                    {
+                      "extension": "corrector"
+                    }
+                  ]
+                },
+                {
+                  "name": "tts_audio_start",
+                  "source": [
+                    {
+                      "extension": "tts"
+                    }
+                  ]
+                },
+                {
+                  "name": "tts_audio_end",
+                  "source": [
+                    {
+                      "extension": "tts"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "corrector",
+              "data": [
+                {
+                  "name": "asr_result",
+                  "source": [
+                    {
+                      "extension": "main_control"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "main_control",
+              "data": [
+                {
+                  "name": "tts_text_input",
+                  "dest": [
+                    {
+                      "extension": "tts"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "tts",
+              "audio_frame": [
+                {
+                  "name": "pcm_frame",
+                  "dest": [
+                    {
+                      "extension": "websocket_server"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "log": {
+      "handlers": [
+        {
+          "matchers": [
+            {
+              "level": "debug"
+            }
+          ],
+          "formatter": {
+            "type": "plain",
+            "colored": true
+          },
+          "emitter": {
+            "type": "console",
+            "config": {
+              "stream": "stdout"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

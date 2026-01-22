@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F59E0B"/>
+      <stop offset="100%" style="stop-color:#EA580C"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#grad)"/>
+  <g fill="white">
+    <!-- 麦克风 -->
+    <path d="M256 64c-26.5 0-48 21.5-48 48v128c0 26.5 21.5 48 48 48s48-21.5 48-48V112c0-26.5-21.5-48-48-48z"/>
+    <path d="M352 224v16c0 53-43 96-96 96s-96-43-96-96v-16h-32v16c0 65.8 50.2 120 114 127v49h-50v32h132v-32h-50v-49c63.8-7 114-61.2 114-127v-16h-32z"/>
+    <!-- 声波 -->
+    <circle cx="256" cy="384" r="16" opacity="0.6"/>
+    <path d="M176 368c-17.7 17.7-17.7 46.3 0 64" stroke="white" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M336 368c17.7 17.7 17.7 46.3 0 64" stroke="white" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M128 336c-35.3 35.3-35.3 92.7 0 128" stroke="white" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.2"/>
+    <path d="M384 336c35.3 35.3 35.3 92.7 0 128" stroke="white" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.2"/>
+  </g>
+</svg>
