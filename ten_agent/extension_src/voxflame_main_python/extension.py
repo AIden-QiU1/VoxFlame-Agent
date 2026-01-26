@@ -136,6 +136,9 @@ class VoxFlameMainExtension(AsyncExtension):
             elif data_name == "tts_audio_end":
                 await self._handle_tts_end(ten_env, data)
 
+            elif data_name == "system_init":
+                await self._handle_system_init(ten_env, data)
+
             else:
                 ten_env.log_debug(f"[VoxFlameMain] Unhandled data: {data_name}")
 
@@ -177,6 +180,27 @@ class VoxFlameMainExtension(AsyncExtension):
     # ========================================
     # Data Handlers
     # ========================================
+
+    async def _handle_system_init(self, ten_env: AsyncTenEnv, data: Data) -> None:
+        """
+        Handle system initialization with user context.
+        Received from Backend Proxy upon connection.
+        """
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            init_data = json.loads(data_json) if data_json else {}
+            
+            user = init_data.get("user")
+            if user:
+                ten_env.log_info(f"[VoxFlameMain] System Init - User: {user.get('email', 'unknown')}")
+                if 'name' in user:
+                    ten_env.log_info(f"[VoxFlameMain] User Name: {user['name']}")
+                
+                # TODO: Store user profile and update LLM Corrector context
+                # self.user_profile = user
+                
+        except Exception as e:
+            ten_env.log_error(f"[VoxFlameMain] Error handling system_init: {e}")
 
     async def _handle_asr_result(self, ten_env: AsyncTenEnv, data: Data) -> None:
         """

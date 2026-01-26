@@ -15,9 +15,17 @@
 - [x] 修复 `sentences.ts` 语法与 ID 问题。
 - [x] 规范数据库 Migration 版本管理。
 
+### 3. 环境与架构修复 (Environment Fixes) - **NEW**
+- [x] **Frontend Login**: 修复 Login 页面的 JSX 语法错误与文本描述。
+- [x] **Environment Architecture**:
+    - 创建 `docs/CONFIGURATION_AND_ENV_GUIDE.md` 规范环境配置。
+    - 优化 `docker-compose.yml` 显式加载子模块 `.env`。
+    - 修复 `frontend/next.config.js` 使用 `BACKEND_INTERNAL_URL` 解决 Docker/Local 连接地址冲突。
+- [x] **PWA**: 确认 PWA 功能已在 Next.js 配置中启用。
+
 ---
 
-## 🚧 进行中: 用户系统集成 (User System Integration)
+## 🚧 进行中: 系统验证与 Agent 调试
 
 **目标**: 将 Supabase Auth 深度集成到 前端、后端 与 Ten Agent 流程中。
 
