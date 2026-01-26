@@ -11,7 +11,9 @@
   "dependencies": {
     "@alicloud/pop-core": "^1.7.13",
     "@supabase/supabase-js": "^2.89.0",
+    "@types/ali-oss": "^6.23.1",
     "@types/axios": "^0.9.36",
+    "ali-oss": "^6.23.0",
     "axios": "^1.13.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

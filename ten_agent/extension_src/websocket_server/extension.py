@@ -69,6 +69,7 @@ class WebsocketServerExtension(AsyncExtension):
                 port=self.config.port,
                 ten_env=ten_env,
                 on_audio_callback=self._on_audio_received,
+                on_cmd_callback=self._on_cmd_received,
                 on_client_connected=self._on_client_connected,
                 on_client_disconnected=self._on_client_disconnected,
             )
@@ -322,3 +323,32 @@ class WebsocketServerExtension(AsyncExtension):
             await self.ten_env.send_cmd(cmd)
         except Exception as e:
             self.ten_env.log_error(f"Error sending on_user_disconnected: {e}")
+
+    async def _on_cmd_received(self, data: dict, client_id: str) -> None:
+        """
+        Callback when a command JSON is received from WebSocket client.
+        Sends Cmd to TEN graph.
+        """
+        try:
+            cmd_name = data.get("type", "unknown_cmd")
+            self.ten_env.log_info(f"Received command: {cmd_name} from {client_id}")
+            
+            cmd = Cmd.create(cmd_name)
+            
+            # Pass properties to Cmd
+            for k, v in data.items():
+                if k == "type": continue
+                # We use set_property_from_json for everything to support complex types
+                try:
+                    cmd.set_property_from_json(k, json.dumps(v))
+                except:
+                    # Fallback for simple strings if json dump fails (unlikely for dict values)
+                    cmd.set_property_string(k, str(v))
+            
+            cmd.set_property_string("client_id", client_id)
+            
+            await self.ten_env.send_cmd(cmd, None)
+            self.ten_env.log_debug(f"Forwarded command {cmd_name} to TEN graph")
+            
+        except Exception as e:
+            self.ten_env.log_error(f"Error processing command from WebSocket: {e}")

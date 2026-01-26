@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { useAgent } from '@/hooks/useAgent'
+import { UserNav } from '@/components/ui/user-nav'
 
 /**
  * 燃言 - 语音转换助手
@@ -56,6 +57,7 @@ export default function Home() {
           ) : (
             <span className="w-2 h-2 bg-gray-300 rounded-full animate-pulse" title="连接中" />
           )}
+          <UserNav />
         </div>
       </nav>
 

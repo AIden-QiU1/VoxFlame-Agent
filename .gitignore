@@ -38,3 +38,7 @@ logs/
 # Compiled manifest lock (generated)
 ten_agent/manifest-lock.json
 ten_packages/
+
+skills-router
+skills-router-cli/
+

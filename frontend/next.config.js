@@ -14,6 +14,19 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 const nextConfig = {
   // Generate standalone output for Docker runtime
   output: 'standalone',
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001';
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${backendUrl}/api/:path*`,
+      },
+      {
+        source: '/ws/agent',
+        destination: `${backendUrl}/ws/agent`,
+      }
+    ]
+  }
 };
 
 module.exports = withPWA(nextConfig);

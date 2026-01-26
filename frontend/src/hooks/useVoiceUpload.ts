@@ -8,6 +8,7 @@
 import { useState, useCallback } from 'react'
 import { supabase, AUDIO_BUCKET, TABLES } from '@/lib/supabase/client'
 import { useContributor } from './useContributor'
+import { config } from '@/lib/config'
 
 interface UploadOptions {
   /** 录音对应的文本内容 */
@@ -31,7 +32,7 @@ export function useVoiceUpload() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [lastError, setLastError] = useState<string | null>(null)
-  
+
   const { contributorId } = useContributor()
 
   /**
@@ -48,68 +49,81 @@ export function useVoiceUpload() {
     const actualContributorId = contributorId || getLocalContributorId()
 
     try {
-      // 1. 准备文件名
+      // 1. 准备文件名与存储路径 (按 有标注/无标注 分类)
       const timestamp = Date.now()
       const ext = audioBlob.type.includes('wav') ? 'wav' : 'webm'
-      const prefix = options.sentenceId || 'recording'
-      const filename = `${prefix}_${timestamp}.${ext}`
-      const storagePath = `${actualContributorId}/${filename}`
+
+      let storagePath = ''
+
+      if (options.source === 'guided_recording' && options.sentenceId) {
+        // 有标注数据: dataset/{user_id}/{sentence_id}_{timestamp}.{ext}
+        storagePath = `dataset/${actualContributorId}/${options.sentenceId}_${timestamp}.${ext}`
+      } else {
+        // 无标注数据 (自由录音/对话): unlabeled/{user_id}/{timestamp}.{ext}
+        storagePath = `unlabeled/${actualContributorId}/${timestamp}.${ext}`
+      }
 
       setUploadProgress(20)
 
-      // 2. 尝试上传到 Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(AUDIO_BUCKET)
-        .upload(storagePath, audioBlob, {
-          contentType: audioBlob.type || 'audio/wav',
-          cacheControl: '3600',
-          upsert: false,
+      // 2. 尝试上传到 OSS (通过后端签名)
+      try {
+        // Use config.api.baseUrl which handles rewrites (e.g. /api)
+        const signRes = await fetch(`${config.api.baseUrl}/upload/sign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: storagePath,
+            contentType: audioBlob.type || 'audio/wav'
+          })
         })
 
-      if (uploadError) {
+        if (!signRes.ok) throw new Error(`签名请求失败: ${signRes.statusText}`)
+        const { url: uploadUrl } = await signRes.json()
+
+        // PUT 上传
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': audioBlob.type || 'audio/wav' },
+          body: audioBlob
+        })
+
+        if (!uploadRes.ok) throw new Error(`OSS上传失败: ${uploadRes.statusText}`)
+      } catch (uploadError: any) {
         console.warn('Storage 上传失败，降级到本地:', uploadError.message)
         return await saveLocally(audioBlob, options, actualContributorId)
       }
 
       setUploadProgress(50)
 
-      // 3. 保存贡献记录到数据库
-      const { data: contributionData, error: dbError } = await supabase
-        .from(TABLES.CONTRIBUTIONS)
-        .insert({
-          contributor_id: actualContributorId,
-          audio_path: uploadData.path,
-          transcript: options.text,
-          sentence_id: options.sentenceId || null,
-          is_free_recording: options.source !== 'guided_recording',
-          duration_seconds: options.duration,
+      // 3. 通知后端完成 (DB写入 + OSS Manifest追加)
+      const completeRes = await fetch(`${config.api.baseUrl}/upload/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contributorId: actualContributorId,
+          audioPath: storagePath,
+          text: options.text,
+          sentenceId: options.sentenceId || null,
+          duration: options.duration,
+          source: options.source,
           metadata: {
             source: options.source || 'unknown',
             user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
             timestamp: new Date().toISOString(),
-          },
+            storage_type: 'oss'
+          }
         })
-        .select()
-        .single()
+      })
 
-      if (dbError) {
-        console.warn('数据库记录失败:', dbError.message)
-        // 文件已上传但记录失败，仍算成功
-        setUploadProgress(100)
-        return true
+      if (!completeRes.ok) {
+        throw new Error(`后端记录失败: ${completeRes.statusText}`)
       }
 
       setUploadProgress(80)
 
-      // 4. 更新贡献者统计（可能会失败，不影响主流程）
-      try {
-        await supabase.rpc('increment_contributor_stats', {
-          p_contributor_id: actualContributorId,
-          p_duration: options.duration,
-        })
-      } catch (e) {
-        console.warn('统计更新失败，不影响录音保存')
-      }
+      // 4. 更新贡献者统计 (暂时跳过，或者也移交给后端)
+      // 由于 RLS 或 RPC 权限，前端直接调用可能失败。
+      // 可以将 stats_increment Logic 放入 /api/upload/complete 后端处理中。
 
       setUploadProgress(100)
       return true
@@ -134,7 +148,7 @@ export function useVoiceUpload() {
     try {
       const timestamp = Date.now()
       const key = `ranyan_recording_${timestamp}`
-      
+
       // 将 Blob 转为 base64 存储
       const base64 = await blobToBase64(audioBlob)
 
@@ -233,7 +247,7 @@ export function useVoiceUpload() {
 function getLocalContributorId(): string {
   const stored = localStorage.getItem('ranyan_contributor_id')
   if (stored) return stored
-  
+
   const newId = `v_${Math.random().toString(36).substring(2, 10)}`
   localStorage.setItem('ranyan_contributor_id', newId)
   return newId

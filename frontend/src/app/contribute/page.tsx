@@ -4,9 +4,17 @@ import Link from 'next/link'
 import { useStepAudio } from '@/hooks/useStepAudio'
 import { useContributor } from '@/hooks/useContributor'
 import { useVoiceUpload } from '@/hooks/useVoiceUpload'
-import { getRandomSentence, CATEGORY_NAMES, DIFFICULTY_NAMES, type CorpusSentence as Sentence } from '@/lib/corpus/sentences'
+import {
+  getRandomSentence,
+  CATEGORY_NAMES,
+  DIFFICULTY_NAMES,
+  getAllCategories,
+  type CorpusSentence as Sentence
+} from '@/lib/corpus/sentences'
 import { AudioProcessor } from '@/lib/audio/audio-processor'
 import { InstallPrompt, OfflineNotice, UpdatePrompt } from '@/components/pwa'
+import { sha256 } from 'js-sha256'
+
 /**
  * 数据收集页面
  * 
@@ -21,22 +29,24 @@ type RecordingState = 'idle' | 'recording' | 'processing' | 'done'
 export default function ContributePage() {
   // 页面模式
   const [mode, setMode] = useState<PageMode>('chat')
-  
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+
   // AI 对话相关
-  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'ai', text: string}>>([])
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'ai', text: string }>>([])
   const [showRecordingOption, setShowRecordingOption] = useState(false)
-  
+
   // 录音相关
   const [recordingState, setRecordingState] = useState<RecordingState>('idle')
   const [recordingTime, setRecordingTime] = useState(0)
   const [currentSentence, setCurrentSentence] = useState<Sentence | null>(null)
   const [completedCount, setCompletedCount] = useState(0)
   const [freeText, setFreeText] = useState('')
-  
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
   // Hooks
   const { contributor, displayName } = useContributor()
   const { uploadRecording, isUploading, uploadProgress, lastError } = useVoiceUpload()
-  
+
   // AI 语音对话
   const {
     isConnected: isAIConnected,
@@ -48,6 +58,7 @@ export default function ContributePage() {
     disconnect: disconnectAI,
     startListening: startAIListening,
     stopListening: stopAIListening,
+    sendText: sendAIText,
   } = useStepAudio({
     apiKey: process.env.NEXT_PUBLIC_STEP_API_KEY || '',
     voice: 'wenrounansheng',
@@ -58,11 +69,16 @@ export default function ContributePage() {
   const audioProcessorRef = useRef<AudioProcessor | null>(null)
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
+
+  // Categories
+  const categories = getAllCategories()
+
   // 初始化
   useEffect(() => {
     audioProcessorRef.current = new AudioProcessor()
-    setCurrentSentence(getRandomSentence())
-    
+    // Initial sentence based on default category 'all'
+    setCurrentSentence(getRandomSentence('all'))
+
     // 尝试连接 AI（如果有 API Key）
     if (process.env.NEXT_PUBLIC_STEP_API_KEY) {
       connectAI().catch(() => {
@@ -77,6 +93,21 @@ export default function ContributePage() {
       }
     }
   }, [])
+  // Handle Category Change
+  const handleCategoryChange = (cat: string) => {
+    setSelectedCategory(cat)
+    // Immediately refresh sentence
+    const newSentence = getRandomSentence(cat)
+    setCurrentSentence(newSentence)
+  }
+
+  // Next Sentence
+  const nextSentence = () => {
+    const newSentence = getRandomSentence(selectedCategory)
+    // Ensure we get a different sentence if possible, but getRandomSentence is stateless random
+    setCurrentSentence(newSentence)
+  }
+
   // 监听 AI 转录
   useEffect(() => {
     if (aiTranscript) {
@@ -87,7 +118,7 @@ export default function ContributePage() {
         }
         return [...prev, { role: 'ai', text: aiTranscript }]
       })
-      
+
       // 检测 AI 是否提到了录音
       if (aiTranscript.includes('录音') || aiTranscript.includes('开始') || aiTranscript.includes('试试')) {
         setShowRecordingOption(true)
@@ -128,7 +159,7 @@ export default function ContributePage() {
       recordingTimerRef.current = setInterval(() => {
         setRecordingTime(t => t + 1)
       }, 1000)
-      await audioProcessorRef.current.start(() => {}, true)
+      await audioProcessorRef.current.start(() => { }, true)
     } catch (error) {
       console.error('Failed to start recording:', error)
       setRecordingState('idle')
@@ -145,17 +176,37 @@ export default function ContributePage() {
     const recordingData = audioProcessorRef.current.stop()
     if (recordingData && recordingData.duration >= 1) {
       const textContent = mode === 'guided' && currentSentence ? currentSentence.text : freeText
-      
+
+      // Generate a deterministic ID for the sentence if missing (based on text hash)
+      let sentenceId = undefined
+      if (mode === 'guided' && currentSentence) {
+        if (currentSentence.id) {
+          sentenceId = currentSentence.id
+        } else {
+          // Generate an 8-char hash ID from the text
+          sentenceId = sha256(currentSentence.text).substring(0, 8)
+        }
+      }
+
       const success = await uploadRecording(recordingData.blob, {
         text: textContent,
         duration: recordingData.duration,
         source: mode === 'guided' ? 'guided_recording' : 'free_recording',
-        sentenceId: mode === 'guided' && currentSentence ? currentSentence.id : undefined
+        sentenceId: sentenceId
       })
       if (success) {
         setCompletedCount(c => c + 1)
+
+        // Encouragement
+        setToastMessage('太棒了！录音成功！')
+        setTimeout(() => setToastMessage(null), 3000)
+
+        if (isAIConnected) {
+          sendAIText('（用户刚刚完成了一条录音，请给一句简短的鼓励，比如“真棒”、“继续加油”之类的）')
+        }
+
         if (mode === 'guided') {
-          setCurrentSentence(getRandomSentence())
+          nextSentence()
         } else {
           setFreeText('')
         }
@@ -176,7 +227,7 @@ export default function ContributePage() {
   return (
     <div className="min-h-screen bg-white">
       {/* 顶部导航 */}
-      <nav 
+      <nav
         className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100"
         role="navigation"
         aria-label="主导航"
@@ -188,12 +239,12 @@ export default function ContributePage() {
               <span className="text-orange-500">言</span>
             </span>
           </Link>
-          
+
           <div className="flex items-center gap-4">
             <span className="text-sm text-amber-600 font-medium" aria-live="polite">
               已贡献 {completedCount} 条
             </span>
-            <div 
+            <div
               className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center"
               aria-label={`贡献者: ${displayName}`}
               title={displayName}
@@ -206,8 +257,15 @@ export default function ContributePage() {
         </div>
       </nav>
       <main className="pt-24 pb-16 px-6" role="main">
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed top-24 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg z-50 animate-bounce transition-all">
+            {toastMessage}
+          </div>
+        )}
+
         <div className="max-w-2xl mx-auto">
-          
+
           {/* AI 对话模式 */}
           {mode === 'chat' && (
             <div className="space-y-6">
@@ -227,7 +285,7 @@ export default function ContributePage() {
                       className="px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-bold transition-all focus:outline-none focus:ring-4 focus:ring-amber-300"
                       aria-label="开始贡献声音"
                     >
-                      开始贡献声音 
+                      开始贡献声音
                     </button>
                   </div>
                 )}
@@ -245,13 +303,13 @@ export default function ContributePage() {
                       onClick={startChat}
                       className="px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-bold transition-all focus:outline-none focus:ring-4 focus:ring-amber-300"
                     >
-                      开始对话 
+                      开始对话
                     </button>
                   </div>
                 )}
                 {/* 对话消息列表 */}
                 {chatMessages.length > 0 && (
-                  <div 
+                  <div
                     ref={chatContainerRef}
                     className="flex-1 overflow-y-auto space-y-4 mb-4"
                     role="log"
@@ -263,26 +321,25 @@ export default function ContributePage() {
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                            msg.role === 'user'
-                              ? 'bg-amber-500 text-white rounded-br-none'
-                              : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                          }`}
+                          className={`max-w-[80%] px-4 py-3 rounded-2xl ${msg.role === 'user'
+                            ? 'bg-amber-500 text-white rounded-br-none'
+                            : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                            }`}
                           role={msg.role === 'ai' ? 'status' : undefined}
                         >
                           {msg.text}
                         </div>
                       </div>
                     ))}
-                    
+
                     {/* AI 正在说话指示 */}
                     {isAISpeaking && (
                       <div className="flex justify-start">
                         <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-bl-none flex items-center gap-2" role="status" aria-label="AI 正在说话">
                           <div className="flex gap-1">
-                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></span>
-                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></span>
-                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></span>
+                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                           </div>
                         </div>
                       </div>
@@ -308,7 +365,7 @@ export default function ContributePage() {
                         </button>
                       </div>
                     )}
-                    
+
                     {/* 语音输入按钮 */}
                     <div className="flex justify-center">
                       <button
@@ -316,11 +373,10 @@ export default function ContributePage() {
                         onMouseUp={stopAIListening}
                         onTouchStart={startAIListening}
                         onTouchEnd={stopAIListening}
-                        className={`w-16 h-16 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-4 focus:ring-amber-300 ${
-                          isAIListening
-                            ? 'bg-red-500 text-white scale-110'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                        className={`w-16 h-16 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-4 focus:ring-amber-300 ${isAIListening
+                          ? 'bg-red-500 text-white scale-110'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
                         aria-label={isAIListening ? '松开发送' : '按住说话'}
                         aria-pressed={isAIListening}
                       >
@@ -340,27 +396,53 @@ export default function ContributePage() {
           {/* 引导式录音模式 */}
           {mode === 'guided' && currentSentence && (
             <div className="space-y-6">
+
+              {/* 主题选择器 */}
+              <div className="flex gap-2 overflow-x-auto py-2 -mx-6 px-6 sm:mx-0 sm:px-0 scrollbar-hide">
+                <button
+                  onClick={() => handleCategoryChange('all')}
+                  className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-colors ${selectedCategory === 'all'
+                    ? 'bg-amber-500 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                >
+                  全部
+                </button>
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => handleCategoryChange(cat)}
+                    className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-colors ${selectedCategory === cat
+                      ? 'bg-amber-500 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                  >
+                    {CATEGORY_NAMES[cat] || cat}
+                  </button>
+                ))}
+              </div>
+
               {/* 句子卡片 */}
               <div className="bg-white rounded-3xl shadow-lg p-8">
                 <div className="flex items-center justify-between mb-4">
                   <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
-                    {CATEGORY_NAMES[currentSentence.category]}
+                    {CATEGORY_NAMES[currentSentence.category] || currentSentence.category}
                   </span>
                   <span className="text-gray-400 text-sm">
                     {DIFFICULTY_NAMES[currentSentence.difficulty]}
                   </span>
                 </div>
-                
-                <p 
+
+                <p
                   className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 text-center py-8 leading-relaxed"
                   aria-label={`请朗读: ${currentSentence.text}`}
                 >
                   {currentSentence.text}
                 </p>
-                
+
                 <div className="flex justify-center">
                   <button
-                    onClick={() => setCurrentSentence(getRandomSentence())}
+                    onClick={nextSentence}
                     className="text-amber-500 hover:text-amber-600 text-sm font-medium focus:outline-none focus:underline"
                     aria-label="换一句话"
                   >
@@ -494,7 +576,7 @@ function RecordingControl({
       <div className="flex flex-col items-center">
         {/* 录音时间 */}
         {recordingState === 'recording' && (
-          <div 
+          <div
             className="text-4xl font-mono text-red-500 mb-4"
             role="timer"
             aria-live="polite"
@@ -506,17 +588,16 @@ function RecordingControl({
         <button
           onClick={recordingState === 'recording' ? onStop : onStart}
           disabled={recordingState === 'processing'}
-          className={`w-24 h-24 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-4 focus:ring-amber-300 ${
-            recordingState === 'recording'
-              ? 'bg-red-500 text-white animate-pulse'
-              : recordingState === 'processing'
+          className={`w-24 h-24 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-4 focus:ring-amber-300 ${recordingState === 'recording'
+            ? 'bg-red-500 text-white animate-pulse'
+            : recordingState === 'processing'
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-amber-500 hover:bg-amber-600 text-white'
-          }`}
+            }`}
           aria-label={
             recordingState === 'recording' ? '点击停止录音' :
-            recordingState === 'processing' ? '正在保存' :
-            '点击开始录音'
+              recordingState === 'processing' ? '正在保存' :
+                '点击开始录音'
           }
         >
           {recordingState === 'recording' ? (
@@ -535,16 +616,16 @@ function RecordingControl({
           )}
         </button>
         <p className="text-gray-500 mt-4" aria-hidden="true">
-          {recordingState === 'recording' ? '点击停止' : 
-           recordingState === 'processing' ? '保存中...' : 
-           '点击开始录音'}
+          {recordingState === 'recording' ? '点击停止' :
+            recordingState === 'processing' ? '保存中...' :
+              '点击开始录音'}
         </p>
         {/* 上传进度 */}
         {isUploading && (
           <div className="w-full max-w-xs mt-4" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100}>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-amber-500 transition-all" 
+              <div
+                className="h-full bg-amber-500 transition-all"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>

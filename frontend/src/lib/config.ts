@@ -47,12 +47,14 @@ export const config = {
       if (envUrl && !envUrl.includes('localhost')) {
         return envUrl
       }
-      // 使用后端代理：ws://host:3001/ws/agent
-      const host = getHost()
+
+      // 使用相对路径，通过 Next.js Rewrite 代理到后端 (http://backend:3001)
+      // 解决 CORS 和 VSCode Remote 端口转发问题
       const protocol = getWsProtocol()
-      return `${protocol}://${host}:3001/ws/agent`
+      const host = getHost()
+      return `${protocol}://${host}:${window.location.port || (protocol === 'wss' ? 443 : 80)}/ws/agent`
     },
-    
+
     /**
      * 后端 API 地址
      * 用于用户配置、工具执行、记忆管理
@@ -62,13 +64,11 @@ export const config = {
       if (envUrl && !envUrl.includes('localhost')) {
         return envUrl
       }
-      // 自动检测
-      const host = getHost()
-      const protocol = getHttpProtocol()
-      return `${protocol}//${host}:3001`
+      // 使用相对路径，通过 Next.js Rewrite 代理
+      return '/api'
     },
   },
-  
+
   // 音频配置 - 固定 16kHz PCM
   audio: {
     sampleRate: 16000,

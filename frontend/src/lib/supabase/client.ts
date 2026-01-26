@@ -2,45 +2,52 @@
  * Supabase 客户端配置
  * 用于数据收集页面的音频存储和元数据记录
  */
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 // 从环境变量读取配置
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-
-// 检查配置是否存在
 const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey)
 
 if (!hasSupabaseConfig) {
-  console.warn('⚠️ Supabase 配置缺失，数据将不会被保存到云端')
+  console.warn('⚠️ Supabase 配置缺失，客户端功能受限')
 }
 
-// 创建 Supabase 客户端（只在有配置时创建）
+// 创建 Supabase 客户端（Singleton）
 let supabaseInstance: SupabaseClient | null = null
 
+/**
+ * 获取 Supabase 客户端实例 (Browser)
+ */
 export const getSupabase = (): SupabaseClient | null => {
   if (!hasSupabaseConfig) return null
-  
+
   if (!supabaseInstance) {
-    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    })
+    supabaseInstance = createBrowserClient(supabaseUrl, supabaseAnonKey)
   }
   return supabaseInstance
+}
+
+/**
+ * 通用创建函数 (供新代码使用)
+ */
+export const createClient = () => {
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
 // 为了向后兼容，导出一个代理对象
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_, prop) {
     const client = getSupabase()
+    if (prop === 'then') return undefined; // Avoid Promise-like behavior check issues
     if (!client) {
-      console.warn(`Supabase not configured, cannot access ${String(prop)}`)
-      return () => Promise.resolve({ data: null, error: new Error('Supabase not configured') })
+      if (typeof prop === 'string' && prop !== 'auth') {
+        console.warn(`Supabase not configured, accessing ${String(prop)}`)
+      }
+      return undefined
     }
-    return (client as unknown as Record<string, unknown>)[prop as string]
+    return (client as any)[prop]
   }
 })
 
@@ -75,7 +82,7 @@ export async function uploadAudio(
   }
 
   const path = `${contributorId}/${filename}`
-  
+
   const { data, error } = await client.storage
     .from(AUDIO_BUCKET)
     .upload(path, audioBlob, {
@@ -169,7 +176,7 @@ export async function getOrCreateContributor(anonymousId: string) {
  * 更新贡献者统计
  */
 export async function updateContributorStats(
-  contributorId: string, 
+  contributorId: string,
   durationToAdd: number
 ) {
   const client = getSupabase()
@@ -208,24 +215,24 @@ export async function getCorpusSentences() {
 export async function getCommunityStats() {
   const client = getSupabase()
   if (!client) {
-    return { 
+    return {
       data: {
         total_contributors: 0,
         total_recordings: 0,
         total_duration_hours: 0,
-      }, 
+      },
       error: new Error('Supabase not configured')
     }
   }
 
   const { data, error } = await client.rpc('get_community_stats')
-  
-  return { 
+
+  return {
     data: data || {
       total_contributors: 0,
       total_recordings: 0,
       total_duration_hours: 0,
-    }, 
-    error 
+    },
+    error
   }
 }

@@ -6,8 +6,8 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { 
-  AgentClient, 
+import {
+  AgentClient,
   AgentClientCallbacks,
   ASRResultMessage,
   ResponseTextMessage,
@@ -17,6 +17,7 @@ import {
 } from '@/lib/websocket/agent-client'
 import { AudioProcessor } from '@/lib/audio/audio-processor'
 import { config } from '@/lib/config'
+import { createClient } from '@/lib/supabase/client'
 
 export interface ConversationMessage {
   id: string
@@ -77,22 +78,29 @@ export function useAgent(options: UseAgentOptions = {}) {
     try {
       setState(prev => ({ ...prev, error: null }))
 
+      // Get Auth Token
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
       // 添加调试日志
-      const wsUrl = config.api.agentWsUrl
+      const baseUrl = config.api.agentWsUrl
+      const wsUrl = token ? `${baseUrl}?token=${token}` : baseUrl
+
       console.log('[useAgent] ========== 连接调试信息 ==========')
-      console.log('[useAgent] WebSocket URL:', wsUrl)
+      console.log('[useAgent] WebSocket URL:', wsUrl) // Log full URL for debugging (remove token in prod)
       console.log('[useAgent] window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'SSR')
       console.log('[useAgent] window.location.protocol:', typeof window !== 'undefined' ? window.location.protocol : 'SSR')
       console.log('[useAgent] =====================================')
 
-      const client = new AgentClient()
+      const client = new AgentClient(wsUrl)
       agentClientRef.current = client
 
       const callbacks: AgentClientCallbacks = {
         onOpen: () => {
           console.log('[useAgent] Connected successfully!')
           setState(prev => ({ ...prev, isConnected: true }))
-          
+
           // Start session
           client.startSession({
             enableTTS,
@@ -181,8 +189,8 @@ export function useAgent(options: UseAgentOptions = {}) {
 
         onError: (error) => {
           console.error('[useAgent] Error:', error)
-          const message = 'error' in error && error.error 
-            ? error.error.message 
+          const message = 'error' in error && error.error
+            ? error.error.message
             : '连接错误'
           setState(prev => ({ ...prev, error: message }))
         },

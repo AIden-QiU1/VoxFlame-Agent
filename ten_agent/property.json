@@ -98,6 +98,14 @@
                       "extension": "main_control"
                     }
                   ]
+                },
+                {
+                  "name": "system_init",
+                  "dest": [
+                    {
+                      "extension": "main_control"
+                    }
+                  ]
                 }
               ],
               "audio_frame": [

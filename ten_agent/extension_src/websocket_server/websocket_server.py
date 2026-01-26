@@ -31,6 +31,7 @@ class WebSocketServerManager:
         port: int,
         ten_env: AsyncTenEnv,
         on_audio_callback: Optional[Callable[[AudioData], None]] = None,
+        on_cmd_callback: Optional[Callable[[dict, str], None]] = None,
         on_client_connected: Optional[Callable[[str], None]] = None,
         on_client_disconnected: Optional[Callable[[str], None]] = None,
     ):
@@ -38,6 +39,7 @@ class WebSocketServerManager:
         self.port = port
         self.ten_env = ten_env
         self.on_audio_callback = on_audio_callback
+        self.on_cmd_callback = on_cmd_callback
         self.on_client_connected = on_client_connected
         self.on_client_disconnected = on_client_disconnected
 
@@ -152,6 +154,12 @@ class WebSocketServerManager:
         try:
             self.ten_env.log_debug(f"Message from {client_id}: len={len(message)}")
             data = json.loads(message)
+
+            # Handle Command Messages (e.g. system_init)
+            if data.get("type") == "system_init":
+                if self.on_cmd_callback:
+                    await self.on_cmd_callback(data, client_id)
+                return
 
             if "audio" not in data:
                 await self._send_error(websocket, 'Missing "audio" field')
