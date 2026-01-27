@@ -202,6 +202,12 @@ export class AgentClient {
             console.log('[AgentClient] Ignoring audio field warning')
             break
           }
+          // 忽略 NO_VALID_AUDIO_ERROR，这是用户没有说话时的正常情况
+          if (message.error?.includes?.('NO_VALID_AUDIO_ERROR') ||
+              message.error?.message?.includes?.('NO_VALID_AUDIO_ERROR')) {
+            console.log('[AgentClient] Ignoring NO_VALID_AUDIO_ERROR (user not speaking)')
+            break
+          }
           console.error('[AgentClient] TEN error:', message.error)
           this.callbacks.onError?.({ type: 'error', error: { message: message.error, code: 'TEN_ERROR' } } as ErrorMessage)
           break
@@ -487,23 +493,34 @@ export class AgentClient {
    * TEN Framework websocket_server 期望 base64 编码的 JSON 格式
    */
   sendAudio(audioData: ArrayBuffer | Uint8Array) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      // Convert ArrayBuffer/Uint8Array to base64
-      const bytes = audioData instanceof ArrayBuffer 
-        ? new Uint8Array(audioData) 
-        : audioData
-      const base64 = btoa(Array.from(bytes).map(b => String.fromCharCode(b)).join(''))
-      
-      // Send as JSON with audio field
-      this.ws.send(JSON.stringify({
-        audio: base64,
-        metadata: {
-          sample_rate: 16000,
-          channels: 1,
-          format: 'pcm_s16le'
-        }
-      }))
+    if (!this.ws) {
+      console.warn('[AgentClient] sendAudio: WebSocket is null')
+      return
     }
+
+    if (this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('[AgentClient] sendAudio: WebSocket not ready, state=', this.ws.readyState)
+      return
+    }
+
+    // Convert ArrayBuffer/Uint8Array to base64
+    const bytes = audioData instanceof ArrayBuffer
+      ? new Uint8Array(audioData)
+      : audioData
+    const base64 = btoa(Array.from(bytes).map(b => String.fromCharCode(b)).join(''))
+
+    // Send as JSON with audio field
+    const message = JSON.stringify({
+      audio: base64,
+      metadata: {
+        sample_rate: 16000,
+        channels: 1,
+        format: 'pcm_s16le'
+      }
+    })
+
+    this.ws.send(message)
+    console.log(`[AgentClient] Sent audio: ${bytes.length} bytes (${message.length} chars base64)`)
   }
 
   /**

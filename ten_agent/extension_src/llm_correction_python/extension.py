@@ -116,6 +116,19 @@ class LLMCorrectionExtension(AsyncExtension):
             self.context_history.clear()
             ten_env.log_info("Flushed correction context")
 
+        elif cmd_name == "update_profile":
+            # Update user profile in corrector
+            try:
+                cmd_json, _ = cmd.get_property_to_json(None)
+                profile_data = json.loads(cmd_json) if cmd_json else {}
+                user_profile = profile_data.get("user_profile")
+
+                if user_profile and self.corrector:
+                    self.corrector.update_user_profile(user_profile)
+                    ten_env.log_info(f"Updated user profile: {user_profile.get('email', 'unknown')}")
+            except Exception as e:
+                ten_env.log_error(f"Error updating profile: {e}")
+
         # Return success
         cmd_result = CmdResult.create(StatusCode.OK, cmd)
         await ten_env.return_result(cmd_result)

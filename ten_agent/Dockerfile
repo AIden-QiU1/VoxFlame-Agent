@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM docker.m.daocloud.io/library/python:3.10-slim
 
 # Install system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -46,16 +46,24 @@ ENV CGO_CFLAGS="-I/app/ten_packages/system/ten_runtime_go/interface/ten_runtime 
 RUN cd /app && go build -o bin/main
 
 # Create venv and install Python deps from extensions
+# IMPORTANT: Disable proxy inside container since we use Aliyun mirror
+ENV http_proxy="" \
+    https_proxy="" \
+    HTTP_PROXY="" \
+    HTTPS_PROXY="" \
+    no_proxy="*"
 RUN python3 -m venv /app/venv \
     && . /app/venv/bin/activate \
     && pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ \
-    && pip install --upgrade pip \
-    && pip install -r /app/ten_packages/system/ten_runtime_python/requirements.txt \
-    && pip install /app/ten_packages/system/ten_runtime_python \
-    && pip install -r /app/ten_packages/system/ten_ai_base/requirements.txt \
-    && find /app/ten_packages/extension -name "requirements.txt" -print -exec pip install -r {} \; \
-    && find /app/ten_packages/extension -maxdepth 1 -mindepth 1 -type d -print -exec pip install {} \; \
-    && pip install --no-cache-dir pydantic==2.10.3 tenacity==8.3.0
+    && pip config set global.trusted-host mirrors.aliyun.com \
+    && export http_proxy="" && export https_proxy="" && export HTTP_PROXY="" && export HTTPS_PROXY="" \
+    && pip install --upgrade pip --proxy="" \
+    && pip install -r /app/ten_packages/system/ten_runtime_python/requirements.txt --proxy="" \
+    && pip install /app/ten_packages/system/ten_runtime_python --proxy="" \
+    && pip install -r /app/ten_packages/system/ten_ai_base/requirements.txt --proxy="" \
+    && find /app/ten_packages/extension -name "requirements.txt" -print -exec pip install -r {} --proxy="" \; \
+    && find /app/ten_packages/extension -maxdepth 1 -mindepth 1 -type d -print -exec pip install {} --proxy="" \; \
+    && pip install --no-cache-dir pydantic==2.10.3 tenacity==8.3.0 --proxy=""
 
 ENV PATH=/app/venv/bin:$PATH
 ENV PYTHONPATH=/app:/app/ten_packages:/app/ten_packages/extension:/app/ten_packages/system/ten_runtime_python/interface:/app/ten_packages/system/ten_ai_base/interface:$PYTHONPATH

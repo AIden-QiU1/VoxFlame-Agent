@@ -59,186 +59,44 @@ sudo docker-compose ps
 
 ### 访问地址
 
-| 服务 | 地址 | 说明 |
+| 环境 | 前端地址 | 后端 API | 说明 |
+|------|----------|----------|------|
+| 本地开发 | http://localhost:3000 | http://localhost:3001/api | localhost 无需 HTTPS |
+| 生产环境 | https://your-server-ip | https://your-server-ip/api | **必须使用 HTTPS** |
+
+**重要提示**：
+- 浏览器安全政策要求 `getUserMedia` API 必须在 HTTPS 环境下运行
+- 只有 `localhost` 和 `file://` 协议例外，允许使用 HTTP
+- 如果通过服务器 IP (如 `http://xxx.xxx.xxx.xxx:3000`) 访问，录音功能将无法使用
+- 生产环境必须配置 HTTPS，详见下方 [HTTPS 部署](#https-部署) 章节
+
+---
+
+## 产品进度
+
+| 阶段 | 内容 | 状态 |
 |------|------|------|
-| 前端 | http://localhost:3000 | 语音转换界面 |
-| 后端 | http://localhost:3001 | API + WebSocket 代理 |
-| Agent | ws://localhost:8766 | TEN Agent (内部) |
+| **v1.x 基础版** | TEN Agent + ASR/LLM/TTS + WebSocket + PWA + UI | ✅ 完成 |
+| **v2.x 生产版** | Nginx + HTTPS + Docker Compose | ✅ 完成 |
+| **v3.0 核心优化** | Agent 细节调优 + 构音障碍适配 | 🚧 进行中 |
 
----
+### 当前重点：Agent 优化
 
-## 产品路线图
+| 任务 | 优先级 |
+|------|--------|
+| VAD 参数调优（构音障碍适配） | P0 |
+| LLM 纠错 Prompt 优化 | P0 |
+| 音频流稳定性提升 | P1 |
+| TTS 音色选择与优化 | P1 |
+| 错误处理与重连机制 | P2 |
 
-### v1.0 - 基础语音助手 (已完成)
+### 后续计划
 
-| 功能 | 描述 | 状态 |
-|------|------|------|
-| TEN Framework 集成 | Go Runtime + Python Extensions | Done |
-| 阿里云 ASR | Paraformer-realtime-v2 实时识别 | Done |
-| 通义千问 LLM | Qwen3-max 对话生成 | Done |
-| CosyVoice TTS | 语音合成 (longxiaochun) | Done |
-| WebSocket 通信 | 实时双向通信（直连模式） | Done |
-| PWA 基础支持 | Service Worker + manifest.json | Done |
-| Docker 配置 | docker-compose.yml + Dockerfile | Done |
-
----
-
-### v1.1 - WebSocket 代理 (已完成)
-
-**问题**：VSCode Remote SSH 环境下，端口转发不支持 WebSocket 协议升级
-
-**解决方案**：后端 (3001) 代理 WebSocket 请求到 TEN Agent (8766)
-
-| 功能 | 描述 | 状态 |
-|------|------|------|
-| 后端代理实现 | ws 库实现双向代理 | Done |
-| 前端配置更新 | agentWsUrl 改为 ws://host:3001/ws/agent | Done |
-| 连接状态管理 | 消息队列处理连接延迟 | Done |
-| 音频流转发 | Base64 音频正常传输 | Done |
-
----
-
-### v1.2 - UI 改进 (已完成)
-
-**目标**：Google 风格简洁界面，优化录音交互
-
-| 功能 | 描述 | 状态 |
-|------|------|------|
-| Google 风格 UI | 白色简洁主题 | Done |
-| 字幕显示 | LLM 纠正后的文字实时显示 | Done |
-| 点击式录音 | 点击开始/结束，替代长按 | Done |
-| 空格键控制 | 空格键切换录音状态 | Done |
-| 页面风格统一 | ranyan/contribute 页面同步更新 | Done |
-
----
-
-### v2.0 - LLM 语音纠错 (开发中)
-
-**目标**：为构音障碍患者提供专业的实时语音纠错功能
-
-**核心流程**：用户说话 → ASR 识别 → LLM 纠错 → 清晰文字 + 正常语音
-
-| Phase | 内容 | 状态 |
-|-------|------|------|
-| Phase 0 | 技术调研（ASR/TTS/VAD/扩展生态） | Done |
-| Phase 1 | 基础 LLM 纠错扩展 (dysarthric_correction) | WIP |
-| Phase 2 | VAD/Turn Detection 优化（构音障碍参数调整） | Planned |
-| Phase 3 | 个性化纠错（用户词库、上下文记忆） | Planned |
-| Phase 4 | N-best 重排序 (Fun-ASR-Nano) | Optional |
-
-**关键技术参数**：
-- VAD 阈值: 0.3-0.4 (降低误触发)
-- 静默时间: 1500-2000ms (延长等待)
-- LLM Prompt: 结合医学知识与语音特征
-
-**详细开发计划**：[docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md](docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md)
-
----
-
-### v2.5 - 部署与运维 (计划中)
-
-**目标**：从开发环境过渡到生产环境，支持 HTTPS + 负载均衡
-
-| 任务 | 描述 | 优先级 |
-|------|------|--------|
-| Nginx 配置 | 反向代理 + WebSocket 升级 + SSL | P1 |
-| SSL/HTTPS | Let's Encrypt 自动续期 | P1 |
-| Docker Nginx 集成 | docker-compose 添加 Nginx 服务 | P1 |
-| 环境配置管理 | dev/test/prod 配置分离 | P2 |
-| 日志收集 | 集中日志管理 | P2 |
-| 健康检查 | 服务监控与自动重启 | P3 |
-
-**Nginx 架构**：
-```
-浏览器 (HTTPS 443)
-    ↓
-Nginx 反向代理
-    ├─→ Frontend :3000 (静态文件 + SSR)
-    ├─→ Backend :3001 (API 接口)
-    └─→ TEN Agent :8766 (WebSocket 音频流)
-```
-
----
-
-### v2.6 - PWA 增强 (计划中)
-
-**目标**：完整的 PWA 离线支持与移动端体验优化
-
-| 任务 | 描述 | 优先级 |
-|------|------|--------|
-| 离线回退页面 | 无网络时友好提示 | P1 |
-| 音频数据缓存 | IndexedDB 存储音频块 | P1 |
-| 更新提示组件 | Service Worker 更新检测与刷新 | P2 |
-| 安装提示横幅 | 引导用户安装 PWA | P2 |
-| Lighthouse 审计 | PWA 分数 > 90 | P3 |
-
-**详细实施指南**：[docs/PWA_IMPLEMENTATION_GUIDE.md](docs/PWA_IMPLEMENTATION_GUIDE.md)
-
----
-
-### v3.0 - RTC 实时通信 (计划中)
-
-**目标**：接入 Agora RTC 实现低延迟实时音视频通信
-
-**适用场景**：> 1000 并发用户，多人协作对话
-
-| 功能 | 描述 |
+| 版本 | 内容 |
 |------|------|
-| Agora RTC SDK | 实时音视频传输 (UDP + RTP) |
-| 多用户房间 | 支持多人同时对话 |
-| 音视频质量优化 | 弱网适配、回声消除、自适应码率 |
-| 云录制 | 对话录音存档 |
-
-**技术对比**：
-| 指标 | WebSocket | Agora RTC |
-|------|-----------|-----------|
-| 协议 | TCP | UDP + RTP |
-| 延迟 | 100-300ms | 50-150ms |
-| 并发支持 | < 1000 | 10,000+ |
-| 弱网适配 | 容易断连 | FEC + NACK |
-
----
-
-### v4.0 - 高并发与扩展 (计划中)
-
-**目标**：支持大规模用户同时在线，实现企业级可扩展性
-
-| 功能 | 描述 |
-|------|------|
-| 负载均衡 | Nginx/K8s 负载分发 |
-| Agent 集群 | 多 TEN Agent 实例 + 会话保持 |
-| 消息队列 | Redis/RabbitMQ 异步处理 |
-| 监控告警 | Prometheus + Grafana |
-| 自动扩缩容 | K8s HPA 根据负载自动扩容 |
-
-**架构演进**：
-```
-Phase 1: 单机部署（当前）
-    Frontend + Backend + TEN Agent (同一台服务器)
-
-Phase 2: 服务分离 (v2.5)
-    Nginx + Frontend + Backend + TEN Agent (独立进程)
-
-Phase 3: 集群部署 (v4.0)
-    Load Balancer → Frontend/Backend/Agent Cluster
-
-Phase 4: 容器编排 (v4.0+)
-    Kubernetes + Auto-scaling + Redis + PostgreSQL
-```
-
----
-
-### v5.0 - 移动端与生态 (远期规划)
-
-**目标**：构建完整的多端生态系统
-
-| 功能 | 描述 |
-|------|------|
-| iOS/Android App | React Native 原生应用 |
-| 智能穿戴 | Apple Watch/WearOS 支持 |
-| 智能音箱 | 接入小度/天猫精灵/小爱同学 |
-| 医疗机构平台 | 康复机构管理后台 |
-| 多语言支持 | 方言/多语言/国际化 |
+| PWA 增强 | 离线支持、IndexedDB 缓存、安装提示 |
+| RTC 通信 | Agora SDK 接入，低延迟多人对话 |
+| 高并发 | 负载均衡、Agent 集群、消息队列 |
 
 ---
 
@@ -300,7 +158,102 @@ VoxFlame-Agent/
 
 ---
 
+## HTTPS 部署
+
+### 为什么需要 HTTPS？
+
+浏览器出于安全考虑，**仅在以下环境允许使用 `getUserMedia` API**（用于录音）：
+- `https://` 协议
+- `localhost` 或 `127.0.0.1`
+- `file://` 协议
+
+如果你通过服务器 IP 地址（如 `http://xxx.xxx.xxx.xxx:3000`）访问，会遇到以下错误：
+```
+当前浏览器不支持 mediaDevices API，请确保使用 HTTPS 或 localhost 访问
+```
+
+### 快速配置 HTTPS（开发环境）
+
+项目已包含自签名 SSL 证书生成脚本：
+
+```bash
+# 1. 生成自签名证书
+bash nginx/generate-ssl.sh
+
+# 2. 启动所有服务（包含 Nginx）
+sudo docker-compose up -d
+
+# 3. 访问 HTTPS
+# 浏览器访问 https://your-server-ip
+# 首次访问会提示证书不安全，点击"继续访问"即可
+```
+
+### 服务架构
+
+```
+┌─────────────────────────────────────────────────────┐
+│                 Nginx (443/80)                      │
+│  ┌─────────────┬─────────────┬─────────────┐        │
+│  │  HTTPS:443  │  HTTP:80    │  WS Proxy   │        │
+│  │  → 转发到   │  → 重定向   │  /ws/agent  │        │
+│  └──────┬──────┴──────┬──────┴──────┬──────┘        │
+└─────────┼──────────────┼─────────────┼───────────────┘
+          │              │             │
+    ┌─────▼─────┐  ┌────▼────┐  ┌────▼────┐
+    │ Frontend  │  │ Backend │  │Ten-Agent│
+    │   :3000   │  │  :3001  │  │  :8766  │
+    └───────────┘  └─────────┘  └─────────┘
+```
+
+### Nginx 配置说明
+
+- **HTTP (80)**: 自动重定向到 HTTPS
+- **HTTPS (443)**: 主服务端口
+  - `/` → Frontend (Next.js)
+  - `/api/` → Backend API
+  - `/ws/agent` → WebSocket (到 TEN Agent)
+  - `/health` → 健康检查
+
+### 生产环境 SSL 证书
+
+开发环境的自签名证书仅用于测试，生产环境建议使用：
+
+**Let's Encrypt (免费)**:
+```bash
+# 安装 certbot
+sudo apt-get install certbot
+
+# 生成证书
+sudo certbot certonly --standalone -d your-domain.com
+
+# 证书路径
+# /etc/letsencrypt/live/your-domain.com/fullchain.pem
+# /etc/letsencrypt/live/your-domain.com/privkey.pem
+
+# 更新 nginx/nginx.conf 中的证书路径
+```
+
+**或使用云服务商提供的 SSL 证书**：阿里云、腾讯云、AWS ACM 等
+
+---
+
 ## 常见问题
+
+### HTTPS 访问提示证书不安全
+
+自签名证书不受浏览器信任，这是正常的：
+1. Chrome/Edge: 点击"高级" → "继续访问"
+2. Firefox: 点击"高级" → "接受风险并继续"
+
+### 通过服务器 IP 访问无法录音
+
+**症状**：`navigator.mediaDevices` 为 `undefined`
+
+**原因**：浏览器安全政策阻止 HTTP 非本地访问
+
+**解决**：
+- 开发测试：使用 `localhost:3000` 或配置 HTTPS
+- 生产环境：必须配置 HTTPS（见上方章节）
 
 ### TEN Agent 启动失败: Failed to load libpython3.10.so
 

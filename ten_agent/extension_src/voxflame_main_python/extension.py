@@ -48,6 +48,9 @@ class VoxFlameMainExtension(AsyncExtension):
         self.conversation_history: list = []
         self.max_history_length: int = 10
 
+        # User profile from authentication
+        self.user_profile: Optional[Dict[str, Any]] = None
+
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
         """Initialize the extension."""
         self.ten_env = ten_env
@@ -189,16 +192,31 @@ class VoxFlameMainExtension(AsyncExtension):
         try:
             data_json, _ = data.get_property_to_json(None)
             init_data = json.loads(data_json) if data_json else {}
-            
+
             user = init_data.get("user")
             if user:
-                ten_env.log_info(f"[VoxFlameMain] System Init - User: {user.get('email', 'unknown')}")
-                if 'name' in user:
-                    ten_env.log_info(f"[VoxFlameMain] User Name: {user['name']}")
-                
-                # TODO: Store user profile and update LLM Corrector context
-                # self.user_profile = user
-                
+                # Store user profile
+                self.user_profile = user
+
+                email = user.get('email', 'unknown')
+                name = user.get('name', '')
+                user_id = user.get('id', '')
+
+                ten_env.log_info(f"[VoxFlameMain] System Init - User: {email}")
+                if name:
+                    ten_env.log_info(f"[VoxFlameMain] User Name: {name}")
+                if user_id:
+                    ten_env.log_info(f"[VoxFlameMain] User ID: {user_id}")
+
+                # Update LLM Corrector with user profile
+                try:
+                    await send_cmd(ten_env, "update_profile", "llm_correction_python", {
+                        "user_profile": user
+                    })
+                    ten_env.log_info("[VoxFlameMain] Sent user profile to LLM Corrector")
+                except Exception as e:
+                    ten_env.log_warn(f"[VoxFlameMain] Failed to update LLM Corrector profile: {e}")
+
         except Exception as e:
             ten_env.log_error(f"[VoxFlameMain] Error handling system_init: {e}")
 

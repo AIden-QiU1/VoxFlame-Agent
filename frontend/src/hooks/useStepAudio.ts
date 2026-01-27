@@ -3,6 +3,19 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { StepAudioClient, StepAudioConfig, RECOMMENDED_VOICES } from '@/lib/realtime-audio/step-audio-client'
 
+/**
+ * 检查浏览器是否支持 getUserMedia
+ */
+function checkMediaDevicesSupport(): boolean {
+  if (typeof window === 'undefined') {
+    throw new Error('getUserMedia 只能在浏览器环境中使用')
+  }
+  if (!navigator.mediaDevices) {
+    throw new Error('当前浏览器不支持 mediaDevices API，请确保使用 HTTPS 或 localhost 访问')
+  }
+  return true
+}
+
 export interface UseStepAudioOptions {
   apiKey?: string
   voice?: string
@@ -119,6 +132,9 @@ export function useStepAudio(options: UseStepAudioOptions = {}): UseStepAudioRet
     }
 
     try {
+      // 检查浏览器环境和支持
+      checkMediaDevicesSupport()
+
       // 获取麦克风权限
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {

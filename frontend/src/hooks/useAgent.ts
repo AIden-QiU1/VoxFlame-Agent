@@ -17,7 +17,7 @@ import {
 } from '@/lib/websocket/agent-client'
 import { AudioProcessor } from '@/lib/audio/audio-processor'
 import { config } from '@/lib/config'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, getValidToken } from '@/lib/supabase/client'
 
 export interface ConversationMessage {
   id: string
@@ -78,19 +78,13 @@ export function useAgent(options: UseAgentOptions = {}) {
     try {
       setState(prev => ({ ...prev, error: null }))
 
-      // Get Auth Token
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
-      // 添加调试日志
-      const baseUrl = config.api.agentWsUrl
-      const wsUrl = token ? `${baseUrl}?token=${token}` : baseUrl
+      // Get Auth Token (使用 getValidToken 自动处理刷新)
+      const token = await getValidToken()
+      const wsUrl = token ? `${config.api.agentWsUrl}?token=${token}` : config.api.agentWsUrl
 
       console.log('[useAgent] ========== 连接调试信息 ==========')
-      console.log('[useAgent] WebSocket URL:', wsUrl) // Log full URL for debugging (remove token in prod)
-      console.log('[useAgent] window.location.hostname:', typeof window !== 'undefined' ? window.location.hostname : 'SSR')
-      console.log('[useAgent] window.location.protocol:', typeof window !== 'undefined' ? window.location.protocol : 'SSR')
+      console.log('[useAgent] WebSocket URL:', wsUrl.replace(/token=.+$/, 'token=***')) // 隐藏 token
+      console.log('[useAgent] Has Auth Token:', !!token)
       console.log('[useAgent] =====================================')
 
       const client = new AgentClient(wsUrl)
@@ -189,9 +183,22 @@ export function useAgent(options: UseAgentOptions = {}) {
 
         onError: (error) => {
           console.error('[useAgent] Error:', error)
+
+          // 忽略 NO_VALID_AUDIO_ERROR - 用户没有说话时的正常情况
+          const isNoValidAudioError =
+            ('error' in error && error.error?.message?.includes?.('NO_VALID_AUDIO_ERROR')) ||
+            ('message' in error && (error as any).message?.includes?.('NO_VALID_AUDIO_ERROR'))
+
+          if (isNoValidAudioError) {
+            console.log('[useAgent] Ignoring NO_VALID_AUDIO_ERROR (user not speaking)')
+            return
+          }
+
           const message = 'error' in error && error.error
             ? error.error.message
             : '连接错误'
+
+          // 只显示真正的连接错误，忽略 ASR 超时等暂时性错误
           setState(prev => ({ ...prev, error: message }))
         },
 
@@ -232,34 +239,51 @@ export function useAgent(options: UseAgentOptions = {}) {
 
   // Start recording
   const startRecording = useCallback(async () => {
+    console.log('[useAgent] ========== startRecording called ==========')
+    console.log('[useAgent] AgentClient connected:', agentClientRef.current?.isConnected())
+
     if (!agentClientRef.current?.isConnected()) {
+      console.error('[useAgent] Not connected to agent!')
       setState(prev => ({ ...prev, error: '未连接到服务器' }))
       return
     }
 
     try {
+      console.log('[useAgent] Clearing previous ASR text and error')
       setState(prev => ({ ...prev, currentASRText: '', error: null }))
 
       // Initialize AudioContext for TTS playback (must be after user gesture)
+      console.log('[useAgent] Initializing AudioContext for TTS...')
       await agentClientRef.current.initAudio()
+      console.log('[useAgent] AudioContext initialized')
 
       if (audioProcessorRef.current) {
+        console.log('[useAgent] Starting AudioProcessor...')
         const analyser = await audioProcessorRef.current.start(
           (data) => {
+            // Audio callback - called repeatedly with audio chunks
+            console.log('[useAgent] Audio chunk received:', data.byteLength, 'bytes')
             if (agentClientRef.current?.isConnected()) {
               // Convert ArrayBufferLike to ArrayBuffer
               agentClientRef.current.sendAudio(data as ArrayBuffer)
+            } else {
+              console.warn('[useAgent] Agent not connected, dropping audio chunk')
             }
           },
           true // enable recording
         )
         analyserRef.current = analyser
+        console.log('[useAgent] AudioProcessor started successfully')
+      } else {
+        console.error('[useAgent] AudioProcessor is null!')
       }
 
+      console.log('[useAgent] Setting isRecording = true')
       setState(prev => ({ ...prev, isRecording: true }))
+      console.log('[useAgent] ========== Recording started ==========')
     } catch (error) {
       console.error('[useAgent] Start recording failed:', error)
-      setState(prev => ({ ...prev, error: '启动录音失败' }))
+      setState(prev => ({ ...prev, error: '启动录音失败: ' + (error instanceof Error ? error.message : String(error)) }))
     }
   }, [])
 
@@ -279,9 +303,13 @@ export function useAgent(options: UseAgentOptions = {}) {
 
   // Toggle recording
   const toggleRecording = useCallback(() => {
+    console.log('[useAgent] ========== toggleRecording called ==========')
+    console.log('[useAgent] Current isRecording:', state.isRecording)
     if (state.isRecording) {
+      console.log('[useAgent] Stopping recording...')
       stopRecording()
     } else {
+      console.log('[useAgent] Starting recording...')
       startRecording()
     }
   }, [state.isRecording, startRecording, stopRecording])

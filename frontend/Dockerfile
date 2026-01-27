@@ -1,10 +1,15 @@
 # Frontend Dockerfile for VoxFlame
-FROM node:20-alpine AS base
+# Using Debian-based image for full glibc compatibility (required by Next.js SWC)
+FROM docker.m.daocloud.io/library/node:20-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 COPY package.json package-lock.json* ./
@@ -36,13 +41,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Install curl for healthchecks inside container
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create logs directory
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 RUN mkdir .next

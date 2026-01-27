@@ -1,12 +1,14 @@
 /**
  * VoxFlame 应用配置
- * 
+ *
  * 单一 Agent 架构 - 只需要两个地址：
- * 1. TEN Agent WebSocket - 通过后端代理 (3001/ws/agent) 连接
- * 2. 后端 API (3001) - 用户配置、记忆管理
- * 
- * 注意：由于 VSCode Remote 不支持 WebSocket 端口转发，
- * 我们通过后端 3001 端口代理 WebSocket 连接到 TEN Agent (8766)
+ * 1. TEN Agent WebSocket - 通过 Nginx 代理 (443/ws/agent) 连接
+ * 2. 后端 API - 通过 Nginx 代理 (443/api) 连接
+ *
+ * HTTPS 部署说明：
+ * - 生产环境必须使用 HTTPS，否则浏览器会禁用 getUserMedia API
+ * - 使用 Nginx 反向代理处理 SSL/TLS 终止
+ * - WebSocket 自动使用 wss:// 协议
  */
 
 // 获取当前主机名用于动态配置
@@ -15,6 +17,19 @@ function getHost(): string {
     return 'localhost'
   }
   return window.location.hostname
+}
+
+// 获取当前端口（在非标准端口时使用）
+function getPort(): string {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+  const port = window.location.port
+  // 标准端口不需要显示指定
+  if (port === '80' || port === '443' || !port) {
+    return ''
+  }
+  return `:${port}`
 }
 
 // 获取 WebSocket 协议（http->ws, https->wss）
@@ -38,33 +53,34 @@ export const config = {
   api: {
     /**
      * TEN Agent WebSocket 地址
-     * 通过后端 3001 端口的 /ws/agent 路径代理
-     * 解决 VSCode Remote 不支持 WebSocket 端口转发的问题
+     * 通过 Nginx /ws/agent 路径代理
+     * 自动根据页面协议选择 ws:// 或 wss://
      */
     get agentWsUrl(): string {
-      const envUrl = process.env.NEXT_PUBLIC_AGENT_WS_URL
-      // 如果环境变量指定了非 localhost 地址，使用它
-      if (envUrl && !envUrl.includes('localhost')) {
+      const envUrl = process.env.NEXT_PUBLIC_WS_URL
+      // 优先使用环境变量配置的 WebSocket 地址
+      if (envUrl) {
         return envUrl
       }
 
-      // 使用相对路径，通过 Next.js Rewrite 代理到后端 (http://backend:3001)
-      // 解决 CORS 和 VSCode Remote 端口转发问题
+      // 动态构建：使用当前页面的 host 和 port
       const protocol = getWsProtocol()
       const host = getHost()
-      return `${protocol}://${host}:${window.location.port || (protocol === 'wss' ? 443 : 80)}/ws/agent`
+      const port = getPort()
+      return `${protocol}://${host}${port}/ws/agent`
     },
 
     /**
      * 后端 API 地址
      * 用于用户配置、工具执行、记忆管理
+     * 使用相对路径，通过 Nginx 代理
      */
     get baseUrl(): string {
       const envUrl = process.env.NEXT_PUBLIC_API_URL
       if (envUrl && !envUrl.includes('localhost')) {
         return envUrl
       }
-      // 使用相对路径，通过 Next.js Rewrite 代理
+      // 使用相对路径，通过 Nginx /api/ 代理
       return '/api'
     },
   },

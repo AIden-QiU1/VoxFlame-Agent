@@ -1,16 +1,30 @@
 import { config } from '../config'
 
+/**
+ * 检查浏览器是否支持 getUserMedia
+ */
+function checkMediaDevicesSupport(): boolean {
+  if (typeof window === 'undefined') {
+    throw new Error('getUserMedia 只能在浏览器环境中使用')
+  }
+  if (!navigator.mediaDevices) {
+    throw new Error('当前浏览器不支持 mediaDevices API，请确保使用 HTTPS 或 localhost 访问')
+  }
+  return true
+}
+
 export class AudioProcessor {
   private audioContext: AudioContext | null = null
   private analyser: AnalyserNode | null = null
   private source: MediaStreamAudioSourceNode | null = null
   private processor: ScriptProcessorNode | null = null
   private stream: MediaStream | null = null
-  
+
   // 录音收集相关
   private recordedChunks: Int16Array[] = []
   private isCollecting: boolean = false
   private recordingStartTime: number = 0
+  private _logCounter: number = 0
 
   // 将 Float32Array 转换为 PCM 16bit
   private floatTo16BitPCM(input: Float32Array): Int16Array {
@@ -60,6 +74,9 @@ export class AudioProcessor {
     onAudioProcess: (data: ArrayBufferLike) => void,
     collectAudio: boolean = false
   ): Promise<AnalyserNode> {
+    // 检查浏览器环境和支持
+    checkMediaDevicesSupport()
+
     // 初始化录音收集
     this.recordedChunks = []
     this.isCollecting = collectAudio
@@ -94,13 +111,19 @@ export class AudioProcessor {
       if (this.audioContext) {
         const resampledData = this.resample(inputData, this.audioContext.sampleRate, config.audio.sampleRate)
         const pcmData = this.floatTo16BitPCM(resampledData)
-        
+
         // 实时回调（用于ASR）
         onAudioProcess(pcmData.buffer)
-        
+
         // 收集音频数据（用于存储）
         if (this.isCollecting) {
           this.recordedChunks.push(new Int16Array(pcmData))
+        }
+
+        // 调试日志（每秒约一次）
+        if (!this._logCounter) this._logCounter = 0
+        if (this._logCounter++ % 50 === 0) {
+          console.log('[AudioProcessor] Audio chunk processed:', pcmData.length, 'samples')
         }
       }
     }

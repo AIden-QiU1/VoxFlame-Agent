@@ -36,6 +36,59 @@ export const createClient = () => {
   return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
+/**
+ * 获取有效的 Access Token
+ * 自动处理 token 过期和刷新
+ *
+ * @returns 返回有效的 access_token，如果用户未登录则返回 null
+ */
+export async function getValidToken(): Promise<string | null> {
+  const client = getSupabase()
+  if (!client) return null
+
+  try {
+    // getSession() 会自动刷新过期的 token
+    const { data: { session }, error } = await client.auth.getSession()
+
+    if (error) {
+      console.error('[getValidToken] 获取 session 失败:', error)
+      return null
+    }
+
+    if (!session) {
+      console.warn('[getValidToken] 用户未登录')
+      return null
+    }
+
+    // 检查 token 是否即将过期（5分钟内）
+    const expiresAt = session.expires_at
+    if (expiresAt) {
+      const now = Math.floor(Date.now() / 1000)
+      const timeUntilExpiry = expiresAt - now
+
+      if (timeUntilExpiry < 300) {
+        // Token 即将过期，手动刷新
+        console.log('[getValidToken] Token 即将过期，正在刷新...')
+        const { data: { session: newSession }, error: refreshError } =
+          await client.auth.refreshSession()
+
+        if (refreshError) {
+          console.error('[getValidToken] 刷新 token 失败:', refreshError)
+          // 返回旧 token，让服务器处理过期
+          return session.access_token
+        }
+
+        return newSession?.access_token || session.access_token
+      }
+    }
+
+    return session.access_token
+  } catch (e) {
+    console.error('[getValidToken] 异常:', e)
+    return null
+  }
+}
+
 // 为了向后兼容，导出一个代理对象
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_, prop) {

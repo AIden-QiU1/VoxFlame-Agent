@@ -44,6 +44,23 @@ class LLMCorrector:
 
         ten_env.log_info(f"LLMCorrector initialized with model: {model}")
 
+    def update_user_profile(self, user_profile: dict) -> None:
+        """Update user profile for personalized correction."""
+        # Format user profile as string for prompt
+        if isinstance(user_profile, dict):
+            profile_parts = []
+            if user_profile.get('email'):
+                profile_parts.append(f"邮箱: {user_profile['email']}")
+            if user_profile.get('name'):
+                profile_parts.append(f"昵称: {user_profile['name']}")
+            if user_profile.get('id'):
+                profile_parts.append(f"用户ID: {user_profile['id']}")
+            self.user_profile = "\n".join(profile_parts) if profile_parts else ""
+        else:
+            self.user_profile = str(user_profile)
+
+        self.ten_env.log_info(f"User profile updated: {self.user_profile[:100] if self.user_profile else 'empty'}...")
+
     def _build_prompt(self, asr_text: str, context: List[dict]) -> str:
         """Build the correction prompt with context"""
         prompt_parts = []
