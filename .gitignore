@@ -42,3 +42,11 @@ ten_packages/
 skills-router/
 skills-router-cli/
 
+# SSL certificates and private keys (NEVER commit these!)
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+*.pem
+*.key
+!package-lock.json
+
