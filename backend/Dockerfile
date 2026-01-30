@@ -1,6 +1,15 @@
+# Backend Dockerfile for VoxFlame
+# 使用 DaoCloud Node 镜像 + 国内镜像源加速
+
 FROM docker.m.daocloud.io/library/node:20-alpine
 
 WORKDIR /app
+
+# 配置阿里云 Alpine 源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
+# 配置 npm 阿里云镜像源
+RUN npm config set registry https://registry.npmmirror.com
 
 # Copy package files
 COPY package*.json ./

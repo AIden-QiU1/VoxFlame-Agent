@@ -77,26 +77,66 @@ sudo docker-compose ps
 | 阶段 | 内容 | 状态 |
 |------|------|------|
 | **v1.x 基础版** | TEN Agent + ASR/LLM/TTS + WebSocket + PWA + UI | ✅ 完成 |
-| **v2.x 生产版** | Nginx + HTTPS + Docker Compose | ✅ 完成 |
-| **v3.0 核心优化** | Agent 细节调优 + 构音障碍适配 | 🚧 进行中 |
+| **v2.x 生产版** | Nginx + HTTPS + Docker Compose + 环境配置修复 | ✅ 完成 |
+| **v3.x 认证系统** | Supabase Auth + 用户上下文感知 | ✅ 完成 |
+| **v4.0 核心优化** | Agent 细节调优 + 构音障碍适配 | 🚧 进行中 |
 
-### 当前重点：Agent 优化
+### 已验证功能 (2026-01-30)
 
-| 任务 | 优先级 |
-|------|--------|
-| VAD 参数调优（构音障碍适配） | P0 |
-| LLM 纠错 Prompt 优化 | P0 |
-| 音频流稳定性提升 | P1 |
-| TTS 音色选择与优化 | P1 |
-| 错误处理与重连机制 | P2 |
+| 功能模块 | 状态 | 说明 |
+|----------|------|------|
+| 用户注册 | ✅ 正常 | 注册后自动登录 |
+| 用户登录 | ✅ 正常 | JWT Token 认证 |
+| WebSocket 连接 | ✅ 正常 | Frontend → Backend → TEN Agent |
+| TTS 语音输出 | ✅ 正常 | 问候语播放成功 |
+| 字幕显示 | ✅ 正常 | ASR 文本实时显示 |
+| 音频录音 | ⚠️ 需 HTTPS | 浏览器安全限制 |
+
+### 待上线准备：域名 + HTTPS
+
+| 步骤 | 操作 | 时间 |
+|------|------|------|
+| 购买域名 | 选择注册商、支付、DNS 配置 | 10-30 分钟 |
+| DNS 生效 | 域名解析到服务器 IP | 10 分钟 - 48 小时 |
+| 申请 SSL | Let's Encrypt 自动申请 | 5 分钟 |
+| 配置 Nginx | 更新配置、重启服务 | 10 分钟 |
+
+**总计**：最快 30 分钟，最长 2 天（等待 DNS）
+
+**一键配置命令**（等有域名后）:
+```bash
+# 1. 安装 certbot
+sudo apt-get install certbot
+
+# 2. 申请证书
+sudo certbot certonly --standalone -d your-domain.com
+
+# 3. 更新 nginx/nginx.conf 中的域名和证书路径
+# 4. 重启服务
+sudo docker-compose restart nginx
+```
+
+**域名推荐**：
+- 国内：阿里云/腾讯云 `.com` 约 50-70 元/年，DNS 生效快
+- 国外：Namecheap/GoDaddy 约 $10-15/年
+
+### 当前重点：构音障碍适配
+
+| 任务 | 优先级 | 预计工期 |
+|------|--------|----------|
+| **快捷指令面板** | P0 | 1-2 天 |
+| **常用短语收藏** | P0 | 1 天 |
+| VAD 参数调优 | P1 | 0.5 天 |
+| LLM 纠错 Prompt 优化 | P1 | 0.5 天 |
+| 音频流稳定性提升 | P2 | 1 天 |
 
 ### 后续计划
 
 | 版本 | 内容 |
 |------|------|
-| PWA 增强 | 离线支持、IndexedDB 缓存、安装提示 |
-| RTC 通信 | Agora SDK 接入，低延迟多人对话 |
-| 高并发 | 负载均衡、Agent 集群、消息队列 |
+| **PWA 增强** | 离线支持、IndexedDB 缓存、安装提示 |
+| **RTC 通信** | Agora SDK 接入，低延迟多人对话 |
+| **高并发** | 负载均衡、Agent 集群、消息队列 |
 
 ---
 

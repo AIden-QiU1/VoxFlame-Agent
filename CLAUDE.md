@@ -7,53 +7,53 @@
 
 ---
 
-## 一、 核心交互准则 (The Core Loop)
+## 一、 核心工具 (Essential Tools)
 
-在本项目中，你必须严格遵守以下 **Interactive MCP Loop**：
+根据实际开发经验，以下 MCP 工具最有价值：
 
-### 1. 知识溯源 (Knowledge Sourcing) - **Context7**
+### 1. Playwright (浏览器自动化) ⭐⭐⭐⭐⭐
+*   **工具**: `mcp__playwright__*` 系列
+*   **用途**:
+    *   UI 测试 - 验证前端功能是否正常
+    *   WebSocket 连接测试
+    *   截图验证界面效果
+*   **常用命令**:
+    *   `browser_navigate` - 打开页面
+    *   `browser_snapshot` - 获取页面状态（比截图更好用）
+    *   `browser_click` - 点击按钮
+    *   `browser_type` - 输入文本
+    *   `console_messages` - 查看浏览器日志
+
+### 2. Web Search (搜索) ⭐⭐⭐⭐⭐
+*   **工具**: `WebSearch`
+*   **用途**: 验证技术方案、查找最新 Bug 修复、寻找最佳实践
+*   **注意**: 仅在美国可用，搜索时使用正确年份（当前是 2026 年）
+
+### 3. Web Reader (网页阅读) ⭐⭐⭐⭐
+*   **工具**: `mcp__web_reader__webReader`
+*   **用途**: 获取网页完整内容进行分析
+*   **参数**: `return_format: "markdown"` 获取格式化内容
+
+### 4. Context7 (文档查询) ⭐⭐⭐⭐
 *   **工具**: `mcp__context7__query-docs`
-*   **规则**:
-    *   **拒绝猜测**: 遇到不熟悉的库（如 TEN Framework, Next.js 最新特性），**必须**先查文档。
-    *   **官方优先**: 使用 `resolve-library-id` 解析官方库 ID，获取最准确的 API 说明。
-    *   **使用流程**:
-        1. 先调用 `resolve-library-id` 获取库 ID
-        2. 再调用 `query-docs` 查询具体 API 或用法
+*   **用途**: 查询库/框架的最新文档和 API
+*   **使用流程**:
+    1. `resolve-library-id` 解析库 ID
+    2. `query-docs` 查询具体用法
 
-### 2. 信息增强 (Information Retrieval) - **Web Search & Web Reader**
-*   **搜索工具**: `WebSearch`
-*   **阅读工具**: `mcp__web_reader__webReader`
-*   **规则**:
-    *   **外部验证**: 当需要验证技术方案的可行性、查找最新的 Bug 修复或寻找最佳实践时，**必须** 先用 `WebSearch` 搜索。
-    *   **完整数据**: 如果需要获取网页完整内容进行分析，使用 Web Reader 的 `return_format: "markdown"` 参数。
-    *   **使用流程**:
-        1. 先用 `WebSearch` 搜索关键词
-        2. 再用 `webReader` 获取目标网页的完整内容
-    *   **注意**: WebSearch 仅在美国可用，搜索时请使用正确年份（当前是 2026 年）
-
-### 3. 图像分析 (Image Analysis) - **4.5v MCP**
+### 5. Image Analysis (图像分析) ⭐⭐⭐
 *   **工具**: `mcp__4_5v_mcp__analyze_image`
-*   **用途**: 分析 UI 截图、设计稿、错误截图等
+*   **用途**: 分析 UI 截图、设计稿、错误截图
+*   **提示词模板**: "Describe in detail the layout structure, color style, main components, and interactive elements..."
 
-### 4. 复杂问题分析 (Complex Reasoning) - **Sequential Thinking**
+### 6. Sequential Thinking (复杂推理) ⭐⭐⭐
 *   **工具**: `mcp__sequential-thinking__sequentialthinking`
-*   **用途**: 处理复杂的多步骤问题，支持迭代思考、分支探索、假设验证
+*   **用途**: 处理复杂的多步骤问题，支持迭代思考、分支探索
 
-### 5. GitHub 集成 (GitHub Integration)
-*   **工具**: `mcp__github__*` 系列
-*   **用途**:
-    *   搜索代码 (`search_code`)
-    *   创建/管理 Issues (`create_issue`, `update_issue`)
-    *   创建/管理 PRs (`create_pull_request`)
-    *   查看仓库信息 (`get_file_contents`, `list_commits`)
-
-### 6. 文件系统操作 (Filesystem Operations)
-*   **工具**: `mcp__filesystem__*` 系列
-*   **用途**:
-    *   读写文件 (`read_text_file`, `write_file`, `edit_file`)
-    *   目录操作 (`directory_tree`, `list_directory`, `create_directory`)
-    *   文件搜索 (`search_files`)
-    *   移动/重命名 (`move_file`)
+### 其他工具 (按需使用)
+*   **GitHub** (`mcp__github__*`) - 搜索代码、创建 Issues/PRs
+*   **Filesystem** (`mcp__filesystem__*`) - 文件读写、目录操作
+*   **TodoWrite** - 任务进度跟踪
 
 ---
 
