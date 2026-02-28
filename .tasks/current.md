@@ -1,67 +1,130 @@
 # 当前任务状态
 
-> 最后更新: 2026-01-30
+> 最后更新: 2026-02-28
 
-## ✅ 已完成
-- Supabase 数据库 (`voice_contributions` 表)
-- Aliyun OSS 集成
-- Backend Upload API
-- 云服务器部署 (腾讯云 Lighthouse 111.230.35.89)
-- Docker 构建修复 (移除代理配置)
-- WebSocket 连接修复 (动态 URL 构建)
-- **Supabase Auth 集成** (密码登录，无需邮件确认)
-- **Agent 用户上下文感知** (system_init → LLM Corrector)
-- **前端环境变量修复** (docker-compose.yml build args)
-- **完整消息链路验证** (Frontend → Backend → TEN Agent 全流程测试通过)
+## 今日工作总结 (2026-02-28)
 
-## 📋 当前功能状态
+### 已完成
+- ✅ **双行字幕镜功能**: Raw ASR + LLM 纠正双行显示实现
+- ✅ **记忆系统深度调研**: 对比分析 EverMemOS / Qdrant / Supabase pgvector
+- ✅ **TEN Framework 记忆架构研究**: 研究了 PowerMem、EverMemOS、memU 示例代码
 
-### 用户认证 ✅
-- 注册功能：正常工作
-- 登录功能：正常工作
-- JWT Token 认证：正常工作
-- 自动登录：注册后自动登录
+### 关键发现
 
-### WebSocket 连接 ✅
-- Frontend → Backend 代理：正常
-- Backend → TEN Agent 转发：正常
-- Auth Token 传递：正常
-- 多客户端支持：已实现
+| 记忆系统 | 性能 | 部署复杂度 | 成本 | 推荐度 |
+|---------|------|-----------|------|--------|
+| **EverMemOS** | 93% LoCoMo | 高 (4 Docker + LLM API) | 内测免费 | ⭐⭐⭐ |
+| **Qdrant** | <10ms | 低 (1 Docker) | 免费 | ⭐⭐⭐⭐⭐ |
+| **pgvector** | >200ms | 无 (已集成) | 免费 | ⭐⭐ |
 
-### Agent 语音交互 ✅
-- TTS 音频输出：正常 (问候语播放成功)
-- ASR 语音识别：待实际麦克风测试
-- LLM 对话响应：通过 TTS 输出验证
-- 字幕显示：正常
+### 研究结论
 
-## 📋 Backlog
-- Qdrant 向量记忆 (基于 User ID)
-- 构音障碍适配 (VAD 参数优化)
-- PWA 离线支持增强
+**EverMemOS Cloud API**:
+- 当前处于内测阶段，需要申请
+- 自部署需要 4 个 Docker 服务 (MongoDB/Elasticsearch/Milvus/Redis) + LLM API
+- SOTA 性能 (92.3% LoCoMo)，但复杂度较高
 
-## 📋 待上线准备
+**Qdrant**:
+- 性能最优 (<10ms 延迟)
+- 部署最简单 (单个 Docker 容器)
+- 90% 内存压缩 (Product Quantization)
 
-### 域名 + HTTPS 配置
-购买域名后，预计 **30 分钟 - 2 天** 可完成配置：
+**Supabase pgvector**:
+- 已集成，无需额外部署
+- 性能瓶颈 (>200ms 延迟，超过 100 万向量时)
+- 适合初期原型，不适合生产规模
 
-| 步骤 | 操作 | 时间 |
-|------|------|------|
-| 购买域名 | 选择注册商、支付、DNS 配置 | 10-30 分钟 |
-| DNS 生效 | 域名解析到服务器 IP | 10 分钟 - 48 小时 |
-| 申请 SSL 证书 | Let's Encrypt 自动申请 | 5 分钟 |
-| 配置 Nginx | 更新配置、重启服务 | 10 分钟 |
+---
 
-**一键配置命令**（等有域名后）:
+## 下次工作优先级
+
+### P0 - 验证现有功能
+> **目标**: 确保系统真正可运行，不是"看起来可以工作"
+
+| 任务 | 验证项 | 预计时间 |
+|------|--------|---------|
+| **登录系统验证** | - 注册功能是否真正可用<br>- 登录 Token 是否正确传递<br>- 用户上下文是否正确加载 | 30分钟 |
+| **用户管理验证** | - 用户数据是否正确存储 Supabase<br>- 多用户隔离是否生效 | 30分钟 |
+| **ASR 功能验证** | - 麦克风录音是否正常<br>- ASR 识别结果是否返回 | 30分钟 |
+| **LLM 纠错验证** | - 纠错结果是否准确<br>- 响应延迟是否可接受 | 30分钟 |
+| **TTS 播放验证** | - 音频是否正常播放<br>- 音质是否清晰 | 30分钟 |
+| **记忆功能验证** | - 当前 Supabase 记忆是否存储<br>- 检索是否工作 | 30分钟 |
+
+### P1 - 记忆系统最终选择
+> **目标**: 基于实际测试选择最适合的记忆系统
+
+| 方案 | 考虑因素 | 决策标准 |
+|------|---------|---------|
+| **Qdrant** | 性能、部署复杂度 | - 延迟 <50ms<br>- 部署时间 <30分钟 |
+| **EverMemOS** | SOTA 性能、内测申请 | - 能否获得 API Key<br>- 是否等待云服务 |
+| **Supabase pgvector** | 已集成、性能 | - 用户量 <1000 可用<br>- 需要后续迁移 |
+
+**Voice Agent 记忆创新点**:
+1. **语音优先的记忆结构**: 存储 Raw ASR + Corrected Text 对比
+2. **清晰度评分记忆**: 记录哪些表达方式最容易被理解
+3. **场景感知记忆**: 就医/购物/家庭等场景的专用记忆
+4. **成功模式学习**: 记住哪些纠错方式最有效
+
+### P2 - 应用上线部署
+> **目标**: 让用户可以真正使用
+
+| 步骤 | 操作 | 预计时间 |
+|------|------|---------|
+| 购买域名 | 选择域名注册商 | 10-30分钟 |
+| DNS 配置 | A 记录指向服务器 IP | 10分钟 - 48小时 |
+| SSL 证书 | Let's Encrypt 自动申请 | 5分钟 |
+| Nginx 更新 | 配置域名、HTTPS | 10分钟 |
+
+**一键配置命令** (等有域名后):
 ```bash
 # 1. 申请证书
 sudo certbot certonly --standalone -d your-domain.com
 
-# 2. 证书路径
-# /etc/letsencrypt/live/your-domain.com/fullchain.pem
-# /etc/letsencrypt/live/your-domain.com/privkey.pem
-
-# 3. 更新 nginx/nginx.conf 后重启
+# 2. 更新 nginx/nginx.conf
+# 3. 重启服务
 sudo docker-compose restart nginx
 ```
 
-项目已配置好 Nginx，只需更新域名和证书路径即可。
+---
+
+## 当前功能状态
+
+### 用户认证 ✅ (需验证)
+- 注册功能：代码已实现，**需验证真正可用**
+- 登录功能：代码已实现，**需验证真正可用**
+- JWT Token 认证：代码已实现，**需验证真正可用**
+- 自动登录：注册后自动登录
+
+### WebSocket 连接 ✅ (需验证)
+- Frontend → Backend 代理：已配置
+- Backend → TEN Agent 转发：已配置
+- Auth Token 传递：已配置
+- 多客户端支持：已实现
+
+### Agent 语音交互 ⚠️ (需全面验证)
+- TTS 音频输出：问候语播放成功
+- ASR 语音识别：**需实际麦克风测试**
+- LLM 对话响应：**需测试完整对话流**
+- 双行字幕：**前端需验证显示效果**
+
+### 记忆系统 🚧 (待选择实现)
+- Supabase pgvector：已集成，**性能待测试**
+- Qdrant：Docker 配置已准备，**待部署**
+- EverMemOS：已调研，**等待内测或决策自部署**
+
+---
+
+## Backlog
+
+### 功能
+- [ ] 数字名片 (陌生人快速理解)
+- [ ] 场景模板 (就医/购物/点餐/打车)
+- [ ] 声音可视化 (波形 + 频谱)
+- [ ] PWA 离线支持增强
+- [ ] 历史记录调用
+
+### 技术
+- [ ] Qwen3-ASR 评估与升级
+- [ ] Qwen3-TTS 评估与升级
+- [ ] VAD 参数优化 (构音障碍适配)
+- [ ] TEN 扩展开发 (memory_layer, speech_clarity)
