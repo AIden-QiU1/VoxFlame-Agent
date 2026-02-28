@@ -50,3 +50,6 @@ nginx/ssl/*.crt
 *.key
 !package-lock.json
 
+openclaw/
+superpowers/
+nanobot/

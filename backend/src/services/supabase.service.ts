@@ -32,19 +32,52 @@ export interface UserProfile {
   updated_at?: string;
 }
 
+export interface QuickPhrase {
+  id?: string;
+  user_id: string;
+  text: string;
+  category: PhraseCategory;
+  tts_url?: string;
+  usage_count: number;
+  last_used_at?: string;
+  order_index: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type PhraseCategory =
+  | 'greeting'
+  | 'need'
+  | 'emotion'
+  | 'medical'
+  | 'shopping'
+  | 'dining'
+  | 'transport'
+  | 'custom';
+
 export class SupabaseService {
   private client: SupabaseClient;
+  private adminClient: SupabaseClient; // service_role client for system operations
   private static instance: SupabaseService;
 
   private constructor() {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Missing Supabase environment variables: SUPABASE_URL, SUPABASE_ANON_KEY');
     }
 
     this.client = createClient(supabaseUrl, supabaseAnonKey);
+
+    // Create admin client with service_role key (bypasses RLS)
+    if (supabaseServiceRoleKey) {
+      this.adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    } else {
+      console.warn('SUPABASE_SERVICE_ROLE_KEY not set, some admin operations may fail');
+      this.adminClient = this.client; // Fallback to anon key
+    }
   }
 
   public static getInstance(): SupabaseService {
@@ -280,6 +313,205 @@ export class SupabaseService {
       total_memories: memories.length,
       last_session: sessions[0]?.start_time || null,
     };
+  }
+
+  // === Quick Phrases ===
+  /**
+   * 创建新短语
+   */
+  async createPhrase(phrase: Omit<QuickPhrase, 'id' | 'created_at' | 'updated_at'>): Promise<QuickPhrase | null> {
+    const { data, error } = await this.adminClient
+      .from('quick_phrases')
+      .insert(phrase)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating phrase:', error);
+      return null;
+    }
+    return data;
+  }
+
+  /**
+   * 获取用户所有短语，可按分类筛选
+   * 注意：此方法使用 adminClient 绕过 RLS，适用于后端 API 调用
+   */
+  async getUserPhrases(userId: string, category?: string, limit?: number): Promise<QuickPhrase[]> {
+    let query = this.adminClient
+      .from('quick_phrases')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (category) {
+      query = query.eq('category', category);
+    }
+
+    query = query.order('order_index', { ascending: true });
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching user phrases:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  /**
+   * 更新短语
+   */
+  async updatePhrase(phraseId: string, updates: Partial<QuickPhrase>): Promise<QuickPhrase | null> {
+    const { data, error } = await this.adminClient
+      .from('quick_phrases')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', phraseId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating phrase:', error);
+      return null;
+    }
+    return data;
+  }
+
+  /**
+   * 删除短语
+   */
+  async deletePhrase(phraseId: string): Promise<boolean> {
+    const { error } = await this.adminClient
+      .from('quick_phrases')
+      .delete()
+      .eq('id', phraseId);
+
+    if (error) {
+      console.error('Error deleting phrase:', error);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * 增加短语使用次数
+   */
+  async incrementPhraseUsage(phraseId: string): Promise<QuickPhrase | null> {
+    // 首先获取当前短语
+    const { data: current } = await this.adminClient
+      .from('quick_phrases')
+      .select('*')
+      .eq('id', phraseId)
+      .single();
+
+    if (!current) {
+      return null;
+    }
+
+    const { data, error } = await this.adminClient
+      .from('quick_phrases')
+      .update({
+        usage_count: (current.usage_count || 0) + 1,
+        last_used_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', phraseId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error incrementing phrase usage:', error);
+      return null;
+    }
+    return data;
+  }
+
+  /**
+   * 批量更新短语顺序
+   */
+  async reorderPhrases(phraseOrders: Array<{ id: string; order_index: number }>): Promise<boolean> {
+    // Supabase 不支持批量更新，需要逐个更新
+    // 使用事务保证一致性
+    const updates = phraseOrders.map(({ id, order_index }) =>
+      this.adminClient
+        .from('quick_phrases')
+        .update({ order_index, updated_at: new Date().toISOString() })
+        .eq('id', id)
+    );
+
+    // 并发执行所有更新
+    const results = await Promise.allSettled(updates);
+
+    // 检查是否所有更新都成功
+    const failures = results.filter(r => r.status === 'rejected');
+    if (failures.length > 0) {
+      console.error('Error reordering phrases:', failures);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 从系统预设表获取所有预设短语
+   */
+  async getPresetPhrases(): Promise<Array<{ text: string; category: PhraseCategory }>> {
+    const { data, error } = await this.client
+      .from('preset_phrases')
+      .select('text, category, order_index')
+      .eq('is_active', true)
+      .order('order_index', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching preset phrases:', error);
+      return [];
+    }
+
+    return data || [];
+  }
+
+  /**
+   * 为用户初始化预设短语（从系统预设表复制）
+   */
+  async initializePresetPhrases(userId: string): Promise<QuickPhrase[]> {
+    // 检查用户是否已有短语
+    const existing = await this.getUserPhrases(userId);
+    if (existing.length > 0) {
+      return existing; // 已有短语，不重复初始化
+    }
+
+    // 从数据库获取预设短语
+    const presets = await this.getPresetPhrases();
+
+    if (presets.length === 0) {
+      console.warn('No preset phrases found in database');
+      return [];
+    }
+
+    // 批量创建预设短语到用户库
+    const phrases = presets.map((preset, index: number) => ({
+      user_id: userId,
+      text: preset.text,
+      category: preset.category,
+      usage_count: 0,
+      order_index: index,
+    }));
+
+    // 使用 adminClient (service_role) 绕过 RLS
+    const { data, error } = await this.adminClient
+      .from('quick_phrases')
+      .insert(phrases)
+      .select();
+
+    if (error) {
+      console.error('Error initializing preset phrases:', error);
+      return [];
+    }
+
+    return data || [];
   }
 }
 

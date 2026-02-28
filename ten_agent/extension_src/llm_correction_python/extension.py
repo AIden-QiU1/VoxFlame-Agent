@@ -222,7 +222,10 @@ class LLMCorrectionExtension(AsyncExtension):
     async def _send_corrected_text(
         self, ten_env: AsyncTenEnv, original: str, corrected: str
     ) -> None:
-        """Send corrected text to frontend via WebSocket"""
+        """Send corrected text to frontend via WebSocket
+
+        双行字幕镜功能：同时发送原始ASR结果和LLM纠正结果，并计算清晰度评分
+        """
         try:
             # Create corrected_text data for frontend
             corrected_data = Data.create("corrected_text")
@@ -230,8 +233,14 @@ class LLMCorrectionExtension(AsyncExtension):
             corrected_data.set_property_string("corrected_text", corrected)
             corrected_data.set_property_bool("is_corrected", original != corrected)
 
+            # 计算清晰度评分（基于原始文本和纠正文本的差异）
+            # 如果两者相同，说明ASR识别正确（清晰度高）
+            # 如果两者不同，说明ASR识别不准确（清晰度低）
+            clarity_score = 100 if original == corrected else max(0, 100 - len(original) * 2)
+            corrected_data.set_property_int("clarity_score", clarity_score)
+
             await ten_env.send_data(corrected_data)
-            ten_env.log_debug(f"Sent corrected text to frontend")
+            ten_env.log_debug(f"Sent dual-line text: original='{original}', corrected='{corrected}', score={clarity_score}")
 
         except Exception as e:
             ten_env.log_error(f"Error sending corrected text: {e}")

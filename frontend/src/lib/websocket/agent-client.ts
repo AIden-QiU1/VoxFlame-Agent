@@ -65,6 +65,15 @@ export interface MemoryStoredMessage {
   content: string
 }
 
+// 双行字幕镜消息类型
+export interface DualLineSubtitleMessage {
+  type: 'dual_line_subtitle'
+  original_text: string      // ASR 原始识别结果
+  corrected_text: string     // LLM 纠正后的结果
+  is_corrected: boolean      // 是否进行了纠正
+  clarity_score: number      // 清晰度评分 (0-100)
+}
+
 // 事件回调类型
 export interface AgentClientCallbacks {
   onSessionStarted?: (data: SessionStartedMessage) => void
@@ -73,6 +82,7 @@ export interface AgentClientCallbacks {
   onResponseAudio?: (data: ResponseAudioMessage) => void
   onThinking?: (data: ThinkingMessage) => void
   onMemoryStored?: (data: MemoryStoredMessage) => void
+  onDualLineSubtitle?: (data: DualLineSubtitleMessage) => void  // 双行字幕回调
   onError?: (error: ErrorMessage | Event) => void
   onClose?: () => void
   onOpen?: () => void
@@ -306,9 +316,23 @@ export class AgentClient {
   }
 
   private handleCorrectedText(data: any) {
-    const correctedText = data?.corrected_text || data?.text
+    const originalText = data?.original_text || ''
+    const correctedText = data?.corrected_text || data?.text || ''
+    const clarityScore = data?.clarity_score ?? 100
+    const isCorrected = data?.is_corrected ?? (originalText !== correctedText)
+
     if (!correctedText) return
 
+    // 双行字幕镜：同时发送原始文本和纠正文本
+    this.callbacks.onDualLineSubtitle?.({
+      type: 'dual_line_subtitle',
+      original_text: originalText,
+      corrected_text: correctedText,
+      is_corrected: isCorrected,
+      clarity_score: clarityScore
+    } as DualLineSubtitleMessage)
+
+    // 保持向后兼容：仍然发送 response_text 消息
     this.callbacks.onResponseText?.({
       type: 'response_text',
       delta: correctedText,

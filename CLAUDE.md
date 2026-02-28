@@ -138,17 +138,149 @@
 
 ---
 
-## 六、 文档导航 (Documentation Map)
+> 来自常用短语板功能开发中的实战经验总结
+
+### 1. 认证架构 (Auth Architecture)
+
+Supabase 有两种密钥，用途不同：
+
+| 密钥 | 用途 | 权限 |
+|------|------|------|
+| `SUPABASE_ANON_KEY` | 前端客户端调用 | 受 RLS 限制 |
+| `SUPABASE_SERVICE_ROLE_KEY` | 后端服务端调用 | **绕过 RLS** |
+
+**关键原则**：
+- 前端使用 `anonKey` 创建 Supabase Client
+- 后端应使用 `serviceRoleKey` 创建 Admin Client 来处理系统操作
+
+### 2. RLS (Row Level Security) 问题与解决
+
+**问题场景**：后端使用 anon key 调用数据库时，`auth.uid()` 返回 NULL，导致 RLS 策略拒绝访问。
+
+**解决方案**：后端创建两个客户端
+
+```typescript
+// backend/src/services/supabase.service.ts
+export class SupabaseService {
+  private client: SupabaseClient;        // anon key - 受 RLS 限制
+  private adminClient: SupabaseClient;   // service_role - 绕过 RLS
+
+  private constructor() {
+    this.client = createClient(supabaseUrl, supabaseAnonKey);
+    this.adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+  }
+
+  // 用户相关操作使用 client（需要验证身份）
+  async getUserPhrases(userId: string): Promise<QuickPhrase[]> {
+    return this.adminClient  // 后端 API 调用使用 adminClient
+      .from('quick_phrases')
+      .select('*')
+      .eq('user_id', userId);
+  }
+}
+```
+
+### 3. 外键约束问题
+
+**问题**：预设短语初始化时，user_id 不在 `auth.users` 表中，导致外键约束失败。
+
+**解决方案**：
+1. 移除外键约束，改为 CHECK 约束验证 UUID 格式
+2. 在应用层保证 user_id 的有效性
+
+```sql
+-- 移除外键
+ALTER TABLE public.quick_phrases DROP CONSTRAINT quick_phrases_user_id_fkey;
+
+-- 添加 UUID 格式验证
+ALTER TABLE public.quick_phrases ADD CONSTRAINT quick_phrases_user_id_valid
+  CHECK (user_id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
+```
+
+### 4. 数据库驱动架构
+
+**教训**：不要在前后端之间共享硬编码数据。
+
+**错误做法**：
+```typescript
+// ❌ 后端导入前端代码
+import { PRESET_PHRASES } from '../../frontend/src/lib/types/phrases';
+```
+
+**正确做法**：将共享数据放入数据库
+- `preset_phrases` 表：系统级预设（所有用户共享）
+- `quick_phrases` 表：用户自定义数据
+
+### 5. 迁移管理
+
+使用 Supabase CLI 推送迁移：
+
+```bash
+# 设置访问令牌
+export SUPABASE_ACCESS_TOKEN="sbp_xxx"
+
+# 推送迁移
+supabase db push
+
+# 如果遇到旧迁移冲突，临时移除后推送
+mv supabase/migrations/old_file.sql /tmp/
+supabase db push
+mv /tmp/old_file.sql supabase/migrations/
+```
+
+### 6. 系统表 vs 用户表
+
+| 表名 | RLS | 用途 |
+|------|-----|------|
+| `preset_phrases` | 禁用 | 系统预设，所有用户可读 |
+| `quick_phrases` | 启用 | 用户数据，需认证 |
+
+**重要**：系统级数据（如预设短语）应该放在独立的表中，并禁用 RLS 或使用宽松策略。
+
+---
+
+## 七、 文档导航 (Documentation Map)
 
 在回答问题或规划任务时，参考以下核心文档，但是不需要一开始就读取相关文档，遇到开发相关问题再查阅：
 
-### 0. 架构与规范 (New!)
+### 0. 架构与规范
     **文档导航** : [../docs/README.md](../docs/README.md)
 *   **架构必读**: [../docs/BEST_PRACTICES_AND_ARCHITECTURE.md](../docs/BEST_PRACTICES_AND_ARCHITECTURE.md) - **编写代码前必读**
 
 
 请确保所有新生成的代码或文档更新都与上述文件的最新状态保持一致。
 
+---
+
+## 八、 问题解决案例 (Case Studies)
+
+### 案例：常用短语板 RLS 问题
+
+**问题描述**：
+后端 API 调用 Supabase 时返回 RLS 策略错误：
+```
+new row violates row-level security policy for table "quick_phrases"
+```
+
+**根本原因**：
+1. 后端使用 `anonKey` 创建 Supabase 客户端
+2. RLS 策略要求 `auth.uid() = user_id`
+3. 但后端调用时 `auth.uid()` 为 NULL（无用户上下文）
+4. 预设短语初始化时 user_id 不在 `auth.users` 表中，外键约束失败
+
+**解决过程**：
+| 尝试 | 方案 | 结果 |
+|------|------|------|
+| 1 | 修改 RLS 策略为 `WITH CHECK (true)` | 失败 - anon key 仍受限制 |
+| 2 | 为 service_role 创建专门策略 | 失败 - 后端仍用 anon key |
+| 3 | 移除外键约束 | 部分成功 - 但 RLS 仍拦截 |
+| 4 | **使用 service_role 创建 adminClient** | ✅ 成功 |
+
+**最终方案**：
+1. 后端创建 `adminClient` (使用 service_role key)
+2. 移除 `auth.users` 外键，改为 UUID 格式验证
+3. 所有后端 API 调用使用 `adminClient` 绕过 RLS
+4. `preset_phrases` 表禁用 RLS（系统级数据）
 
 
 遇到问题一定要找到切入点，全力解决， 直到筋疲力尽，用完我给你的所有工具，多次尝试相关想法， 再反馈给我你做了什么，学到了什么，卡在哪里了，下一步准备怎么做。

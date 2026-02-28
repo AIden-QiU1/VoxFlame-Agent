@@ -20,6 +20,7 @@ import { agentRouter } from './controllers/agent.controller'
 import sessionRouter from './controllers/session.controller'
 import { memoryController } from './controllers/memory.controller'
 import { uploadRouter } from './controllers/upload.controller'
+import { phrasesController } from './controllers/phrases.controller'
 import { errorHandler } from './middlewares/error.middleware'
 import { createClient } from '@supabase/supabase-js'
 
@@ -211,6 +212,17 @@ memoryRouter.get('/hotwords/:userId', memoryController.getHotwords.bind(memoryCo
 memoryRouter.get('/stats/:userId', memoryController.getUserStats.bind(memoryController))
 app.use('/api/memory', memoryRouter)
 
+// Phrases API 路由 (常用短语)
+const phrasesRouter = express.Router()
+phrasesRouter.post('/', phrasesController.createPhrase.bind(phrasesController))
+phrasesRouter.get('/user/:userId', phrasesController.getUserPhrases.bind(phrasesController))
+phrasesRouter.put('/:phraseId', phrasesController.updatePhrase.bind(phrasesController))
+phrasesRouter.delete('/:phraseId', phrasesController.deletePhrase.bind(phrasesController))
+phrasesRouter.post('/:phraseId/use', phrasesController.incrementUsage.bind(phrasesController))
+phrasesRouter.post('/reorder', phrasesController.reorderPhrases.bind(phrasesController))
+phrasesRouter.post('/presets/initialize', phrasesController.initializePresets.bind(phrasesController))
+app.use('/api/phrases', phrasesRouter)
+
 // Upload API 路由 (OSS 签名)
 app.use('/api/upload', uploadRouter)
 
@@ -254,6 +266,14 @@ server.listen(PORT, () => {
   console.log('   - POST /api/memory/add')
   console.log('   - GET  /api/memory/search?user_id=xxx&query=...')
   console.log('   - GET  /api/memory/user/:userId')
+
+  console.log('')
+  console.log('💬 Phrases API 端点:')
+  console.log('   - POST /api/phrases')
+  console.log('   - GET  /api/phrases/user/:userId')
+  console.log('   - PUT  /api/phrases/:phraseId')
+  console.log('   - POST /api/phrases/:phraseId/use')
+  console.log('   - POST /api/phrases/reorder')
 
   console.log('')
   console.log('📡 Webhook 端点:')

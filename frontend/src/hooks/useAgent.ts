@@ -13,7 +13,8 @@ import {
   ResponseTextMessage,
   ResponseAudioMessage,
   ThinkingMessage,
-  MemoryStoredMessage
+  MemoryStoredMessage,
+  DualLineSubtitleMessage
 } from '@/lib/websocket/agent-client'
 import { AudioProcessor } from '@/lib/audio/audio-processor'
 import { config } from '@/lib/config'
@@ -27,6 +28,18 @@ export interface ConversationMessage {
   audioPlaying?: boolean
 }
 
+/**
+ * 双行字幕镜数据
+ * 显示用户语音的原始识别结果 vs LLM 纠正后的结果
+ */
+export interface DualLineSubtitle {
+  originalText: string      // ASR 原始识别结果
+  correctedText: string     // LLM 纠正后的结果
+  isCorrected: boolean      // 是否进行了纠正
+  clarityScore: number      // 清晰度评分 (0-100)
+  timestamp: Date
+}
+
 export interface AgentState {
   isConnected: boolean
   isRecording: boolean
@@ -35,6 +48,7 @@ export interface AgentState {
   sessionId: string | null
   currentASRText: string
   currentResponseText: string
+  currentDualLine: DualLineSubtitle | null  // 双行字幕镜数据
   messages: ConversationMessage[]
   error: string | null
 }
@@ -56,6 +70,7 @@ export function useAgent(options: UseAgentOptions = {}) {
     sessionId: null,
     currentASRText: '',
     currentResponseText: '',
+    currentDualLine: null,
     messages: [],
     error: null,
   })
@@ -179,6 +194,20 @@ export function useAgent(options: UseAgentOptions = {}) {
 
         onMemoryStored: (data: MemoryStoredMessage) => {
           console.log('[useAgent] Memory stored:', data.memory_id)
+        },
+
+        onDualLineSubtitle: (data: DualLineSubtitleMessage) => {
+          console.log('[useAgent] Dual line subtitle:', data)
+          setState(prev => ({
+            ...prev,
+            currentDualLine: {
+              originalText: data.original_text,
+              correctedText: data.corrected_text,
+              isCorrected: data.is_corrected,
+              clarityScore: data.clarity_score,
+              timestamp: new Date()
+            }
+          }))
         },
 
         onError: (error) => {
