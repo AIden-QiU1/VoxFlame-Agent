@@ -5,15 +5,33 @@ export class MemoryController {
   // POST /api/memory/add - Add new memory from TEN Agent
   async addMemory(req: Request, res: Response): Promise<void> {
     try {
+      // 从认证中间件获取用户 ID
+      const authenticatedUserId = req.user?.id
       const { user_id, session_id, content, metadata } = req.body;
 
-      if (!user_id || !session_id || !content) {
-        res.status(400).json({ error: 'Missing required fields: user_id, session_id, content' });
+      // 验证：请求的 user_id 必须与认证用户匹配
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      // 安全检查：确保 user_id 与 token 匹配
+      if (user_id && user_id !== authenticatedUserId) {
+        console.warn(`[MemoryController] User ID mismatch: token=${authenticatedUserId}, body=${user_id}`)
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      // 使用认证后的 user_id
+      const safeUserId = authenticatedUserId;
+
+      if (!session_id || !content) {
+        res.status(400).json({ error: 'Missing required fields: session_id, content' });
         return;
       }
 
       const memory: Memory = {
-        user_id,
+        user_id: safeUserId,
         session_id,
         content,
         metadata,
@@ -21,7 +39,7 @@ export class MemoryController {
       };
 
       const created = await SupabaseService.getInstance().addMemory(memory);
-      
+
       if (!created) {
         res.status(500).json({ error: 'Failed to add memory' });
         return;
@@ -37,15 +55,23 @@ export class MemoryController {
   // GET /api/memory/search?user_id=xxx&query=... - Semantic search memories
   async searchMemories(req: Request, res: Response): Promise<void> {
     try {
-      const { user_id, query, limit } = req.query;
+      // 从认证中间件获取用户 ID
+      const authenticatedUserId = req.user?.id;
+      const { query, limit } = req.query;
 
-      if (!user_id || !query) {
-        res.status(400).json({ error: 'Missing required parameters: user_id, query' });
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
         return;
       }
 
+      if (!query) {
+        res.status(400).json({ error: 'Missing required parameter: query' });
+        return;
+      }
+
+      // 使用认证后的 user_id，忽略请求参数中的 user_id
       const memories = await SupabaseService.getInstance().searchMemories(
-        user_id as string,
+        authenticatedUserId,
         query as string,
         limit ? parseInt(limit as string) : 10
       );
@@ -60,6 +86,7 @@ export class MemoryController {
   // GET /api/memory/user/:userId - Get all user memories
   async getUserMemories(req: Request, res: Response): Promise<void> {
     try {
+      // validateUserId 中间件已验证 userId 与 token 匹配
       const { userId } = req.params;
       const { limit } = req.query;
 
@@ -85,14 +112,17 @@ export class MemoryController {
     try {
       const { memoryId } = req.params;
       const updates = req.body;
+      const authenticatedUserId = req.user?.id;
 
       if (!memoryId) {
         res.status(400).json({ error: 'Missing memoryId parameter' });
         return;
       }
 
+      // TODO: 添加 memory ownership 验证
+
       const updated = await SupabaseService.getInstance().updateMemory(memoryId, updates);
-      
+
       if (!updated) {
         res.status(404).json({ error: 'Memory not found or update failed' });
         return;
@@ -109,14 +139,17 @@ export class MemoryController {
   async deleteMemory(req: Request, res: Response): Promise<void> {
     try {
       const { memoryId } = req.params;
+      const authenticatedUserId = req.user?.id;
 
       if (!memoryId) {
         res.status(400).json({ error: 'Missing memoryId parameter' });
         return;
       }
 
+      // TODO: 添加 memory ownership 验证
+
       const success = await SupabaseService.getInstance().deleteMemory(memoryId);
-      
+
       if (!success) {
         res.status(404).json({ error: 'Memory not found or deletion failed' });
         return;
@@ -132,6 +165,7 @@ export class MemoryController {
   // GET /api/memory/hotwords/:userId - Extract hotwords from user sessions
   async getHotwords(req: Request, res: Response): Promise<void> {
     try {
+      // validateUserId 中间件已验证 userId 与 token 匹配
       const { userId } = req.params;
 
       if (!userId) {
@@ -151,6 +185,7 @@ export class MemoryController {
   // GET /api/memory/stats/:userId - Get user statistics
   async getUserStats(req: Request, res: Response): Promise<void> {
     try {
+      // validateUserId 中间件已验证 userId 与 token 匹配
       const { userId } = req.params;
 
       if (!userId) {

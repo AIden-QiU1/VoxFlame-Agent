@@ -80,8 +80,104 @@
 | **Frontend** | Next.js 14, PWA, Tailwind | 3000 | 极简交互，WebSocket 客户端 |
 | **Backend** | Express.js, WS Proxy | 3001 | 协议转换，鉴权代理 |
 | **Agent** | TEN Framework (Go/Python) | 8766 | ASR -> LLM (Correction) -> TTS 流水线 |
-| **Data** | Qdrant, PostgreSQL | 6333 | 向量记忆，用户配置 |
+| **Data** | Qdrant, PostgreSQL, SQLite | 6333 | 向量记忆，用户配置，本地存储 |
 | **Storage** | 阿里云 OSS | - | 用户音频存储 (`{user_id}/...`) |
+
+### 当前功能实现状态 (2026-03-02)
+
+| 功能 | 实现状态 | 集成状态 | 说明 |
+|------|----------|----------|------|
+| **双行字幕镜** | ✅ 组件完成 | ⚠️ 未集成 | `DualLineSubtitleDisplay` 组件存在但无路由 |
+| **常用短语板** | ✅ 完整实现 | ⚠️ 未集成 | 8个分类 + Supabase + CRUD |
+| **记忆系统 v2** | ✅ 已实现 | ✅ 已集成 | Local-first + Hybrid 架构 |
+| **认证系统** | ✅ 代码完成 | 需验证 | Supabase Auth + JWT |
+| **A2UI 框架** | 🚧 开发中 | - | Agent 主动推送 UI |
+
+**关键发现**：
+- `ChatInterface.tsx` 包含双行字幕和短语板，但 `/chat` 路由不存在（404）
+- 主页 (`/`) 仅显示基础录音界面，未集成高级组件
+- 下一步：将 ChatInterface 组件集成到主页或创建独立路由
+
+---
+
+## 听障群体支持规划 (Hearing Impaired Support) 🆕
+
+### 问题定义
+如何将外界声音传递给听障群体？
+
+### 解决方案架构
+
+```
+外界声音 → ASR → translation_skill → A2UI 展示
+   ↓            ↓              ↓            ↓
+麦克风阵列  语音识别    翻译/字幕    全屏大字
+```
+
+### TEN 扩展计划
+
+| 扩展名 | 功能 | 优先级 | 状态 |
+|--------|------|--------|------|
+| `translation_skill_python` | 语音转文字 + 翻译 | P0 | 📝 规划中 |
+| `hearing_assist_python` | 听障辅助模式 | P1 | 📝 规划中 |
+| `caption_display_python` | 全屏字幕控制 | P1 | 📝 规划中 |
+
+### 实现要点
+
+1. **实时 ASR**: 对方说话时实时转文字
+2. **全屏展示**: 超大字体，适合远距离观看
+3. **双行字幕**: 原文 + 翻译（如果需要）
+4. **表情辅助**: 语气图标帮助理解
+
+---
+
+## A2UI (Agentic UI) 开发指南 🆕
+
+### A2UI vs 传统 UI
+
+| 特性 | 传统 UI | A2UI |
+|------|---------|------|
+| 触发方式 | 用户点击/输入 | Agent 主动推送 |
+| 状态管理 | React useState | Agent 决策 + 前端渲染 |
+| 显示时机 | 固定布局 | 根据场景动态显示 |
+
+### 实现模式
+
+```typescript
+// 1. TEN Agent 扩展推送事件
+// extension_src/translation_skill_python/extension.py
+def on_caption(self, text: str):
+    self.send_event({
+        'type': 'ui_update',
+        'component': 'full_screen_caption',
+        'props': {'text': text, 'size': 'extra_large'}
+    })
+
+// 2. 前端 useAgent Hook 监听
+// frontend/src/hooks/useAgent.ts
+useEffect(() => {
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data)
+    if (msg.type === 'ui_update') {
+      setUiState(msg.props)  // 动态更新 UI
+    }
+  }
+}, [])
+
+// 3. 组件根据状态渲染
+<FullScreenCaption {...uiState} />
+```
+
+### A2UI 组件库
+
+| 组件 | 用途 | 触发条件 |
+|------|------|----------|
+| `DualLineSubtitle` | 双行字幕 | ASR 结果 ≠ LLM 纠正 |
+| `FullScreenCaption` | 全屏大字 | 听障模式激活 |
+| `IntentPanel` | 意图面板 | Agent 预测意图 |
+| `PhraseSuggestions` | 短语建议 | 场景匹配 |
+| `DigitalCard` | 数字名片 | 陌生人场景 |
+
+---
 
 ### 关键路径
 1.  **用户语音** -> 前端 (Microphone)
@@ -91,7 +187,50 @@
 
 ---
 
-## 四、 开发工作流 (Workflow)
+## 四、 Docker 操作规范 (Docker Operations)
+
+**重要**：本项目使用 Docker Compose 构建，所有服务在容器中运行。
+
+### 标准命令
+
+```bash
+# 查看服务状态
+sudo docker compose ps
+
+# 启动所有服务
+sudo docker compose up -d
+
+# 停止所有服务
+sudo docker compose down
+
+# 重新构建并启动（代码变更后）
+sudo docker compose build && sudo docker compose up -d
+
+# 查看服务日志
+sudo docker compose logs -f [service_name]  # 如 backend, frontend, ten-agent
+
+# 重启单个服务
+sudo docker compose restart [service_name]
+
+# 进入容器调试
+sudo docker exec -it voxflame-backend sh
+sudo docker exec -it voxflame-frontend sh
+sudo docker exec -it voxflame-ten-agent bash
+```
+
+### 服务端口映射
+
+| 服务 | 容器名 | 端口 |
+|------|--------|------|
+| Frontend | voxflame-frontend | 3000 (HTTP), 3443 (HTTPS) |
+| Backend | voxflame-backend | 3001 |
+| TEN Agent | voxflame-ten-agent | 8766 (WebSocket) |
+| Qdrant | voxflame-qdrant | 6333, 6334 |
+| Redis | voxflame-redis | 6379 |
+
+---
+
+## 五、 开发工作流 (Workflow)
 
 
 1.  **调研 (Research)**:
@@ -103,11 +242,12 @@
     *   保持代码简洁（KISS 原则）。
 
 3.  **验证 (Verify)**:
+    *   代码变更后：`sudo docker compose build && sudo docker compose up -d`
     *   使用 `playwright` 进行 UI 测试（如适用）。
     *   或者编写简单的集成测试脚本。
 
 
-## 五、 当前任务上下文 (Current Context)
+## 六、 当前任务上下文 (Current Context)
 
 > 同步 `.tasks/current.md`
 
@@ -239,7 +379,7 @@ mv /tmp/old_file.sql supabase/migrations/
 
 ---
 
-## 七、 文档导航 (Documentation Map)
+## 八、 文档导航 (Documentation Map)
 
 在回答问题或规划任务时，参考以下核心文档，但是不需要一开始就读取相关文档，遇到开发相关问题再查阅：
 
@@ -252,7 +392,7 @@ mv /tmp/old_file.sql supabase/migrations/
 
 ---
 
-## 八、 问题解决案例 (Case Studies)
+## 九、 问题解决案例 (Case Studies)
 
 ### 案例：常用短语板 RLS 问题
 

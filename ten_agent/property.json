@@ -45,7 +45,8 @@
                 "enable_greeting": true,
                 "enable_correction": true,
                 "enable_interrupt": true,
-                "interrupt_threshold_ms": 200
+                "interrupt_threshold_ms": 200,
+                "enable_memory": true
               }
             },
             {
@@ -77,6 +78,21 @@
                   "voice": "longanyang"
                 }
               }
+            },
+            {
+              "type": "extension",
+              "name": "memory_layer",
+              "addon": "memory_layer_python",
+              "extension_group": "memory",
+              "property": {
+                "storage_backend": "local",
+                "local_base_path": "~/.voxflame",
+                "learning": {
+                  "auto_hotword_threshold": 3,
+                  "confusion_pattern_threshold": 5,
+                  "clarity_score_window": 100
+                }
+              }
             }
           ],
           "connections": [
@@ -88,6 +104,9 @@
                   "dest": [
                     {
                       "extension": "main_control"
+                    },
+                    {
+                      "extension": "memory_layer"
                     }
                   ]
                 },
@@ -96,6 +115,9 @@
                   "dest": [
                     {
                       "extension": "main_control"
+                    },
+                    {
+                      "extension": "memory_layer"
                     }
                   ]
                 },
@@ -104,6 +126,9 @@
                   "dest": [
                     {
                       "extension": "main_control"
+                    },
+                    {
+                      "extension": "memory_layer"
                     }
                   ]
                 }
@@ -134,6 +159,14 @@
                       "extension": "main_control"
                     }
                   ]
+                },
+                {
+                  "name": "clarity_score",
+                  "source": [
+                    {
+                      "extension": "memory_layer"
+                    }
+                  ]
                 }
               ]
             },
@@ -145,6 +178,14 @@
                   "dest": [
                     {
                       "extension": "tts"
+                    }
+                  ]
+                },
+                {
+                  "name": "save_conversation",
+                  "dest": [
+                    {
+                      "extension": "memory_layer"
                     }
                   ]
                 }
@@ -189,6 +230,14 @@
                       "extension": "tts"
                     }
                   ]
+                },
+                {
+                  "name": "correction_event",
+                  "dest": [
+                    {
+                      "extension": "memory_layer"
+                    }
+                  ]
                 }
               ]
             },
@@ -200,6 +249,14 @@
                   "source": [
                     {
                       "extension": "main_control"
+                    }
+                  ]
+                },
+                {
+                  "name": "voice_profile",
+                  "source": [
+                    {
+                      "extension": "memory_layer"
                     }
                   ]
                 }
@@ -226,6 +283,27 @@
                   "dest": [
                     {
                       "extension": "websocket_server"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "memory_layer",
+              "data": [
+                {
+                  "name": "voice_profile",
+                  "dest": [
+                    {
+                      "extension": "corrector"
+                    }
+                  ]
+                },
+                {
+                  "name": "memory_context",
+                  "dest": [
+                    {
+                      "extension": "corrector"
                     }
                   ]
                 }

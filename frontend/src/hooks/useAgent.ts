@@ -19,6 +19,7 @@ import {
 import { AudioProcessor } from '@/lib/audio/audio-processor'
 import { config } from '@/lib/config'
 import { createClient, getValidToken } from '@/lib/supabase/client'
+import { memoryService } from '@/lib/memory/memory-service'
 
 export interface ConversationMessage {
   id: string
@@ -61,6 +62,14 @@ export interface UseAgentOptions {
 
 export function useAgent(options: UseAgentOptions = {}) {
   const { autoConnect = false, enableTTS = true, userId } = options
+
+  // Initialize memory service when userId is available
+  useEffect(() => {
+    if (userId) {
+      memoryService.init(userId)
+      console.log('[useAgent] Memory service initialized for user:', userId)
+    }
+  }, [userId])
 
   const [state, setState] = useState<AgentState>({
     isConnected: false,
@@ -138,6 +147,12 @@ export function useAgent(options: UseAgentOptions = {}) {
 
         onASRResult: (data: ASRResultMessage) => {
           console.log('[useAgent] ASR result:', data.text, 'is_final:', data.is_final)
+
+          // Record to memory when final
+          if (data.is_final && userId) {
+            memoryService.addTurn('user', data.text)
+          }
+
           setState(prev => ({
             ...prev,
             currentASRText: data.text,
@@ -171,6 +186,11 @@ export function useAgent(options: UseAgentOptions = {}) {
             }
 
             if (data.is_final && data.full_text) {
+              // Record to memory
+              if (userId) {
+                memoryService.addTurn('assistant', data.full_text)
+              }
+
               newState.messages = [
                 ...prev.messages,
                 {

@@ -1,18 +1,22 @@
 # VoxFlame Backend
 
-**燃言后端 - API 服务 + WebSocket 代理**
+**燃言后端 - API 服务 + WebSocket 代理 + 记忆系统**
 
 ## 技术栈
 
 - **框架**: Express.js + TypeScript
 - **WebSocket**: ws 库
-- **功能**: REST API + WebSocket 代理
+- **数据库**: Supabase PostgreSQL (记忆元数据)
+- **向量检索**: FAISS (本地) / Qdrant (未来)
+- **功能**: REST API + WebSocket 代理 + 记忆管理
 
-## 当前功能 (v1.2)
+## 当前功能 (v2.1)
 
-- WebSocket 代理 (前端 ↔ TEN Agent)
+- WebSocket 代理 (前端 ↔ TEN Agent) + 用户认证
 - 健康检查 API
 - CORS 支持
+- **记忆系统 API** (v2.1 新增)
+- **常用短语 API** (v2.0 新增)
 
 ## 目录结构
 
@@ -77,10 +81,51 @@ wss.on('connection', (clientWs, req) => {
 
 ### API 端点
 
+### 核心 API
+
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/health` | GET | 健康检查 |
 | `/ws/agent` | WS | WebSocket 代理 |
+
+### 记忆系统 API (v2.1 新增)
+
+| 端点 | 方法 | 说明 | 认证 |
+|------|------|------|------|
+| `/api/memory/add` | POST | 添加记忆 | ✅ |
+| `/api/memory/search` | GET | 语义检索记忆 | ✅ |
+| `/api/memory/user/:userId` | GET | 获取用户所有记忆 | ✅ |
+| `/api/memory/:memoryId` | PUT | 更新记忆 | ✅ |
+| `/api/memory/:memoryId` | DELETE | 删除记忆 | ✅ |
+| `/api/memory/hotwords/:userId` | GET | 获取用户热词 | ✅ |
+| `/api/memory/stats/:userId` | GET | 获取记忆统计 | ✅ |
+
+**添加记忆请求示例**:
+```json
+{
+  "user_id": "uuid",
+  "content": "用户喜欢用简短句子表达",
+  "memory_type": "preference",
+  "metadata": { "source": "conversation" }
+}
+```
+
+**检索记忆请求示例**:
+```
+GET /api/memory/search?user_id=xxx&query=用户偏好&limit=10
+```
+
+### 常用短语 API (v2.0)
+
+| 端点 | 方法 | 说明 | 认证 |
+|------|------|------|------|
+| `/api/phrases` | POST | 创建短语 | ✅ |
+| `/api/phrases/user/:userId` | GET | 获取用户短语 | ✅ |
+| `/api/phrases/:phraseId` | PUT | 更新短语 | ✅ |
+| `/api/phrases/:phraseId` | DELETE | 删除短语 | ✅ |
+| `/api/phrases/:phraseId/use` | POST | 增加使用次数 | ✅ |
+| `/api/phrases/reorder` | POST | 重排序短语 | ✅ |
+| `/api/phrases/presets/initialize` | POST | 初始化预设 | ✅ |
 
 ## 环境变量
 
@@ -88,6 +133,14 @@ wss.on('connection', (clientWs, req) => {
 # .env
 PORT=3001
 TEN_AGENT_URL=ws://ten-agent:8766
+
+# Supabase (认证 + 数据库)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=xxx
+SUPABASE_SERVICE_ROLE_KEY=xxx  # 后端管理操作
+
+# 记忆系统 (可选)
+QDRANT_URL=http://qdrant:6333  # Phase 3
 ```
 
 ## 开发经验
@@ -173,3 +226,58 @@ sudo docker-compose logs -f backend
 - [主项目 README](../README.md)
 - [前端 README](../frontend/README.md)
 - [Agent README](../ten_agent/README.md)
+- [记忆系统设计](../docs/VOXFLAME_MEMORY_DESIGN.md)
+
+---
+
+## 记忆系统架构 (v2.1)
+
+### 双层存储架构
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    VoxFlame Memory Stack                     │
+├──────────────────────────────────────────────────────────────┤
+│  TEN Agent (memory_layer_python)                             │
+│  • 实时语音画像 (混淆模式、热词、清晰度)                        │
+│  • 会话事件处理                                               │
+│  • SQLite 本地存储                                            │
+└──────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Backend (Node.js)                                           │
+│  • REST API (CRUD)                                           │
+│  • FAISS 语义检索                                             │
+│  • Supabase 元数据同步                                        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 记忆类型
+
+| 类型 | 描述 | 存储位置 |
+|------|------|---------|
+| **preference** | 用户偏好 | Supabase |
+| **fact** | 个人事实 | Supabase + 本地 |
+| **correction** | ASR 纠错记录 | 本地 SQLite |
+| **hotword** | 个人热词 | 本地 + Supabase |
+| **session** | 会话摘要 | Supabase |
+
+### 文件结构
+
+```
+~/.voxflame/
+├── memory.db          # SQLite 数据库
+├── MEMORY.md          # 长期记忆 (用户画像)
+├── faiss_index/       # FAISS 向量索引
+└── daily/
+    └── 2026-03-02.md  # 每日日志
+```
+
+### 热词学习机制
+
+当用户说话被 ASR 识别后，经过 LLM 纠错：
+1. 原始文本 ≠ 纠错文本 → 产生纠错事件
+2. 记忆层分析混淆模式 (拼音相似性)
+3. 累计 3 次以上 → 自动加入热词表
+4. 下次 ASR 调用时注入热词

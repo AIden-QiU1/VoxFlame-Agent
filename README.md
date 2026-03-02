@@ -103,10 +103,12 @@ AI Agent = LLM (Brain) + Memory (Soul) + Planning + Tool Use
 │  ✅ websocket_server  WebSocket 服务器                            │
 │  ✅ llm_correction     LLM 纠错                                   │
 │  ✅ voxflame_main     主控制器                                    │
-│  🚧 memory_layer      记忆层 (开发中)                             │
+│  ✅ memory_layer      记忆层 (已实现)                             │
 │  📝 speech_clarity    语音清晰度评估 (规划中)                     │
 │  📝 intent_predict    意图预测 (规划中)                           │
 │  📝 context_share     上下文分享 (规划中)                         │
+│  📝 translation_skill 翻译技能 (听障支持)                          │
+│  📝 hearing_assist    听障辅助 (外界声音转文字)                    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -122,6 +124,75 @@ AI Agent = LLM (Brain) + Memory (Soul) + Planning + Tool Use
 | **热更新** | 动态加载/卸载扩展 | 无需重启服务 | ✅ 便捷 |
 
 **结论**：TEN Framework 仍有很大开发空间，暂不需要自研框架。
+
+---
+
+### 听障群体支持规划 🆕
+
+**问题**：如何将外界声音传递给听障群体？
+
+**解决方案**：增加翻译/听障辅助 Skill 到 Agent，利用 A2UI 在前端展示
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    听障群体支持架构                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ 外界声音输入 (对方说话)                                      │ │
+│  │  • 麦克风阵列拾音                                           │ │
+│  │  • 降噪 + 回声消除                                          │ │
+│  └────────────────────┬───────────────────────────────────────┘ │
+│                       │ ASR                                    │
+│  ┌────────────────────▼───────────────────────────────────────┐ │
+│  │  translation_skill_python (TEN 扩展)                       │ │
+│  │  • 实时语音转文字 (ASR)                                     │ │
+│  │  • 对方语音 → 大字显示 (全屏字幕)                           │ │
+│  │  • 多语言翻译支持 (中英日韩等)                              │ │
+│  └────────────────────┬───────────────────────────────────────┘ │
+│                       │                                        │
+│  ┌────────────────────▼───────────────────────────────────────┐ │
+│  │  A2UI 前端展示 (Agentic UI)                                │ │
+│  │  • 全屏字幕镜 (超大字体显示)                                │ │
+│  │  • 双行字幕 (原文 + 翻译)                                   │ │
+│  │  • 表情/语气图标辅助理解                                    │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**TEN 扩展实现计划**：
+
+| 扩展名 | 功能 | 优先级 |
+|--------|------|--------|
+| `translation_skill_python` | 实时语音转文字 + 翻译 | P0 |
+| `hearing_assist_python` | 听障辅助模式 (大字/简化/表情) | P1 |
+| `caption_display_python` | 全屏字幕输出控制 | P1 |
+
+**A2UI 前端展示特性**：
+- **全屏字幕模式**：超大字体显示对方说话内容
+- **双行字幕**：原文 (ASR) + 翻译 (LLM)
+- **表情辅助**：根据语气显示相关表情图标
+- **历史回看**：滚动查看最近对话记录
+- **Agentic 主动推送**：Agent 根据场景主动调整显示模式
+
+---
+
+### A2UI (Agentic UI) 集成说明 🆕
+
+A2UI 是 Agent 驱动的用户界面，与传统的 React 组件不同：
+
+| 特性 | 传统 UI | A2UI |
+|------|---------|------|
+| **触发方式** | 用户点击/输入 | Agent 主动推送 |
+| **状态管理** | 前端 useState | Agent 决策 + 前端渲染 |
+| **显示时机** | 固定布局 | 根据场景动态显示 |
+| **数据来源** | API 调用 | Agent 推送事件 |
+
+**实现方式**：
+1. **TEN Agent 扩展**通过 WebSocket 推送 UI 事件
+2. **前端 `useAgent` Hook**监听事件并更新状态
+3. **组件根据状态渲染**（如双行字幕、意图面板）
 
 ---
 
@@ -211,22 +282,25 @@ AI Agent = LLM (Brain) + Memory (Soul) + Planning + Tool Use
 | **v4.0 核心功能** | 常用短语板 + RLS修复 | ✅ 完成 |
 | **v5.0 Agent+记忆** | 双行字幕镜 + 记忆系统 + Agent Skills | 🚧 **进行中** |
 
-### 今日工作总结 (2026-02-28)
+### 今日工作总结 (2026-03-02)
 
 **已完成**:
-- ✅ 双行字幕镜功能（Raw ASR + LLM 纠正显示）
-- ✅ 记忆系统深度调研（EverMemOS/Qdrant/Supabase pgvector 对比）
-- ✅ TEN Framework 记忆架构研究（PowerMem/EverMemOS/memU 示例分析）
+- ✅ 双行字幕镜 UI 组件（`DualLineSubtitleDisplay`）
+- ✅ 常用短语板完整实现（8个分类 + CRUD）
+- ✅ 记忆系统 v2.0（Local-first + Hybrid 架构）
+- ✅ memory_layer_python TEN 扩展
+- ✅ 语音画像记忆（混淆模式、热词、清晰度评分）
 
-**关键发现**:
-- **EverMemOS**: 93% LoCoMo 准确率，但需内测申请或复杂部署（4个Docker + LLM API）
-- **Qdrant**: <10ms 延迟，最轻量，只需 1 个 Docker
-- **pgvector**: 已集成 Supabase，但 >200ms 延迟，性能瓶颈
+**已知状态**:
+- ⚠️ 双行字幕镜和短语板组件已实现，但**未集成到活跃路由**
+- ⚠️ 主页 (`/`) 仅显示基础录音界面
+- ⚠️ `/chat` 路由不存在（返回 404）
+- ✅ 认证系统代码完成，需验证实际可用性
 
 **下次优先级**:
-1. **验证**: 登录系统、用户管理、各功能模块是否真正可运行
-2. **选择**: 最适合 Voice Agent 的记忆系统，设计创新点
-3. **部署**: 应用上线（域名 + HTTPS 配置）
+1. **集成**: 将 ChatInterface 组件集成到主页面
+2. **验证**: 登录、ASR、LLM、TTS 完整流程测试
+3. **部署**: 域名 + HTTPS 配置，上线准备
 
 ### 开发优先级 (2026 Q1)
 
@@ -564,6 +638,106 @@ VoxFlame-Agent/
 | [记忆系统计划](docs/MEMORY_SYSTEM_PLAN.md) | PowerMem + Qdrant |
 | [TEN扩展分析](docs/TEN_EXTENSIONS_ANALYSIS.md) | TEN Framework 生态 |
 | [WebSocket vs RTC](docs/WEBSOCKET_VS_RTC_GUIDE.md) | 实时通信协议对比 |
+
+---
+
+## 部署上线准备 🆕
+
+### 检查清单
+
+| 类别 | 检查项 | 状态 | 说明 |
+|------|--------|------|------|
+| **域名** | 购买域名 | ⬜ | 推荐阿里云/腾讯云 |
+| **DNS** | A 记录解析 | ⬜ | 指向服务器 IP |
+| **SSL** | HTTPS 证书 | ⬜ | Let's Encrypt 免费 |
+| **服务器** | 云服务器配置 | ⬜ | 推荐 2C4G 起步 |
+| **Docker** | Docker + Docker Compose | ✅ | 已配置 |
+| **防火墙** | 端口开放 (80/443/3001) | ⬜ | 安全组配置 |
+| **环境变量** | .env 配置 | ⬜ | API Key 替换 |
+| **数据库** | Supabase 项目 | ✅ | 已配置 |
+| **监控** | 日志收集 | ⬜ | 可选 |
+
+### 部署步骤
+
+#### 1. 域名配置
+```bash
+# 购买域名后，添加 A 记录
+# 例如：voxflame.com → 服务器 IP
+```
+
+#### 2. SSL 证书 (Let's Encrypt)
+```bash
+# 安装 certbot
+sudo apt-get install certbot
+
+# 生成证书
+sudo certbot certonly --standalone -d voxflame.com
+
+# 证书路径
+/etc/letsencrypt/live/voxflame.com/fullchain.pem
+/etc/letsencrypt/live/voxflame.com/privkey.pem
+```
+
+#### 3. Nginx 反向代理
+```nginx
+server {
+    listen 80;
+    server_name voxflame.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name voxflame.com;
+
+    ssl_certificate /etc/letsencrypt/live/voxflame.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/voxflame.com/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /ws/ {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+#### 4. Docker Compose 启动
+```bash
+# 拉取最新代码
+git pull origin main
+
+# 更新环境变量
+cp .env.example .env
+# 编辑 .env 填入生产环境配置
+
+# 构建并启动
+sudo docker-compose up -d --build
+
+# 检查状态
+sudo docker-compose ps
+```
+
+#### 5. 验证部署
+- [ ] 访问 https://voxflame.com 正常
+- [ ] WebSocket 连接成功
+- [ ] 用户注册/登录正常
+- [ ] 录音功能正常（需 HTTPS）
+
+### 环境变量配置清单
+
+| 变量名 | 说明 | 获取方式 |
+|--------|------|---------|
+| `NEXT_PUBLIC_API_URL` | 后端 API 地址 | 生产域名 |
+| `SUPABASE_URL` | Supabase API | Supabase 控制台 |
+| `SUPABASE_ANON_KEY` | Supabase 匿名密钥 | Supabase 控制台 |
+| `DASHSCOPE_API_KEY` | 阿里云 API Key | 阿里云控制台 |
 
 ---
 

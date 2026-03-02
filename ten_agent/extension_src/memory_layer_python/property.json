@@ -1,0 +1,9 @@
+{
+  "storage_backend": "local",
+  "local_base_path": "~/.voxflame",
+  "learning": {
+    "auto_hotword_threshold": 3,
+    "confusion_pattern_threshold": 5,
+    "clarity_score_window": 100
+  }
+}

@@ -30,6 +30,7 @@ class VoxFlameMainExtension(AsyncExtension):
     2. Handle user speech interruption (flush TTS when user speaks)
     3. Send transcripts to WebSocket for frontend display
     4. Manage conversation state and history
+    5. Send correction events to memory layer for learning
     """
 
     def __init__(self, name: str):
@@ -51,6 +52,9 @@ class VoxFlameMainExtension(AsyncExtension):
         # User profile from authentication
         self.user_profile: Optional[Dict[str, Any]] = None
 
+        # Last ASR result for memory tracking
+        self.last_asr_text: str = ""
+
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
         """Initialize the extension."""
         self.ten_env = ten_env
@@ -61,7 +65,8 @@ class VoxFlameMainExtension(AsyncExtension):
             config_json, _ = await ten_env.get_property_to_json(None)
             self.config = VoxFlameMainConfig.model_validate_json(config_json)
             ten_env.log_info(f"[VoxFlameMain] Config loaded: greeting={self.config.greeting}, "
-                           f"enable_interrupt={self.config.enable_interrupt}")
+                           f"enable_interrupt={self.config.enable_interrupt}, "
+                           f"enable_memory={getattr(self.config, 'enable_memory', False)}")
         except Exception as e:
             ten_env.log_warn(f"[VoxFlameMain] Failed to load config, using defaults: {e}")
             self.config = VoxFlameMainConfig()
@@ -157,6 +162,7 @@ class VoxFlameMainExtension(AsyncExtension):
         ten_env.log_info("[VoxFlameMain] User connected")
         self.user_connected = True
         self.conversation_history = []
+        self.last_asr_text = ""
 
         # Send greeting if enabled
         if self.config.enable_greeting and self.config.greeting:
@@ -166,10 +172,18 @@ class VoxFlameMainExtension(AsyncExtension):
             # Also send to WebSocket for display
             await self._send_to_websocket(ten_env, "assistant", self.config.greeting, is_final=True)
 
+        # Send session_start to memory layer
+        if getattr(self.config, 'enable_memory', False):
+            await self._send_session_event(ten_env, "session_start")
+
     async def _handle_user_disconnected(self, ten_env: AsyncTenEnv) -> None:
         """Handle user disconnection."""
         ten_env.log_info("[VoxFlameMain] User disconnected")
         self.user_connected = False
+
+        # Send session_end to memory layer for learning
+        if getattr(self.config, 'enable_memory', False):
+            await self._send_session_event(ten_env, "session_end")
 
         # Flush any ongoing TTS
         if self.is_tts_playing:
@@ -217,6 +231,18 @@ class VoxFlameMainExtension(AsyncExtension):
                 except Exception as e:
                     ten_env.log_warn(f"[VoxFlameMain] Failed to update LLM Corrector profile: {e}")
 
+                # Initialize memory layer with user info
+                if getattr(self.config, 'enable_memory', False):
+                    try:
+                        await send_cmd(ten_env, "init_memory", "memory_layer_python", {
+                            "user_id": user_id,
+                            "user_name": name,
+                            "user_email": email
+                        })
+                        ten_env.log_info("[VoxFlameMain] Sent user info to Memory Layer")
+                    except Exception as e:
+                        ten_env.log_warn(f"[VoxFlameMain] Failed to initialize memory layer: {e}")
+
         except Exception as e:
             ten_env.log_error(f"[VoxFlameMain] Error handling system_init: {e}")
 
@@ -254,6 +280,9 @@ class VoxFlameMainExtension(AsyncExtension):
 
             # If final result, forward to corrector
             if is_final and self.config.enable_correction:
+                # Store for memory tracking
+                self.last_asr_text = text
+                
                 ten_env.log_info(f"[VoxFlameMain] Forwarding to corrector: '{text}'")
                 await self._forward_to_corrector(ten_env, text, asr_data)
 
@@ -275,6 +304,7 @@ class VoxFlameMainExtension(AsyncExtension):
         Forward to:
         1. TTS for speech synthesis
         2. WebSocket for frontend display
+        3. Memory layer for learning (if correction occurred)
         """
         try:
             data_json, _ = data.get_property_to_json(None)
@@ -308,6 +338,10 @@ class VoxFlameMainExtension(AsyncExtension):
                 "timestamp": int(time.time() * 1000)
             })
             self._trim_history()
+
+            # Send correction event to memory layer for learning
+            if getattr(self.config, 'enable_memory', False) and original_text != corrected_text:
+                await self._send_correction_event(ten_env, original_text, corrected_text)
 
         except Exception as e:
             ten_env.log_error(f"[VoxFlameMain] Error handling corrected text: {e}")
@@ -416,7 +450,29 @@ class VoxFlameMainExtension(AsyncExtension):
         except Exception as e:
             ten_env.log_error(f"[VoxFlameMain] Error sending to WebSocket: {e}")
 
-    
+    async def _send_correction_event(self, ten_env: AsyncTenEnv, raw_text: str, corrected_text: str) -> None:
+        """Send correction event to memory layer for learning."""
+        try:
+            await send_data(ten_env, "correction_event", "memory_layer", {
+                "raw_text": raw_text,
+                "corrected_text": corrected_text,
+                "timestamp": int(time.time() * 1000)
+            })
+            ten_env.log_info(f"[VoxFlameMain] Sent correction event to memory layer: '{raw_text}' -> '{corrected_text}'")
+        except Exception as e:
+            ten_env.log_error(f"[VoxFlameMain] Error sending correction event: {e}")
+
+    async def _send_session_event(self, ten_env: AsyncTenEnv, event_type: str) -> None:
+        """Send session event to memory layer."""
+        try:
+            await send_data(ten_env, event_type, "memory_layer", {
+                "timestamp": int(time.time() * 1000),
+                "turn_count": len(self.conversation_history)
+            })
+            ten_env.log_info(f"[VoxFlameMain] Sent {event_type} event to memory layer")
+        except Exception as e:
+            ten_env.log_error(f"[VoxFlameMain] Error sending session event: {e}")
+
     def _trim_history(self) -> None:
         """Trim conversation history to max length."""
         if len(self.conversation_history) > self.max_history_length:

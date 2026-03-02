@@ -22,6 +22,7 @@ import { memoryController } from './controllers/memory.controller'
 import { uploadRouter } from './controllers/upload.controller'
 import { phrasesController } from './controllers/phrases.controller'
 import { errorHandler } from './middlewares/error.middleware'
+import { authMiddleware, validateUserId } from './middlewares/auth.middleware'
 import { createClient } from '@supabase/supabase-js'
 
 // 加载环境变量
@@ -201,26 +202,26 @@ app.use('/api/agent', agentRouter)
 // Session API 路由 (会话管理)
 app.use('/api/session', sessionRouter)
 
-// Memory API 路由 (记忆系统)
+// Memory API 路由 (记忆系统) - 需要认证
 const memoryRouter = express.Router()
-memoryRouter.post('/add', memoryController.addMemory.bind(memoryController))
-memoryRouter.get('/search', memoryController.searchMemories.bind(memoryController))
-memoryRouter.get('/user/:userId', memoryController.getUserMemories.bind(memoryController))
-memoryRouter.put('/:memoryId', memoryController.updateMemory.bind(memoryController))
-memoryRouter.delete('/:memoryId', memoryController.deleteMemory.bind(memoryController))
-memoryRouter.get('/hotwords/:userId', memoryController.getHotwords.bind(memoryController))
-memoryRouter.get('/stats/:userId', memoryController.getUserStats.bind(memoryController))
+memoryRouter.post('/add', authMiddleware, memoryController.addMemory.bind(memoryController))
+memoryRouter.get('/search', authMiddleware, memoryController.searchMemories.bind(memoryController))
+memoryRouter.get('/user/:userId', authMiddleware, validateUserId, memoryController.getUserMemories.bind(memoryController))
+memoryRouter.put('/:memoryId', authMiddleware, memoryController.updateMemory.bind(memoryController))
+memoryRouter.delete('/:memoryId', authMiddleware, memoryController.deleteMemory.bind(memoryController))
+memoryRouter.get('/hotwords/:userId', authMiddleware, validateUserId, memoryController.getHotwords.bind(memoryController))
+memoryRouter.get('/stats/:userId', authMiddleware, validateUserId, memoryController.getUserStats.bind(memoryController))
 app.use('/api/memory', memoryRouter)
 
-// Phrases API 路由 (常用短语)
+// Phrases API 路由 (常用短语) - 需要认证
 const phrasesRouter = express.Router()
-phrasesRouter.post('/', phrasesController.createPhrase.bind(phrasesController))
-phrasesRouter.get('/user/:userId', phrasesController.getUserPhrases.bind(phrasesController))
-phrasesRouter.put('/:phraseId', phrasesController.updatePhrase.bind(phrasesController))
-phrasesRouter.delete('/:phraseId', phrasesController.deletePhrase.bind(phrasesController))
-phrasesRouter.post('/:phraseId/use', phrasesController.incrementUsage.bind(phrasesController))
-phrasesRouter.post('/reorder', phrasesController.reorderPhrases.bind(phrasesController))
-phrasesRouter.post('/presets/initialize', phrasesController.initializePresets.bind(phrasesController))
+phrasesRouter.post('/', authMiddleware, phrasesController.createPhrase.bind(phrasesController))
+phrasesRouter.get('/user/:userId', authMiddleware, validateUserId, phrasesController.getUserPhrases.bind(phrasesController))
+phrasesRouter.put('/:phraseId', authMiddleware, phrasesController.updatePhrase.bind(phrasesController))
+phrasesRouter.delete('/:phraseId', authMiddleware, phrasesController.deletePhrase.bind(phrasesController))
+phrasesRouter.post('/:phraseId/use', authMiddleware, phrasesController.incrementUsage.bind(phrasesController))
+phrasesRouter.post('/reorder', authMiddleware, phrasesController.reorderPhrases.bind(phrasesController))
+phrasesRouter.post('/presets/initialize', authMiddleware, phrasesController.initializePresets.bind(phrasesController))
 app.use('/api/phrases', phrasesRouter)
 
 // Upload API 路由 (OSS 签名)

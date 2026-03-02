@@ -1,11 +1,23 @@
-# VoxFlame Agent 记忆系统实施计划
+# VoxFlame Agent 记忆系统实施计划 v2.0
 
-## 🎯 目标
+> **更新日期**: 2026-03-02
+> **基于**: PRD 深研交付物 B（语音产品记忆系统前沿研究）
+> **参考架构**: [OpenClaw Memory](https://blog.csdn.net/tianyuanwo/article/details/158428045)
 
-为构音障碍患者提供智能记忆能力，实现：
-1. **上下文感知**：多轮对话理解
-2. **个性化学习**：热词库、纠错历史
-3. **音频记忆**（未来）：语音模式库
+---
+
+## 🎯 设计目标
+
+为构音障碍患者提供智能记忆能力，核心原则：
+
+| 目标 | 描述 | 对标 |
+|------|------|------|
+| **可控** | 默认本地保存，用户决定上传与分享 | Looki "默认不连续录制" |
+| **可检索** | 语义 + 关键词 + 时间 + 场景检索 | Weaviate Hybrid Search |
+| **可遗忘** | 选择性遗忘与自动 compaction | OpenClaw memoryFlush |
+| **可审计** | 写入/检索/导出/删除可追踪 | GDPR/BIPA/CCPA 合规 |
+
+---
 
 ## 📊 技术方案对比
 
@@ -14,326 +26,365 @@
 **原因：**
 - ❌ 需要自研会话管理逻辑
 - ❌ 缺少对话 AI 专用优化
+- ❌ >200ms 延迟，超过 100 万向量时性能瓶颈
 - ❌ 维护成本高
-- ❌ 缺少官方支持和社区案例
 
-**现状：**
-- 已创建 pgvector 扩展和表结构
-- `searchMemories()` 函数仅有 TODO 注释
-- 20KB FAISS 索引文件未使用
-
-### 采用方案：TEN Framework PowerMem + Qdrant
-
-**Phase 1: PowerMem (OceanBase)**
-```
-短期记忆 = 对话上下文 + 热词 + 纠错历史
-```
-
-**Phase 2: 热词与纠错增强**
-```
-个性化 = 用户词库 + ASR 纠错模式学习
-```
-
-**Phase 3: Qdrant (未来)**
-```
-音频记忆 = Wav2Vec 2.0 embedding + 语音相似度检索
-```
-
-## 🗂️ 架构设计
-
-### 三层记忆架构
+### 采用方案：Local-first + Hybrid 架构
 
 ```
-┌─────────────────────────────────────────┐
-│        Frontend (React Hooks)          │
-│   - useAgent (WebSocket 连接)          │
-│   - 对话历史显示                         │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│   Backend (Express Memory API)          │
-│   - /api/memory/add                     │
-│   - /api/memory/search                  │
-│   - /api/memory/hotwords                │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────────────────┐
-│          TEN Agent (PowerMem Extension)             │
-│                                                      │
-│  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │
-│  │   ASR       │─▶│ PowerMem    │─▶│    LLM     │ │
-│  │ (Aliyun)    │  │ (对话记忆)   │  │  (Qwen3)   │ │
-│  └─────────────┘  └─────────────┘  └────────────┘ │
-│                           │                         │
-│                           ▼                         │
-│                   ┌──────────────┐                 │
-│                   │  OceanBase   │                 │
-│                   │  SeekDB      │                 │
-│                   └──────────────┘                 │
-└─────────────────────────────────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│    Supabase PostgreSQL (长期存储)       │
-│   - user_profiles (用户档案)             │
-│   - sessions (会话记录)                  │
-│   - user_hotwords (热词库)               │
-│   - speech_corrections (纠错历史)        │
-└─────────────────────────────────────────┘
-               │
-               ▼ (Phase 3 未来)
-┌─────────────────────────────────────────┐
-│     Qdrant (音频向量库)                  │
-│   - 语音 embedding (Wav2Vec 2.0)        │
-│   - 语音模式相似度检索                    │
-│   - WavRAG 音频增强                     │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    VOXFLAME MEMORY STACK                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │           TEN Framework Agent (PowerMem)                 │    │
+│  │  • 对话记忆（短期上下文）                                  │    │
+│  │  • 用户画像注入                                          │    │
+│  │  • 个性化问候                                            │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              │                                   │
+│                              ▼                                   │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              Local Store (本地优先)                       │    │
+│  │  • MEMORY.md - 长期记忆（用户画像、发音特点、偏好）        │    │
+│  │  • memory/YYYY-MM-DD.md - 每日日志（工作记忆）            │    │
+│  │  • SQLite - 元数据索引                                   │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              │                                   │
+│                              ▼ (可选云端同步)                     │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              Supabase PostgreSQL (元数据)                 │    │
+│  │  • sessions, utterances, hotwords, corrections           │    │
+│  │  • pgvector HNSW 索引（小规模语义检索）                    │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              │                                   │
+│                              ▼ (Phase 3: 音频向量)               │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              Qdrant (音频向量库)                          │    │
+│  │  • text_episodic - 文本 embedding                        │    │
+│  │  • audio_content - Wav2Vec/HuBERT/Whisper embedding      │    │
+│  │  • speaker_voiceprint - 说话人 embedding                 │    │
+│  │  • 量化压缩：Product Quantization（91%内存节省）          │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 数据流
+---
 
-#### 1. 对话记忆（PowerMem）
+## 🗂️ 四种记忆类型
 
-```python
-# TEN Agent Extension
-class VoiceAssistantExtension:
-    def on_start(self, ten_env):
-        # 初始化 PowerMem
-        self._initialize_memory_client()
-    
-    def on_asr_result(self, ten_env, asr_text):
-        # 检索相关记忆
-        memories = self._retrieve_memory(asr_text)
-        
-        # 构建 LLM 上下文
-        context = self._build_llm_context(asr_text, memories)
-        
-        # 调用 LLM
-        llm_response = self.call_llm(context)
-        
-        # 保存对话到记忆库
-        self._memorize_conversation(asr_text, llm_response)
+参考 2024-2026 记忆代理研究（检索、学习、长程理解、选择性遗忘）：
+
+| 类型 | 描述 | 存储位置 | 示例 |
+|------|------|---------|------|
+| **Episodic（情景）** | 对话片段、当天事件 | SQLite + 每日日志 | "今天下午和医生说了..." |
+| **Semantic（语义）** | 长期事实（偏好、身份） | MEMORY.md | "我妈妈叫王芳"、"不喜欢绕弯子" |
+| **Skill（技能）** | 短语模板、场景脚本 | Supabase | 就医场景模板、常用短语 |
+| **Voice-profile（语音画像）** | 热词、混淆模式、清晰度趋势 | Qdrant + Supabase | "z/zh 混淆"、"喝水 高频" |
+
+---
+
+## 📁 本地文件结构（参考 OpenClaw）
+
+```
+~/.voxflame/
+├── MEMORY.md              # 长期记忆（用户画像 + 稳定信息）
+├── SOUL.md                # 核心身份和偏好（可选）
+└── memory/
+    ├── 2026-03-02.md     # 每日日志（工作记忆）
+    ├── 2026-03-01.md
+    └── archives/         # 会话归档
+        └── session-xxx.md
 ```
 
-#### 2. 热词增强（Supabase）
+### MEMORY.md 示例
+
+```markdown
+# MEMORY.md
+
+## 用户画像
+
+- 姓名：张三
+- 障碍类型：痉挛型构音障碍
+- 发音特点：舌尖音不清、语速快、停顿少
+
+## 常用词汇
+
+- 喝水 (高频)
+- 帮忙 (每日)
+- 谢谢 (每日)
+
+## 发音混淆模式
+
+- z/zh 混淆
+- l/n 混淆
+- 前后鼻音
+
+## 康复进度
+
+- 2026-02-01：清晰度评分 45
+- 2026-02-15：清晰度评分 52 (+7)
+- 2026-03-01：清晰度评分 58 (+6)
+
+## 沟通偏好
+
+- 喜欢直接表达，不喜欢绕弯子
+- 需要对方耐心等待
+- 用手势辅助表达
+```
+
+---
+
+## 🗄️ 数据库 Schema
+
+### PostgreSQL（Supabase）元数据
 
 ```sql
--- 查询用户热词（注入到 ASR）
-SELECT word, phonetic 
-FROM user_hotwords 
-WHERE user_id = $1 
-ORDER BY frequency DESC 
-LIMIT 100;
+-- 会话表
+CREATE TABLE sessions (
+  session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES user_profiles(id),
+  started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  ended_at TIMESTAMP WITH TIME ZONE,
+  mode VARCHAR(50) DEFAULT 'communication', -- communication/training/review
+  consent_level VARCHAR(50) DEFAULT 'assist', -- assist/relay/delegate
+  partner_present BOOLEAN DEFAULT FALSE
+);
 
--- 查询纠错历史（注入到 LLM prompt）
-SELECT asr_text, corrected_text 
-FROM speech_corrections 
-WHERE user_id = $1 
-ORDER BY created_at DESC 
-LIMIT 20;
-```
+-- 话语表（DualLineSubtitle 的数据映射）
+CREATE TABLE utterances (
+  utt_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  session_id UUID REFERENCES sessions(session_id),
+  speaker_role VARCHAR(50) DEFAULT 'user', -- user/partner/agent
+  raw_asr TEXT NOT NULL,           -- ASR 原始识别
+  corrected_text TEXT,             -- LLM 纠正后
+  final_text TEXT,                 -- 用户确认的最终文本
+  clarity_score FLOAT DEFAULT 0.0, -- 清晰度评分 (0-1)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-#### 3. LLM Prompt 构建
+-- 音频对象表（只存引用）
+CREATE TABLE audio_objects (
+  obj_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES user_profiles(id),
+  session_id UUID REFERENCES sessions(session_id),
+  storage_uri TEXT NOT NULL,       -- OSS/本地路径
+  codec VARCHAR(20) DEFAULT 'opus', -- opus/aac/flac
+  sample_rate INT DEFAULT 16000,
+  duration_ms INT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-```python
-def build_correction_prompt(user_id, asr_text, memories, hotwords, corrections):
-    return f"""
-你是一个专为构音障碍患者设计的语音助手。
-
-【用户热词库】
-{', '.join(hotwords)}
-
-【常见纠错模式】
-{format_corrections(corrections)}
-
-【上下文记忆】
-{format_memories(memories)}
-
-【当前识别】
-ASR: {asr_text}
-
-请根据上下文、热词和纠错历史，输出正确的文本。
-"""
-```
-
-## 📅 实施计划
-
-### Phase 1: PowerMem 集成（2周）
-
-#### Week 1: OceanBase + PowerMem
-
-**任务清单：**
-- [ ] 启动 OceanBase 容器（docker-compose.yml 已有）
-- [ ] 安装 PowerMem Extension 到 `ten_agent/ten_packages/extension/`
-- [ ] 配置 PowerMem 连接 OceanBase
-- [ ] 测试记忆存储和检索
-
-**技术细节：**
-```bash
-# 1. 启动 OceanBase
-docker compose up -d oceanbase
-
-# 2. 下载 PowerMem Extension
-cd ten_agent/ten_packages/extension/
-git clone https://github.com/ten-framework/powermem-extension.git
-
-# 3. 配置 property.json
-{
-  "extensions": [
-    {
-      "name": "powermem",
-      "database": {
-        "type": "oceanbase",
-        "host": "oceanbase",
-        "port": 2881,
-        "user": "root",
-        "password": "root",
-        "database": "voxflame"
-      }
-    }
-  ]
-}
-```
-
-#### Week 2: Memory API 更新
-
-**任务清单：**
-- [ ] Backend Memory API 对接 PowerMem
-- [ ] 实现 `/api/memory/retrieve` 端点
-- [ ] 实现 `/api/memory/save` 端点
-- [ ] 前端 useAgent hook 集成记忆显示
-- [ ] 测试多轮对话记忆
-
-**Backend API 示例：**
-```typescript
-// backend/src/services/powermem.service.ts
-export class PowerMemService {
-  async retrieve(userId: string, query: string) {
-    // 调用 TEN Agent PowerMem API
-    const response = await fetch(`http://ten-agent:8080/memory/retrieve`, {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId, query })
-    });
-    return response.json();
-  }
-  
-  async save(userId: string, conversation: string) {
-    await fetch(`http://ten-agent:8080/memory/save`, {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId, content: conversation })
-    });
-  }
-}
-```
-
-### Phase 2: 热词与纠错增强（2周）
-
-#### Week 3: 数据库表与热词管理
-
-**任务清单：**
-- [ ] Supabase 迁移：创建 `user_hotwords` 表
-- [ ] Supabase 迁移：创建 `speech_corrections` 表
-- [ ] Backend API: `/api/hotwords/add`
-- [ ] Backend API: `/api/hotwords/list`
-- [ ] 前端：热词管理界面
-- [ ] ASR 热词注入逻辑
-
-**数据库迁移：**
-```sql
--- supabase/migrations/20260102_memory_system.sql
-
--- 用户热词表
-CREATE TABLE IF NOT EXISTS user_hotwords (
+-- 热词表
+CREATE TABLE hotwords (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES user_profiles(id),
   word TEXT NOT NULL,
+  phonetic TEXT,                   -- 拼音：zhang1_wei3
   frequency INT DEFAULT 1,
   category VARCHAR(50) DEFAULT 'custom', -- person/place/medical/custom
-  phonetic TEXT,  -- 拼音：zhang1_wei3 (张伟)
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, word)
 );
 
-CREATE INDEX idx_hotwords_user_id ON user_hotwords(user_id);
-CREATE INDEX idx_hotwords_frequency ON user_hotwords(user_id, frequency DESC);
+CREATE INDEX idx_hotwords_frequency ON hotwords(user_id, frequency DESC);
 
--- 语音纠错历史表
-CREATE TABLE IF NOT EXISTS speech_corrections (
+-- 纠错历史表
+CREATE TABLE corrections (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
-  session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
-  asr_text TEXT NOT NULL,        -- ASR 原始识别
-  corrected_text TEXT NOT NULL,  -- LLM 纠正后
-  confidence FLOAT DEFAULT 0.0,  -- 纠正置信度 (0-1)
-  context JSONB DEFAULT '{}',    -- 上下文信息
+  user_id UUID NOT NULL REFERENCES user_profiles(id),
+  session_id UUID REFERENCES sessions(session_id),
+  asr_text TEXT NOT NULL,
+  corrected_text TEXT NOT NULL,
+  context_hash VARCHAR(64),        -- 上下文指纹
+  confidence FLOAT DEFAULT 0.0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_corrections_user_id ON speech_corrections(user_id, created_at DESC);
-CREATE INDEX idx_corrections_session_id ON speech_corrections(session_id);
+CREATE INDEX idx_corrections_user ON corrections(user_id, created_at DESC);
 ```
 
-#### Week 4: LLM Prompt 注入与测试
+### Qdrant 集合设计
 
-**任务清单：**
-- [ ] 修改 LLM Extension: 注入热词到 prompt
-- [ ] 修改 LLM Extension: 注入纠错历史到 prompt
-- [ ] 纠错结果自动保存到 `speech_corrections`
-- [ ] 测试热词识别准确率提升
-- [ ] 测试纠错模式学习效果
-
-**LLM Extension 修改：**
 ```python
-# ten_agent/ten_packages/extension/openai_llm2_python/extension.py
+from qdrant_client import QdrantClient, models
 
-def build_prompt_with_memory(self, user_id, asr_text):
-    # 1. 获取热词
-    hotwords = self.backend_api.get_hotwords(user_id)
-    
-    # 2. 获取纠错历史
-    corrections = self.backend_api.get_corrections(user_id, limit=20)
-    
-    # 3. 获取对话记忆（PowerMem）
-    memories = self._retrieve_memory(asr_text)
-    
-    # 4. 构建 prompt
-    return f"""
-【用户热词】{', '.join(hotwords)}
-【纠错模式】{format_corrections(corrections)}
-【对话记忆】{format_memories(memories)}
-【识别文本】{asr_text}
+client = QdrantClient(url="http://localhost:6333")
 
-输出纠正后的文本：
-"""
+# 文本情景向量
+client.create_collection(
+    collection_name="text_episodic",
+    vectors_config=models.VectorParams(
+        size=512,  # DashScope text-embedding-v3
+        distance=models.Distance.COSINE,
+        on_disk=True
+    ),
+    quantization_config=models.ScalarQuantization(
+        scalar=models.ScalarQuantizationConfig(
+            type=models.ScalarType.INT8,
+            always_ram=True
+        )
+    )
+)
+
+# 音频内容向量
+client.create_collection(
+    collection_name="audio_content",
+    vectors_config=models.VectorParams(
+        size=768,  # Wav2Vec2/HuBERT
+        distance=models.Distance.COSINE,
+        on_disk=True
+    )
+)
+
+# 说话人向量
+client.create_collection(
+    collection_name="speaker_voiceprint",
+    vectors_config=models.VectorParams(
+        size=512,  # ECAPA-TDNN
+        distance=models.Distance.COSINE
+    )
+)
 ```
 
-### Phase 3: Qdrant 音频向量库（未来规划）
+---
 
-**触发条件：**
+## 🔌 API 设计
+
+### Memory Service API（v1）
+
+```typescript
+// 写入事件
+POST /v1/memory/ingest
+{
+  "type": "episodic" | "semantic" | "skill" | "voice-profile",
+  "content": string,
+  "audio_ref"?: string,      // 音频引用 URI
+  "embedding"?: number[],    // 可选，服务端生成
+  "tags"?: string[],
+  "metadata"?: Record<string, any>
+}
+
+// 混合检索
+POST /v1/memory/search
+{
+  "query": string,
+  "types"?: string[],        // 记忆类型过滤
+  "filters"?: {
+    "date_range"?: { "from": string, "to": string },
+    "tags"?: string[],
+    "min_clarity_score"?: number
+  },
+  "hybrid"?: {
+    "alpha": 0.5,            // 向量 vs BM25 权重
+    "top_k": 10
+  }
+}
+
+// 触发压缩
+POST /v1/memory/compact
+{
+  "scope": "session" | "daily" | "all",
+  "session_id"?: string
+}
+
+// 删除（满足删除权）
+DELETE /v1/memory/items/:id
+DELETE /v1/memory/sessions/:session_id
+
+// 导出
+GET /v1/memory/export?format=markdown|jsonl|csv
+
+// 策略查询（合规透明）
+GET /v1/memory/policy
+```
+
+---
+
+## 🚀 实施计划
+
+### Phase 1: Local-first 基础（Week 1-2）
+
+**目标**：建立本地存储基础
+
+| 任务 | 状态 |
+|------|------|
+| 设计 ~/.voxflame/ 目录结构 | 待开始 |
+| 实现 MEMORY.md 读写服务 | 待开始 |
+| 实现每日日志（memory/YYYY-MM-DD.md） | 待开始 |
+| SQLite 元数据索引 | 待开始 |
+| 本地检索（BM25） | 待开始 |
+
+**技术栈**：
+- 前端：IndexedDB + File System Access API
+- 后端：better-sqlite3 + gray-matter
+
+### Phase 2: 云端同步 + PowerMem（Week 3-4）
+
+**目标**：集成 TEN Framework PowerMem
+
+| 任务 | 状态 |
+|------|------|
+| Supabase 迁移脚本（sessions/utterances/hotwords/corrections） | 待开始 |
+| Backend Memory API 实现 | 待开始 |
+| PowerMem Extension 配置 | 待开始 |
+| 对话记忆自动保存 | 待开始 |
+| 热词注入到 ASR | 待开始 |
+
+**PowerMem 配置**：
+```json
+{
+  "enable_memorization": true,
+  "enable_user_memory": true,
+  "memory_save_interval_turns": 5,
+  "memory_idle_timeout_seconds": 30.0,
+  "powermem_config": {
+    "vector_store": {
+      "provider": "oceanbase",
+      "config": {
+        "collection_name": "voxflame_memories",
+        "host": "${env:OCEANBASE_HOST}",
+        "embedding_model_dims": "512"
+      }
+    },
+    "llm": {
+      "provider": "qwen",
+      "config": {
+        "api_key": "${env:DASHSCOPE_API_KEY}",
+        "model": "qwen-plus"
+      }
+    }
+  }
+}
+```
+
+### Phase 3: Qdrant 音频向量（Week 5-8，未来）
+
+**触发条件**：
 - 用户量 > 1000
 - 需要音频相似度检索
 - WavRAG 音频增强需求
 
-**任务清单（P3）：**
-- [ ] Docker Compose 添加 Qdrant 服务
-- [ ] 集成 Wav2Vec 2.0 模型（音频 embedding）
-- [ ] 构建用户语音模式库
-- [ ] 实现音频相似度检索
-- [ ] ASR 结果基于音频相似度纠错
+| 任务 | 状态 |
+|------|------|
+| Docker Compose 添加 Qdrant | 待开始 |
+| Wav2Vec 2.0 embedding 提取 | 待开始 |
+| 音频相似度检索 API | 待开始 |
+| 量化配置（Product Quantization） | 待开始 |
+| 召回评估（recall@k） | 待开始 |
+
+---
 
 ## 🧪 测试计划
 
 ### 单元测试
 
 ```bash
+# 本地存储测试
+npm run test backend/src/services/memory/local-store.test.ts
+
 # PowerMem 连接测试
 pytest tests/test_powermem_connection.py
-
-# Memory API 测试
-npm run test backend/src/services/powermem.service.test.ts
 
 # 热词注入测试
 pytest tests/test_hotword_injection.py
@@ -347,80 +398,73 @@ pytest tests/test_hotword_injection.py
 
 # 纠错历史学习测试
 ./tests/integration/test_correction_learning.sh
+
+# 本地→云端同步测试
+./tests/integration/test_sync.sh
 ```
 
 ### 性能测试
 
 | 指标 | 目标 | 测试方法 |
 |------|------|----------|
-| 记忆检索延迟 | < 100ms | Apache Bench |
-| OceanBase 查询延迟 | < 50ms | pgbench |
-| LLM 上下文构建 | < 50ms | Python profiler |
+| 本地检索延迟 | < 50ms | SQLite benchmark |
+| 云端检索延迟 p95 | < 150ms | Apache Bench |
+| Qdrant 检索延迟 p95 | < 30ms | Qdrant benchmark |
 | 端到端响应时间 | < 2s | E2E 测试 |
+
+---
 
 ## 📈 成功指标
 
-### Phase 1 (PowerMem)
+### Phase 1 (Local-first)
+- ✅ 本地日志自动生成
+- ✅ MEMORY.md 可人工编辑
+- ✅ 本地检索可用
+
+### Phase 2 (PowerMem)
 - ✅ 多轮对话上下文保持 > 5 轮
-- ✅ 记忆检索准确率 > 85%
-- ✅ 端到端延迟 < 2s
-
-### Phase 2 (热词增强)
 - ✅ 热词识别准确率提升 > 20%
-- ✅ ASR 纠错成功率 > 75%
-- ✅ 用户满意度提升 > 30%
+- ✅ 纠错历史有效注入
 
-### Phase 3 (Qdrant - 未来)
+### Phase 3 (Qdrant)
 - ⏳ 音频相似度检索准确率 > 80%
 - ⏳ 语音模式学习收敛 < 100 样本
+- ⏳ 内存占用降低 > 80%（量化）
+
+---
 
 ## 🚨 风险与缓解
 
 | 风险 | 影响 | 缓解措施 |
 |------|------|----------|
-| OceanBase 性能瓶颈 | 高 | 使用 Redis 缓存热数据 |
-| PowerMem 文档不足 | 中 | 参考官方示例代码 |
-| 热词注入影响 ASR | 中 | A/B 测试验证效果 |
-| 记忆隐私泄露 | 高 | 用户级数据隔离 + 加密 |
-
-## 📚 参考资源
-
-### TEN Framework 官方文档
-- [PowerMem Architecture](https://docs.ten.ai/powermem)
-- [Memory Extension Examples](https://github.com/ten-framework/ten-framework/tree/main/ai_agents/agents/examples/voice-assistant-with-memU)
-- [TEN Agent API Reference](https://docs.ten.ai/api)
-
-### 数据库文档
-- [OceanBase SeekDB](https://www.oceanbase.com/docs/seekdb)
-- [Qdrant Documentation](https://qdrant.tech/documentation/)
-
-### 音频处理
-- [Wav2Vec 2.0 Paper](https://arxiv.org/abs/2006.11477)
-- [WavRAG for Audio Retrieval](https://arxiv.org/abs/2401.12345)
-
-## 🎯 交付物
-
-### Phase 1
-- [ ] PowerMem Extension 配置文件
-- [ ] OceanBase 数据库 schema
-- [ ] Backend Memory API 代码
-- [ ] 测试报告
-
-### Phase 2
-- [ ] Supabase 数据库迁移脚本
-- [ ] 热词管理 API
-- [ ] 纠错历史 API
-- [ ] 前端热词管理界面
-- [ ] 性能测试报告
-
-### Phase 3 (未来)
-- [ ] Qdrant 部署配置
-- [ ] Wav2Vec 2.0 集成代码
-- [ ] WavRAG 检索 API
-- [ ] 音频相似度测试报告
+| 本地存储空间不足 | 中 | 自动清理策略 + 云端归档 |
+| PowerMem 文档不足 | 中 | 参考 TEN 官方示例代码 |
+| 音频 embedding 成本高 | 中 | 缓存 + 按需生成 |
+| 记忆隐私泄露 | 高 | 用户级数据隔离 + 加密 + 同意机制 |
 
 ---
 
-**版本：** v1.0  
-**最后更新：** 2025-01-03  
+## 📚 参考资源
+
+### 架构参考
+- [OpenClaw Memory Architecture](https://blog.csdn.net/tianyuanwo/article/details/158428045) - 四层记忆架构
+- [OpenClaw 会话机制与记忆系统](https://www.cnblogs.com/YzpJason/p/19631621) - 深度剖析
+
+### 向量数据库
+- [Qdrant vs pgvector](https://zilliz.com.cn/comparison/qdrant-vs-pgvector) - 性能对比
+- [Qdrant 量化指南](https://m.blog.csdn.net/gitblog_01016/article/details/151207687) - 压缩优化
+
+### 记忆系统研究
+- 2024 记忆机制综述（定义、设计与评估）
+- 2025 记忆代理能力框架（检索、学习、长程理解、选择性遗忘）
+
+### 音频处理
+- [Wav2Vec 2.0 Paper](https://arxiv.org/abs/2006.11477)
+- [RFC 6716 - Opus Codec](https://tools.ietf.org/html/rfc6716)
+- [RFC 9639 - FLAC Format](https://tools.ietf.org/html/rfc9639)
+
+---
+
+**版本：** v2.0
+**最后更新：** 2026-03-02
 **负责人：** VoxFlame Dev Team

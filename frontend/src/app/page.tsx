@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useAgent } from '@/hooks/useAgent'
+import { useAuth } from '@/hooks/useAuth'
 import { UserNav } from '@/components/ui/user-nav'
 
 /**
@@ -10,8 +11,23 @@ import { UserNav } from '@/components/ui/user-nav'
  * Google 风格简洁设计
  * 核心功能：语音 → 纠正 → 字幕 + 语音输出
  * 交互：点击开始/结束，自动检测说话轮次
+ *
+ * 重要：用户必须登录才能使用
  */
 export default function Home() {
+  // 1. 强制登录检查
+  const { userId, isLoading: authLoading, isAuthenticated } = useAuth({
+    redirectToLogin: true,
+    loginPath: '/login',
+  })
+
+  // 2. 只有登录后才连接 Agent，并传入 userId
+  const agentOptions = useMemo(() => ({
+    enableTTS: true,
+    autoConnect: isAuthenticated && !!userId,
+    userId: userId || undefined,
+  }), [isAuthenticated, userId])
+
   const {
     isConnected,
     isRecording,
@@ -19,7 +35,7 @@ export default function Home() {
     messages,
     error,
     toggleRecording,
-  } = useAgent({ enableTTS: true, autoConnect: true })
+  } = useAgent(agentOptions)
 
   // 空格键切换录音（点击式，不是按住）
   useEffect(() => {
@@ -38,6 +54,29 @@ export default function Home() {
     .filter(m => m.role === 'assistant')
     .slice(-3)
     .map(m => m.content)
+
+  // 认证加载中
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500">正在验证登录状态...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 未认证（正在跳转中）
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500">请先登录...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

@@ -2,6 +2,8 @@
  * 常用短语控制器
  *
  * 提供短语的 CRUD 操作和 TTS 预生成功能
+ *
+ * 安全：所有操作都需要认证，user_id 从 token 中获取
  */
 
 import { Request, Response } from 'express'
@@ -13,19 +15,36 @@ export class PhrasesController {
    */
   async createPhrase(req: Request, res: Response): Promise<void> {
     try {
+      // 从认证中间件获取用户 ID
+      const authenticatedUserId = req.user?.id
       const { user_id, text, category } = req.body
 
-      if (!user_id || !text || !category) {
-        res.status(400).json({ error: '缺少必填字段: user_id, text, category' })
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: '未授权 - 无用户上下文' })
+        return
+      }
+
+      // 安全检查：确保 user_id 与 token 匹配
+      if (user_id && user_id !== authenticatedUserId) {
+        console.warn(`[PhrasesController] User ID mismatch: token=${authenticatedUserId}, body=${user_id}`)
+        res.status(403).json({ error: '禁止访问 - User ID 不匹配' })
+        return
+      }
+
+      // 使用认证后的 user_id
+      const safeUserId = authenticatedUserId
+
+      if (!text || !category) {
+        res.status(400).json({ error: '缺少必填字段: text, category' })
         return
       }
 
       // 获取用户当前最大 order_index
-      const existingPhrases = await SupabaseService.getInstance().getUserPhrases(user_id)
+      const existingPhrases = await SupabaseService.getInstance().getUserPhrases(safeUserId)
       const maxOrder = existingPhrases.reduce((max, p) => Math.max(max, p.order_index || 0), 0)
 
       const phrase: Omit<QuickPhrase, 'id' | 'created_at' | 'updated_at'> = {
-        user_id,
+        user_id: safeUserId,
         text: text.trim(),
         category,
         usage_count: 0,
@@ -48,6 +67,7 @@ export class PhrasesController {
 
   /**
    * GET /api/phrases/user/:userId - 获取用户所有短语
+   * validateUserId 中间件已验证 userId 与 token 匹配
    */
   async getUserPhrases(req: Request, res: Response): Promise<void> {
     try {
@@ -161,10 +181,23 @@ export class PhrasesController {
    */
   async reorderPhrases(req: Request, res: Response): Promise<void> {
     try {
+      // 从认证中间件获取用户 ID
+      const authenticatedUserId = req.user?.id
       const { user_id, phrase_orders } = req.body
 
-      if (!user_id || !Array.isArray(phrase_orders)) {
-        res.status(400).json({ error: '缺少必填字段: user_id, phrase_orders (数组)' })
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: '未授权 - 无用户上下文' })
+        return
+      }
+
+      // 安全检查：确保 user_id 与 token 匹配
+      if (user_id && user_id !== authenticatedUserId) {
+        res.status(403).json({ error: '禁止访问 - User ID 不匹配' })
+        return
+      }
+
+      if (!Array.isArray(phrase_orders)) {
+        res.status(400).json({ error: '缺少必填字段: phrase_orders (数组)' })
         return
       }
 
@@ -188,14 +221,25 @@ export class PhrasesController {
    */
   async initializePresets(req: Request, res: Response): Promise<void> {
     try {
+      // 从认证中间件获取用户 ID
+      const authenticatedUserId = req.user?.id
       const { user_id } = req.body
 
-      if (!user_id) {
-        res.status(400).json({ error: '缺少必填字段: user_id' })
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: '未授权 - 无用户上下文' })
         return
       }
 
-      const phrases = await SupabaseService.getInstance().initializePresetPhrases(user_id)
+      // 安全检查：确保 user_id 与 token 匹配
+      if (user_id && user_id !== authenticatedUserId) {
+        res.status(403).json({ error: '禁止访问 - User ID 不匹配' })
+        return
+      }
+
+      // 使用认证后的 user_id
+      const safeUserId = authenticatedUserId
+
+      const phrases = await SupabaseService.getInstance().initializePresetPhrases(safeUserId)
 
       res.json({
         success: true,

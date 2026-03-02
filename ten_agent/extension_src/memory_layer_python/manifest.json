@@ -1,0 +1,69 @@
+{
+  "type": "extension",
+  "name": "memory_layer_python",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.11"
+    }
+  ],
+  "api": {
+    "cmd_in": [
+      {
+        "name": "init_memory",
+        "description": "Initialize memory for a user session"
+      },
+      {
+        "name": "save_conversation",
+        "description": "Save a conversation turn to memory"
+      },
+      {
+        "name": "search_memory",
+        "description": "Search memory for relevant context"
+      },
+      {
+        "name": "get_voice_profile",
+        "description": "Get user voice profile (patterns, hotwords)"
+      },
+      {
+        "name": "update_voice_profile",
+        "description": "Update voice profile with new patterns"
+      },
+      {
+        "name": "flush",
+        "description": "Flush pending memory to storage"
+      }
+    ],
+    "cmd_out": [],
+    "data_in": [
+      {
+        "name": "correction_event",
+        "description": "Correction event for learning (raw -> corrected)"
+      },
+      {
+        "name": "session_start",
+        "description": "New session started"
+      },
+      {
+        "name": "session_end",
+        "description": "Session ended"
+      }
+    ],
+    "data_out": [
+      {
+        "name": "voice_profile",
+        "description": "Voice profile data for ASR enhancement"
+      },
+      {
+        "name": "memory_context",
+        "description": "Relevant memory context for LLM"
+      },
+      {
+        "name": "clarity_score",
+        "description": "Clarity score for current session"
+      }
+    ]
+  }
+}
