@@ -31,6 +31,13 @@ export interface Session {
   turns: ConversationTurn[]
 }
 
+export interface CreateMemoryInput {
+  type?: MemoryType
+  content: string
+  metadata?: Record<string, unknown>
+  createdAt?: number
+}
+
 const KEYS = {
   MEMORIES: 'voxflame_memories',
   SESSIONS: 'voxflame_sessions',
@@ -96,6 +103,28 @@ class MemoryService {
   getRecent(limit = 20): Memory[] {
     if (!this.userId) return []
     return parseJson<Memory[]>(localStorage.getItem(userKey(this.userId, KEYS.MEMORIES)), []).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
+  }
+
+  addMemoryEntry(input: CreateMemoryInput): Memory | null {
+    if (!this.userId) return null
+
+    const timestamp = input.createdAt ?? Date.now()
+    const memory: Memory = {
+      id: genId(),
+      userId: this.userId,
+      type: input.type ?? 'episodic',
+      content: input.content,
+      metadata: input.metadata,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+
+    const existing = parseJson<Memory[]>(localStorage.getItem(userKey(this.userId, KEYS.MEMORIES)), [])
+    existing.push(memory)
+    localStorage.setItem(userKey(this.userId, KEYS.MEMORIES), JSON.stringify(existing.slice(-1000)))
+    this.queue.push(memory)
+    void this.syncBackend()
+    return memory
   }
 
   getStats() {

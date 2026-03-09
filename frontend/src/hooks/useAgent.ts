@@ -60,6 +60,10 @@ export interface UseAgentOptions {
   userId?: string
 }
 
+export interface AgentConnectOptions {
+  suppressGreeting?: boolean
+}
+
 export function useAgent(options: UseAgentOptions = {}) {
   const { autoConnect = false, enableTTS = true, userId } = options
 
@@ -98,20 +102,33 @@ export function useAgent(options: UseAgentOptions = {}) {
   }, [])
 
   // Connect to Agent
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (options: AgentConnectOptions = {}) => {
     try {
       setState(prev => ({ ...prev, error: null }))
 
       // Get Auth Token (使用 getValidToken 自动处理刷新)
       const token = await getValidToken()
-      const wsUrl = token ? `${config.api.agentWsUrl}?token=${token}` : config.api.agentWsUrl
+      const wsUrl = new URL(
+        config.api.agentWsUrl,
+        typeof window !== 'undefined' ? window.location.href : 'http://localhost',
+      )
+      if (token) {
+        wsUrl.searchParams.set('token', token)
+      }
+      if (options.suppressGreeting) {
+        wsUrl.searchParams.set('suppress_greeting', '1')
+      }
 
       console.log('[useAgent] ========== 连接调试信息 ==========')
-      console.log('[useAgent] WebSocket URL:', wsUrl.replace(/token=.+$/, 'token=***')) // 隐藏 token
+      console.log(
+        '[useAgent] WebSocket URL:',
+        wsUrl.toString().replace(/token=.+?(?=&|$)/, 'token=***'),
+      )
       console.log('[useAgent] Has Auth Token:', !!token)
+      console.log('[useAgent] Suppress Greeting:', !!options.suppressGreeting)
       console.log('[useAgent] =====================================')
 
-      const client = new AgentClient(wsUrl)
+      const client = new AgentClient(wsUrl.toString())
       agentClientRef.current = client
 
       const callbacks: AgentClientCallbacks = {

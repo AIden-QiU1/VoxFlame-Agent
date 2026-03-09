@@ -58,12 +58,13 @@ const wss = new WebSocketServer({ server, path: '/ws/agent' })
 
 wss.on('connection', async (clientWs, req) => {
   console.log('[WS Proxy] 新客户端连接，正在代理到 TEN Agent...')
+  const clientUrl = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`)
+  const suppressGreeting = clientUrl.searchParams.get('suppress_greeting') === '1'
 
   // 1. 身份验证 (Auth)
   let userProfile: any = null
   try {
-    const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`)
-    const token = url.searchParams.get('token')
+    const token = clientUrl.searchParams.get('token')
 
     if (token && supabase) {
       // 验证 Token
@@ -86,7 +87,14 @@ wss.on('connection', async (clientWs, req) => {
   }
 
   // 连接到 TEN Agent
-  const agentWs = new WebSocket(TEN_AGENT_WS_URL)
+  const agentWsUrl = new URL(TEN_AGENT_WS_URL)
+  if (suppressGreeting) {
+    agentWsUrl.searchParams.set('suppress_greeting', '1')
+  }
+  const agentWs = new WebSocket(agentWsUrl.toString())
+  console.log(
+    `[WS Proxy] 代理目标: ${agentWsUrl.toString()}${suppressGreeting ? ' (suppress_greeting=1)' : ''}`,
+  )
 
   let isAgentConnected = false
   const pendingMessages: string[] = []

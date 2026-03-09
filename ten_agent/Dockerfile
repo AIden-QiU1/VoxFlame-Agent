@@ -43,11 +43,28 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
 # STEP 2: 安装 tman (TEN Package Manager)
 # =============================================
 
-# 直接从 GitHub 安装 tman（不使用国内代理，因为 ghproxy 不可用）
-RUN curl -fsSL https://raw.githubusercontent.com/TEN-framework/ten-framework/main/tools/tman/install_tman.sh | bash
+# 固定 tman 版本，避免每次调用 GitHub API 查询 latest 带来的额外延迟
+ARG TMAN_VERSION=0.11.57
+# 可按环境覆盖下载源（默认 GitHub Releases 官方地址）
+ARG TMAN_DOWNLOAD_BASE=https://github.com/TEN-framework/ten-framework/releases/download
 
-# 确保 tman 在 PATH 中（安装到 ~/.local/bin）
-ENV PATH="/root/.local/bin:${PATH}" \
+# 直接下载 release 二进制，避免依赖 raw.githubusercontent.com
+RUN set -eux; \
+    case "$(dpkg --print-architecture)" in \
+      amd64) TMAN_ARCH="x64" ;; \
+      arm64) TMAN_ARCH="arm64" ;; \
+      *) echo "Unsupported architecture: $(dpkg --print-architecture)"; exit 1 ;; \
+    esac; \
+    curl -fL --retry 8 --retry-all-errors --retry-delay 2 --connect-timeout 10 --continue-at - \
+      -o /tmp/tman.zip \
+      "${TMAN_DOWNLOAD_BASE}/${TMAN_VERSION}/tman-linux-release-${TMAN_ARCH}.zip"; \
+    unzip -q /tmp/tman.zip -d /tmp/tman-install; \
+    install -m 0755 /tmp/tman-install/ten_manager/bin/tman /usr/local/bin/tman; \
+    rm -rf /tmp/tman.zip /tmp/tman-install; \
+    tman --version
+
+# 确保 tman 在 PATH 中
+ENV PATH="/usr/local/bin:${PATH}" \
     # 禁用代理
     http_proxy= \
     https_proxy= \
@@ -61,16 +78,20 @@ WORKDIR /app
 # STEP 3: 配置 tman 使用中国 Registry
 # =============================================
 
-# 配置 tman 使用中国官方 registry (v3 API)
+# 默认使用 TEN 官方 global registry；可通过构建参数覆盖为区域地址
+ARG TEN_REGISTRY_INDEX=https://ten-store.theten.ai/api/ten-cloud-store/v3/packages
 RUN mkdir -p ~/.tman && \
-    echo '{"registry":{"default":{"index":"https://registry-ten.rtcdeveloper.cn/api/ten-cloud-store/v3/packages"}},"enable_package_cache":false}' > ~/.tman/config.json
+    printf '{"registry":{"default":{"index":"%s"}},"enable_package_cache":true}\n' "$TEN_REGISTRY_INDEX" > ~/.tman/config.json
 
-# 先复制 manifest.json，利用 Docker 缓存
+# 先复制依赖定义文件，利用 Docker 缓存
 COPY manifest.json /app/
+COPY manifest-lock.json /app/
 
-# 安装 TEN 依赖包（从中国 registry）
-# 明确禁用代理环境变量，避免 Go 程序解析错误
-RUN unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY && tman install
+# 安装 TEN 依赖包
+RUN set -eux; \
+    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY no_proxy NO_PROXY; \
+    rm -f /app/manifest-lock.json; \
+    tman install
 
 # =============================================
 # STEP 4: 安装本地扩展

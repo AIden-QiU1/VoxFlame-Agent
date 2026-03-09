@@ -1,4 +1,4 @@
-import { RecognitionResult, WebSocketMessage } from '../types'
+import { WebSocketMessage } from '../types'
 import { config } from '../config'
 
 export class ASRClient {
@@ -52,9 +52,34 @@ export class ASRClient {
       if (typeof data === 'string') {
         this.ws.send(data)
       } else {
-        this.ws.send(data)
+        this.ws.send(JSON.stringify(data))
       }
     }
+  }
+
+  sendAudio(audioData: ArrayBufferLike | Uint8Array) {
+    const bytes = audioData instanceof Uint8Array
+      ? audioData
+      : audioData
+        ? new Uint8Array(audioData)
+        : new Uint8Array()
+
+    const base64 = btoa(Array.from(bytes).map((byte) => String.fromCharCode(byte)).join(''))
+
+    this.send({
+      audio: base64,
+      metadata: {
+        sample_rate: 16000,
+        channels: 1,
+        format: 'pcm_s16le',
+      },
+    })
+  }
+
+  endAudioStream() {
+    this.send({
+      type: 'end_audio',
+    })
   }
 
   close() {

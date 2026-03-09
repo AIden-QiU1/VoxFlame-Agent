@@ -1,802 +1,346 @@
 # VoxFlame Agent
 
-**燃言 - Ignite Your Voice**
+> 让声音不仅被听见，更被理解。  
+> A real-time communication system for people with dysarthric speech.
 
-*让每个声音都被听见，让每种表达都被理解*
-
----
-
-## 项目愿景
-
-**VoxFlame 燃言** 是为构音障碍者（Dysarthria）打造的 **Agentic Voice 应用**。
-
-### 核心理念
-
-> **"不是纠正用户的声音，而是理解用户的意图"**
-> **"Agent 是大脑，记忆是灵魂，UI 只是手脚"**
-
-构音障碍患者面临的核心问题：
-1. **认知差异**：患者觉得自己说的是正常的，但他人听到的是不同的声音
-2. **沟通障碍**：陌生人无法快速理解其表达意图
-3. **长期康复**：需要持续的训练和反馈
-
-### 产品定位：Agent + 记忆驱动的智能语音助理
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              VoxFlame Agentic Voice (2026架构)                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │                   Agentic UI (A2UI)                         │ │
-│  │   双行字幕镜 │ 声音反馈 │ 意图面板 │ 数字名片              │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                              ↕                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │                TEN Framework + Agent Core                   │ │
-│  │  ┌──────────────────────────────────────────────────────┐  │ │
-│  │  │           Memory Layer (三层记忆)                      │  │ │
-│  │  │  • 感知记忆: 当前对话上下文                           │  │ │
-│  │  │  • 工作记忆: 交流主题 + 对方身份                      │  │ │
-│  │  │  • 长期记忆: 用户画像 + 成功模式                      │  │ │
-│  │  └──────────────────────────────────────────────────────┘  │ │
-│  │  ┌──────────────────────────────────────────────────────┐  │ │
-│  │  │         Skills & Tools Layer (可扩展)                 │  │ │
-│  │  │  • SpeechClaritySkill    (语音澄清)                  │  │ │
-│  │  │  • IntentPredictionSkill (意图预测)                  │  │ │
-│  │  │  • ContextSharingSkill   (上下文分享)                │  │ │
-│  │  │  • QuickPhraseSkill      (常用短语)                  │  │ │
-│  │  └──────────────────────────────────────────────────────┘  │ │
-│  │  Mic → ASR → [Raw] → LLM → [Corrected] → TTS             │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                              ↕                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │            Supabase + Qdrant (记忆存储)                     │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 核心公式 (2026 Agentic AI)
-
-```
-AI Agent = LLM (Brain) + Memory (Soul) + Planning + Tool Use
-```
-
-**参考**：[MemBrain 1.0](https://blog.csdn.net/cf2SudS8x8F0v/article/details/157816826) (2026年2月发布，SOTA记忆系统)
+**更新时间**: 2026-03-09
 
 ---
 
-## 系统架构
+## 项目目标
 
-### 当前架构（基于 TEN Framework + Agent Memory）
+VoxFlame 不是“通用语音助手”，而是一个**软硬件一体的实时沟通解决方案**，优先服务：
+- 构音障碍、发音不清用户（首要）
+- 在突发、陌生人、高压场景下需要快速表达的人
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│                       用户设备 (Web/PWA)                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │  录音输入    │  │  双行字幕    │  │  TTS播放     │         │
-│  │  AudioWorklet│  │  Raw+Correct │  │  CosyVoice   │         │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘         │
-│         │ WebSocket (base64 audio)              │              │
-└─────────┼───────────────────────────────────────┼──────────────┘
-          │                                       │
-┌─────────▼───────────────────────────────────────▼──────────────┐
-│                      Backend (Express)                           │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │  Supabase    │  │  WebSocket   │  │  Memory Svc  │         │
-│  │  Auth        │  │  Proxy       │  │  (NEW!)      │         │
-│  └──────────────┘  └──────┬───────┘  └──────────────┘         │
-└────────────────────────────┼───────────────────────────────────┘
-                               │ WebSocket
-┌──────────────────────────────▼──────────────────────────────────┐
-│                    TEN Agent (Python Extensions)                 │
-│  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  │
-│  │websocket│→│  ASR   │→│  LLM   │→│  Main  │→│  TTS   │  │
-│  │ _server│  │(阿里云) │  │+Memory │  │Control │  │(Cosy)  │  │
-│  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘  │
-│                                                         │       │
-│              TEN 数据流图 (property.json)                     │
-│         websocket → stt → llm_memory → main_control → tts     │
-│                                                                  │
-│  扩展路线图：                                                    │
-│  ✅ websocket_server  WebSocket 服务器                            │
-│  ✅ llm_correction     LLM 纠错                                   │
-│  ✅ voxflame_main     主控制器                                    │
-│  ✅ memory_layer      记忆层 (已实现)                             │
-│  📝 speech_clarity    语音清晰度评估 (规划中)                     │
-│  📝 intent_predict    意图预测 (规划中)                           │
-│  📝 context_share     上下文分享 (规划中)                         │
-│  📝 translation_skill 翻译技能 (听障支持)                          │
-│  📝 hearing_assist    听障辅助 (外界声音转文字)                    │
-└─────────────────────────────────────────────────────────────────┘
-```
+目标不是“把用户改造成标准发音”，而是：
+- 在关键场景里，先帮助用户更容易主动开口
+- 在需要沟通时，快速把“难懂语音”转成“可理解表达”
+- 尽量保持用户自己的表达风格与声纹特征
+- 持续复盘，帮助用户长期提升沟通效果
 
-### TEN Framework 能力评估
+## 项目协作特色
 
-| 能力 | 描述 | 应用场景 | 评估 |
-|------|------|---------|------|
-| **数据流图** | 可视化配置扩展连接 | 灵活组装处理流程 | ✅ 强大 |
-| **多语言扩展** | Python/Go/C++/JS/TS | 选择最适合的语言开发 | ✅ 灵活 |
-| **音频帧处理** | PCM 帧输入/输出 | 低延迟音频流处理 | ✅ 高效 |
-| **系统扩展** | ASR/TTS/LLM/VAD 等 | 即插即用能力模块 | ✅ 丰富 |
-| **实时通信** | WebSocket/内置流式 | 端到端实时交互 | ✅ 稳定 |
-| **热更新** | 动态加载/卸载扩展 | 无需重启服务 | ✅ 便捷 |
+除了代码、任务和架构文档，仓库里还保留了一个给产品想法使用的 `ideas/` 目录：
 
-**结论**：TEN Framework 仍有很大开发空间，暂不需要自研框架。
+- `ideas/DAILY_CAPTURE.md`
+  用来随手记下外部看到的好产品、好交互、好仓库、半成品念头
+- `ideas/LONG_TERM_TOPICS.md`
+  用来沉淀那些需要长期讨论、持续调研、暂时没有结论的问题
+
+它不是默认启动上下文，也不替代当前任务列表。只有当我们在讨论新想法、产品方向或长期调研时，才会按需读取。
 
 ---
 
-### 听障群体支持规划 🆕
+## 核心判断（先把方向讲清楚）
 
-**问题**：如何将外界声音传递给听障群体？
+### 1) TEN 是数据驱动流，不是意图驱动流
 
-**解决方案**：增加翻译/听障辅助 Skill 到 Agent，利用 A2UI 在前端展示
+当前项目主链路是 TEN graph 编排：`音频 -> ASR -> 纠错 -> TTS -> WebSocket`。  
+它擅长低延迟、确定性管线；不擅长复杂的“LLM 自主规划 + 动态多工具编排”。
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    听障群体支持架构                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ 外界声音输入 (对方说话)                                      │ │
-│  │  • 麦克风阵列拾音                                           │ │
-│  │  • 降噪 + 回声消除                                          │ │
-│  └────────────────────┬───────────────────────────────────────┘ │
-│                       │ ASR                                    │
-│  ┌────────────────────▼───────────────────────────────────────┐ │
-│  │  translation_skill_python (TEN 扩展)                       │ │
-│  │  • 实时语音转文字 (ASR)                                     │ │
-│  │  • 对方语音 → 大字显示 (全屏字幕)                           │ │
-│  │  • 多语言翻译支持 (中英日韩等)                              │ │
-│  └────────────────────┬───────────────────────────────────────┘ │
-│                       │                                        │
-│  ┌────────────────────▼───────────────────────────────────────┐ │
-│  │  A2UI 前端展示 (Agentic UI)                                │ │
-│  │  • 全屏字幕镜 (超大字体显示)                                │ │
-│  │  • 双行字幕 (原文 + 翻译)                                   │ │
-│  │  • 表情/语气图标辅助理解                                    │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+### 2) Voice Agent 是实时系统，A2UI/Skill 不是第一优先级
 
-**TEN 扩展实现计划**：
+对实时语音场景，核心是：
+- 低延迟
+- 打断与抢话稳定性
+- 错误兜底
+- 连续可用性
 
-| 扩展名 | 功能 | 优先级 |
-|--------|------|--------|
-| `translation_skill_python` | 实时语音转文字 + 翻译 | P0 |
-| `hearing_assist_python` | 听障辅助模式 (大字/简化/表情) | P1 |
-| `caption_display_python` | 全屏字幕输出控制 | P1 |
+A2UI/Skill 更适合桌面辅助、复盘、训练阶段，在“实时对话主回路”里当前价值有限。
 
-**A2UI 前端展示特性**：
-- **全屏字幕模式**：超大字体显示对方说话内容
-- **双行字幕**：原文 (ASR) + 翻译 (LLM)
-- **表情辅助**：根据语气显示相关表情图标
-- **历史回看**：滚动查看最近对话记录
-- **Agentic 主动推送**：Agent 根据场景主动调整显示模式
+### 3) 产品路线应是三阶段
+
+1. **实时沟通助手（当前主线）**: 能在真实场景里稳定帮用户说清楚
+2. **半智能助手（下一阶段）**: 会准备、会兜底、会复盘
+3. **全智能助手（远期）**: 在授权边界内主动参与对话与任务执行
 
 ---
 
-### A2UI (Agentic UI) 集成说明 🆕
+## 技术难点与深度调研结论
 
-A2UI 是 Agent 驱动的用户界面，与传统的 React 组件不同：
+### A. 你构想中的关键技术难点
 
-| 特性 | 传统 UI | A2UI |
-|------|---------|------|
-| **触发方式** | 用户点击/输入 | Agent 主动推送 |
-| **状态管理** | 前端 useState | Agent 决策 + 前端渲染 |
-| **显示时机** | 固定布局 | 根据场景动态显示 |
-| **数据来源** | API 调用 | Agent 推送事件 |
+1. **低延迟 vs 高准确率冲突**
+- 构音障碍语音纠错通常需要上下文与个性化信息，但这会增加时延。
 
-**实现方式**：
-1. **TEN Agent 扩展**通过 WebSocket 推送 UI 事件
-2. **前端 `useAgent` Hook**监听事件并更新状态
-3. **组件根据状态渲染**（如双行字幕、意图面板）
+2. **全双工交互 vs 稳定中断控制**
+- 用户和系统同时说话时，必须可靠实现 barge-in（用户打断系统）、重入、去抖。
 
----
+3. **实时沟通 vs 长时记忆治理**
+- “记录什么、何时记录、记录多久、如何遗忘”是产品和合规双重难题。
 
-## 技术栈与升级计划
+4. **语音翻译/重表达 vs 工具调用并行**
+- 同一会话内兼顾语音对话、翻译、工具调用，容易出现状态竞争、上下文错配。
 
-| 模块 | 当前技术 | 2026 升级选项 | 状态 |
-|------|---------|---------------|------|
-| **前端** | Next.js 14 + PWA | - | ✅ 稳定 |
-| **实时通信** | WebSocket | - | ✅ 工作中 |
-| **后端** | Express + WS Proxy | - | ✅ 稳定 |
-| **Agent框架** | TEN Framework | - | ✅ 当前核心 |
-| **ASR** | 阿里云 funasr-nano | → **Qwen3-ASR** (52 种方言) | 📝 计划升级 |
-| **LLM** | QWEN3 Max | → **Qwen3.5** (思考模式、长上下文) | 📝 计划升级 |
-| **TTS** | CosyVoice v3 | → **Qwen3-TTS** (3秒克隆、情感控制) | 📝 计划升级 |
-| **认证** | Supabase Auth | - | ✅ 完成 |
-| **记忆系统** | (待开发) | PostgreSQL + Qdrant + IndexedDB | 🚧 开发中 |
+5. **个性化语音模型训练数据稀缺**
+- 每位用户的发音模式差异极大，小样本个体化是硬问题。
 
-### 2026 模型评估
+6. **软硬件协同难题**
+- 类 PLAUD + 翻译耳机形态涉及：收音阵列、降噪、回声消除、蓝牙链路、续航、端云协同。
 
-**Qwen3-ASR** [了解更多](https://qwen-ai.com/)：
-- 52 种语言/方言支持（22 种中文方言）
-- 4.97% 普通话识别错误率（超越 GPT-4o Transcribe）
-- 极端噪声环境：16.17% WER（Whisper 为 63.17%）
-- 混合方言：15.94% WER（Whisper 为 44.55%）
-- 支持流式识别和离线部署
-- Apache 2.0 开源许可
+### B. 对“最先进语音多模态/全双工模型”的调研结论
 
-**Qwen3-TTS** [了解更多](https://qwen-ai.com/)：
-- 3 秒声音克隆
-- 情感、音调、节奏控制
-- 17 种表达音色
-- 97ms 超低延迟
-- 中韩跨语言生成：错误率比 CosyVoice3 降低 66%
+> 结论（截至 2026-03-04）：**没有单一模型可以在生产级同时完美覆盖“低延迟全双工对话 + 高质量语音翻译 + 稳定工具调用 + 个体化长期记忆”**。  
+> 可行方案仍然是“分层架构 + 能力解耦”。
 
-**Qwen3.5** [了解更多](https://github.com/QwenLM/Qwen3.5/)：
-- 397B MoE 架构（每前向传播仅激活 17B 参数）
-- 原生 262K 上下文，可扩展至 1M tokens
-- 思考模式 (`/think`) 用于复杂逻辑推理
-- 支持 201 种语言和方言
-- 本地部署仅需 4 张 H20 GPU（比 R1 少 1/3）
+| 方案 | 实时语音 | 工具调用 | 关键限制（与你场景相关） |
+|---|---|---|---|
+| OpenAI Realtime API | 支持语音到语音 | 支持（含异步函数调用） | 长会话与上下文治理复杂；需要额外状态编排 |
+| Gemini Live API | 支持实时音频交互 | 支持函数调用 | 官方文档说明同一回复通常只输出一种模态（音频或文本） |
+| Qwen Realtime API | 支持实时语音，支持 text+audio 同回包 | Qwen 文档中工具调用主要走 Chat Completions；Realtime 工具链需额外验证 | 需自行做会话编排、工具状态同步 |
+| Kyutai Moshi/Hibiki（研究/开源） | 全双工低延迟很强 | 非工具调用导向 | 任务边界窄（如 Hibiki 当前是法英同传），不直接等于产品级 Agent |
+
+### C. 对 VoxFlame 的技术策略含义
+
+1. **短期**: TEN 保持实时主回路，避免把复杂 Agent 决策塞进回路里。
+2. **中期**: 在 TEN 旁路增加“策略层/编排层”（计划、记忆检索、工具仲裁）。
+3. **长期**: 再评估统一端到端语音多模态模型是否可替代部分分层组件。
 
 ---
 
-## 模型精度对比
+## 项目使用 / 部署
 
-### ASR 语音识别对比
+### 1. 环境要求
 
-| 模型 | 普通话 CER | 极端噪声 WER | 混合方言 WER | 延迟 |
-|------|-----------|-------------|-------------|------|
-| **Qwen3-ASR** | **4.97%** | **16.17%** | **15.94%** | 160ms |
-| FunASR (Paraformer) | ~7% | - | - | 低 |
-| Whisper-large-v3 | - | 63.17% | 44.55% | - |
-| GPT-4o Transcribe | - | - | - | - |
-| Doubao-ASR | - | - | 19.85% | - |
+- Docker + Docker Compose
+- 可用的 Supabase 项目（Auth + DB）
+- 阿里云 DashScope API Key（ASR/LLM/TTS）
 
-**结论**：Qwen3-ASR 在中文场景下全面领先，特别是在噪声和方言环境中表现突出。
+### 2. 环境变量
 
-### TTS 语音合成对比
-
-| 模型 | 音色质量 | 情感控制 | 延迟 | 声音克隆 |
-|------|---------|---------|------|---------|
-| **Qwen3-TTS** | **真人级** | **优秀** | **97ms** | **3秒** |
-| CosyVoice v3 | 高 | 良好 | 低 | 支持 |
-| 跨语言生成 | - | 错误率 14.4% | - | - |
-| **Qwen3-TTS (跨语言)** | - | **4.82% (-66%)** | - | - |
-
-**结论**：Qwen3-TTS 在音质、情感控制和跨语言生成方面均优于 CosyVoice。
-
-### 模型选择建议
-
-| 场景 | ASR 选择 | TTS 选择 | LLM 选择 |
-|------|---------|---------|---------|
-| 实时对话 | Qwen3-ASR-0.6B | Qwen3-TTS-0.6B | Qwen3.5-NonThink |
-| 高质量输出 | Qwen3-ASR-1.7B | Qwen3-TTS-1.7B | Qwen3.5-Think |
-| 离线部署 | Qwen3-ASR 本地 | Qwen3-TTS 本地 | Qwen3.5 本地 |
-| 成本优先 | FunASR + Qwen3-TTS 混合 | - | - |
-
----
-
-## 产品进度
-
-| 阶段 | 内容 | 状态 |
-|------|------|------|
-| **v1.x 基础版** | TEN Agent + ASR/LLM/TTS + WebSocket + PWA + UI | ✅ 完成 |
-| **v2.x 生产版** | Nginx + HTTPS + Docker Compose + 环境配置修复 | ✅ 完成 |
-| **v3.x 认证系统** | Supabase Auth + 用户上下文感知 | ✅ 完成 |
-| **v4.0 核心功能** | 常用短语板 + RLS修复 | ✅ 完成 |
-| **v5.0 Agent+记忆** | 双行字幕镜 + 记忆系统 + Agent Skills | 🚧 **进行中** |
-
-### 今日工作总结 (2026-03-02)
-
-**已完成**:
-- ✅ 双行字幕镜 UI 组件（`DualLineSubtitleDisplay`）
-- ✅ 常用短语板完整实现（8个分类 + CRUD）
-- ✅ 记忆系统 v2.0（Local-first + Hybrid 架构）
-- ✅ memory_layer_python TEN 扩展
-- ✅ 语音画像记忆（混淆模式、热词、清晰度评分）
-
-**已知状态**:
-- ⚠️ 双行字幕镜和短语板组件已实现，但**未集成到活跃路由**
-- ⚠️ 主页 (`/`) 仅显示基础录音界面
-- ⚠️ `/chat` 路由不存在（返回 404）
-- ✅ 认证系统代码完成，需验证实际可用性
-
-**下次优先级**:
-1. **集成**: 将 ChatInterface 组件集成到主页面
-2. **验证**: 登录、ASR、LLM、TTS 完整流程测试
-3. **部署**: 域名 + HTTPS 配置，上线准备
-
-### 开发优先级 (2026 Q1)
-
-> 基于 **Agent + 记忆驱动** 架构，聚焦核心能力
-
-| Phase | 任务 | 描述 | 预计时间 |
-|-------|------|------|---------|
-| **P1** | 双行字幕镜 | Raw ASR + LLM纠正 + 清晰度评分 | 1周 |
-| **P1** | TEN记忆层Extension | 用户画像 + 对话历史存储 | 2周 |
-| **P1** | Agent Skills | 意图预测 + 短语建议 + 上下文分享 | 1周 |
-| **P2** | 数字名片 | 陌生人快速理解 + 场景预设 | 1周 |
-| **P2** | A2UI优化 | Agent主动推送 + 意图面板 | 1周 |
-| **P3** | 评估收集模块 | 独立页面 + 数据导入记忆 | 1周 |
-
-### 已验证功能
-
-| 功能模块 | 状态 | 说明 |
-|----------|------|------|
-| 用户注册/登录 | ✅ 正常 | JWT Token 认证 |
-| WebSocket 连接 | ✅ 正常 | Frontend → Backend → TEN Agent |
-| TTS 语音输出 | ✅ 正常 | 问候语播放成功 |
-| 字幕显示 | ✅ 正常 | ASR 文本实时显示 |
-| 音频录音 | ⚠️ 需 HTTPS | 浏览器安全限制 |
-
-### 代码规模
-
-| 模块 | 文件数 | 代码行数 |
-|------|--------|---------|
-| Frontend (TSX/TS) | 40 | ~3,500 |
-| Backend (TS) | 9 | ~1,500 |
-| TEN Extensions | 3 | ~1,200 |
-| **总计** | **52** | **~6,200** |
-
----
-
-## 开发路线图
-
-> **策略：基于 TEN + PWA 做到极致，自研框架延后**
-
-### 立即执行（本周）
-
-| 功能 | 描述 | 优先级 | 预计工作量 |
-|------|------|--------|-----------|
-| **双行字幕镜** | Raw ASR + LLM纠正 + 最终文本 三行对照 | P0 | 2-3天 |
-| **常用短语板** | 点击即播 + 自定义添加 + TTS 预缓存 | P0 | 1-2天 |
-| **场景模板** | 就医/购物/点餐/打车 预设短语 | P0 | 1天 |
-| **Qwen3-ASR 评估** | 评估升级到 Qwen3-ASR 的可行性 | P0 | 1天 |
-
-### 短期（2-4 周）
-
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| **PWA 完善** | Service Worker + IndexedDB 本地存储 | P1 |
-| **全屏对外字幕** | 给对方看的超大字显示 | P1 |
-| **历史记录调用** | 最近消息 + 收藏 + 重播 | P1 |
-| **记忆系统基础** | PostgreSQL + 基础 API | P1 |
-
-### 中期（1-2 月）
-
-| 功能 | 描述 | 状态 |
-|------|------|------|
-| **感知差镜子** | Listener Simulation + 断裂点高亮 | 📝 设计中 |
-| **声音可视化** | 波形 + 梅尔频谱 + 对比 | 📝 设计中 |
-| **模型升级** | Qwen3-ASR/TTS + Qwen3.5 | 📝 计划中 |
-| **伙伴模式** | 对方"懂/不懂"按钮 + 自动修复 | 📝 设计中 |
-
-### 长期（3-6 月）
-
-| 功能 | 描述 | 状态 |
-|------|------|------|
-| **TEN 扩展** | memory、phrase_manager、tool_calling | 📝 规划中 |
-| **声音教练** | 节拍训练 + 游戏化练习 | 📝 设计中 |
-| **生活代理** | 智能家居集成 + 确认式执行 | 📝 设计中 |
-
-### 极长期（6 月+）
-
-| 功能 | 描述 | 触发条件 |
-|------|------|---------|
-| **自研框架评估** | 当 TEN 达到上限时再开发 | 需要评估 |
-| **边缘计算** | 本地 ASR/TTS 部署 | 性能需求 |
-| **多模态** | 视频、手势辅助 | 用户需求 |
-
----
-
-## TEN 扩展开发计划
-
-### 现有扩展
-
-```
-ten_agent/extension_src/
-├── websocket_server/     # WebSocket 服务器
-├── voxflame_main_python/ # 主控制器
-└── llm_correction_python/# LLM 纠错
-```
-
-### 计划扩展（Agent + 记忆驱动）
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    TEN Agent 扩展架构                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Phase 1: 记忆层 (Memory Layer) - P0                              │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  memory_layer_python                                        │ │
-│  │  ├── 功能: 三层记忆管理（感知/工作/长期）                    │ │
-│  │  ├── 输入: 对话数据、用户行为                                │ │
-│  │  ├── 输出: 记忆检索、上下文注入                              │ │
-│  │  └── 存储: Supabase (结构化) + Qdrant (向量)                │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  Phase 2: Agent Skills - P0                                      │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  speech_clarity_python                                      │ │
-│  │  ├── 功能: 实时语音清晰度评估                               │ │
-│  │  ├── 输入: ASR置信度 + 音频特征                             │ │
-│  │  └── 输出: 清晰度评分 (0-100) + 颜色编码                    │ │
-│  │                                                              │ │
-│  │  intent_prediction_python                                   │ │
-│  │  ├── 功能: 增强型意图识别                                    │ │
-│  │  ├── 输入: ASR结果 + 用户画像                                │ │
-│  │  └── 输出: 预测意图 + 建议表达                                │ │
-│  │                                                              │ │
-│  │  phrase_suggestion_python                                   │ │
-│  │  ├── 功能: 基于上下文的短语建议                              │ │
-│  │  ├── 输入: 当前场景 + 用户历史                               │ │
-│  │  └── 输出: 推荐短语列表                                      │ │
-│  │                                                              │ │
-│  │  context_sharing_python                                     │ │
-│  │  ├── 功能: 陌生人快速理解                                    │ │
-│  │  ├── 输入: 场景触发                                          │ │
-│  │  └── 输出: 数字名片 + 预设开场白                              │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  Phase 3: 高级扩展 - P1                                          │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  visualization_python  # 语音可视化（波形/频谱）            │ │
-│  │  tool_calling_python      # 工具调用与执行                 │ │
-│  │  voice_coach_python       # 声音教练（节拍训练）            │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## PWA 能力评估
-
-### 当前 PWA 功能
-
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| 可安装 | ✅ | 可添加到主屏幕 |
-| manifest.json | ✅ | 完整配置 |
-| usePWA Hook | ✅ | 已实现 |
-| InstallPrompt | ✅ | 安装提示组件 |
-| Service Worker | ⚠️ | 部分实现，待完善 |
-| IndexedDB | ❌ | 未实现 |
-| 离线模式 | ❌ | 待开发 |
-
-### PWA vs 原生对比
-
-| 能力 | PWA | 原生 | 选择 |
-|------|-----|------|------|
-| 开发成本 | 低 | 高 | PWA |
-| 跨平台 | ✅ | ❌ | PWA |
-| 性能 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | PWA 够用 |
-| 硬件访问 | 有限 | 完整 | PWA 够用 |
-| 审核上架 | 无 | 需要 | PWA |
-
-**结论**：当前阶段 PWA 完全够用，无需开发原生应用。
-
----
-
-## 记忆系统设计
-
-### 混合架构
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     VoxFlame 混合记忆架构                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  层 1: Supabase PostgreSQL (核心存储)                            │
-│  ├── user_profiles (用户画像)                                    │
-│  ├── sessions (会话记录)                                         │
-│  ├── memories (长期记忆)                                         │
-│  └── phrase_library (短语库)                                     │
-│                                                                  │
-│  层 2: Qdrant 向量数据库 (语义检索)                               │
-│  └── conversation_embeddings (对话嵌入)                         │
-│                                                                  │
-│  层 3: IndexedDB (本地缓存 - 离线可用)                           │
-│  ├── 常用短语                                                   │
-│  ├── TTS 音频缓存                                                │
-│  └── 最近会话                                                    │
-│                                                                  │
-│  层 4: Markdown 导出 (用户可读)                                   │
-│  └── 用户可导出记忆为 Markdown 文件                               │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 音频 RAG 方案
-
-对于 Voice Agent，需要特殊的记忆结构：
-
-```typescript
-interface AudioMemory {
-  id: string;
-  user_id: string;
-  
-  // 原始音频
-  audio_url: string;  // OSS 存储
-  
-  // ASR 结果
-  raw_asr: string;
-  asr_confidence: number;
-  
-  // LLM 纠错
-  corrected_text: string;
-  
-  // 语义嵌入（用于检索）
-  text_embedding: number[];  // OpenAI/Qwen Embeddings
-  
-  // 元数据
-  timestamp: Date;
-  context: string;  // 场景（就医/购物/家庭）
-  emotional_tone: string;  // 情绪（急切/平静/开心）
-}
-```
-
----
-
-## 参考项目与灵感
-
-### 核心参考架构
-
-| 项目 | 描述 | 可借鉴点 |
-|------|------|---------|
-| [TEN Framework](https://github.com/TEN-framework/ten-framework) | 实时语音 Agent 框架 | **当前核心**，数据流图、多语言扩展 |
-| [OpenClaw](https://github.com/AIden-QiU1/openclaw) | AI Agent 框架 | Gateway 架构、Markdown 记忆、插件系统 |
-| [QuQu](https://github.com/yan5xu/ququ) | 开源语音输入工具 | 本地 FunASR、过滤口头禅 |
-| [VocoType](https://github.com/233stone/vocotype-cli) | 离线语音输入法 | 隐私优先 |
-
-### 技术参考
-
-| 技术 | 用途 |
-|------|------|
-| [Qwen3-ASR](https://qwen-ai.com/) | 52 种方言 ASR，升级首选 |
-| [Qwen3-TTS](https://qwen-ai.com/) | 3 秒声音克隆，情感控制 |
-| [Qwen3.5](https://github.com/QwenLM/Qwen3.5) | 思考模式 LLM，长上下文 |
-| [FunASR](https://github.com/alibaba-damo-academy/FunASR) | 工业级 ASR 工具包 |
-
----
-
-## 快速开始
-
-### Docker 部署 (推荐)
+至少确认以下文件已配置：
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/AIden-QiU1/VoxFlame-Agent.git
-cd VoxFlame-Agent
-
-# 2. 配置环境变量
 cp .env.example .env
-# 编辑 .env 填入 DASHSCOPE_API_KEY
-
-# 3. 启动服务
-sudo docker-compose up -d --build
-
-# 4. 查看状态
-sudo docker-compose ps
-
-# 5. 查看日志
-sudo docker-compose logs -f ten-agent
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+cp ten_agent/.env.example ten_agent/.env
 ```
 
-### 访问地址
+关键变量：
+- `DASHSCOPE_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_WS_URL`（建议 `ws://localhost:3001/ws/agent`）
 
-| 环境 | 前端地址 | 说明 |
-|------|----------|------|
-| 本地开发 | http://localhost:3000 | localhost 无需 HTTPS |
-| 生产环境 | https://your-domain.com | **必须使用 HTTPS** |
+### 3. Docker 启动（推荐）
 
-**重要**：浏览器 `getUserMedia` API 要求 HTTPS 环境（localhost 例外）。
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+常用运维命令：
+
+```bash
+docker compose logs -f frontend
+docker compose logs -f backend
+docker compose logs -f ten-agent
+
+docker compose restart frontend
+docker compose restart backend
+docker compose restart ten-agent
+
+docker compose down
+```
+
+### 4. 访问入口
+
+- Frontend: `http://localhost:3000`
+- Backend health: `http://localhost:3001/health`
+- WS proxy: `ws://localhost:3001/ws/agent`
+- TEN Agent WS: `ws://localhost:8766`
 
 ---
 
-## 项目结构
+## 基本结构
 
-```
+```text
 VoxFlame-Agent/
-├── frontend/              # Next.js 前端
-│   ├── src/app/          # 页面组件
-│   ├── src/hooks/        # useAgent, usePhrases, useScenarios
-│   ├── src/lib/          # WebSocket, AudioProcessor
-│   └── src/components/
-│       ├── chat/         # ChatInterface
-│       ├── quick-phrases/  # 常用短语 (新增)
-│       └── scenarios/     # 场景模板 (新增)
-├── backend/              # Express 后端
-│   └── src/
-│       ├── index.ts      # WebSocket Proxy
-│       ├── controllers/
-│       └── services/
-├── ten_agent/            # TEN Framework Agent
-│   ├── extension_src/    # Python 扩展
-│   │   ├── websocket_server/
-│   │   ├── voxflame_main_python/
-│   │   └── llm_correction_python/
-│   ├── manifest.json     # Agent 配置
-│   └── property.json     # 数据流图配置
-├── docs/
-│   ├── product/          # 产品规划
-│   │   ├── feature-roadmap.md
-│   │   ├── ai-plan.md
-│   │   ├── my-image.md
-│   │   └── repo-refer.md
-│   ├── DEVELOPMENT_ROADMAP.md  # 开发路线图
-│   └── COMPREHENSIVE_DEVELOPMENT_PLAN.md  # 全面开发计划
+├── frontend/                    # Next.js 14 前端
+│   └── src/app/
+│       ├── page.tsx             # 公共首页 + 沟通模式切换
+│       ├── chat/page.tsx        # 兼容路由（重定向到 /?mode=communicate）
+│       ├── contribute/page.tsx  # 中文语训 + 录后反馈 + 匿名上传页
+│       ├── ranyan/page.tsx      # 项目介绍页
+│       ├── (auth)/login/page.tsx
+│       └── auth/callback/route.ts
+├── backend/                     # Express + WS Proxy + API
+│   └── src/index.ts
+├── ten_agent/                   # TEN Runtime + Python extensions
+│   ├── property.json            # 图编排（数据流）
+│   └── extension_src/
+│       ├── websocket_server/
+│       ├── voxflame_main_python/
+│       ├── llm_correction_python/
+│       └── memory_layer_python/
+├── supabase/                    # 迁移脚本
+├── docs/                        # 架构与研究文档
 └── docker-compose.yml
 ```
 
 ---
 
-## 技术文档
+## 项目现有进度（按代码现状）
 
-| 文档 | 描述 |
-|------|------|
-| [全面开发计划](docs/COMPREHENSIVE_DEVELOPMENT_PLAN.md) | 代码现状评估 + 2026 技术选型 |
-| [开发路线图](docs/DEVELOPMENT_ROADMAP.md) | 五阶段开发计划 |
-| [LLM纠错开发计划](docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md) | v2.0 语音纠正扩展 |
-| [记忆系统计划](docs/MEMORY_SYSTEM_PLAN.md) | PowerMem + Qdrant |
-| [TEN扩展分析](docs/TEN_EXTENSIONS_ANALYSIS.md) | TEN Framework 生态 |
-| [WebSocket vs RTC](docs/WEBSOCKET_VS_RTC_GUIDE.md) | 实时通信协议对比 |
+### 已可用
 
----
+- `Frontend -> Backend -> TEN Agent` WebSocket 代理链路
+- Supabase 登录鉴权（前后端均已接入）
+- TEN 实时链路：ASR -> LLM 纠错 -> TTS
+- 首页已切换为公开产品首页：明确“现在沟通 / 练习表达 / 查看进展与记忆”，`/?mode=communicate` 进入沟通模式，`/chat` 保留兼容跳转
+- 多客户端会话隔离（`client_id` 维度）与定向消息回传
+- 纠错事件 + 会话 turn 写入 memory layer（local-first）
+- `voice_profile / memory_context` 已进入纠错链路
+- 常用短语 CRUD API（后端）
+- 主动沟通 Starter Kit 第一版：基于 AAC / 医疗 / 应急资料整理的中文场景卡片与第一句话代播
+- WebSocket 纯文本 `user_input -> TEN Agent -> TTS` 已打通，匿名 starter phrase 会自动连接并跳过默认问候
+- `/contribute` 已进入中文语训页第二阶段：高价值场景句、拼音、实时转写、录后反馈、匿名上传和训练结果写回已形成最小闭环
+- Docker 构建链路稳定（`docker compose build` 已验证通过）
 
-## 部署上线准备 🆕
+### 部分可用 / 需实测
 
-### 检查清单
+- 真实麦克风端到端延迟、误打断率、弱网重连表现
+- Memory 检索质量与日级复盘效果（跨会话）
+- 用户身份上下文注入后的个性化纠错收益量化
 
-| 类别 | 检查项 | 状态 | 说明 |
-|------|--------|------|------|
-| **域名** | 购买域名 | ⬜ | 推荐阿里云/腾讯云 |
-| **DNS** | A 记录解析 | ⬜ | 指向服务器 IP |
-| **SSL** | HTTPS 证书 | ⬜ | Let's Encrypt 免费 |
-| **服务器** | 云服务器配置 | ⬜ | 推荐 2C4G 起步 |
-| **Docker** | Docker + Docker Compose | ✅ | 已配置 |
-| **防火墙** | 端口开放 (80/443/3001) | ⬜ | 安全组配置 |
-| **环境变量** | .env 配置 | ⬜ | API Key 替换 |
-| **数据库** | Supabase 项目 | ✅ | 已配置 |
-| **监控** | 日志收集 | ⬜ | 可选 |
+### 仍是占位/原型的能力
 
-### 部署步骤
+- 工具执行接口（电话/设备/提醒）当前以模拟逻辑为主
+- 半智能复盘与训练教练流程尚未闭环
 
-#### 1. 域名配置
-```bash
-# 购买域名后，添加 A 记录
-# 例如：voxflame.com → 服务器 IP
-```
-
-#### 2. SSL 证书 (Let's Encrypt)
-```bash
-# 安装 certbot
-sudo apt-get install certbot
-
-# 生成证书
-sudo certbot certonly --standalone -d voxflame.com
-
-# 证书路径
-/etc/letsencrypt/live/voxflame.com/fullchain.pem
-/etc/letsencrypt/live/voxflame.com/privkey.pem
-```
-
-#### 3. Nginx 反向代理
-```nginx
-server {
-    listen 80;
-    server_name voxflame.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name voxflame.com;
-
-    ssl_certificate /etc/letsencrypt/live/voxflame.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/voxflame.com/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location /ws/ {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
-
-#### 4. Docker Compose 启动
-```bash
-# 拉取最新代码
-git pull origin main
-
-# 更新环境变量
-cp .env.example .env
-# 编辑 .env 填入生产环境配置
-
-# 构建并启动
-sudo docker-compose up -d --build
-
-# 检查状态
-sudo docker-compose ps
-```
-
-#### 5. 验证部署
-- [ ] 访问 https://voxflame.com 正常
-- [ ] WebSocket 连接成功
-- [ ] 用户注册/登录正常
-- [ ] 录音功能正常（需 HTTPS）
-
-### 环境变量配置清单
-
-| 变量名 | 说明 | 获取方式 |
-|--------|------|---------|
-| `NEXT_PUBLIC_API_URL` | 后端 API 地址 | 生产域名 |
-| `SUPABASE_URL` | Supabase API | Supabase 控制台 |
-| `SUPABASE_ANON_KEY` | Supabase 匿名密钥 | Supabase 控制台 |
-| `DASHSCOPE_API_KEY` | 阿里云 API Key | 阿里云控制台 |
 
 ---
 
-## 常见问题
+## 下步计划（与你的产品构想对齐）
 
-### HTTPS 访问提示证书不安全
+### Phase 1: 实时沟通助手（P0）
 
-自签名证书不受浏览器信任，这是正常的：
-1. Chrome/Edge: 点击"高级" → "继续访问"
-2. Firefox: 点击"高级" → "接受风险并继续"
+目标：先把“帮助用户主动开口并被理解”做到可用。
 
-### 通过服务器 IP 访问无法录音
+- ✅ 首页信息架构已完成第一轮重构：公开首页先讲“现在沟通 / 练习表达 / 查看进展与记忆”，并保留 `/?mode=communicate` 沟通入口
+- ✅ 第一话 / 场景模板 / 快捷短语 / 一键代播闭环（第一版）
+- 🚧 中文训练页第二阶段已落地：目标句、拼音、录后反馈、匿名上传、训练结果写回已接通；趋势页与更细的拼音 / 音节反馈待补
+- 打断策略与时延治理（p95、误打断率、重连恢复）作为所有主功能的上线门槛
+- 全屏字幕保留，但降级为辅助显示能力，不再作为近期主叙事
 
-**症状**：`navigator.mediaDevices` 为 `undefined`
 
-**原因**：浏览器安全政策阻止 HTTP 非本地访问
+### Phase 2: 半智能助手（P1）
 
-**解决**：
-- 开发测试：使用 `localhost:3000` 或配置 HTTPS
-- 生产环境：必须配置 HTTPS
+目标：会准备、会复盘、会逐渐理解这个用户。
 
-### TEN Agent 启动失败
+- 会话前准备建议（基于历史习惯 + 场景）
+- 会话中兜底表达建议（用户确认后执行）
+- 个体沟通记忆（高频表达、混淆词、场景偏好、训练历史）
+- 每日复盘（遗漏信息、沟通风险点、改进建议）
 
-```bash
-export TEN_PYTHON_LIB_PATH=/usr/lib/x86_64-linux-gnu/libpython3.10.so.1.0
-```
+### Phase 3: 全智能助手（P2）
+
+目标：在强授权下主动参与对话，并开始连接外部场景。
+
+- 可控代理模式（白名单对象 + 白名单工具 + 可审计）
+- 多轮任务级沟通目标追踪
+- 用户成长模型（鼓励、训练计划、自适应难度）
+- 场景声音提醒与用户定义设备 / App 联动
 
 ---
 
-## 贡献指南
+## 技术特点
 
-我们欢迎任何形式的贡献：
+- **TEN 数据流核心**: 适合实时音频处理链路
+- **本地优先记忆**: 为长期个体化提供基础
+- **后端 WS 代理**: 解决前端到 Agent 的工程接入问题
+- **可演进架构**: 先实时稳定，再叠加半智能与全智能层
 
-1. **代码贡献**：提交 PR，修复 Bug 或实现新功能
-2. **TEN 扩展**：开发新的 Python 扩展
-3. **数据贡献**：构音障碍语音数据标注
-4. **场景模板**：分享常用场景短语模板
-5. **反馈建议**：提出产品改进建议
+---
+
+## QA
+
+### Q1: 为什么不直接做“全能 Agent + A2UI + Skill”?
+
+因为实时语音场景的第一约束是**时延和稳定性**。先把核心沟通链路做稳，再增加智能层，风险更低。
+
+### Q2: TEN 能不能直接做意图驱动的工具调度？
+
+能做，但不自然。TEN 原生更偏图式数据流。复杂工具仲裁建议放在旁路编排层。
+
+### Q3: 这个项目是“语音翻译器”还是“沟通助手”？
+
+短期就应该是“主动沟通助手”，不是只会展示字幕的翻译器；中长期再长成“训练教练 + 成长系统 + 场景感知助手”。
+
+### Q4: 为什么强调记录与复盘？
+
+单次纠错解决“当下可说”；复盘与训练解决“长期变好”。两者缺一不可。
+
+### Q5: 听障辅助为什么放后面？
+
+它很有价值，但工程边界和主沟通链路不同。近期更适合先做“场景声音提醒 + 硬件 / App / Web 通信”的原型验证，而不是直接挤占构音障碍主线的 P0 资源。
+
+---
+
+## 项目号召
+
+我们正在寻找以下方向的贡献者：
+
+- 语音算法（ASR 个体化、语音重表达、TTS 声纹保真）
+- 实时系统工程（WebSocket/RTC、低延迟音频链路）
+- 康复与沟通科学（评估指标、训练方案、伦理边界）
+- 硬件工程（麦克风阵列、耳机形态、低功耗端侧）
+- 临床与用户研究（构音障碍真实场景数据与反馈）
+
+如果你认同“沟通权”是基本权利，欢迎一起把它做成可用产品。
+
+---
+
+## 参考资料 / 致谢
+
+### 官方文档与模型能力
+
+- OpenAI Realtime API 介绍与更新  
+  https://openai.com/index/introducing-the-realtime-api/  
+  https://developers.openai.com/blog/realtime-api
+
+- Google Gemini Live API（能力、限制、工具调用）  
+  https://ai.google.dev/gemini-api/docs/live-guide  
+  https://ai.google.dev/gemini-api/docs/live-tools
+
+- Alibaba Cloud Model Studio（Qwen Realtime / Function Calling）  
+  https://www.alibabacloud.com/help/en/model-studio/realtime-model  
+  https://www.alibabacloud.com/help/en/model-studio/function-calling
+
+- Kyutai 全双工语音项目  
+  https://github.com/kyutai-labs/moshi  
+  https://github.com/kyutai-labs/hibiki
+
+### 构音障碍语音研究
+
+- Interspeech 2025 Dysarthric Speech Recognition Challenge  
+  https://www.isca-archive.org/interspeech_2025/plumley25_interspeech.html
+
+- DyPCL: Personalized Dysarthric Speech Recognition with Prompt-based Contrastive Learning (NAACL 2025)  
+  https://aclanthology.org/2025.findings-naacl.388/
+
+- Hypernetworks for Personalized, Cross-Lingual Dysarthria and Stuttering Speech Recognition (Apple, Interspeech 2025)  
+  https://machinelearning.apple.com/research/hypernetworks-personalized-cross-lingual-dysarthria-stuttering
+
+- Latent Phrase Matching for Dysarthric Speech Recognition (Apple, Interspeech 2023)  
+  https://machinelearning.apple.com/research/latent-phrase-matching
+
+### 开源社区与框架
+
+- TEN Framework 官方文档  
+  https://theten.ai/docs/ten_framework/extension/
+
+- 本项目文档导航  
+  [docs/README.md](docs/README.md)
 
 ---
 
 ## License
 
-**CC BY-NC 4.0** - 非商业用途
-
-> 注：作者声明可随时商用，许可证文本待更新以与商业计划对齐。
-
----
-
-## 致谢
-
-- [TEN Framework](https://github.com/TEN-framework/ten-framework) - 实时语音 Agent 框架
-- [OpenClaw](https://github.com/AIden-QiU1/openclaw) - AI Agent 架构参考
-- [Qwen3 系列](https://qwen-ai.com/) - ASR/TTS/LLM 模型
-- [FunASR](https://github.com/alibaba-damo-academy/FunASR) - 中文 ASR 模型
-- [CosyVoice](https://github.com/FisherAudio/CosyVoice) - 开源 TTS 模型
-
----
-
-**让每个声音都被听见，让每种表达都被理解。**
-
-**让声音不仅被听见，更被理解。**
+本项目协议保持不变，详见 [LICENSE](LICENSE)。

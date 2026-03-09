@@ -3,10 +3,10 @@
 # Main extension implementation for TEN Framework
 #
 
-import asyncio
 import json
 import time
-from typing import Optional, Dict, Any, List
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any
 
 from ten_runtime import (
     AsyncExtension,
@@ -22,10 +22,25 @@ from .stores.base import ConversationTurn, VoiceProfile
 from .stores.local_store import LocalStore
 
 
+DEFAULT_CLIENT_ID = "default"
+
+
+@dataclass
+class MemorySessionContext:
+    """Per-client memory session context."""
+
+    client_id: str
+    user_id: str = "anonymous"
+    agent_id: str = "voxflame_voice_assistant"
+    store: Optional[LocalStore] = None
+    pending_corrections: list[dict[str, Any]] = field(default_factory=list)
+    correction_counts: Dict[str, int] = field(default_factory=dict)
+
+
 class MemoryLayerExtension(AsyncExtension):
     """
     Memory Layer Extension for VoxFlame
-    
+
     Responsibilities:
     1. Store conversation turns for context
     2. Learn pronunciation patterns from corrections
@@ -40,17 +55,8 @@ class MemoryLayerExtension(AsyncExtension):
         self.config: MemoryLayerConfig = None
         self.stopped: bool = False
 
-        # Storage backend
-        self.store: Optional[LocalStore] = None
-
-        # Session state
-        self.user_id: str = ""
-        self.agent_id: str = "voxflame_voice_assistant"
-        self.session_turns: List[ConversationTurn] = []
-        self.pending_corrections: List[Dict[str, Any]] = []
-
-        # Learning state
-        self.correction_counts: Dict[str, int] = {}  # word -> count
+        # client_id -> session context.
+        self.sessions: Dict[str, MemorySessionContext] = {}
 
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
         """Initialize the extension."""
@@ -58,10 +64,11 @@ class MemoryLayerExtension(AsyncExtension):
         ten_env.log_info("[MemoryLayer] Initializing...")
 
         try:
-            # Load configuration
             config_json, _ = await ten_env.get_property_to_json(None)
             self.config = MemoryLayerConfig.model_validate_json(config_json)
-            ten_env.log_info(f"[MemoryLayer] Config loaded: backend={self.config.storage_backend}")
+            ten_env.log_info(
+                f"[MemoryLayer] Config loaded: backend={self.config.storage_backend}"
+            )
         except Exception as e:
             ten_env.log_warn(f"[MemoryLayer] Failed to load config, using defaults: {e}")
             self.config = MemoryLayerConfig()
@@ -70,20 +77,16 @@ class MemoryLayerExtension(AsyncExtension):
         """Called when extension starts."""
         ten_env.log_info("[MemoryLayer] Started")
 
-        # Initialize storage backend
-        await self._init_store()
-
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
         """Called when extension stops."""
         ten_env.log_info("[MemoryLayer] Stopping...")
         self.stopped = True
 
-        # Flush pending data
-        await self._flush_session()
-
-        # Close store
-        if self.store:
-            await self.store.close()
+        for client_id, session in list(self.sessions.items()):
+            await self._flush_session(session)
+            if session.store:
+                await session.store.close()
+            self.sessions.pop(client_id, None)
 
     async def on_deinit(self, ten_env: AsyncTenEnv) -> None:
         """Cleanup resources."""
@@ -94,19 +97,24 @@ class MemoryLayerExtension(AsyncExtension):
         cmd_name = cmd.get_name()
         ten_env.log_info(f"[MemoryLayer] Received cmd: {cmd_name}")
 
+        cmd_data = self._load_json_from_cmd(cmd)
+        client_id = self._resolve_client_id_from_cmd(cmd, cmd_data)
+
         try:
             if cmd_name == "init_memory":
-                await self._handle_init_memory(ten_env, cmd)
+                await self._handle_init_memory(ten_env, cmd, client_id, cmd_data)
             elif cmd_name == "save_conversation":
-                await self._handle_save_conversation(ten_env, cmd)
+                await self._handle_save_conversation(ten_env, cmd, client_id, cmd_data)
             elif cmd_name == "search_memory":
-                await self._handle_search_memory(ten_env, cmd)
+                await self._handle_search_memory(ten_env, cmd, client_id, cmd_data)
             elif cmd_name == "get_voice_profile":
-                await self._handle_get_voice_profile(ten_env, cmd)
+                await self._handle_get_voice_profile(ten_env, cmd, client_id)
             elif cmd_name == "update_voice_profile":
-                await self._handle_update_voice_profile(ten_env, cmd)
+                await self._handle_update_voice_profile(ten_env, cmd, client_id, cmd_data)
+            elif cmd_name == "system_init":
+                await self._handle_system_init(ten_env, cmd, client_id, cmd_data)
             elif cmd_name == "flush":
-                await self._handle_flush(ten_env, cmd)
+                await self._handle_flush(ten_env, cmd, client_id, cmd_data)
             else:
                 ten_env.log_warn(f"[MemoryLayer] Unknown cmd: {cmd_name}")
                 await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
@@ -136,28 +144,62 @@ class MemoryLayerExtension(AsyncExtension):
     # Command Handlers
     # ========================================
 
-    async def _handle_init_memory(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
-        """Initialize memory for a user session."""
+    async def _handle_system_init(
+        self,
+        ten_env: AsyncTenEnv,
+        cmd: Cmd,
+        client_id: str,
+        cmd_data: Dict[str, Any],
+    ) -> None:
+        """Handle system_init command directly from websocket server."""
+        user = cmd_data.get("user", {})
+        if not isinstance(user, dict):
+            await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
+            return
+
+        init_payload = {
+            "user_id": user.get("id", "anonymous"),
+            "user_name": user.get("name", ""),
+            "user_email": user.get("email", ""),
+            "agent_id": self.config.agent_id,
+        }
+        await self._handle_init_memory(ten_env, cmd, client_id, init_payload)
+
+    async def _handle_init_memory(
+        self,
+        ten_env: AsyncTenEnv,
+        cmd: Cmd,
+        client_id: str,
+        cmd_data: Dict[str, Any],
+    ) -> None:
+        """Initialize memory for one client session."""
         try:
-            # Get user info from command
-            cmd_json, _ = cmd.get_property_to_json(None)
-            cmd_data = json.loads(cmd_json) if cmd_json else {}
+            user_id = str(cmd_data.get("user_id", "") or "").strip() or "anonymous"
+            agent_id = str(cmd_data.get("agent_id", "") or "").strip() or self.config.agent_id
 
-            self.user_id = cmd_data.get("user_id", "")
-            self.agent_id = cmd_data.get("agent_id", self.agent_id)
+            session = self._get_or_create_session(client_id)
+            await self._initialize_session_store(session, user_id, agent_id)
 
-            if not self.user_id:
-                ten_env.log_warn("[MemoryLayer] No user_id provided, using anonymous")
-                self.user_id = "anonymous"
+            ten_env.log_info(
+                f"[MemoryLayer] Memory initialized for client_id={client_id}, user_id={session.user_id}"
+            )
 
-            # Initialize store for this user
-            if self.store:
-                await self.store.initialize(self.user_id, self.agent_id)
-                ten_env.log_info(f"[MemoryLayer] Memory initialized for user: {self.user_id}")
+            profile = await session.store.get_voice_profile()
+            await self._broadcast_voice_profile(ten_env, client_id, profile)
 
-                # Get voice profile and broadcast
-                profile = await self.store.get_voice_profile()
-                await self._broadcast_voice_profile(ten_env, profile)
+            recent_turns = await session.store.search("", limit=5)
+            if recent_turns:
+                context_lines: list[str] = []
+                for item in recent_turns:
+                    text = item.get("content", "") if isinstance(item, dict) else ""
+                    if text:
+                        context_lines.append(f"- {text}")
+                if context_lines:
+                    await self._broadcast_memory_context(
+                        ten_env,
+                        client_id,
+                        "\n".join(context_lines[:5]),
+                    )
 
             await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
 
@@ -165,90 +207,116 @@ class MemoryLayerExtension(AsyncExtension):
             ten_env.log_error(f"[MemoryLayer] Error initializing memory: {e}")
             await ten_env.return_result(CmdResult.create(StatusCode.ERROR, cmd))
 
-    async def _handle_save_conversation(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
-        """Save a conversation turn to memory."""
+    async def _handle_save_conversation(
+        self,
+        ten_env: AsyncTenEnv,
+        cmd: Cmd,
+        client_id: str,
+        turn_data: Dict[str, Any],
+    ) -> None:
+        """Save a conversation turn to client-scoped memory."""
         try:
-            cmd_json, _ = cmd.get_property_to_json(None)
-            turn_data = json.loads(cmd_json) if cmd_json else {}
+            session = self._get_or_create_session(client_id)
+            if not session.store:
+                await self._initialize_session_store(session, session.user_id, session.agent_id)
 
             turn = ConversationTurn(
                 role=turn_data.get("role", "user"),
                 content=turn_data.get("content", ""),
                 raw_asr=turn_data.get("raw_asr", ""),
                 corrected_text=turn_data.get("corrected_text", ""),
-                clarity_score=turn_data.get("clarity_score", 0.0)
+                clarity_score=turn_data.get("clarity_score", 0.0),
+                metadata={"client_id": client_id},
             )
 
-            self.session_turns.append(turn)
+            await session.store.add_conversation([turn])
 
-            # Persist to store
-            if self.store:
-                await self.store.add_conversation([turn])
-
-            ten_env.log_info(f"[MemoryLayer] Saved conversation turn: {turn.role}")
-
+            ten_env.log_info(
+                f"[MemoryLayer] Saved conversation turn: client_id={client_id}, role={turn.role}"
+            )
             await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
 
         except Exception as e:
             ten_env.log_error(f"[MemoryLayer] Error saving conversation: {e}")
             await ten_env.return_result(CmdResult.create(StatusCode.ERROR, cmd))
 
-    async def _handle_search_memory(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
+    async def _handle_search_memory(
+        self,
+        ten_env: AsyncTenEnv,
+        cmd: Cmd,
+        client_id: str,
+        search_data: Dict[str, Any],
+    ) -> None:
         """Search memory for relevant context."""
         try:
-            cmd_json, _ = cmd.get_property_to_json(None)
-            search_data = json.loads(cmd_json) if cmd_json else {}
-
             query = search_data.get("query", "")
-            limit = search_data.get("limit", 10)
+            limit = int(search_data.get("limit", 10))
 
             results = []
-            if self.store:
-                results = await self.store.search(query, limit)
+            session = self.sessions.get(client_id)
+            if session and session.store:
+                results = await session.store.search(query, limit)
 
-            # Return results
             result = CmdResult.create(StatusCode.OK, cmd)
-            result.set_property_from_json(None, json.dumps({"results": results}))
+            result.set_property_from_json(
+                None,
+                json.dumps({"client_id": client_id, "results": results}),
+            )
             await ten_env.return_result(result)
 
         except Exception as e:
             ten_env.log_error(f"[MemoryLayer] Error searching memory: {e}")
             await ten_env.return_result(CmdResult.create(StatusCode.ERROR, cmd))
 
-    async def _handle_get_voice_profile(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
-        """Get user voice profile."""
+    async def _handle_get_voice_profile(
+        self,
+        ten_env: AsyncTenEnv,
+        cmd: Cmd,
+        client_id: str,
+    ) -> None:
+        """Get user voice profile for one client."""
         try:
             profile = None
-            if self.store:
-                profile = await self.store.get_voice_profile()
+            session = self.sessions.get(client_id)
+            if session and session.store:
+                profile = await session.store.get_voice_profile()
 
             result = CmdResult.create(StatusCode.OK, cmd)
             if profile:
-                result.set_property_from_json(None, json.dumps(profile.to_dict()))
+                payload = profile.to_dict()
+                payload["client_id"] = client_id
+                result.set_property_from_json(None, json.dumps(payload))
             await ten_env.return_result(result)
 
         except Exception as e:
             ten_env.log_error(f"[MemoryLayer] Error getting voice profile: {e}")
             await ten_env.return_result(CmdResult.create(StatusCode.ERROR, cmd))
 
-    async def _handle_update_voice_profile(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
+    async def _handle_update_voice_profile(
+        self,
+        ten_env: AsyncTenEnv,
+        cmd: Cmd,
+        client_id: str,
+        update_data: Dict[str, Any],
+    ) -> None:
         """Update voice profile with new data."""
         try:
-            cmd_json, _ = cmd.get_property_to_json(None)
-            update_data = json.loads(cmd_json) if cmd_json else {}
+            session = self._get_or_create_session(client_id)
+            if not session.store:
+                await self._initialize_session_store(session, session.user_id, session.agent_id)
 
-            if self.store:
-                profile = await self.store.get_voice_profile()
+            profile = await session.store.get_voice_profile()
 
-                # Update fields
-                if "hotwords" in update_data:
-                    for hw in update_data["hotwords"]:
-                        await self.store.add_hotword(hw["word"], hw.get("category", "custom"))
+            if "hotwords" in update_data:
+                for hw in update_data["hotwords"]:
+                    if isinstance(hw, dict) and "word" in hw:
+                        await session.store.add_hotword(hw["word"], hw.get("category", "custom"))
 
-                if "preferences" in update_data:
-                    profile.preferences.update(update_data["preferences"])
+            if "preferences" in update_data and isinstance(update_data["preferences"], dict):
+                profile.preferences.update(update_data["preferences"])
 
-                await self.store.update_voice_profile(profile)
+            await session.store.update_voice_profile(profile)
+            await self._broadcast_voice_profile(ten_env, client_id, profile)
 
             await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
 
@@ -256,9 +324,23 @@ class MemoryLayerExtension(AsyncExtension):
             ten_env.log_error(f"[MemoryLayer] Error updating voice profile: {e}")
             await ten_env.return_result(CmdResult.create(StatusCode.ERROR, cmd))
 
-    async def _handle_flush(self, ten_env: AsyncTenEnv, cmd: Cmd) -> None:
+    async def _handle_flush(
+        self,
+        ten_env: AsyncTenEnv,
+        cmd: Cmd,
+        client_id: str,
+        cmd_data: Dict[str, Any],
+    ) -> None:
         """Flush pending data to storage."""
-        await self._flush_session()
+        explicit_client_id = self._extract_client_id(cmd_data)
+        if explicit_client_id:
+            target = self.sessions.get(explicit_client_id)
+            if target:
+                await self._flush_session(target)
+        else:
+            for session in self.sessions.values():
+                await self._flush_session(session)
+
         await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
 
     # ========================================
@@ -271,127 +353,244 @@ class MemoryLayerExtension(AsyncExtension):
             data_json, _ = data.get_property_to_json(None)
             correction = json.loads(data_json) if data_json else {}
 
+            client_id = self._extract_client_id(correction) or DEFAULT_CLIENT_ID
+            session = self.sessions.get(client_id)
+            if not session or not session.store:
+                ten_env.log_debug(
+                    f"[MemoryLayer] Skip correction_event for uninitialized client_id={client_id}"
+                )
+                return
+
             raw_text = correction.get("raw_text", "")
             corrected_text = correction.get("corrected_text", "")
 
             if not raw_text or not corrected_text or raw_text == corrected_text:
                 return
 
-            ten_env.log_info(f"[MemoryLayer] Correction: '{raw_text}' -> '{corrected_text}'")
+            ten_env.log_info(
+                f"[MemoryLayer] Correction client_id={client_id}: '{raw_text}' -> '{corrected_text}'"
+            )
 
-            # Record correction
-            if self.store:
-                await self.store.record_correction(raw_text, corrected_text)
+            await session.store.record_correction(raw_text, corrected_text)
 
-            # Track for potential hotword learning
             key = corrected_text.lower()
-            self.correction_counts[key] = self.correction_counts.get(key, 0) + 1
+            session.correction_counts[key] = session.correction_counts.get(key, 0) + 1
 
-            # Auto-learn hotword if threshold reached
-            if self.correction_counts[key] >= self.config.learning.auto_hotword_threshold:
-                ten_env.log_info(f"[MemoryLayer] Auto-learning hotword: {corrected_text}")
-                if self.store:
-                    await self.store.add_hotword(corrected_text, "auto_learned")
-                    # Reset count
-                    self.correction_counts[key] = 0
+            if session.correction_counts[key] >= self.config.learning.auto_hotword_threshold:
+                ten_env.log_info(
+                    f"[MemoryLayer] Auto-learning hotword for client_id={client_id}: {corrected_text}"
+                )
+                await session.store.add_hotword(corrected_text, "auto_learned")
+                session.correction_counts[key] = 0
 
-                    # Broadcast updated profile
-                    profile = await self.store.get_voice_profile()
-                    await self._broadcast_voice_profile(ten_env, profile)
+                profile = await session.store.get_voice_profile()
+                await self._broadcast_voice_profile(ten_env, client_id, profile)
 
-            # Broadcast clarity score update
-            if self.store:
-                score = await self.store.get_clarity_score()
-                await self._broadcast_clarity_score(ten_env, score)
+            score = await session.store.get_clarity_score()
+            await self._broadcast_clarity_score(ten_env, client_id, score)
 
         except Exception as e:
             ten_env.log_error(f"[MemoryLayer] Error handling correction: {e}")
 
     async def _handle_session_start(self, ten_env: AsyncTenEnv, data: Data) -> None:
         """Handle session start event."""
-        ten_env.log_info("[MemoryLayer] Session started")
-        self.session_turns = []
-        self.pending_corrections = []
+        payload = self._load_json_from_data(data)
+        client_id = self._extract_client_id(payload) or DEFAULT_CLIENT_ID
+        session = self._get_or_create_session(client_id)
+
+        session.pending_corrections = []
+        ten_env.log_info(f"[MemoryLayer] Session started: client_id={client_id}")
 
     async def _handle_session_end(self, ten_env: AsyncTenEnv, data: Data) -> None:
         """Handle session end event."""
-        ten_env.log_info("[MemoryLayer] Session ended")
+        payload = self._load_json_from_data(data)
+        client_id = self._extract_client_id(payload) or DEFAULT_CLIENT_ID
+        session = self.sessions.get(client_id)
 
-        # Learn from this session's corrections
-        if self.store:
-            await self.store.learn_from_corrections(
-                threshold=self.config.learning.confusion_pattern_threshold
-            )
+        ten_env.log_info(f"[MemoryLayer] Session ended: client_id={client_id}")
 
-        # Flush all pending data
-        await self._flush_session()
+        if not session or not session.store:
+            return
+
+        await session.store.learn_from_corrections(
+            threshold=self.config.learning.confusion_pattern_threshold
+        )
+        await self._flush_session(session)
 
     # ========================================
     # Helper Methods
     # ========================================
 
-    async def _init_store(self) -> None:
-        """Initialize storage backend."""
-        try:
-            if self.config.storage_backend == "local":
-                self.store = LocalStore(
-                    base_path=self.config.local_base_path,
-                    db_name=self.config.local_sqlite_db
-                )
-                self.ten_env.log_info(f"[MemoryLayer] LocalStore initialized at {self.config.local_base_path}")
-            else:
-                # Default to local store
-                self.store = LocalStore()
-                self.ten_env.log_info("[MemoryLayer] Using default LocalStore")
+    async def _initialize_session_store(
+        self,
+        session: MemorySessionContext,
+        user_id: str,
+        agent_id: str,
+    ) -> None:
+        """Initialize or re-initialize LocalStore for one session."""
+        if (
+            session.store
+            and session.user_id == user_id
+            and session.agent_id == agent_id
+        ):
+            return
 
-        except Exception as e:
-            self.ten_env.log_error(f"[MemoryLayer] Failed to initialize store: {e}")
-            self.store = None
+        if session.store:
+            await session.store.close()
+            session.store = None
 
-    async def _flush_session(self) -> None:
-        """Flush pending session data."""
-        if self.session_turns and self.store:
-            await self.store.add_conversation(self.session_turns)
-            self.ten_env.log_info(f"[MemoryLayer] Flushed {len(self.session_turns)} turns")
+        if self.config.storage_backend != "local":
+            self.ten_env.log_warn(
+                "[MemoryLayer] Non-local backend not implemented, falling back to LocalStore"
+            )
 
-        self.session_turns = []
-        self.pending_corrections = []
+        session.store = LocalStore(
+            base_path=self.config.local_base_path,
+            db_name=self.config.local_sqlite_db,
+        )
+        await session.store.initialize(user_id, agent_id)
 
-    async def _broadcast_voice_profile(self, ten_env: AsyncTenEnv, profile: VoiceProfile) -> None:
+        session.user_id = user_id
+        session.agent_id = agent_id
+
+    async def _flush_session(self, session: MemorySessionContext) -> None:
+        """Flush pending in-memory state for one session."""
+        session.pending_corrections = []
+
+    async def _broadcast_voice_profile(
+        self,
+        ten_env: AsyncTenEnv,
+        client_id: str,
+        profile: VoiceProfile,
+    ) -> None:
         """Broadcast voice profile for ASR enhancement."""
         try:
             data = Data.create("voice_profile")
-            data.set_property_from_json(None, json.dumps({
-                "hotwords": profile.get_hotwords_for_asr(),
-                "confusion_rules": profile.get_confusion_rules(),
-                "speech_rate": profile.speech_rate,
-                "dysarthria_type": profile.dysarthria_type
-            }))
-            # Note: In TEN, we need to send via proper channel
-            # This would be configured in property.json connections
-            ten_env.log_info(f"[MemoryLayer] Voice profile updated: {len(profile.hotwords)} hotwords")
+            data.set_property_from_json(
+                None,
+                json.dumps(
+                    {
+                        "client_id": client_id,
+                        "hotwords": profile.get_hotwords_for_asr(),
+                        "confusion_rules": profile.get_confusion_rules(),
+                        "speech_rate": profile.speech_rate,
+                        "dysarthria_type": profile.dysarthria_type,
+                    }
+                ),
+            )
+            await ten_env.send_data(data)
+            ten_env.log_info(
+                f"[MemoryLayer] Voice profile updated: client_id={client_id}, {len(profile.hotwords)} hotwords"
+            )
         except Exception as e:
             ten_env.log_error(f"[MemoryLayer] Error broadcasting profile: {e}")
 
-    async def _broadcast_clarity_score(self, ten_env: AsyncTenEnv, score: float) -> None:
+    async def _broadcast_clarity_score(
+        self,
+        ten_env: AsyncTenEnv,
+        client_id: str,
+        score: float,
+    ) -> None:
         """Broadcast clarity score update."""
         try:
             data = Data.create("clarity_score")
-            data.set_property_from_json(None, json.dumps({
-                "score": score,
-                "timestamp": int(time.time() * 1000)
-            }))
-            ten_env.log_debug(f"[MemoryLayer] Clarity score: {score:.2f}")
+            data.set_property_from_json(
+                None,
+                json.dumps(
+                    {
+                        "client_id": client_id,
+                        "score": score,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                ),
+            )
+            await ten_env.send_data(data)
+            ten_env.log_debug(
+                f"[MemoryLayer] Clarity score client_id={client_id}: {score:.2f}"
+            )
         except Exception as e:
             ten_env.log_error(f"[MemoryLayer] Error broadcasting score: {e}")
 
-    async def _broadcast_memory_context(self, ten_env: AsyncTenEnv, context: str) -> None:
+    async def _broadcast_memory_context(
+        self,
+        ten_env: AsyncTenEnv,
+        client_id: str,
+        context: str,
+    ) -> None:
         """Broadcast memory context for LLM."""
         try:
             data = Data.create("memory_context")
-            data.set_property_from_json(None, json.dumps({
-                "context": context,
-                "timestamp": int(time.time() * 1000)
-            }))
+            data.set_property_from_json(
+                None,
+                json.dumps(
+                    {
+                        "client_id": client_id,
+                        "context": context,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                ),
+            )
+            await ten_env.send_data(data)
         except Exception as e:
             ten_env.log_error(f"[MemoryLayer] Error broadcasting context: {e}")
+
+    def _get_or_create_session(self, client_id: str) -> MemorySessionContext:
+        """Get client memory session, create if missing."""
+        normalized = client_id.strip() if client_id and client_id.strip() else DEFAULT_CLIENT_ID
+        session = self.sessions.get(normalized)
+        if session is None:
+            session = MemorySessionContext(client_id=normalized)
+            self.sessions[normalized] = session
+        return session
+
+    def _resolve_client_id_from_cmd(
+        self,
+        cmd: Cmd,
+        cmd_data: Dict[str, Any],
+    ) -> str:
+        """Resolve client_id from command properties and payload."""
+        try:
+            from_property = cmd.get_property_string("client_id")
+            if isinstance(from_property, str) and from_property.strip():
+                return from_property.strip()
+        except Exception:
+            pass
+
+        from_payload = self._extract_client_id(cmd_data)
+        if from_payload:
+            return from_payload
+
+        return DEFAULT_CLIENT_ID
+
+    def _extract_client_id(self, payload: Any) -> Optional[str]:
+        """Extract client_id from payload and nested metadata."""
+        if not isinstance(payload, dict):
+            return None
+
+        raw = payload.get("client_id")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+
+        metadata = payload.get("metadata")
+        if isinstance(metadata, dict):
+            nested = metadata.get("client_id")
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+
+        return None
+
+    def _load_json_from_cmd(self, cmd: Cmd) -> dict:
+        """Best-effort command payload parser."""
+        try:
+            cmd_json, _ = cmd.get_property_to_json(None)
+            return json.loads(cmd_json) if cmd_json else {}
+        except Exception:
+            return {}
+
+    def _load_json_from_data(self, data: Data) -> dict:
+        """Best-effort data payload parser."""
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            return json.loads(data_json) if data_json else {}
+        except Exception:
+            return {}

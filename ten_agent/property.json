@@ -131,6 +131,22 @@
                       "extension": "memory_layer"
                     }
                   ]
+                },
+                {
+                  "name": "user_input",
+                  "dest": [
+                    {
+                      "extension": "main_control"
+                    }
+                  ]
+                },
+                {
+                  "name": "training_result",
+                  "dest": [
+                    {
+                      "extension": "main_control"
+                    }
+                  ]
                 }
               ],
               "audio_frame": [

@@ -1,0 +1,17 @@
+name: AI Doc Guard
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate-ai-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate AI documentation harness
+        run: bash scripts/check_ai_docs.sh

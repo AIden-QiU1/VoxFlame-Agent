@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
 import { Toaster } from "@/components/ui/toaster"
 import './globals.css'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: '燃言 - 让每个声音都被听见',
@@ -89,14 +86,11 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" dir="ltr">
       <head>
-        {/* 添加 preconnect 以优化字体和 API 加载 */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* MS 应用磁贴配置 */}
         <meta name="msapplication-TileColor" content="#F59E0B" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
       </head>
-      <body className={`${inter.className} antialiased`}>
+      <body className="antialiased">
         {/* Skip to main content link for accessibility */}
         <a
           href="#main-content"

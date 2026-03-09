@@ -226,7 +226,7 @@ sudo docker-compose logs -f backend
 - [主项目 README](../README.md)
 - [前端 README](../frontend/README.md)
 - [Agent README](../ten_agent/README.md)
-- [记忆系统设计](../docs/VOXFLAME_MEMORY_DESIGN.md)
+- [统一记忆系统报告](../docs/VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md)
 
 ---
 

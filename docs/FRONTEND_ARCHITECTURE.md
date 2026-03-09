@@ -1,139 +1,154 @@
 # VoxFlame 前端架构与交互设计指南
 
-> **版本**: 1.0  
-> **更新日期**: 2026-01-04  
-> **目标读者**: 前端开发者、产品经理
+> 版本：2.0  
+> 更新日期：2026-03-09  
+> 目标读者：前端开发者、产品经理
 
-此文档详细描述了 VoxFlame (燃言) 前端应用的页面结构、组件交互逻辑及数据流向，重点解析 **数据贡献页 (Contribute Page)** 的内部状态机与 AI 交互机制。
+这份文档只保留当前仍然有效的前端结构。`/contribute` 已不再是旧的 `chat / guided / free` 数据采集页，而是面向中文场景的训练与录音上传页。
 
 ---
 
-## 1. 核心页面结构 (Site Map)
+## 1. 当前页面结构
 
 ```mermaid
 graph TD
-    A[Landing Page (/)] -->|点击"开始贡献"| B[Contribute Page (/contribute)]
-    B --> C{用户模式 Mode}
-    C -->|默认| D[Chat Mode (AI对话)]
-    C -->|选择| E[Guided Mode (跟读录音)]
-    C -->|选择| F[Free Mode (自由录音)]
+    A[Home (/)] -->|现在沟通| B[Communicate View (/?mode=communicate)]
+    A -->|练习表达| C[Contribute Page (/contribute)]
+    A -->|查看记忆/进展| D[后续页面]
 ```
 
-- **Landing Page**: 项目介绍、愿景展示、入口。
-- **Contribute Page**: 核心业务页，承载所有录音与交互逻辑。
+- `Home (/)`：公开产品首页，负责解释“现在沟通 / 练习表达 / 查看进展与记忆”。
+- `Communicate View`：实时沟通页，承接 starter phrase、快捷短语和实时代播。
+- `Contribute Page (/contribute)`：中文训练页当前主页面，承接目标句、拼音、录后反馈、匿名上传和训练结果写回。
 
 ---
 
-## 2. 数据贡献页 (Contribute Page) 深度解析
+## 2. `/contribute` 当前交互闭环
 
-该页面采用 **单页应用 (SPA)** 模式，通过内部状态 `mode` 切换不同视图，保持 AI 连接不断开。
+### 2.1 页面目标
 
-### 2.1 状态模式 (Modes)
+`/contribute` 的目标不是“尽可能多录音”，而是完成一个更克制的闭环：
 
-| 模式 | 状态值 `mode` | 用途 | 核心组件 |
-|------|--------------|------|----------|
-| **AI 对话** | `'chat'` (Default) | 建立信任，引导用户，消除紧张感 | `ChatList`, `VoiceButton` |
-| **跟读录音** | `'guided'` | 核心数据采集，标准化语料录制 | `TopicSelector`, `SentenceCard`, `RecordingControl` |
-| **自由录音** | `'free'` | 采集非结构化语音，捕捉自然表达 | `TextArea`, `RecordingControl` |
+1. 用户看到真实沟通高价值句。
+2. 用户看到拼音和本次练习重点。
+3. 用户开始录音并获取实时转写。
+4. 录音结束后看到目标句 vs 系统听到的结果。
+5. 用户决定是否把这次录音匿名上传。
+6. 训练结果以最小结构写回本地记忆，并同步送入 TEN 记忆层。
 
-### 2.2 核心交互流程 (Interaction Flow)
+### 2.2 当前状态块
 
-#### A. 录音与激励闭环
-这是一个典型的 **"行为 -> 反馈"** 闭环设计：
+| 区块 | 作用 | 关键数据 |
+|------|------|----------|
+| 页面头部 | 解释产品意图、当前贡献者、完成次数 | `displayName`, `completedCount`, `total_recordings` |
+| 训练句卡片 | 展示句子、拼音、难点标签、来源 | `MandarinTrainingExercise` |
+| 录音区 | 开始/停止录音，显示实时转写 | `useMandarinTrainingSession` |
+| 反馈区 | 展示识别结果、差异和建议 | `analyzeMandarinAttempt` |
+| 上传区 | 决定是否匿名上传，展示上传状态或本地降级 | `useVoiceUpload` |
+| 记忆写回 | 记录训练摘要并把关键词送入 agent | `memoryService`, `sendTrainingResult` |
 
-1.  **用户行为**: 点击录音 -> 朗读 -> 点击停止。
-2.  **系统处理**:
-    *   `AudioProcessor` 停止采集，生成 Blob。
-    *   `useVoiceUpload` 上传文件 (带 metadata: `category`, `sentenceId`)。
-3.  **双重反馈 (Dual Feedback)**:
-    *   **视觉反馈**: 页面顶部弹出绿色 Toast ("太棒了！录音成功！")。
-    *   **听觉反馈 (AI)**:
-        *   系统自动调用 `sendText("（用户刚刚完成...请鼓励）")` (隐形指令)。
-        *   AI 收到指令后，生成语音回复 ("哇，读得真清楚！继续加油！")。
-        *   **目的**: 模拟真实的陪伴感，减少枯燥感。
-
-#### B. 数据流转图
+### 2.3 当前交互流
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant UI as ContributePage
-    participant Hook as useStepAudio
-    participant AI as StepFun Model
-    participant Backend
+    participant UI as /contribute
+    participant Session as useMandarinTrainingSession
+    participant Agent as TEN Agent
+    participant Upload as useVoiceUpload
 
-    User->>UI: 点击 "开始录音"
-    UI->>UI: RecordingState = 'recording'
-    User->>UI: 朗读句子...
-    User->>UI: 点击 "停止"
-    
-    par 上传数据
-        UI->>Backend: uploadRecording(Blob, Metadata)
-        Backend-->>UI: Success
-    and 获取AI反馈
-        UI->>Hook: sendText("(Hidden Instruction)")
-        Hook->>AI: 发送隐形提示词
-        AI-->>Hook: "真棒！" (Audio Stream)
-        Hook-->>User: 播放语音鼓励
+    User->>UI: 选择训练句
+    UI-->>User: 显示汉字 + 拼音 + focus tags
+    User->>UI: 点击开始录音
+    UI->>Session: startRecording()
+    Session->>Agent: WebSocket 连接 + PCM 音频流
+    Agent-->>Session: interim_text / text_data
+    Session-->>UI: 实时转写
+    User->>UI: 点击停止
+    UI->>Session: stopRecording()
+    Session-->>UI: 最终转写 + 录音 Blob
+    UI->>UI: analyzeMandarinAttempt()
+    UI->>UI: memoryService.addMemoryEntry()
+    UI->>Agent: training_result
+    Agent->>Agent: save_conversation + update_voice_profile
+    alt 用户已授权上传
+        UI->>Upload: uploadRecording()
+        Upload-->>UI: 成功或本地降级
+    else 未授权
+        UI-->>User: 仅显示本次反馈
     end
-
-    UI->>UI: 显示 Toast "录音成功"
-    UI->>UI: 切换下一句 (Next Sentence)
 ```
 
-### 2.3 关键组件说明
+### 2.4 当前边界
 
-#### 1. 主题选择器 (Topic Selector)
-*   **位置**: Guided Mode 顶部。
-*   **逻辑**: 横向滚动列表。点击 Tag 切换 `selectedCategory`，并立即触发 `getRandomSentence(category)` 刷新卡片。
-*   **数据源**: `src/lib/corpus/sentences.ts` -> `CATEGORY_NAMES`。
-
-#### 2. 录音控制器 (RecordingControl)
-*   **状态机**: `idle` -> `recording` (计时中) -> `processing` (上传中) -> `done` (成功提示) -> `idle`。
-*   **设计**: 状态不同，按钮颜色/图标不同 (红/灰/琥珀色)，给予用户明确的视觉指示。
+- 页面内反馈仍然是文本 / 标签级，不是医学级发音诊断。
+- 训练历史趋势和个性化练习集还不在第一页闭环里。
+- 训练结果写回已经是最小闭环：前端本地记忆 + 登录态后端同步 + TEN hotword / conversation 更新。
+- 上传采用匿名 ID 和显式授权，未勾选时不自动上传。
 
 ---
 
-## 3. 技术架构细节
+## 3. 关键前端模块
 
-### 3.1 目录结构
+### 3.1 页面入口
 
-```
-src/
-├── app/
-│   └── contribute/
-│       └── page.tsx       # 核心页面逻辑 (State, UI Layout)
-├── components/
-│   └── pwa/               # PWA 安装/离线提示
-├── hooks/
-│   ├── useStepAudio.ts    # AI 实时对话 (WebSocket)
-│   ├── useVoiceUpload.ts  # 录音上传逻辑
-│   └── useContributor.ts  # 用户身份管理 (LocalStorage)
-└── lib/
-    ├── audio/             # AudioWorklet 处理器
-    └── corpus/
-        └── sentences.ts   # 语料库 (JSON Data + Helpers)
-```
+| 文件 | 作用 |
+|------|------|
+| `frontend/src/app/page.tsx` | 首页和沟通模式切换 |
+| `frontend/src/app/contribute/page.tsx` | 中文训练与录音上传页 |
 
-### 3.2 语料库设计
-*   **文件**: `sentences.ts`
-*   **结构**: `CorpusSentence` 数组。
-*   **分类**: 包含 "日常交流", "医疗需求", "文学朗读" 等 6 大类。
-*   **扩充性**: 纯静态 JSON，未来可改为从后端 API `GET /api/corpus` 获取。
+### 3.2 训练页核心模块
 
-### 3.3 AI 提示词工程 (System Prompt)
-在 `page.tsx` 中定义了 `getContributeSystemPrompt()`：
-*   **人设**: 温暖、有同理心的志愿者伙伴。
-*   **策略**: 不主动纠错，以鼓励为主；引导用户从闲聊平滑过渡到录音任务。
+| 文件 | 作用 |
+|------|------|
+| `frontend/src/hooks/useMandarinTrainingSession.ts` | 训练页专用录音会话，管理 WebSocket、实时转写、结束等待 |
+| `frontend/src/hooks/useVoiceUpload.ts` | 上传录音或本地降级，并写入结构化 metadata |
+| `frontend/src/hooks/useContributor.ts` | 匿名贡献者身份与统计 |
+| `frontend/src/lib/memory/memory-service.ts` | 训练摘要、本地记忆与登录态后端同步 |
+| `frontend/src/lib/corpus/mandarin-training.ts` | 第一阶段高质量训练句、拼音、focus tags、来源 |
+| `frontend/src/lib/training/mandarin-feedback.ts` | 目标句 vs 识别结果的最小反馈规则层 |
+| `frontend/src/lib/audio/audio-processor.ts` | 浏览器侧 PCM 采集与 WAV 汇总 |
+| `frontend/src/lib/websocket/asr-client.ts` | 训练页使用的轻量 WebSocket 客户端 |
+
+### 3.3 当前数据结构
+
+#### `MandarinTrainingExercise`
+
+- `id`
+- `text`
+- `pinyin`
+- `category`
+- `difficulty`
+- `focusTags`
+- `keywords`
+- `coachingTip`
+- `source`
+
+#### 上传 metadata
+
+- `training_mode`
+- `exercise_id`
+- `exercise_text`
+- `exercise_category`
+- `focus_tags`
+- `keywords`
+- `recognized_text`
+- `feedback_status`
+- `missing_chars`
+- `extra_chars`
+- `source_label`
+- `source_url`
+- `upload_consent`
 
 ---
 
-## 4. 后续维护建议
+## 4. 当前维护建议
 
-1.  **新增语料**: 直接修改 `sentences.ts` 的 `CORPUS_SENTENCES` 数组。
-2.  **修改激励语**: 调整 `stopRecording` 函数中的 `sendText` 内容。
-3.  **对接 OSS**: 修改 `useVoiceUpload.ts`，将目前的 Mock 上传逻辑替换为真实的阿里云 OSS SDK 调用。
+1. 新增训练句时，优先修改 `mandarin-training.ts`，不要继续往旧 `sentences.ts` 塞无来源数据。
+2. 如果训练页要升级成更细的拼音 / 音节反馈，先扩展 `mandarin-feedback.ts`，不要直接把规则硬写进页面组件。
+3. 当前训练结果已经按最小结构写回记忆，后续趋势图应优先复用现有 `keywords / focus_tags / feedback_status`，不要再造第二套埋点。
+4. 如果后续要做趋势图、训练周报或个性化练习包，应新增独立模块，不把 `/contribute` 再膨胀回单页大全。
 
 ---
 
-**总结**: 本架构的核心理念是 **"Technology that cares" (有温度的技术)**。通过 AI 的实时陪伴和即时反馈，降低构音障碍用户的挫败感，提升数据采集的完成率。
+**总结**：前端当前的重点已经从“多模式数据采集”转向“让真实中文练习可反馈、可上传、可沉淀”。这要求页面保持短闭环、清晰授权、来源可追溯，并尽早把训练结果接入真实记忆层。

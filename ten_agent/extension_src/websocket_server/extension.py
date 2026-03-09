@@ -5,6 +5,7 @@
 #
 import json
 from pathlib import Path
+from typing import Any, Optional
 from ten_runtime import (
     AudioFrame,
     VideoFrame,
@@ -18,7 +19,11 @@ from ten_runtime import (
 )
 
 from .config import WebSocketServerConfig
-from .websocket_server import WebSocketServerManager, AudioData
+from .websocket_server import (
+    WebSocketServerManager,
+    AudioData,
+    ClientConnectionContext,
+)
 
 
 class WebsocketServerExtension(AsyncExtension):
@@ -115,12 +120,14 @@ class WebsocketServerExtension(AsyncExtension):
             cmd_json = cmd.to_json()
             cmd_data = json.loads(cmd_json)
 
-            # Broadcast to all WebSocket clients
+            target_client_id = self._extract_client_id_from_cmd(cmd)
             if self.ws_server:
                 message = {"type": "cmd", "name": cmd_name, "data": cmd_data}
-                await self.ws_server.broadcast(message)
-                ten_env.log_debug(
-                    f"Broadcasted command {cmd_name} to WebSocket clients"
+                await self._send_message_to_clients(
+                    ten_env,
+                    message,
+                    target_client_id,
+                    log_label=f"cmd/{cmd_name}",
                 )
 
         except Exception as e:
@@ -147,16 +154,18 @@ class WebsocketServerExtension(AsyncExtension):
                 ten_env.log_info(f"Data [{data_name}]: {data_json}")
                 data_dict = json.loads(data_json)
 
-                # Broadcast to all WebSocket clients
+                target_client_id = self._extract_client_id_from_payload(data_dict)
                 if self.ws_server:
                     message = {
                         "type": "data",
                         "name": data_name,
                         "data": data_dict,
                     }
-                    await self.ws_server.broadcast(message)
-                    ten_env.log_debug(
-                        f"Broadcasted data {data_name} to WebSocket clients"
+                    await self._send_message_to_clients(
+                        ten_env,
+                        message,
+                        target_client_id,
+                        log_label=f"data/{data_name}",
                     )
 
         except Exception as e:
@@ -206,8 +215,19 @@ class WebsocketServerExtension(AsyncExtension):
                 }
             )
 
-            # Send to WebSocket clients
-            await self.ws_server.send_audio_to_clients(pcm_data, metadata)
+            target_client_id = self._extract_client_id_from_payload(metadata)
+            if target_client_id:
+                sent = await self.ws_server.send_audio_to_client(
+                    target_client_id,
+                    pcm_data,
+                    metadata,
+                )
+                if not sent:
+                    ten_env.log_warn(
+                        f"Failed to send audio to target client {target_client_id}; dropping chunk"
+                    )
+            else:
+                await self.ws_server.send_audio_to_clients(pcm_data, metadata)
 
             ten_env.log_debug(
                 f"Forwarded {len(pcm_data)} bytes of audio to WebSocket clients"
@@ -298,15 +318,26 @@ class WebsocketServerExtension(AsyncExtension):
             ten_env.log_error(f"Error processing audio from WebSocket: {e}")
             raise
 
-    async def _on_client_connected(self, client_id: str) -> None:
+    async def _on_client_connected(
+        self,
+        client_id: str,
+        connection_context: ClientConnectionContext,
+    ) -> None:
         """
         Callback when a WebSocket client connects.
         Sends on_user_connected command to main_control.
         """
         try:
-            self.ten_env.log_info(f"Sending on_user_connected for client: {client_id}")
+            self.ten_env.log_info(
+                "Sending on_user_connected for client: "
+                f"{client_id}, suppress_greeting={connection_context.suppress_greeting}"
+            )
             cmd = Cmd.create("on_user_connected")
             cmd.set_property_string("client_id", client_id)
+            cmd.set_property_from_json(
+                "suppress_greeting",
+                json.dumps(connection_context.suppress_greeting),
+            )
             await self.ten_env.send_cmd(cmd)
         except Exception as e:
             self.ten_env.log_error(f"Error sending on_user_connected: {e}")
@@ -347,8 +378,67 @@ class WebsocketServerExtension(AsyncExtension):
             
             cmd.set_property_string("client_id", client_id)
             
-            await self.ten_env.send_cmd(cmd, None)
+            await self.ten_env.send_cmd(cmd)
             self.ten_env.log_debug(f"Forwarded command {cmd_name} to TEN graph")
             
         except Exception as e:
             self.ten_env.log_error(f"Error processing command from WebSocket: {e}")
+
+    def _extract_client_id_from_cmd(self, cmd: Cmd) -> Optional[str]:
+        """Extract client_id from TEN command payload if present."""
+        try:
+            client_id = cmd.get_property_string("client_id")
+            if isinstance(client_id, str) and client_id.strip():
+                return client_id.strip()
+        except Exception:
+            pass
+
+        try:
+            payload_json, _ = cmd.get_property_to_json(None)
+            payload = json.loads(payload_json) if payload_json else {}
+            return self._extract_client_id_from_payload(payload)
+        except Exception:
+            return None
+
+    def _extract_client_id_from_payload(self, payload: Any) -> Optional[str]:
+        """Extract target client_id from payload and nested metadata."""
+        if not isinstance(payload, dict):
+            return None
+
+        direct = payload.get("client_id")
+        if isinstance(direct, str) and direct.strip():
+            return direct.strip()
+
+        metadata = payload.get("metadata")
+        if isinstance(metadata, dict):
+            nested = metadata.get("client_id")
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+
+        return None
+
+    async def _send_message_to_clients(
+        self,
+        ten_env: AsyncTenEnv,
+        message: dict[str, Any],
+        target_client_id: Optional[str],
+        log_label: str,
+    ) -> None:
+        """Send message to one client if targeted, otherwise broadcast."""
+        if not self.ws_server:
+            return
+
+        if target_client_id:
+            sent = await self.ws_server.send_to_client(target_client_id, message)
+            if sent:
+                ten_env.log_debug(
+                    f"Sent {log_label} to target client {target_client_id}"
+                )
+            else:
+                ten_env.log_warn(
+                    f"Failed to send {log_label} to target client {target_client_id}"
+                )
+            return
+
+        await self.ws_server.broadcast(message)
+        ten_env.log_debug(f"Broadcasted {log_label} to all WebSocket clients")

@@ -1,165 +1,132 @@
 # VoxFlame 技术文档导航
 
-> 本目录包含项目的技术调研、开发计划和实施指南。
+> 当前文档已按“单主题单主文档”收敛，减少计划类与调研类重复维护。
 
 ---
 
-## 📚 文档分类
+## 文档分类
 
-### 🎯 TEN Framework 相关
-
-核心框架分析，了解 TEN 的架构和扩展机制。
+### AI 工程与协作
 
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
-| [TEN Framework 分析](TEN_FRAMEWORK_ANALYSIS.md) | TEN 架构概览 | ⭐⭐⭐ |
-| [TEN 扩展分析](TEN_EXTENSIONS_ANALYSIS.md) | 扩展生态系统深度分析 | ⭐⭐⭐ |
-| [TEN VAD 分析](TEN_VAD_ANALYSIS.md) | 语音活动检测参数研究 | ⭐⭐ |
-| [TEN Turn Detection 分析](TEN_TURN_DETECTION_ANALYSIS.md) | 对话轮次检测机制 | ⭐⭐ |
+| [AI 编程指导体系](AI_ENGINEERING_SYSTEM.md) | 基于 Harness Engineering 收敛出的协作分层、计划标准、验证门禁与维护规则 | ⭐⭐⭐ |
+| [AI 执行计划模板](AI_EXECUTION_PLAN_TEMPLATE.md) | 非 trivial 任务的统一计划模板，明确目标、边界、验证与回退 | ⭐⭐ |
+| [执行计划归档](plans/README.md) | 阶段性执行计划统一放在 `docs/plans/`，避免顶层继续膨胀 | ⭐⭐ |
 
-**适用场景**：
-- 开发 TEN 扩展时
-- 调试 Agent 问题时
-- 优化 VAD/Turn Detection 参数时
-
----
-
-### 🧠 Memory & RAG 系统
-
-记忆系统和检索增强生成相关研究。
+### 想法与孵化
 
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
-| [Memory RAG 系统研究](MEMORY_RAG_SYSTEMS_RESEARCH.md) | RAG 技术调研 | ⭐⭐⭐ |
-| [Memory 系统计划](MEMORY_SYSTEM_PLAN.md) | 记忆系统实施方案 | ⭐⭐ |
+| [ideas 目录说明](../ideas/README.md) | 说明 ideas 目录只在讨论新想法、长期调研或外部参考时按需查阅 | ⭐⭐ |
+| [日常随手记](../ideas/DAILY_CAPTURE.md) | 记录每天随手看到的产品灵感、仓库链接、交互观察与半成品念头 | ⭐⭐ |
+| [长期讨论 / 调研](../ideas/LONG_TERM_TOPICS.md) | 沉淀需要反复讨论、长期调研、暂时没有结论的问题与资料 | ⭐⭐ |
 
-**适用场景**：
-- 实现上下文记忆时
-- 集成向量数据库（Qdrant）时
-- 设计个性化纠错时
-
----
-
-### 🎤 语音技术调研
-
-ASR/TTS 模型和构音障碍相关研究。
+### TEN 与实时架构
 
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
-| [ASR/TTS 模型报告](LATEST_ASR_TTS_MODELS_REPORT.md) | 最新语音模型对比 | ⭐⭐⭐ |
-| [LLM 纠错开发计划](LLM_CORRECTION_DEVELOPMENT_PLAN.md) | v2.0 纠错扩展实施方案 | ⭐⭐⭐ |
-| [用户研究：构音障碍老年群体](USER_RESEARCH_DYSARTHRIC_ELDERLY_CN.md) | 用户需求洞察 | ⭐⭐ |
+| [TEN 框架能力与上限评估（2026-03-05）](TEN_FRAMEWORK_CAPABILITY_CEILING_REPORT_2026-03-05.md) | TEN 能力边界、性能上限、WebSocket/RTC 决策（内容已按当前代码更新） | ⭐⭐⭐ |
 
-**适用场景**：
-- 优化语音识别准确率时
-- 调整 LLM 纠错 Prompt 时
-- 理解用户需求时
-
----
-
-### 🌐 前端与通信
-
-前端开发和实时通信相关文档。
+### 产品战略与执行
 
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
-| [PWA 实施指南](PWA_IMPLEMENTATION_GUIDE.md) | PWA 离线策略 | ⭐⭐ |
-| [WebSocket vs RTC 指南](WEBSOCKET_VS_RTC_GUIDE.md) | 实时通信协议对比 | ⭐⭐ |
-| [API 规范](API_SPECIFICATION.md) | 后端 API 文档 | ⭐⭐ |
+| [产品方向重排（2026-03-09）](COMMUNICATION_FIRST_PRODUCT_RESET_2026-03-09.md) | 重新评估“全屏字幕 / 主动沟通 / 训练反馈 / 记忆 / 硬件联动”的近期优先级 | ⭐⭐⭐ |
+| [主动沟通 Starter Kit 数据来源（2026-03-09）](COMMUNICATION_STARTER_KIT_SOURCES_2026-03-09.md) | 说明第一句话场景模板引用了哪些 AAC / 医疗 / 应急资料，以及如何改写成中文页面文案 | ⭐⭐⭐ |
+| [产品战略与用户研究统一报告（2026-03-05）](VOXFLAME_PRODUCT_STRATEGY_AND_USER_RESEARCH_2026-03-05.md) | 定位、人群、场景优先级、指标框架、技术边界核验 | ⭐⭐⭐ |
+| [执行路线图（2026-03-05）](VOXFLAME_EXECUTION_ROADMAP_2026-03-05.md) | 90/180/365 天执行计划、验收标准、风险控制（状态已并入对应章节） | ⭐⭐⭐ |
 
-**适用场景**：
-- 开发前端功能时
-- 优化 WebSocket 通信时
-- 评估 RTC 迁移时
-
----
-
-### 📦 部署与运维
-
-部署、运维和数据库相关文档。
+### Memory 与 RAG
 
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
-| [部署指南](DEPLOYMENT_GUIDE.md) | Docker 部署流程 | ⭐⭐⭐ |
-| [数据库设计](database/) | 数据库 schema | ⭐ |
+| [统一记忆系统报告（2026-03-05）](VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md) | 本地记忆 + 服务化记忆 + 音频多模态记忆统一方案（状态已并入对应章节） | ⭐⭐⭐ |
 
-**适用场景**：
-- 部署到生产环境时
-- 配置 Nginx/SSL 时
-- 数据库迁移时
+### 语音与纠错
 
----
+| 文档 | 描述 | 优先级 |
+|------|------|--------|
+| [LLM 纠错开发计划](LLM_CORRECTION_DEVELOPMENT_PLAN.md) | 纠错扩展实现计划与评估指标 | ⭐⭐⭐ |
+| [中文语训反馈方案（2026-03-09）](MANDARIN_PRONUNCIATION_FEEDBACK_PLAN_2026-03-09.md) | 面向中文普通话场景的拼音、音节、声母/韵母/声调反馈设计 | ⭐⭐⭐ |
+| [中文语训与录音上传页来源说明（2026-03-09）](MANDARIN_TRAINING_SOURCES_2026-03-09.md) | 训练句、难点标签、匿名上传元数据所依据的官方与权威资料 | ⭐⭐⭐ |
+| [ASR/TTS 模型报告](LATEST_ASR_TTS_MODELS_REPORT.md) | 语音模型与生态调研（需持续更新） | ⭐⭐ |
 
-### 📄 项目文档
+### 阶段计划
 
-项目概述和通用文档。
+| 文档 | 描述 | 优先级 |
+|------|------|--------|
+| [Starter Kit 执行计划（2026-03-09）](plans/COMMUNICATION_STARTER_KIT_EXECUTION_PLAN_2026-03-09.md) | 第一句话 / 主动沟通闭环的执行记录 | ⭐ |
+| [中文语训页第一阶段执行计划（2026-03-09）](plans/MANDARIN_TRAINING_EXECUTION_PLAN_2026-03-09.md) | `/contribute` 第一阶段页面闭环与上传边界 | ⭐ |
+| [中文训练页 Phase 2 执行计划（2026-03-09）](plans/MANDARIN_MEMORY_PHASE2_EXECUTION_PLAN_2026-03-09.md) | 语料扩充、训练结果写回记忆与验证路径 | ⭐⭐ |
 
-| 文档 | 描述 |
-|------|------|
-| [VoxFlame 概述](VoxFlame.md) | 项目愿景和架构 |
+### 前端与 PWA
 
----
+| 文档 | 描述 | 优先级 |
+|------|------|--------|
+| [前端架构指南](FRONTEND_ARCHITECTURE.md) | 页面结构、交互流、前端技术分层 | ⭐⭐ |
+| [PWA 实现指南](PWA_IMPLEMENTATION_GUIDE.md) | Service Worker、缓存策略、离线能力 | ⭐⭐ |
 
-## 🔍 快速查找
+### 数据与部署
 
-### 按任务类型查找
-
-**开发 TEN 扩展**：
-1. [TEN Framework 分析](TEN_FRAMEWORK_ANALYSIS.md) - 了解架构
-2. [TEN 扩展分析](TEN_EXTENSIONS_ANALYSIS.md) - 查看示例
-3. [LLM 纠错开发计划](LLM_CORRECTION_DEVELOPMENT_PLAN.md) - 具体实现
-
-**优化语音识别**：
-1. [ASR/TTS 模型报告](LATEST_ASR_TTS_MODELS_REPORT.md) - 模型选择
-2. [TEN VAD 分析](TEN_VAD_ANALYSIS.md) - 参数调整
-3. [用户研究](USER_RESEARCH_DYSARTHRIC_ELDERLY_CN.md) - 理解用户
-
-**实现记忆系统**：
-1. [Memory RAG 系统研究](MEMORY_RAG_SYSTEMS_RESEARCH.md) - 技术调研
-2. [Memory 系统计划](MEMORY_SYSTEM_PLAN.md) - 实施方案
-3. [数据库设计](database/) - 数据表设计
-
-**前端开发**：
-1. [PWA 实施指南](PWA_IMPLEMENTATION_GUIDE.md) - 离线策略
-2. [WebSocket vs RTC 指南](WEBSOCKET_VS_RTC_GUIDE.md) - 通信协议
-3. [API 规范](API_SPECIFICATION.md) - 接口文档
-
-**部署上线**：
-1. [部署指南](DEPLOYMENT_GUIDE.md) - 完整流程
-2. [Docker 配置](../docker-compose.yml) - 容器编排
+| 文档 | 描述 | 优先级 |
+|------|------|--------|
+| [数据库设计](database/) | 数据库 schema 与迁移说明 | ⭐ |
+| [Docker 部署说明（根目录）](../DOCKER_DEPLOY.md) | 容器部署与启动说明 | ⭐⭐ |
 
 ---
 
-## 📊 文档优先级说明
+## 快速查找
 
-- ⭐⭐⭐ **必读** - 核心文档，开发前必读
-- ⭐⭐ **推荐** - 重要文档，建议阅读
-- ⭐ **参考** - 可选文档，需要时查阅
+**要评估 TEN 是否继续作为核心底座**
+1. [TEN 框架能力与上限评估（2026-03-05）](TEN_FRAMEWORK_CAPABILITY_CEILING_REPORT_2026-03-05.md)
+
+**要推进 AI 编程协作体系**
+1. [AI 编程指导体系](AI_ENGINEERING_SYSTEM.md)
+2. [AI 执行计划模板](AI_EXECUTION_PLAN_TEMPLATE.md)
+3. [执行计划归档](plans/README.md)
+
+**要记录或筛选外部灵感**
+1. [ideas 目录说明](../ideas/README.md)
+2. [日常随手记](../ideas/DAILY_CAPTURE.md)
+3. [长期讨论 / 调研](../ideas/LONG_TERM_TOPICS.md)
+
+**要排执行优先级与里程碑**
+1. [产品方向重排（2026-03-09）](COMMUNICATION_FIRST_PRODUCT_RESET_2026-03-09.md)
+2. [主动沟通 Starter Kit 数据来源（2026-03-09）](COMMUNICATION_STARTER_KIT_SOURCES_2026-03-09.md)
+3. [执行路线图（2026-03-05）](VOXFLAME_EXECUTION_ROADMAP_2026-03-05.md)
+
+**要讨论首页、训练页、记忆和硬件联动应该先做什么**
+1. [执行路线图（2026-03-05）](VOXFLAME_EXECUTION_ROADMAP_2026-03-05.md)
+2. [产品方向重排（2026-03-09）](COMMUNICATION_FIRST_PRODUCT_RESET_2026-03-09.md)
+3. [产品战略与用户研究统一报告（2026-03-05）](VOXFLAME_PRODUCT_STRATEGY_AND_USER_RESEARCH_2026-03-05.md)
+
+**要推进记忆系统**
+1. [统一记忆系统报告（2026-03-05）](VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md)
+
+**要推进纠错能力**
+1. [LLM 纠错开发计划](LLM_CORRECTION_DEVELOPMENT_PLAN.md)
+2. [中文语训反馈方案（2026-03-09）](MANDARIN_PRONUNCIATION_FEEDBACK_PLAN_2026-03-09.md)
+3. [中文训练页 Phase 2 执行计划（2026-03-09）](plans/MANDARIN_MEMORY_PHASE2_EXECUTION_PLAN_2026-03-09.md)
+4. [中文语训与录音上传页来源说明（2026-03-09）](MANDARIN_TRAINING_SOURCES_2026-03-09.md)
+5. [ASR/TTS 模型报告](LATEST_ASR_TTS_MODELS_REPORT.md)
+
+**要做前端/PWA**
+1. [前端架构指南](FRONTEND_ARCHITECTURE.md)
+2. [PWA 实现指南](PWA_IMPLEMENTATION_GUIDE.md)
 
 ---
 
-## 🔄 文档维护
+## 优先级说明
 
-### 添加新文档
-
-1. 在对应分类下创建文档
-2. 更新本导航文件
-3. 在根目录 `CLAUDE.md` 中同步更新链接
-
-### 文档命名规范
-
-- 使用大写蛇形命名：`DOCUMENT_NAME.md`
-- 清晰描述文档内容
-- 避免缩写（除非是通用缩写）
+- ⭐⭐⭐ 必读：直接影响架构与路线
+- ⭐⭐ 推荐：影响实现质量与迭代效率
+- ⭐ 参考：按需查阅
 
 ---
 
-## 🔗 相关资源
+## 相关资源
 
 - [项目主文档](../CLAUDE.md)
 - [当前任务](../.tasks/current.md)
-- [GitHub 仓库](https://github.com/AIden-QiU1/VoxFlame-Agent)
-
----
-
-**让每个声音都被听见** 🎗️
+- [Docker 编排](../docker-compose.yml)

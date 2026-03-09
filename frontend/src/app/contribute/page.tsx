@@ -1,669 +1,720 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useStepAudio } from '@/hooks/useStepAudio'
+import { InstallPrompt, OfflineNotice, UpdatePrompt } from '@/components/pwa'
+import { useAuth } from '@/hooks/useAuth'
 import { useContributor } from '@/hooks/useContributor'
+import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
 import { useVoiceUpload } from '@/hooks/useVoiceUpload'
 import {
-  getRandomSentence,
-  CATEGORY_NAMES,
-  DIFFICULTY_NAMES,
-  getAllCategories,
-  type CorpusSentence as Sentence
-} from '@/lib/corpus/sentences'
-import { AudioProcessor } from '@/lib/audio/audio-processor'
-import { InstallPrompt, OfflineNotice, UpdatePrompt } from '@/components/pwa'
-import { sha256 } from 'js-sha256'
+  MANDARIN_TRAINING_CATEGORIES,
+  MANDARIN_TRAINING_EXERCISES,
+  MandarinTrainingCategory,
+  MandarinTrainingExercise,
+  getExercisesByCategory,
+} from '@/lib/corpus/mandarin-training'
+import {
+  MandarinTrainingFeedback,
+  analyzeMandarinAttempt,
+} from '@/lib/training/mandarin-feedback'
+import { memoryService } from '@/lib/memory/memory-service'
 
-/**
- * 数据收集页面
- * 
- * 设计风格：温暖、包容、无障碍友好
- * 功能：
- * 1. AI 对话引导（可选）
- * 2. 引导式录音 - 跟读句子
- * 3. 自由录音 - 说自己想说的话
- */
-type PageMode = 'chat' | 'guided' | 'free'
-type RecordingState = 'idle' | 'recording' | 'processing' | 'done'
+type TrainingCategoryFilter = MandarinTrainingCategory | 'all'
+
+interface RecordingPayload {
+  blob: Blob
+  duration: number
+  sampleRate: number
+}
+
+interface TrainingAttempt {
+  exerciseId: string
+  transcript: string
+  feedback: MandarinTrainingFeedback
+  recording: RecordingPayload | null
+  uploaded: boolean
+}
+
+const DIFFICULTY_LABELS = {
+  easy: '容易',
+  medium: '中等',
+  hard: '较难',
+} as const
+
+const FEEDBACK_STATUS_LABELS = {
+  excellent: '匹配良好',
+  close: '接近目标句',
+  retry: '建议重练',
+  unclear: '系统未稳定听清',
+} as const
+
+function formatSeconds(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
+function buildUploadMetadata(
+  exercise: MandarinTrainingExercise,
+  transcript: string,
+  feedback: MandarinTrainingFeedback,
+  consentToUpload: boolean,
+) {
+  return {
+    training_mode: 'mandarin_practice',
+    exercise_id: exercise.id,
+    exercise_text: exercise.text,
+    exercise_category: exercise.category,
+    focus_tags: exercise.focusTags,
+    keywords: exercise.keywords,
+    recognized_text: transcript,
+    feedback_status: feedback.status,
+    missing_chars: feedback.missingChars,
+    extra_chars: feedback.extraChars,
+    source_label: exercise.source.label,
+    source_url: exercise.source.url,
+    upload_consent: consentToUpload,
+  }
+}
+
+function buildTrainingMemoryContent(
+  exercise: MandarinTrainingExercise,
+  transcript: string,
+  feedback: MandarinTrainingFeedback,
+): string {
+  const transcriptLabel = transcript || '系统未稳定听清'
+  return `训练记录：目标句“${exercise.text}”；系统听到“${transcriptLabel}”；结果为${FEEDBACK_STATUS_LABELS[feedback.status]}；重点标签：${exercise.focusTags.join('、')}。`
+}
+
+function buildTrainingResultPayload(
+  exercise: MandarinTrainingExercise,
+  transcript: string,
+  feedback: MandarinTrainingFeedback,
+  consentToUpload: boolean,
+) {
+  return {
+    exercise_id: exercise.id,
+    exercise_text: exercise.text,
+    exercise_category: exercise.category,
+    keywords: exercise.keywords,
+    focus_tags: exercise.focusTags,
+    recognized_text: transcript,
+    feedback_status: feedback.status,
+    missing_chars: feedback.missingChars,
+    extra_chars: feedback.extraChars,
+    upload_consent: consentToUpload,
+    source_label: exercise.source.label,
+    source_url: exercise.source.url,
+  }
+}
+
 export default function ContributePage() {
-  // 页面模式
-  const [mode, setMode] = useState<PageMode>('chat')
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
-
-  // AI 对话相关
-  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'ai', text: string }>>([])
-  const [showRecordingOption, setShowRecordingOption] = useState(false)
-
-  // 录音相关
-  const [recordingState, setRecordingState] = useState<RecordingState>('idle')
-  const [recordingTime, setRecordingTime] = useState(0)
-  const [currentSentence, setCurrentSentence] = useState<Sentence | null>(null)
-  const [completedCount, setCompletedCount] = useState(0)
-  const [freeText, setFreeText] = useState('')
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-
-  // Hooks
-  const { contributor, displayName } = useContributor()
-  const { uploadRecording, isUploading, uploadProgress, lastError } = useVoiceUpload()
-
-  // AI 语音对话
+  const { userId } = useAuth()
+  const { contributor, anonymousId, displayName, refreshStats } = useContributor()
   const {
-    isConnected: isAIConnected,
-    isListening: isAIListening,
-    isSpeaking: isAISpeaking,
-    userTranscript,
-    aiTranscript,
-    connect: connectAI,
-    disconnect: disconnectAI,
-    startListening: startAIListening,
-    stopListening: stopAIListening,
-    sendText: sendAIText,
-  } = useStepAudio({
-    apiKey: process.env.NEXT_PUBLIC_STEP_API_KEY || '',
-    voice: 'wenrounansheng',
-    systemPrompt: getContributeSystemPrompt(),
-    onError: (error) => console.error('AI Error:', error)
-  })
-  // Refs
-  const audioProcessorRef = useRef<AudioProcessor | null>(null)
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
+    uploadRecording,
+    isUploading,
+    uploadProgress,
+    lastError,
+  } = useVoiceUpload()
+  const {
+    status,
+    interimText,
+    error: sessionError,
+    isRecording,
+    isProcessing,
+    startRecording,
+    stopRecording,
+    sendTrainingResult,
+    disconnect,
+  } = useMandarinTrainingSession()
 
-  // Categories
-  const categories = getAllCategories()
+  const [selectedCategory, setSelectedCategory] = useState<TrainingCategoryFilter>('all')
+  const [currentExerciseId, setCurrentExerciseId] = useState(MANDARIN_TRAINING_EXERCISES[0]?.id ?? '')
+  const [recordingTime, setRecordingTime] = useState(0)
+  const [completedCount, setCompletedCount] = useState(0)
+  const [consentToUpload, setConsentToUpload] = useState(false)
+  const [attempt, setAttempt] = useState<TrainingAttempt | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const memoryOwnerId = userId || anonymousId || null
 
-  // 初始化
+  const filteredExercises = getExercisesByCategory(selectedCategory)
+  const currentExercise =
+    filteredExercises.find((exercise) => exercise.id === currentExerciseId) ??
+    filteredExercises[0] ??
+    MANDARIN_TRAINING_EXERCISES[0]
+
   useEffect(() => {
-    audioProcessorRef.current = new AudioProcessor()
-    // Initial sentence based on default category 'all'
-    setCurrentSentence(getRandomSentence('all'))
-
-    // 尝试连接 AI（如果有 API Key）
-    if (process.env.NEXT_PUBLIC_STEP_API_KEY) {
-      connectAI().catch(() => {
-        console.log('AI connection failed, using manual mode')
-      })
+    if (!currentExercise) {
+      return
     }
+
+    const existsInCurrentFilter = filteredExercises.some((exercise) => exercise.id === currentExerciseId)
+    if (!existsInCurrentFilter) {
+      setCurrentExerciseId(currentExercise.id)
+    }
+  }, [currentExercise, currentExerciseId, filteredExercises])
+
+  useEffect(() => {
+    if (!isRecording) {
+      return
+    }
+
+    setRecordingTime(0)
+    const timer = window.setInterval(() => {
+      setRecordingTime((value) => value + 1)
+    }, 1000)
+
     return () => {
-      audioProcessorRef.current?.stop()
-      disconnectAI()
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current)
+      window.clearInterval(timer)
+    }
+  }, [isRecording])
+
+  useEffect(() => {
+    return () => {
+      disconnect()
+    }
+  }, [disconnect])
+
+  useEffect(() => {
+    if (!memoryOwnerId) {
+      return
+    }
+
+    memoryService.init(memoryOwnerId)
+  }, [memoryOwnerId])
+
+  useEffect(() => {
+    if (!toastMessage) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setToastMessage(null)
+    }, 3200)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [toastMessage])
+
+  async function uploadAttempt(
+    targetExercise: MandarinTrainingExercise,
+    targetAttempt: TrainingAttempt,
+    fromAutoUpload: boolean,
+  ) {
+    if (!targetAttempt.recording) {
+      setToastMessage('这次录音没有可上传的音频文件。')
+      return
+    }
+
+    const effectiveConsent = fromAutoUpload ? consentToUpload : true
+
+    const success = await uploadRecording(targetAttempt.recording.blob, {
+      text: targetExercise.text,
+      duration: targetAttempt.recording.duration,
+      source: 'guided_recording',
+      sentenceId: targetExercise.id,
+      metadata: buildUploadMetadata(
+        targetExercise,
+        targetAttempt.transcript,
+        targetAttempt.feedback,
+        effectiveConsent,
+      ),
+    })
+
+    if (!success) {
+      setToastMessage('上传失败，请稍后重试。')
+      return
+    }
+
+    setAttempt((prev) => {
+      if (!prev || prev.exerciseId !== targetExercise.id) {
+        return prev
       }
-    }
-  }, [])
-  // Handle Category Change
-  const handleCategoryChange = (cat: string) => {
-    setSelectedCategory(cat)
-    // Immediately refresh sentence
-    const newSentence = getRandomSentence(cat)
-    setCurrentSentence(newSentence)
-  }
 
-  // Next Sentence
-  const nextSentence = () => {
-    const newSentence = getRandomSentence(selectedCategory)
-    // Ensure we get a different sentence if possible, but getRandomSentence is stateless random
-    setCurrentSentence(newSentence)
-  }
-
-  // 监听 AI 转录
-  useEffect(() => {
-    if (aiTranscript) {
-      setChatMessages(prev => {
-        const lastMsg = prev[prev.length - 1]
-        if (lastMsg?.role === 'ai') {
-          return [...prev.slice(0, -1), { role: 'ai', text: aiTranscript }]
-        }
-        return [...prev, { role: 'ai', text: aiTranscript }]
-      })
-
-      // 检测 AI 是否提到了录音
-      if (aiTranscript.includes('录音') || aiTranscript.includes('开始') || aiTranscript.includes('试试')) {
-        setShowRecordingOption(true)
+      return {
+        ...prev,
+        uploaded: true,
       }
-    }
-  }, [aiTranscript])
-  useEffect(() => {
-    if (userTranscript) {
-      setChatMessages(prev => {
-        const lastMsg = prev[prev.length - 1]
-        if (lastMsg?.role === 'user') {
-          return [...prev.slice(0, -1), { role: 'user', text: userTranscript }]
-        }
-        return [...prev, { role: 'user', text: userTranscript }]
-      })
-    }
-  }, [userTranscript])
-  // 自动滚动到最新消息
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
-    }
-  }, [chatMessages])
-  // 开始与 AI 对话
-  const startChat = async () => {
-    if (isAIConnected) {
-      await startAIListening()
-    } else {
-      setMode('guided')
-    }
+    })
+    await refreshStats()
+    setToastMessage(fromAutoUpload ? '录音已按你的授权加入匿名语料。' : '这次录音已加入匿名语料。')
   }
-  // 开始录音
-  const startRecording = async () => {
-    if (!audioProcessorRef.current) return
+
+  function persistTrainingMemory(
+    exercise: MandarinTrainingExercise,
+    transcript: string,
+    feedback: MandarinTrainingFeedback,
+  ) {
+    if (!memoryOwnerId) {
+      return
+    }
+
+    const content = buildTrainingMemoryContent(exercise, transcript, feedback)
+    memoryService.addMemoryEntry({
+      type: 'episodic',
+      content,
+      metadata: {
+        kind: 'training_result',
+        exercise_id: exercise.id,
+        exercise_category: exercise.category,
+        keywords: exercise.keywords,
+        focus_tags: exercise.focusTags,
+        recognized_text: transcript,
+        feedback_status: feedback.status,
+        missing_chars: feedback.missingChars,
+        extra_chars: feedback.extraChars,
+        source_label: exercise.source.label,
+        source_url: exercise.source.url,
+      },
+    })
+  }
+
+  async function handleStartRecording() {
+    if (!currentExercise || isUploading || isProcessing) {
+      return
+    }
+
+    setAttempt(null)
+    setToastMessage(null)
+
     try {
-      setRecordingState('recording')
-      setRecordingTime(0)
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime(t => t + 1)
-      }, 1000)
-      await audioProcessorRef.current.start(() => { }, true)
+      await startRecording()
     } catch (error) {
-      console.error('Failed to start recording:', error)
-      setRecordingState('idle')
+      console.error('Failed to start training recording:', error)
+      setToastMessage('录音启动失败，请检查麦克风权限。')
     }
   }
-  // 停止录音并上传
-  const stopRecording = async () => {
-    if (!audioProcessorRef.current) return
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current)
-      recordingTimerRef.current = null
-    }
-    setRecordingState('processing')
-    const recordingData = audioProcessorRef.current.stop()
-    if (recordingData && recordingData.duration >= 1) {
-      const textContent = mode === 'guided' && currentSentence ? currentSentence.text : freeText
 
-      // Generate a deterministic ID for the sentence if missing (based on text hash)
-      let sentenceId = undefined
-      if (mode === 'guided' && currentSentence) {
-        if (currentSentence.id) {
-          sentenceId = currentSentence.id
-        } else {
-          // Generate an 8-char hash ID from the text
-          sentenceId = sha256(currentSentence.text).substring(0, 8)
-        }
+  async function handleStopRecording() {
+    if (!currentExercise) {
+      return
+    }
+
+    try {
+      const result = await stopRecording()
+      const transcript = result.transcript.trim()
+      const feedback = analyzeMandarinAttempt(currentExercise, transcript)
+
+      const nextAttempt: TrainingAttempt = {
+        exerciseId: currentExercise.id,
+        transcript,
+        feedback,
+        recording: result.recording,
+        uploaded: false,
       }
 
-      const success = await uploadRecording(recordingData.blob, {
-        text: textContent,
-        duration: recordingData.duration,
-        source: mode === 'guided' ? 'guided_recording' : 'free_recording',
-        sentenceId: sentenceId
-      })
-      if (success) {
-        setCompletedCount(c => c + 1)
+      setAttempt(nextAttempt)
+      setCompletedCount((value) => value + 1)
+      persistTrainingMemory(currentExercise, transcript, feedback)
+      sendTrainingResult(
+        buildTrainingResultPayload(
+          currentExercise,
+          transcript,
+          feedback,
+          consentToUpload,
+        ),
+      )
 
-        // Encouragement
-        setToastMessage('太棒了！录音成功！')
-        setTimeout(() => setToastMessage(null), 3000)
-
-        if (isAIConnected) {
-          sendAIText('（用户刚刚完成了一条录音，请给一句简短的鼓励，比如“真棒”、“继续加油”之类的）')
-        }
-
-        if (mode === 'guided') {
-          nextSentence()
-        } else {
-          setFreeText('')
-        }
+      if (consentToUpload && result.recording) {
+        await uploadAttempt(currentExercise, nextAttempt, true)
+      } else {
+        setToastMessage('已生成本次反馈。需要时可以手动匿名上传。')
       }
+    } catch (error) {
+      console.error('Failed to stop training recording:', error)
+      setToastMessage('录音结束失败，请重新尝试。')
     }
-    setRecordingState('done')
-    setTimeout(() => setRecordingState('idle'), 1500)
   }
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
+
+  function moveExercise(offset: number) {
+    if (filteredExercises.length === 0 || !currentExercise) {
+      return
+    }
+
+    const currentIndex = filteredExercises.findIndex((exercise) => exercise.id === currentExercise.id)
+    const nextIndex = (currentIndex + offset + filteredExercises.length) % filteredExercises.length
+    setCurrentExerciseId(filteredExercises[nextIndex].id)
+    setAttempt(null)
   }
-  const switchToRecording = (recordMode: 'guided' | 'free') => {
-    stopAIListening()
-    setMode(recordMode)
-  }
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* 顶部导航 */}
-      <nav
-        className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100"
-        role="navigation"
-        aria-label="主导航"
-      >
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2" aria-label="燃言项目首页">
-            <span className="text-xl font-bold">
-              <span className="text-amber-500">燃</span>
-              <span className="text-orange-500">言</span>
-            </span>
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-amber-600 font-medium" aria-live="polite">
-              已贡献 {completedCount} 条
-            </span>
-            <div
-              className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center"
-              aria-label={`贡献者: ${displayName}`}
-              title={displayName}
-            >
-              <span className="text-amber-600 text-sm font-bold">
-                {displayName?.[0] || '?'}
-              </span>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.12),_transparent_24%),linear-gradient(180deg,_#fffdf8_0%,_#fff9f0_48%,_#fff5eb_100%)]">
+      <nav className="sticky top-0 z-40 border-b border-amber-100/80 bg-white/85 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <Link href="/" className="flex items-center gap-3 text-gray-900">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-lg font-semibold text-amber-700">
+              燃
             </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-amber-600">VoxFlame</p>
+              <p className="text-base font-semibold">中文语训与录音上传</p>
+            </div>
+          </Link>
+          <div className="rounded-full border border-amber-200 bg-white px-4 py-2 text-sm text-gray-600">
+            当前贡献者：<span className="font-semibold text-gray-900">{displayName}</span>
           </div>
         </div>
       </nav>
-      <main className="pt-24 pb-16 px-6" role="main">
-        {/* Toast Notification */}
-        {toastMessage && (
-          <div className="fixed top-24 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg z-50 animate-bounce transition-all">
-            {toastMessage}
-          </div>
-        )}
 
-        <div className="max-w-2xl mx-auto">
-
-          {/* AI 对话模式 */}
-          {mode === 'chat' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-3xl shadow-lg p-6 min-h-[400px] flex flex-col">
-                {/* 无 AI 时的欢迎界面 */}
-                {chatMessages.length === 0 && !isAIConnected && (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="text-6xl mb-4" aria-hidden="true"></div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">你好！</h1>
-                    <p className="text-gray-500 mb-6">
-                      感谢你来帮助我们收集语音数据。
-                      <br />
-                      你的每一句话都很珍贵。
-                    </p>
-                    <button
-                      onClick={() => setMode('guided')}
-                      className="px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-bold transition-all focus:outline-none focus:ring-4 focus:ring-amber-300"
-                      aria-label="开始贡献声音"
-                    >
-                      开始贡献声音
-                    </button>
-                  </div>
-                )}
-                {/* 有 AI 但未开始对话 */}
-                {chatMessages.length === 0 && isAIConnected && !isAIListening && (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="text-6xl mb-4" aria-hidden="true">🎙</div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">准备好了吗？</h1>
-                    <p className="text-gray-500 mb-6">
-                      点击下方按钮，我会先和你聊聊天，
-                      <br />
-                      然后再开始录音。
-                    </p>
-                    <button
-                      onClick={startChat}
-                      className="px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-bold transition-all focus:outline-none focus:ring-4 focus:ring-amber-300"
-                    >
-                      开始对话
-                    </button>
-                  </div>
-                )}
-                {/* 对话消息列表 */}
-                {chatMessages.length > 0 && (
-                  <div
-                    ref={chatContainerRef}
-                    className="flex-1 overflow-y-auto space-y-4 mb-4"
-                    role="log"
-                    aria-label="对话记录"
-                  >
-                    {chatMessages.map((msg, i) => (
-                      <div
-                        key={i}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[80%] px-4 py-3 rounded-2xl ${msg.role === 'user'
-                            ? 'bg-amber-500 text-white rounded-br-none'
-                            : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                            }`}
-                          role={msg.role === 'ai' ? 'status' : undefined}
-                        >
-                          {msg.text}
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* AI 正在说话指示 */}
-                    {isAISpeaking && (
-                      <div className="flex justify-start">
-                        <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-bl-none flex items-center gap-2" role="status" aria-label="AI 正在说话">
-                          <div className="flex gap-1">
-                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {/* 对话控制按钮 */}
-                {isAIConnected && chatMessages.length > 0 && (
-                  <div className="flex flex-col gap-3">
-                    {showRecordingOption && (
-                      <div className="flex gap-3 justify-center flex-wrap">
-                        <button
-                          onClick={() => switchToRecording('guided')}
-                          className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-medium transition-all focus:outline-none focus:ring-4 focus:ring-amber-300"
-                        >
-                          好的，开始跟读
-                        </button>
-                        <button
-                          onClick={() => switchToRecording('free')}
-                          className="px-6 py-3 bg-white border-2 border-amber-500 text-amber-600 rounded-full font-medium transition-all hover:bg-amber-50 focus:outline-none focus:ring-4 focus:ring-amber-300"
-                        >
-                          我想自由说话
-                        </button>
-                      </div>
-                    )}
-
-                    {/* 语音输入按钮 */}
-                    <div className="flex justify-center">
-                      <button
-                        onMouseDown={startAIListening}
-                        onMouseUp={stopAIListening}
-                        onTouchStart={startAIListening}
-                        onTouchEnd={stopAIListening}
-                        className={`w-16 h-16 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-4 focus:ring-amber-300 ${isAIListening
-                          ? 'bg-red-500 text-white scale-110'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        aria-label={isAIListening ? '松开发送' : '按住说话'}
-                        aria-pressed={isAIListening}
-                      >
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                        </svg>
-                      </button>
-                    </div>
-                    <p className="text-center text-gray-400 text-sm" aria-hidden="true">
-                      {isAIListening ? '松开发送' : '按住说话'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {/* 引导式录音模式 */}
-          {mode === 'guided' && currentSentence && (
-            <div className="space-y-6">
-
-              {/* 主题选择器 */}
-              <div className="flex gap-2 overflow-x-auto py-2 -mx-6 px-6 sm:mx-0 sm:px-0 scrollbar-hide">
-                <button
-                  onClick={() => handleCategoryChange('all')}
-                  className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-colors ${selectedCategory === 'all'
-                    ? 'bg-amber-500 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                >
-                  全部
-                </button>
-                {categories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => handleCategoryChange(cat)}
-                    className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-colors ${selectedCategory === cat
-                      ? 'bg-amber-500 text-white shadow-md'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                  >
-                    {CATEGORY_NAMES[cat] || cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* 句子卡片 */}
-              <div className="bg-white rounded-3xl shadow-lg p-8">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
-                    {CATEGORY_NAMES[currentSentence.category] || currentSentence.category}
-                  </span>
-                  <span className="text-gray-400 text-sm">
-                    {DIFFICULTY_NAMES[currentSentence.difficulty]}
-                  </span>
-                </div>
-
-                <p
-                  className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 text-center py-8 leading-relaxed"
-                  aria-label={`请朗读: ${currentSentence.text}`}
-                >
-                  {currentSentence.text}
-                </p>
-
-                <div className="flex justify-center">
-                  <button
-                    onClick={nextSentence}
-                    className="text-amber-500 hover:text-amber-600 text-sm font-medium focus:outline-none focus:underline"
-                    aria-label="换一句话"
-                  >
-                    换一句 →
-                  </button>
-                </div>
-              </div>
-              {/* 录音控制 */}
-              <RecordingControl
-                recordingState={recordingState}
-                recordingTime={recordingTime}
-                onStart={startRecording}
-                onStop={stopRecording}
-                isUploading={isUploading}
-                uploadProgress={uploadProgress}
-                lastError={lastError}
-              />
-              {/* 模式切换 */}
-              <div className="flex justify-center gap-4 flex-wrap">
-                <button
-                  onClick={() => setMode('free')}
-                  className="text-amber-500 hover:text-amber-600 text-sm font-medium focus:outline-none focus:underline"
-                >
-                  切换到自由录音 →
-                </button>
-                {isAIConnected && (
-                  <button
-                    onClick={() => setMode('chat')}
-                    className="text-gray-400 hover:text-gray-600 text-sm font-medium focus:outline-none focus:underline"
-                  >
-                    返回对话
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-          {/* 自由录音模式 */}
-          {mode === 'free' && (
-            <div className="space-y-6">
-              {/* 文本输入 */}
-              <div className="bg-white rounded-3xl shadow-lg p-8">
-                <label htmlFor="free-text" className="block text-gray-700 font-medium mb-2">
-                  你想说什么？
-                </label>
-                <textarea
-                  id="free-text"
-                  value={freeText}
-                  onChange={(e) => setFreeText(e.target.value)}
-                  placeholder="输入你想说的话，或者直接录音..."
-                  className="w-full h-32 p-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200 resize-none"
-                  aria-describedby="free-text-hint"
-                />
-                <p id="free-text-hint" className="text-gray-400 text-sm mt-2">
-                  可以先写下来，也可以直接录音
-                </p>
-              </div>
-              {/* 录音控制 */}
-              <RecordingControl
-                recordingState={recordingState}
-                recordingTime={recordingTime}
-                onStart={startRecording}
-                onStop={stopRecording}
-                isUploading={isUploading}
-                uploadProgress={uploadProgress}
-                lastError={lastError}
-              />
-              {/* 模式切换 */}
-              <div className="flex justify-center gap-4 flex-wrap">
-                <button
-                  onClick={() => setMode('guided')}
-                  className="text-amber-500 hover:text-amber-600 text-sm font-medium focus:outline-none focus:underline"
-                >
-                  ← 切换到跟读模式
-                </button>
-                {isAIConnected && (
-                  <button
-                    onClick={() => setMode('chat')}
-                    className="text-gray-400 hover:text-gray-600 text-sm font-medium focus:outline-none focus:underline"
-                  >
-                    返回对话
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-          {/* 底部提示 */}
-          <div className="text-center mt-8 text-gray-400 text-sm">
-            <p>
-              您的语音数据将被匿名存储，用于改进语音识别技术。
-              <br />
-              <Link href="/ranyan" className="text-amber-500 hover:underline">了解更多</Link>
-            </p>
-          </div>
+      {toastMessage ? (
+        <div className="fixed left-1/2 top-24 z-50 -translate-x-1/2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white shadow-xl">
+          {toastMessage}
         </div>
+      ) : null}
+
+      <main className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 lg:py-10">
+        <section className="grid gap-6 lg:grid-cols-[1.35fr_0.9fr]">
+          <div className="rounded-[32px] border border-amber-100 bg-white/90 p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                Mandarin Practice
+              </span>
+              <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">
+                先练真实沟通句，再决定是否匿名上传
+              </span>
+            </div>
+            <h1 className="mt-5 max-w-3xl text-3xl font-semibold leading-tight text-gray-900 sm:text-4xl">
+              这不是泛化录音采集页，而是一条完整的中文训练闭环。
+            </h1>
+            <p className="mt-4 max-w-3xl text-base leading-7 text-gray-600">
+              每次练习都会展示目标句、拼音和本次重点。录音结束后，你可以看到系统听到的结果、差异提示，以及是否把这条样本匿名上传，用于后续中文语训和个体化建议。
+            </p>
+
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-3xl bg-amber-50 px-5 py-4">
+                <p className="text-sm text-amber-700">本次已完成</p>
+                <p className="mt-2 text-3xl font-semibold text-gray-900">{completedCount}</p>
+                <p className="mt-2 text-sm text-gray-600">本轮页面内练习次数</p>
+              </div>
+              <div className="rounded-3xl bg-orange-50 px-5 py-4">
+                <p className="text-sm text-orange-700">累计上传</p>
+                <p className="mt-2 text-3xl font-semibold text-gray-900">
+                  {contributor?.total_recordings ?? 0}
+                </p>
+                <p className="mt-2 text-sm text-gray-600">匿名贡献到语料库的录音数</p>
+              </div>
+              <div className="rounded-3xl bg-stone-100 px-5 py-4">
+                <p className="text-sm text-stone-700">连接状态</p>
+                <p className="mt-2 text-xl font-semibold text-gray-900">
+                  {status === 'recording'
+                    ? '正在录音'
+                    : status === 'processing'
+                      ? '处理中'
+                      : status === 'ready'
+                        ? '已就绪'
+                        : status === 'connecting'
+                          ? '正在连接'
+                          : status === 'error'
+                            ? '连接异常'
+                            : '待开始'}
+                </p>
+                <p className="mt-2 text-sm text-gray-600">录音时会自动连接 TEN Agent 做实时转写</p>
+              </div>
+            </div>
+          </div>
+
+          <aside className="rounded-[32px] border border-amber-100 bg-[#fffaf2] p-7 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
+            <h2 className="text-lg font-semibold text-gray-900">匿名上传说明</h2>
+            <p className="mt-3 text-sm leading-6 text-gray-600">
+              上传内容包括录音、目标句、练习标签和系统识别结果。未勾选授权时，这次练习只保留在当前页面反馈里，不会主动上传。
+            </p>
+
+            <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-3xl border border-amber-200 bg-white p-4">
+              <input
+                type="checkbox"
+                checked={consentToUpload}
+                onChange={(event) => setConsentToUpload(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="text-sm leading-6 text-gray-700">
+                完成录音后，匿名上传这次样本，用于中文语训、语料整理和后续个体化建议。
+              </span>
+            </label>
+
+            <div className="mt-6 rounded-3xl border border-dashed border-amber-200 bg-white px-4 py-4 text-sm leading-6 text-gray-600">
+              <p className="font-medium text-gray-900">上传策略</p>
+              <p className="mt-2">默认 local-first。授权后才上传；如果网络或存储异常，会自动降级为本地暂存。</p>
+            </div>
+
+            {isUploading ? (
+              <div className="mt-6 rounded-3xl bg-amber-100 px-4 py-4">
+                <p className="text-sm font-medium text-amber-900">正在处理上传</p>
+                <div className="mt-3 h-2 rounded-full bg-white/80">
+                  <div
+                    className="h-2 rounded-full bg-amber-500 transition-all"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-amber-800">进度 {uploadProgress}%</p>
+              </div>
+            ) : null}
+
+            {lastError ? (
+              <div className="mt-4 rounded-3xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm leading-6 text-orange-800">
+                {lastError}
+              </div>
+            ) : null}
+
+            {sessionError ? (
+              <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-800">
+                {sessionError}
+              </div>
+            ) : null}
+          </aside>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                  selectedCategory === 'all'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                全部练习
+              </button>
+              {MANDARIN_TRAINING_CATEGORIES.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    selectedCategory === category
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+
+            {currentExercise ? (
+              <div className="mt-8">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
+                    {currentExercise.category}
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-600">
+                    {DIFFICULTY_LABELS[currentExercise.difficulty]}
+                  </span>
+                </div>
+
+                <p className="mt-6 text-3xl font-semibold leading-snug text-gray-900 sm:text-4xl">
+                  {currentExercise.text}
+                </p>
+                <p className="mt-4 rounded-3xl bg-stone-100 px-4 py-4 font-mono text-sm leading-7 text-stone-700 sm:text-base">
+                  {currentExercise.pinyin}
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {currentExercise.focusTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-amber-200 bg-white px-3 py-1 text-sm text-amber-700"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-stone-200 bg-stone-50 px-5 py-4">
+                  <p className="text-sm font-medium text-gray-900">本次练习提示</p>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">{currentExercise.coachingTip}</p>
+                </div>
+
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
+                  <a
+                    href={currentExercise.source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-amber-700 underline decoration-amber-300 underline-offset-4"
+                  >
+                    来源：{currentExercise.source.label}
+                  </a>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => moveExercise(-1)}
+                      className="rounded-full border border-gray-200 px-4 py-2 text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
+                    >
+                      上一句
+                    </button>
+                    <button
+                      onClick={() => moveExercise(1)}
+                      className="rounded-full border border-gray-200 px-4 py-2 text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
+                    >
+                      下一句
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="space-y-6">
+            <section className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">开始录音</h2>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">
+                    录音时会显示实时转写。停止后，我们会先给出对照反馈，再根据你的授权决定是否上传。
+                  </p>
+                </div>
+                <div className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-gray-700">
+                  {isRecording ? formatSeconds(recordingTime) : status === 'processing' ? '处理中' : '准备就绪'}
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-[28px] bg-[#fff8ef] p-6">
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <button
+                    onClick={isRecording ? handleStopRecording : handleStartRecording}
+                    disabled={isUploading || isProcessing}
+                    className={`h-24 w-24 rounded-full text-white shadow-lg transition ${
+                      isRecording
+                        ? 'bg-rose-500 hover:bg-rose-600'
+                        : 'bg-amber-500 hover:bg-amber-600'
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                    aria-label={isRecording ? '停止录音' : '开始录音'}
+                  >
+                    {isRecording ? '停止' : '录音'}
+                  </button>
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {isRecording ? '正在跟读当前句子' : '按下按钮开始练习'}
+                    </p>
+                    <p className="mt-2 text-sm text-gray-600">
+                      {isRecording
+                        ? '录音结束后会自动生成对照反馈。'
+                        : '建议先看一遍拼音，再开始录音。'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-white/80 bg-white/90 px-4 py-4">
+                  <p className="text-sm font-medium text-gray-900">实时转写</p>
+                  <p className="mt-3 min-h-16 text-base leading-7 text-gray-700">
+                    {interimText || '开始录音后，这里会显示系统当前听到的内容。'}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {attempt ? (
+              <section className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold text-gray-900">录后反馈</h2>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
+                    {FEEDBACK_STATUS_LABELS[attempt.feedback.status]}
+                  </span>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  <div className="rounded-3xl bg-stone-100 px-4 py-4">
+                    <p className="text-sm font-medium text-gray-900">目标句</p>
+                    <p className="mt-2 text-base leading-7 text-gray-700">{currentExercise.text}</p>
+                  </div>
+                  <div className="rounded-3xl bg-amber-50 px-4 py-4">
+                    <p className="text-sm font-medium text-gray-900">系统听到的内容</p>
+                    <p className="mt-2 text-base leading-7 text-gray-700">
+                      {attempt.transcript || '这次系统还没有稳定拿到最终结果。'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-gray-200 bg-white px-5 py-4">
+                  <p className="text-sm font-medium text-gray-900">总结</p>
+                  <p className="mt-2 text-sm leading-6 text-gray-700">{attempt.feedback.summary}</p>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-stone-100 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-stone-500">漏掉的字</p>
+                      <p className="mt-2 text-sm text-gray-700">
+                        {attempt.feedback.missingChars.length > 0
+                          ? attempt.feedback.missingChars.join('、')
+                          : '无'}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-100 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-stone-500">多出的字</p>
+                      <p className="mt-2 text-sm text-gray-700">
+                        {attempt.feedback.extraChars.length > 0
+                          ? attempt.feedback.extraChars.join('、')
+                          : '无'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4">
+                  <p className="text-sm font-medium text-gray-900">建议</p>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+                    {attempt.feedback.suggestions.map((suggestion) => (
+                      <li key={suggestion}>- {suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  {!attempt.uploaded ? (
+                    <button
+                      onClick={() => uploadAttempt(currentExercise, attempt, false)}
+                      disabled={isUploading || !attempt.recording}
+                      className="rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      匿名上传这次录音
+                    </button>
+                  ) : (
+                    <span className="rounded-full bg-emerald-100 px-4 py-3 text-sm font-medium text-emerald-700">
+                      这次录音已完成贡献
+                    </span>
+                  )}
+
+                  <button
+                    onClick={() => moveExercise(1)}
+                    className="rounded-full border border-gray-200 px-5 py-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
+                  >
+                    换一句继续练
+                  </button>
+                </div>
+              </section>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="rounded-[32px] border border-stone-200 bg-white/90 p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
+          <h2 className="text-lg font-semibold text-gray-900">这一页现在能做什么</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div className="rounded-3xl bg-stone-100 px-5 py-4">
+              <p className="text-sm font-medium text-gray-900">中文场景句</p>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                当前先练真实高价值句，不先追求大而全语料库。
+              </p>
+            </div>
+            <div className="rounded-3xl bg-stone-100 px-5 py-4">
+              <p className="text-sm font-medium text-gray-900">录后对照反馈</p>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                先做目标句、识别结果和训练标签级建议，不假装给出医学诊断。
+              </p>
+            </div>
+            <div className="rounded-3xl bg-stone-100 px-5 py-4">
+              <p className="text-sm font-medium text-gray-900">匿名上传</p>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                只有你明确授权后才上传；网络异常时会按现有逻辑本地降级。
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
-      {/* PWA 组件 */}
+
       <OfflineNotice />
       <InstallPrompt />
       <UpdatePrompt />
     </div>
   )
-}
-/**
- * 录音控制组件
- */
-interface RecordingControlProps {
-  recordingState: RecordingState
-  recordingTime: number
-  onStart: () => void
-  onStop: () => void
-  isUploading: boolean
-  uploadProgress: number
-  lastError: string | null
-}
-function RecordingControl({
-  recordingState,
-  recordingTime,
-  onStart,
-  onStop,
-  isUploading,
-  uploadProgress,
-  lastError
-}: RecordingControlProps) {
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-  return (
-    <div className="bg-white rounded-3xl shadow-lg p-8">
-      <div className="flex flex-col items-center">
-        {/* 录音时间 */}
-        {recordingState === 'recording' && (
-          <div
-            className="text-4xl font-mono text-red-500 mb-4"
-            role="timer"
-            aria-live="polite"
-          >
-            {formatTime(recordingTime)}
-          </div>
-        )}
-        {/* 录音按钮 */}
-        <button
-          onClick={recordingState === 'recording' ? onStop : onStart}
-          disabled={recordingState === 'processing'}
-          className={`w-24 h-24 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-4 focus:ring-amber-300 ${recordingState === 'recording'
-            ? 'bg-red-500 text-white animate-pulse'
-            : recordingState === 'processing'
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-amber-500 hover:bg-amber-600 text-white'
-            }`}
-          aria-label={
-            recordingState === 'recording' ? '点击停止录音' :
-              recordingState === 'processing' ? '正在保存' :
-                '点击开始录音'
-          }
-        >
-          {recordingState === 'recording' ? (
-            <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          ) : recordingState === 'processing' ? (
-            <svg className="w-10 h-10 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          ) : (
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-            </svg>
-          )}
-        </button>
-        <p className="text-gray-500 mt-4" aria-hidden="true">
-          {recordingState === 'recording' ? '点击停止' :
-            recordingState === 'processing' ? '保存中...' :
-              '点击开始录音'}
-        </p>
-        {/* 上传进度 */}
-        {isUploading && (
-          <div className="w-full max-w-xs mt-4" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100}>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-amber-500 transition-all"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-          </div>
-        )}
-        {/* 错误提示 */}
-        {lastError && (
-          <p className="text-amber-600 text-sm mt-2" role="alert">{lastError}</p>
-        )}
-        {/* 完成提示 */}
-        {recordingState === 'done' && !lastError && (
-          <p className="text-green-500 text-sm mt-2" role="status">✓ 保存成功！</p>
-        )}
-      </div>
-    </div>
-  )
-}
-/**
- * 获取数据收集场景的系统提示词
- */
-function getContributeSystemPrompt(): string {
-  return `你是燃言的 AI 助手，一个温暖、有同理心的语音伙伴。
-你的任务是引导用户参与语音数据收集，帮助改进语音识别技术。
-**对话风格：**
-- 温暖、耐心、鼓励
-- 像朋友一样自然聊天
-- 回复简短，每次 1-2 句话
-- 不要一开始就提到录音，先聊几句
-**对话流程：**
-1. 先打招呼，问问用户今天怎么样
-2. 简单了解他们为什么来（自己需要？帮家人？想帮忙？）
-3. 表达感谢和理解
-4. 自然地引出"要不要试试录音"
-**重要：**
-- 如果用户说话不太清楚，不要纠正，表示理解
-- 用鼓励的语气，让用户感到自己的声音很有价值
-- 提到"录音"或"开始"时，用户界面会显示录音按钮
-**示例开场：**
-"你好呀！今天怎么样？"（等待回复）
-"原来是这样，很高兴认识你..."（继续对话）`
 }

@@ -8,16 +8,21 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { useAgent, ConversationMessage, DualLineSubtitle } from '@/hooks/useAgent'
 import WaveformVisualizer from '@/components/WaveformVisualizer'
 import { QuickPhrasesPanel } from '@/components/phrases'
+import { CommunicationStarterKit } from '@/components/chat/CommunicationStarterKit'
+import { UserNav } from '@/components/ui/user-nav'
 import { ChevronLeftIcon, ChevronRightIcon, EarIcon, BrainIcon } from 'lucide-react'
 
 interface ChatInterfaceProps {
   userId?: string
+  homeHref?: string
+  onReturnHome?: () => void
 }
 
-export default function ChatInterface({ userId }: ChatInterfaceProps) {
+export default function ChatInterface({ userId, homeHref, onReturnHome }: ChatInterfaceProps) {
   const {
     isConnected,
     isRecording,
@@ -42,6 +47,8 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
   const [textInput, setTextInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [showPhrasesPanel, setShowPhrasesPanel] = useState(false)
+  const [isCaptionMode, setIsCaptionMode] = useState(false)
+  const [isLaunchingStarter, setIsLaunchingStarter] = useState(false)
 
   // Audio player ref for TTS playback
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null)
@@ -50,18 +57,21 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
   // Initialize audio player
   useEffect(() => {
     const audio = new Audio()
-    audio.addEventListener('ended', () => setIsPlayingAudio(false))
-    audio.addEventListener('error', (e) => {
+    const handleEnded = () => setIsPlayingAudio(false)
+    const handleError = (e: Event) => {
       console.error('Audio playback error:', e)
       setIsPlayingAudio(false)
-    })
+    }
+
+    audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('error', handleError)
     audioPlayerRef.current = audio
     
     return () => {
       audio.pause()
-      audio.src = ''
-      audio.removeEventListener('ended', () => setIsPlayingAudio(false))
-      audio.removeEventListener('error', () => setIsPlayingAudio(false))
+      audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('error', handleError)
+      audioPlayerRef.current = null
     }
   }, [])
 
@@ -109,6 +119,10 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
         e.preventDefault()
         toggleRecording()
       }
+      // Escape to exit fullscreen caption mode
+      if (e.code === 'Escape' && isCaptionMode) {
+        setIsCaptionMode(false)
+      }
       // Escape to stop recording
       if (e.code === 'Escape' && isRecording) {
         stopRecording()
@@ -117,7 +131,7 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isConnected, isRecording, toggleRecording, stopRecording])
+  }, [isCaptionMode, isConnected, isRecording, toggleRecording, stopRecording])
 
   // Handle text submit
   const handleSubmit = (e: React.FormEvent) => {
@@ -132,6 +146,26 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
   const handlePhrasePlay = (text: string) => {
     sendText(text)
   }
+
+  const handleStarterPhrase = async (text: string) => {
+    if (isConnected) {
+      sendText(text)
+      return
+    }
+
+    setIsLaunchingStarter(true)
+    try {
+      await connect({ suppressGreeting: true })
+      sendText(text)
+    } finally {
+      setIsLaunchingStarter(false)
+    }
+  }
+
+  const latestAssistantText = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant')?.content
+  const captionText = currentResponseText || currentDualLine?.correctedText || latestAssistantText || currentASRText
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-amber-50 via-white to-orange-50">
@@ -193,26 +227,35 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
                 停止播放
               </button>
             )}
-            
-            {/* Audio control button */}
-            {isConnected && isPlayingAudio && (
-              <button
-                onClick={stopAudio}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full text-sm font-medium transition-colors flex items-center gap-2"
-                aria-label="停止音频"
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-                停止播放
-              </button>
-            )}
           </div>
           
           <div className="flex items-center gap-3">
+            {homeHref && (
+              onReturnHome ? (
+                <button
+                  type="button"
+                  onClick={onReturnHome}
+                  className="hidden sm:inline text-sm text-gray-600 hover:text-gray-900"
+                >
+                  返回首页
+                </button>
+              ) : (
+                <Link href={homeHref} className="hidden sm:inline text-sm text-gray-600 hover:text-gray-900">
+                  返回首页
+                </Link>
+              )
+            )}
+            <Link href="/ranyan" className="hidden sm:inline text-sm text-gray-600 hover:text-gray-900">
+              关于燃言
+            </Link>
+            <Link href="/contribute" className="hidden sm:inline text-sm text-gray-600 hover:text-gray-900">
+              练习表达
+            </Link>
             {!isConnected ? (
               <button
-                onClick={connect}
+                onClick={() => {
+                  void connect()
+                }}
                 className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-full text-sm font-medium transition-colors"
               >
                 连接助手
@@ -225,6 +268,13 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
                 断开连接
               </button>
             )}
+            <button
+              onClick={() => setIsCaptionMode(!isCaptionMode)}
+              className="px-4 py-2 bg-black text-white rounded-full text-sm font-medium transition-colors hover:bg-gray-800"
+            >
+              {isCaptionMode ? '退出字幕辅助' : '字幕辅助'}
+            </button>
+            <UserNav />
           </div>
         </div>
       </header>
@@ -234,22 +284,33 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
         <div className="max-w-4xl mx-auto space-y-4">
           {/* Welcome message */}
           {messages.length === 0 && !currentResponseText && (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4"></div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                你好！我是燃言助手
-              </h2>
-              <p className="text-gray-600 mb-6">
-                我会记住你说的每一句话，随时为你提供帮助
-              </p>
-              {!isConnected && (
-                <button
-                  onClick={connect}
-                  className="px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-medium transition-colors"
-                >
-                  开始对话
-                </button>
-              )}
+            <div className="space-y-6 py-8">
+              <div className="text-center">
+                <h2 className="text-3xl font-bold text-gray-900">
+                  先帮你完成第一次有效沟通
+                </h2>
+                <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-gray-600">
+                  进入这里，不是先让你和 AI 聊天，而是先给你一组能立即代播的高价值开口句。
+                  你可以先说明自己的说话状态，再表达需求、疼痛、求助或照护安排。
+                </p>
+                {!isConnected && (
+                  <button
+                    onClick={() => {
+                      void connect()
+                    }}
+                    className="mt-5 rounded-full bg-amber-500 px-8 py-3 font-medium text-white transition-colors hover:bg-amber-600"
+                  >
+                    先连接助手
+                  </button>
+                )}
+              </div>
+
+              <CommunicationStarterKit
+                disabled={false}
+                isConnected={isConnected}
+                isLaunching={isLaunchingStarter}
+                onSelectPhrase={handleStarterPhrase}
+              />
             </div>
           )}
 
@@ -388,6 +449,25 @@ export default function ChatInterface({ userId }: ChatInterfaceProps) {
         }
         .animate-blink { animation: blink 1s infinite; }
       `}</style>
+
+      {isCaptionMode && (
+        <div className="fixed inset-0 z-30 bg-black text-white flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/20">
+            <div className="text-sm text-white/80">全屏字幕模式</div>
+            <button
+              onClick={() => setIsCaptionMode(false)}
+              className="px-4 py-2 rounded-full bg-white text-black text-sm font-medium hover:bg-white/90"
+            >
+              退出
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center px-8">
+            <p className="text-center text-4xl md:text-6xl leading-tight font-semibold max-w-5xl">
+              {captionText || '正在等待语音输入...'}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

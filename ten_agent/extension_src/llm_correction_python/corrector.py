@@ -34,6 +34,7 @@ class LLMCorrector:
         self.system_prompt = system_prompt
         self.user_profile = user_profile
         self.vocabulary = vocabulary
+        self.memory_context = ""
         self.ten_env = ten_env
 
         # Initialize OpenAI client with DashScope endpoint
@@ -61,7 +62,27 @@ class LLMCorrector:
 
         self.ten_env.log_info(f"User profile updated: {self.user_profile[:100] if self.user_profile else 'empty'}...")
 
-    def _build_prompt(self, asr_text: str, context: List[dict]) -> str:
+    def update_vocabulary(self, vocabulary: List[str]) -> None:
+        """Update personal vocabulary hints."""
+        normalized = []
+        for word in vocabulary:
+            if isinstance(word, str):
+                candidate = word.strip()
+                if candidate:
+                    normalized.append(candidate)
+
+        # Keep order while removing duplicates.
+        self.vocabulary = list(dict.fromkeys(normalized))
+        self.ten_env.log_info(f"Vocabulary updated: {len(self.vocabulary)} words")
+
+    def update_memory_context(self, memory_context: str) -> None:
+        """Update retrieved long-term memory context."""
+        self.memory_context = (memory_context or "").strip()
+        self.ten_env.log_info(
+            f"Memory context updated: {len(self.memory_context)} chars"
+        )
+
+    def _build_prompt(self, asr_text: str, context: List[dict], memory_context: str = "") -> str:
         """Build the correction prompt with context"""
         prompt_parts = []
 
@@ -82,6 +103,9 @@ class LLMCorrector:
             ])
             prompt_parts.append(f"## 最近对话\n{context_str}\n")
 
+        if memory_context:
+            prompt_parts.append(f"## 记忆上下文\n{memory_context}\n")
+
         # Add the ASR text to correct
         prompt_parts.append(f"## 语音识别结果\n{asr_text}\n")
         prompt_parts.append("## 纠正后的文本")
@@ -89,7 +113,10 @@ class LLMCorrector:
         return "\n".join(prompt_parts)
 
     async def correct(
-        self, asr_text: str, context: Optional[List[dict]] = None
+        self,
+        asr_text: str,
+        context: Optional[List[dict]] = None,
+        memory_context: str = "",
     ) -> str:
         """
         Correct ASR text using LLM.
@@ -106,7 +133,7 @@ class LLMCorrector:
 
         try:
             # Build the user prompt
-            user_prompt = self._build_prompt(asr_text, context or [])
+            user_prompt = self._build_prompt(asr_text, context or [], memory_context)
 
             self.ten_env.log_debug(f"Correction prompt: {user_prompt[:200]}...")
 

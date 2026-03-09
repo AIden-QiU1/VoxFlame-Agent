@@ -29,6 +29,7 @@ export function QuickPhrasesPanel({
     phrases,
     isLoading,
     error,
+    requiresAuth,
     selectedCategory,
     loadPhrases,
     createPhrase,
@@ -96,7 +97,8 @@ export function QuickPhrasesPanel({
   const categoryStats = getCategoryStats()
 
   // 如果没有短语，显示初始化提示
-  const showInitPrompt = phrases.length === 0 && !isLoading
+  const showInitPrompt = phrases.length === 0 && !isLoading && !requiresAuth
+  const showAnonymousPrompt = phrases.length === 0 && !isLoading && requiresAuth
 
   return (
     <div className={className}>
@@ -149,6 +151,17 @@ export function QuickPhrasesPanel({
       )}
 
       {/* 初始化提示 */}
+      {showAnonymousPrompt && (
+        <div className="rounded-lg border border-dashed px-4 py-8 text-center">
+          <p className="mb-2 text-sm font-medium text-foreground">
+            当前可以先试用沟通模式
+          </p>
+          <p className="mb-4 text-sm text-muted-foreground">
+            登录后即可保存常用短语、同步预设，并让系统逐步学习你的高频表达。
+          </p>
+        </div>
+      )}
+
       {showInitPrompt && (
         <div className="text-center py-8 px-4 border border-dashed rounded-lg">
           <p className="text-muted-foreground mb-4">

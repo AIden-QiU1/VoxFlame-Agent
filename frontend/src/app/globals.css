@@ -179,5 +179,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   }
 }

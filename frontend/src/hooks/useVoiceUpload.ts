@@ -19,6 +19,8 @@ interface UploadOptions {
   source?: string
   /** 句子ID（引导模式时） */
   sentenceId?: string
+  /** 结构化元数据 */
+  metadata?: Record<string, unknown>
 }
 
 interface UploadResult {
@@ -110,7 +112,8 @@ export function useVoiceUpload() {
             source: options.source || 'unknown',
             user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
             timestamp: new Date().toISOString(),
-            storage_type: 'oss'
+            storage_type: 'oss',
+            ...options.metadata,
           }
         })
       })
@@ -159,6 +162,7 @@ export function useVoiceUpload() {
         sentenceId: options.sentenceId,
         source: options.source,
         duration: options.duration,
+        metadata: options.metadata || {},
         contributorId,
         createdAt: new Date().toISOString(),
         synced: false,
@@ -204,6 +208,7 @@ export function useVoiceUpload() {
           duration: record.duration,
           source: record.source,
           sentenceId: record.sentenceId,
+          metadata: record.metadata || {},
         })
 
         if (success) {

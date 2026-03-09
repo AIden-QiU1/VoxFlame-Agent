@@ -5,7 +5,8 @@
 import json
 import asyncio
 from collections import deque
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Optional, Any, Dict
 
 from ten_runtime import (
     AsyncExtension,
@@ -18,6 +19,18 @@ from ten_runtime import (
 
 from .config import LLMCorrectionConfig
 from .corrector import LLMCorrector
+
+
+DEFAULT_CLIENT_ID = "default"
+
+
+@dataclass
+class ClientCorrectionContext:
+    """Per-client correction context to avoid cross-session contamination."""
+
+    context_history: deque
+    voice_profile: dict = field(default_factory=dict)
+    memory_context: str = ""
 
 
 class LLMCorrectionExtension(AsyncExtension):
@@ -37,8 +50,8 @@ class LLMCorrectionExtension(AsyncExtension):
         self.corrector: Optional[LLMCorrector] = None
         self.ten_env: Optional[AsyncTenEnv] = None
 
-        # Context history for better correction
-        self.context_history: deque = deque(maxlen=5)
+        # Per-client contexts.
+        self.client_contexts: Dict[str, ClientCorrectionContext] = {}
 
         # Pending correction task
         self._correction_task: Optional[asyncio.Task] = None
@@ -49,15 +62,11 @@ class LLMCorrectionExtension(AsyncExtension):
         ten_env.log_info("LLM Correction Extension initializing...")
 
         try:
-            # Load configuration
             config_json, _ = await ten_env.get_property_to_json("")
             self.config = LLMCorrectionConfig.model_validate_json(config_json)
             self.config.validate_config()
 
             ten_env.log_info(f"Loaded config: {self.config.to_str()}")
-
-            # Update context history max length
-            self.context_history = deque(maxlen=self.config.max_context_length)
 
         except Exception as e:
             ten_env.log_error(f"Failed to load configuration: {e}")
@@ -68,7 +77,6 @@ class LLMCorrectionExtension(AsyncExtension):
         ten_env.log_info("LLM Correction Extension starting...")
 
         try:
-            # Initialize the corrector
             self.corrector = LLMCorrector(
                 api_key=self.config.api_key,
                 base_url=self.config.base_url,
@@ -90,13 +98,14 @@ class LLMCorrectionExtension(AsyncExtension):
         """Stop the extension"""
         ten_env.log_info("LLM Correction Extension stopping...")
 
-        # Cancel any pending correction task
         if self._correction_task and not self._correction_task.done():
             self._correction_task.cancel()
             try:
                 await self._correction_task
             except asyncio.CancelledError:
                 pass
+
+        self.client_contexts.clear()
 
     async def on_deinit(self, ten_env: AsyncTenEnv) -> None:
         """Deinitialize the extension"""
@@ -108,28 +117,35 @@ class LLMCorrectionExtension(AsyncExtension):
         cmd_name = cmd.get_name()
         ten_env.log_debug(f"Received command: {cmd_name}")
 
+        cmd_data = self._load_json_from_cmd(cmd)
+        client_id = self._extract_client_id(cmd_data)
+
         if cmd_name == "flush":
-            # Cancel any pending correction
             if self._correction_task and not self._correction_task.done():
                 self._correction_task.cancel()
-            # Clear context
-            self.context_history.clear()
-            ten_env.log_info("Flushed correction context")
+
+            if client_id:
+                context = self.client_contexts.get(client_id)
+                if context:
+                    context.context_history.clear()
+                    context.memory_context = ""
+                ten_env.log_info(f"Flushed correction context for client_id={client_id}")
+            else:
+                self.client_contexts.clear()
+                ten_env.log_info("Flushed correction contexts for all clients")
 
         elif cmd_name == "update_profile":
-            # Update user profile in corrector
             try:
-                cmd_json, _ = cmd.get_property_to_json(None)
-                profile_data = json.loads(cmd_json) if cmd_json else {}
-                user_profile = profile_data.get("user_profile")
-
+                user_profile = cmd_data.get("user_profile")
                 if user_profile and self.corrector:
                     self.corrector.update_user_profile(user_profile)
-                    ten_env.log_info(f"Updated user profile: {user_profile.get('email', 'unknown')}")
+                    ten_env.log_info(
+                        f"Updated user profile for client_id={client_id or DEFAULT_CLIENT_ID}: "
+                        f"{user_profile.get('email', 'unknown')}"
+                    )
             except Exception as e:
                 ten_env.log_error(f"Error updating profile: {e}")
 
-        # Return success
         cmd_result = CmdResult.create(StatusCode.OK, cmd)
         await ten_env.return_result(cmd_result)
 
@@ -151,109 +167,223 @@ class LLMCorrectionExtension(AsyncExtension):
 
         if data_name == "asr_result":
             try:
-                # Parse ASR result
                 data_json, _ = data.get_property_to_json(None)
-                asr_data = json.loads(data_json)
+                asr_data = json.loads(data_json) if data_json else {}
 
                 text = asr_data.get("text", "")
                 is_final = asr_data.get("is_final", False)
+                client_id = self._extract_client_id(asr_data) or DEFAULT_CLIENT_ID
 
-                ten_env.log_info(f"ASR result: '{text}', final={is_final}")
+                ten_env.log_info(
+                    f"ASR result client_id={client_id}: '{text}', final={is_final}"
+                )
 
                 if not text.strip():
                     ten_env.log_debug("Empty ASR text, skipping correction")
                     return
 
-                # Only correct final results to avoid excessive API calls
                 if is_final:
-                    await self._process_final_asr(ten_env, text, asr_data)
+                    await self._process_final_asr(ten_env, client_id, text, asr_data)
                 else:
-                    # For interim results, just forward to frontend for display
-                    await self._send_interim_text(ten_env, text)
+                    await self._send_interim_text(ten_env, text, client_id)
 
             except Exception as e:
                 ten_env.log_error(f"Error processing ASR result: {e}")
 
+        elif data_name == "voice_profile":
+            await self._handle_voice_profile(ten_env, data)
+
+        elif data_name == "memory_context":
+            await self._handle_memory_context(ten_env, data)
+
     async def _process_final_asr(
-        self, ten_env: AsyncTenEnv, text: str, asr_data: dict
+        self,
+        ten_env: AsyncTenEnv,
+        client_id: str,
+        text: str,
+        asr_data: dict,
     ) -> None:
         """Process final ASR result with LLM correction"""
         try:
-            # Get context for better correction
-            context = list(self.context_history)
+            context = self._get_or_create_client_context(client_id)
 
-            # Perform correction
-            corrected_text = await self.corrector.correct(text, context)
+            if self.corrector and isinstance(context.voice_profile, dict):
+                hotwords = context.voice_profile.get("hotwords", [])
+                if isinstance(hotwords, list):
+                    self.corrector.update_vocabulary(hotwords)
+                self.corrector.update_memory_context(context.memory_context)
 
-            ten_env.log_info(f"Correction: '{text}' -> '{corrected_text}'")
+            corrected_text = text
+            if self.corrector:
+                corrected_text = await self.corrector.correct(
+                    text,
+                    list(context.context_history),
+                    memory_context=context.memory_context,
+                )
 
-            # Add to context history
-            self.context_history.append({
-                "original": text,
-                "corrected": corrected_text
-            })
+            ten_env.log_info(
+                f"Correction client_id={client_id}: '{text}' -> '{corrected_text}'"
+            )
 
-            # Send corrected text to TTS (text_data format)
-            await self._send_to_tts(ten_env, corrected_text)
+            context.context_history.append(
+                {
+                    "original": text,
+                    "corrected": corrected_text,
+                }
+            )
 
-            # Send corrected text to frontend (for display)
-            await self._send_corrected_text(ten_env, text, corrected_text)
+            await self._send_to_tts(ten_env, corrected_text, client_id)
+            await self._send_corrected_text(ten_env, text, corrected_text, client_id)
 
         except Exception as e:
             ten_env.log_error(f"Error in correction: {e}")
-            # On error, forward original text
-            await self._send_to_tts(ten_env, text)
-            await self._send_corrected_text(ten_env, text, text)
+            await self._send_to_tts(ten_env, text, client_id)
+            await self._send_corrected_text(ten_env, text, text, client_id)
 
-    async def _send_to_tts(self, ten_env: AsyncTenEnv, text: str) -> None:
+    async def _handle_voice_profile(self, ten_env: AsyncTenEnv, data: Data) -> None:
+        """Receive personal voice profile from memory layer."""
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            profile = json.loads(data_json) if data_json else {}
+            if not isinstance(profile, dict):
+                ten_env.log_warn("voice_profile payload is not a dict, ignored")
+                return
+
+            client_id = self._extract_client_id(profile) or DEFAULT_CLIENT_ID
+            context = self._get_or_create_client_context(client_id)
+            context.voice_profile = profile
+
+            hotwords = profile.get("hotwords", [])
+            if isinstance(hotwords, list) and self.corrector:
+                self.corrector.update_vocabulary(hotwords)
+
+            ten_env.log_info(
+                f"Voice profile received for client_id={client_id}: "
+                f"{len(hotwords) if isinstance(hotwords, list) else 0} hotwords"
+            )
+        except Exception as e:
+            ten_env.log_error(f"Error handling voice_profile: {e}")
+
+    async def _handle_memory_context(self, ten_env: AsyncTenEnv, data: Data) -> None:
+        """Receive long-term memory retrieval result from memory layer."""
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            context_payload = json.loads(data_json) if data_json else {}
+            client_id = self._extract_client_id(context_payload) or DEFAULT_CLIENT_ID
+
+            context_value = context_payload.get("context", "")
+            if not isinstance(context_value, str):
+                context_value = str(context_value)
+
+            context = self._get_or_create_client_context(client_id)
+            context.memory_context = context_value.strip()
+
+            if self.corrector:
+                self.corrector.update_memory_context(context.memory_context)
+
+            ten_env.log_info(
+                f"Memory context received for client_id={client_id}: "
+                f"{len(context.memory_context)} chars"
+            )
+        except Exception as e:
+            ten_env.log_error(f"Error handling memory_context: {e}")
+
+    async def _send_to_tts(
+        self,
+        ten_env: AsyncTenEnv,
+        text: str,
+        client_id: str,
+    ) -> None:
         """Send corrected text to TTS extension"""
         try:
-            # Create text_data for TTS
             text_data = Data.create("text_data")
             text_data.set_property_string("text", text)
             text_data.set_property_bool("end_of_segment", True)
+            text_data.set_property_string("client_id", client_id)
 
             await ten_env.send_data(text_data)
-            ten_env.log_debug(f"Sent to TTS: '{text}'")
+            ten_env.log_debug(f"Sent to TTS client_id={client_id}: '{text}'")
 
         except Exception as e:
             ten_env.log_error(f"Error sending to TTS: {e}")
 
     async def _send_corrected_text(
-        self, ten_env: AsyncTenEnv, original: str, corrected: str
+        self,
+        ten_env: AsyncTenEnv,
+        original: str,
+        corrected: str,
+        client_id: str,
     ) -> None:
-        """Send corrected text to frontend via WebSocket
-
-        双行字幕镜功能：同时发送原始ASR结果和LLM纠正结果，并计算清晰度评分
-        """
+        """Send corrected text to frontend via WebSocket."""
         try:
-            # Create corrected_text data for frontend
             corrected_data = Data.create("corrected_text")
             corrected_data.set_property_string("original_text", original)
             corrected_data.set_property_string("corrected_text", corrected)
             corrected_data.set_property_bool("is_corrected", original != corrected)
+            corrected_data.set_property_string("client_id", client_id)
 
-            # 计算清晰度评分（基于原始文本和纠正文本的差异）
-            # 如果两者相同，说明ASR识别正确（清晰度高）
-            # 如果两者不同，说明ASR识别不准确（清晰度低）
             clarity_score = 100 if original == corrected else max(0, 100 - len(original) * 2)
             corrected_data.set_property_int("clarity_score", clarity_score)
 
             await ten_env.send_data(corrected_data)
-            ten_env.log_debug(f"Sent dual-line text: original='{original}', corrected='{corrected}', score={clarity_score}")
+            ten_env.log_debug(
+                "Sent dual-line text: "
+                f"client_id={client_id}, original='{original}', corrected='{corrected}', score={clarity_score}"
+            )
 
         except Exception as e:
             ten_env.log_error(f"Error sending corrected text: {e}")
 
-    async def _send_interim_text(self, ten_env: AsyncTenEnv, text: str) -> None:
-        """Send interim (non-final) ASR text to frontend"""
+    async def _send_interim_text(
+        self,
+        ten_env: AsyncTenEnv,
+        text: str,
+        client_id: str,
+    ) -> None:
+        """Send interim (non-final) ASR text to frontend."""
         try:
             interim_data = Data.create("interim_text")
             interim_data.set_property_string("text", text)
             interim_data.set_property_bool("is_interim", True)
+            interim_data.set_property_string("client_id", client_id)
 
             await ten_env.send_data(interim_data)
-            ten_env.log_debug(f"Sent interim text: '{text}'")
+            ten_env.log_debug(f"Sent interim text client_id={client_id}: '{text}'")
 
         except Exception as e:
             ten_env.log_error(f"Error sending interim text: {e}")
+
+    def _get_or_create_client_context(self, client_id: str) -> ClientCorrectionContext:
+        """Get per-client correction context."""
+        normalized = client_id.strip() if isinstance(client_id, str) and client_id.strip() else DEFAULT_CLIENT_ID
+        context = self.client_contexts.get(normalized)
+        if context is None:
+            maxlen = self.config.max_context_length if self.config else 5
+            context = ClientCorrectionContext(context_history=deque(maxlen=maxlen))
+            self.client_contexts[normalized] = context
+        return context
+
+    def _extract_client_id(self, payload: Any) -> Optional[str]:
+        """Extract client_id from payload and nested metadata."""
+        if not isinstance(payload, dict):
+            return None
+
+        raw = payload.get("client_id")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+
+        metadata = payload.get("metadata")
+        if isinstance(metadata, dict):
+            nested = metadata.get("client_id")
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+
+        return None
+
+    def _load_json_from_cmd(self, cmd: Cmd) -> dict:
+        """Best-effort command payload parsing helper."""
+        try:
+            cmd_json, _ = cmd.get_property_to_json(None)
+            return json.loads(cmd_json) if cmd_json else {}
+        except Exception:
+            return {}

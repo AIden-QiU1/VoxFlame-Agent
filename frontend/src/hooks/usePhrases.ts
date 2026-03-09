@@ -24,6 +24,7 @@ export interface PhrasesState {
   phrases: QuickPhrase[]
   isLoading: boolean
   error: string | null
+  requiresAuth: boolean
   selectedCategory: PhraseCategory | 'all'
 }
 
@@ -34,6 +35,7 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
     phrases: [],
     isLoading: false,
     error: null,
+    requiresAuth: false,
     selectedCategory: 'all'
   })
 
@@ -83,7 +85,15 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
     try {
       const currentUserId = await getCurrentUserId()
       if (!currentUserId) {
-        throw new Error('未登录')
+        setState(prev => ({
+          ...prev,
+          phrases: [],
+          isLoading: false,
+          error: null,
+          requiresAuth: true,
+          selectedCategory: category || 'all'
+        }))
+        return
       }
 
       const categoryParam = category && category !== 'all' ? `?category=${category}` : ''
@@ -93,6 +103,7 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
         ...prev,
         phrases: data.phrases || [],
         isLoading: false,
+        requiresAuth: false,
         selectedCategory: category || 'all'
       }))
     } catch (error) {
@@ -100,6 +111,7 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
       setState(prev => ({
         ...prev,
         isLoading: false,
+        requiresAuth: false,
         error: error instanceof Error ? error.message : '加载失败'
       }))
     }
@@ -112,7 +124,7 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
     try {
       const currentUserId = await getCurrentUserId()
       if (!currentUserId) {
-        throw new Error('未登录')
+        throw new Error('登录后可保存自定义短语')
       }
 
       const data = await apiRequest('/phrases', {
@@ -246,7 +258,7 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
     try {
       const currentUserId = await getCurrentUserId()
       if (!currentUserId) {
-        throw new Error('未登录')
+        throw new Error('登录后可初始化并同步预设短语')
       }
 
       await apiRequest('/phrases/presets/initialize', {

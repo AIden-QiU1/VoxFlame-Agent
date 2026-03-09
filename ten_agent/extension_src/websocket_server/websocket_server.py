@@ -6,9 +6,9 @@ WebSocket Server Manager for receiving audio data
 import asyncio
 import json
 import base64
-import traceback
 from typing import Callable, Optional, Any, Dict
 from dataclasses import dataclass
+from urllib.parse import parse_qs, urlsplit
 import websockets
 from ten_runtime.async_ten_env import AsyncTenEnv
 
@@ -22,6 +22,14 @@ class AudioData:
     metadata: dict[str, Any]
 
 
+@dataclass
+class ClientConnectionContext:
+    """Context parsed from the initial WebSocket request."""
+
+    path: str
+    suppress_greeting: bool = False
+
+
 class WebSocketServerManager:
     """Manages WebSocket server and multiple client connections"""
 
@@ -32,7 +40,9 @@ class WebSocketServerManager:
         ten_env: AsyncTenEnv,
         on_audio_callback: Optional[Callable[[AudioData], None]] = None,
         on_cmd_callback: Optional[Callable[[dict, str], None]] = None,
-        on_client_connected: Optional[Callable[[str], None]] = None,
+        on_client_connected: Optional[
+            Callable[[str, ClientConnectionContext], None]
+        ] = None,
         on_client_disconnected: Optional[Callable[[str], None]] = None,
     ):
         self.host = host
@@ -110,17 +120,21 @@ class WebSocketServerManager:
     async def _handle_client(self, websocket: Any) -> None:
         """Handle a WebSocket client connection"""
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
+        connection_context = self._extract_connection_context(websocket)
 
         # 添加到客户端列表
         async with self._client_lock:
             self.clients[client_id] = websocket
 
-        self.ten_env.log_info(f"Client connected: {client_id} (total: {len(self.clients)})")
+        self.ten_env.log_info(
+            f"Client connected: {client_id} (total: {len(self.clients)}), "
+            f"path={connection_context.path}, suppress_greeting={connection_context.suppress_greeting}"
+        )
 
         # Notify about client connection
         if self.on_client_connected:
             try:
-                await self.on_client_connected(client_id)
+                await self.on_client_connected(client_id, connection_context)
             except Exception as e:
                 self.ten_env.log_error(f"Error in on_client_connected callback: {e}")
 
@@ -155,8 +169,8 @@ class WebSocketServerManager:
             self.ten_env.log_debug(f"Message from {client_id}: len={len(message)}")
             data = json.loads(message)
 
-            # Handle Command Messages (e.g. system_init)
-            if data.get("type") == "system_init":
+            # Handle command-style JSON messages (e.g. system_init, user_input).
+            if isinstance(data.get("type"), str) and "audio" not in data:
                 if self.on_cmd_callback:
                     await self.on_cmd_callback(data, client_id)
                 return
@@ -220,15 +234,28 @@ class WebSocketServerManager:
             return
 
         try:
-            audio_base64 = base64.b64encode(pcm_data).decode("utf-8")
-            message = {"type": "audio", "audio": audio_base64}
-            if metadata:
-                message["metadata"] = metadata
-            self.ten_env.log_info(f"send_audio_to_clients: Broadcasting audio message")
+            message = self._build_audio_message(pcm_data, metadata)
+            self.ten_env.log_info("send_audio_to_clients: Broadcasting audio message")
             await self.broadcast(message)
             self.ten_env.log_info(f"send_audio_to_clients: Broadcast completed")
         except Exception as e:
             self.ten_env.log_error(f"Error sending audio: {e}")
+
+    async def send_audio_to_client(
+        self,
+        client_id: str,
+        pcm_data: bytes,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> bool:
+        """Send audio to one specific client."""
+        try:
+            message = self._build_audio_message(pcm_data, metadata)
+            return await self.send_to_client(client_id, message)
+        except Exception as e:
+            self.ten_env.log_error(
+                f"send_audio_to_client failed for {client_id}: {e}"
+            )
+            return False
 
     async def send_to_client(
         self, client_id: str, message: dict[str, Any]
@@ -247,3 +274,44 @@ class WebSocketServerManager:
     def get_client_count(self) -> int:
         """Get number of connected clients"""
         return len(self.clients)
+
+    def _extract_connection_context(self, websocket: Any) -> ClientConnectionContext:
+        """Parse request path and query params from a new websocket connection."""
+        raw_path = ""
+
+        try:
+            raw_path = getattr(websocket, "path", "") or ""
+        except Exception:
+            raw_path = ""
+
+        if not raw_path:
+            try:
+                request = getattr(websocket, "request", None)
+                raw_path = getattr(request, "path", "") or ""
+            except Exception:
+                raw_path = ""
+
+        parsed = urlsplit(raw_path or "")
+        query = parse_qs(parsed.query)
+        suppress_raw = (
+            query.get("suppress_greeting", ["0"])[0].strip().lower()
+            if query.get("suppress_greeting")
+            else "0"
+        )
+
+        return ClientConnectionContext(
+            path=parsed.path or raw_path or "/",
+            suppress_greeting=suppress_raw in {"1", "true", "yes", "on"},
+        )
+
+    def _build_audio_message(
+        self,
+        pcm_data: bytes,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """Build websocket audio payload from raw PCM bytes."""
+        audio_base64 = base64.b64encode(pcm_data).decode("utf-8")
+        message: dict[str, Any] = {"type": "audio", "audio": audio_base64}
+        if metadata:
+            message["metadata"] = metadata
+        return message
