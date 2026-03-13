@@ -35,8 +35,7 @@ const ACTION_CARDS: ActionCard[] = [
     title: '现在沟通',
     description: '先把第一句话说出来，再逐步进入实时沟通。主入口围绕医疗、家庭、陌生人和紧急场景。',
     details: [
-      '场景卡 + 常用短语 + 一键代播，而不是直接把用户扔进聊天框。',
-      '保留实时理解、字幕辅助和可中断控制，但它们服务沟通，不主导首页。',
+      '场景卡、常用短语和一键代播先帮用户把最重要的话说出去。',
     ],
     tags: ['医疗', '家庭', '陌生人', '紧急'],
     status: '可直接进入',
@@ -48,8 +47,7 @@ const ACTION_CARDS: ActionCard[] = [
     title: '练习表达',
     description: '训练页将围绕中文普通话设计：汉字、拼音、声母/韵母/声调和混淆模式反馈。',
     details: [
-      '近期不再把录音页当采集页，而是给出目标句、拼音、差异和最关键的 1 到 2 条建议。',
-      '训练语料与拼音标签会按普通话规范逐步整理，不走英文口音训练逻辑。',
+      '每次录音先换回拼音对照、重点音节和动作提示，再决定是否匿名上传。',
     ],
     tags: ['目标句', '拼音', '音节差异', '趋势反馈'],
     status: '重构中',
@@ -62,13 +60,12 @@ const ACTION_CARDS: ActionCard[] = [
     title: '查看进展与记忆',
     description: '后续的记忆不是“全量记录一切”，而是积累真正有助于沟通和训练的个体档案。',
     details: [
-      '高频表达、常见混淆、场景偏好和训练趋势会逐步进入你的个体沟通记忆。',
-      '这一层会先在首页做清楚，再逐步发展成真正可见的成长档案页面。',
+      '先看最近训练、高频表达、重点音节和热词，不再只停留在首页承诺。',
     ],
     tags: ['高频表达', '混淆模式', '场景偏好', '训练历史'],
-    status: '规划已明确',
-    actionLabel: '查看规划',
-    href: '#progress-memory',
+    status: '已可查看',
+    actionLabel: '进入记忆页',
+    href: '/memory',
   },
 ]
 
@@ -200,8 +197,8 @@ export default function HomeDashboard({
           <nav className="hidden items-center gap-6 text-sm text-slate-600 md:flex">
             <Link href="#entry-points" className="hover:text-slate-950">入口</Link>
             <Link href="#evidence" className="hover:text-slate-950">依据</Link>
-            <Link href="#progress-memory" className="hover:text-slate-950">进展与记忆</Link>
-            <Link href="/ranyan" className="hover:text-slate-950">关于燃言</Link>
+            <Link href="/memory" className="hover:text-slate-950">进展与记忆</Link>
+            <Link href="/contribute" className="hover:text-slate-950">练习表达</Link>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -234,8 +231,7 @@ export default function HomeDashboard({
               </h1>
 
               <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-                VoxFlame 不是把用户直接扔进字幕或模型链路，而是先回答三个更实际的问题：
-                现在能不能开始沟通、中文训练到底怎么给反馈、以及系统会不会逐渐学会真正对这个人有帮助的记忆。
+                现在先解决三件事：帮你开口、给你更具体的中文训练反馈、把已经学到的个人记忆展示出来。
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -267,35 +263,35 @@ export default function HomeDashboard({
             </div>
 
             <aside className="rounded-[32px] border border-white/70 bg-white/80 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">为什么首页先这样设计</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">现在能直接得到什么</div>
               <div className="mt-4 space-y-4">
                 <div className="rounded-2xl bg-amber-50 p-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
                     <ShieldCheck className="h-4 w-4" />
-                    先做补偿沟通
+                    沟通先行
                   </div>
                   <p className="mt-2 text-sm leading-7 text-amber-900/80">
-                    AAC 和 dysarthria 指南都支持先通过场景卡、短语与代播帮助用户被理解，而不是只追求“模型更强”。
+                    用场景卡、短语和代播把最重要的话先说出去。
                   </p>
                 </div>
 
                 <div className="rounded-2xl bg-slate-100 p-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <BookOpen className="h-4 w-4" />
-                    中文训练先围绕拼音和音节
+                    训练有回报
                   </div>
                   <p className="mt-2 text-sm leading-7 text-slate-700">
-                    训练页会按中文普通话做目标句、拼音、声母/韵母/声调反馈，不照搬英文 phonics 或 IPA 教学路径。
+                    录完就能看到拼音对照、重点音节和动作提示。
                   </p>
                 </div>
 
                 <div className="rounded-2xl bg-orange-50 p-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-orange-800">
                     <Brain className="h-4 w-4" />
-                    记忆要先服务真实沟通
+                    记忆可见
                   </div>
                   <p className="mt-2 text-sm leading-7 text-orange-900/80">
-                    个体记忆近期只记录高频表达、混淆模式、场景偏好和训练趋势，不做泛化的“全量记录”叙事。
+                    最近训练、高频表达和热词会开始沉淀成真正可查看的页面。
                   </p>
                 </div>
               </div>
@@ -308,10 +304,10 @@ export default function HomeDashboard({
             <div className="max-w-3xl">
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600">入口设计</div>
               <h2 className="mt-3 text-3xl font-semibold text-slate-950 sm:text-4xl">
-                首页先告诉用户现在能做什么
+                首页只保留立刻能开始的入口
               </h2>
               <p className="mt-4 text-base leading-8 text-slate-600">
-                这三个入口对应当前产品最需要解决的三个问题：先开口、练表达、看进展。模型链路和字幕展示退到后面，作为能力支撑而不是首页主叙事。
+                三个入口分别对应先开口、练表达、看进展。底层模型和字幕只是支撑，不再占据首页注意力。
               </p>
             </div>
 
@@ -329,13 +325,13 @@ export default function HomeDashboard({
 
         <section id="evidence" className="px-5 py-10 sm:px-8 sm:py-14">
           <div className="mx-auto max-w-7xl rounded-[32px] border border-slate-200 bg-white/85 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
-            <div className="max-w-3xl">
+            <div className="max-w-4xl">
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600">设计依据</div>
               <h2 className="mt-3 text-3xl font-semibold text-slate-950 sm:text-4xl">
-                入口和文案不靠拍脑袋命名
+                方向有依据，但不再把依据堆满首页
               </h2>
               <p className="mt-4 text-base leading-8 text-slate-600">
-                首页的场景排序和训练方向，优先参考 AAC、成人构音障碍和普通话训练的权威资料。后续每一类模板和语料也都要沿着这条规则补齐来源。
+                首页场景排序和训练方向仍然参考 AAC、成人构音障碍和普通话训练资料，但详细依据退到这里和文档里，不再抢首屏注意力。
               </p>
             </div>
 
@@ -360,36 +356,43 @@ export default function HomeDashboard({
           </div>
         </section>
 
-        <section id="progress-memory" className="px-5 pb-16 pt-10 sm:px-8 sm:pb-20 sm:pt-14">
+        <section className="px-5 pb-16 pt-10 sm:px-8 sm:pb-20 sm:pt-14">
           <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.95fr,1.05fr] lg:items-start">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600">进展与记忆</div>
               <h2 className="mt-3 text-3xl font-semibold text-slate-950 sm:text-4xl">
-                记忆系统先做成可解释的成长档案
+                记忆不再只停留在首页说明
               </h2>
               <p className="mt-4 text-base leading-8 text-slate-600">
-                这一页当前还没有完整产品化，所以首页先把边界讲清楚：只记录真正能帮助下一次沟通或训练的内容，默认最小必要存储，不做夸张的“越来越懂你”口号。
+                现在已经可以直接进入记忆页查看最近训练、高频表达、重点音节和热词。首页只保留一个预告，不再替代真正的页面。
               </p>
 
               <div className="mt-8 rounded-[28px] border border-slate-200 bg-white/85 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <Sparkles className="h-4 w-4 text-amber-600" />
-                  首页先把“未来会看到什么”说清楚
+                  现在可以直接去看的内容
                 </div>
                 <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-700">
                   <li className="flex gap-3">
                     <span className="mt-2 h-1.5 w-1.5 rounded-full bg-amber-500" />
-                    <span>下次进入沟通模式时，优先看到更适合你的短语和场景。</span>
+                    <span>最近训练记录和状态分布。</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="mt-2 h-1.5 w-1.5 rounded-full bg-amber-500" />
-                    <span>训练页会逐步展示中文音节混淆趋势，而不是只有“录音成功”。</span>
+                    <span>高频表达、重点音节和动作提示回顾。</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="mt-2 h-1.5 w-1.5 rounded-full bg-amber-500" />
-                    <span>后续再逐步开放真正的成长档案页和更细的个体记忆查看能力。</span>
+                    <span>agent 已经学到的部分热词。</span>
                   </li>
                 </ul>
+                <Button
+                  asChild
+                  type="button"
+                  className="mt-6 h-11 rounded-full bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  <Link href="/memory">进入记忆页</Link>
+                </Button>
               </div>
             </div>
 

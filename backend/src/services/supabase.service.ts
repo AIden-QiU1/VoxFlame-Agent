@@ -1,11 +1,17 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  buildMemoryGrowthProfileSnapshot,
+  MemoryGrowthProfileSnapshot,
+} from './memory-growth.service';
+
+type JsonRecord = Record<string, unknown>;
 
 export interface Memory {
   id?: string;
   user_id: string;
   session_id: string;
   content: string;
-  metadata?: any;
+  metadata?: JsonRecord;
   embedding?: number[];
   created_at?: string;
   updated_at?: string;
@@ -18,7 +24,7 @@ export interface Session {
   end_time?: string;
   duration?: number;
   transcript?: string;
-  metadata?: any;
+  metadata?: JsonRecord;
 }
 
 export interface UserProfile {
@@ -27,7 +33,7 @@ export interface UserProfile {
   age?: number;
   condition?: string;
   hotwords?: string[];
-  preferences?: any;
+  preferences?: JsonRecord;
   created_at?: string;
   updated_at?: string;
 }
@@ -43,6 +49,14 @@ export interface QuickPhrase {
   order_index: number;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface MemoryProfileSnapshot {
+  memories: Memory[];
+  sessions: Session[];
+  hotwords: string[];
+  growth_profile: MemoryGrowthProfileSnapshot;
+  synced_at: string;
 }
 
 export type PhraseCategory =
@@ -88,8 +102,23 @@ export class SupabaseService {
   }
 
   // === User Profiles ===
+  async ensureUserProfile(userId: string): Promise<void> {
+    const { error } = await this.adminClient
+      .from('user_profiles')
+      .upsert(
+        {
+          id: userId,
+        },
+        { onConflict: 'id' },
+      );
+
+    if (error) {
+      console.error('Error ensuring user profile:', error);
+    }
+  }
+
   async getUserProfile(userId: string): Promise<UserProfile | null> {
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('user_profiles')
       .select('*')
       .eq('id', userId)
@@ -103,7 +132,7 @@ export class SupabaseService {
   }
 
   async createUserProfile(profile: UserProfile): Promise<UserProfile | null> {
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('user_profiles')
       .insert(profile)
       .select()
@@ -117,7 +146,7 @@ export class SupabaseService {
   }
 
   async updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile | null> {
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('user_profiles')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', userId)
@@ -132,8 +161,30 @@ export class SupabaseService {
   }
 
   // === Sessions ===
+  async ensureSession(session: Session): Promise<Session | null> {
+    await this.ensureUserProfile(session.user_id);
+
+    const { data, error } = await this.adminClient
+      .from('sessions')
+      .upsert(
+        {
+          ...session,
+          metadata: session.metadata || {},
+        },
+        { onConflict: 'id' },
+      )
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error ensuring session:', error);
+      return null;
+    }
+    return data;
+  }
+
   async createSession(session: Session): Promise<Session | null> {
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('sessions')
       .insert(session)
       .select()
@@ -152,7 +203,7 @@ export class SupabaseService {
 
     const duration = Math.floor((new Date(endTime).getTime() - new Date(session.start_time).getTime()) / 1000);
 
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('sessions')
       .update({ end_time: endTime, duration, transcript })
       .eq('id', sessionId)
@@ -167,7 +218,7 @@ export class SupabaseService {
   }
 
   async getSession(sessionId: string): Promise<Session | null> {
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('sessions')
       .select('*')
       .eq('id', sessionId)
@@ -181,7 +232,7 @@ export class SupabaseService {
   }
 
   async getUserSessions(userId: string, limit: number = 10): Promise<Session[]> {
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('sessions')
       .select('*')
       .eq('user_id', userId)
@@ -197,7 +248,9 @@ export class SupabaseService {
 
   // === Memories ===
   async addMemory(memory: Memory): Promise<Memory | null> {
-    const { data, error } = await this.client
+    await this.ensureUserProfile(memory.user_id);
+
+    const { data, error } = await this.adminClient
       .from('memories')
       .insert(memory)
       .select()
@@ -211,7 +264,7 @@ export class SupabaseService {
   }
 
   async getMemories(userId: string, limit: number = 50): Promise<Memory[]> {
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('memories')
       .select('*')
       .eq('user_id', userId)
@@ -228,7 +281,7 @@ export class SupabaseService {
   async searchMemories(userId: string, query: string, limit: number = 10): Promise<Memory[]> {
     // TODO: Implement semantic search with pgvector
     // For now, simple text search
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('memories')
       .select('*')
       .eq('user_id', userId)
@@ -242,8 +295,22 @@ export class SupabaseService {
     return data || [];
   }
 
+  async getMemoryById(memoryId: string): Promise<Memory | null> {
+    const { data, error } = await this.adminClient
+      .from('memories')
+      .select('*')
+      .eq('id', memoryId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching memory by ID:', error);
+      return null;
+    }
+    return data;
+  }
+
   async updateMemory(memoryId: string, updates: Partial<Memory>): Promise<Memory | null> {
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('memories')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', memoryId)
@@ -258,7 +325,7 @@ export class SupabaseService {
   }
 
   async deleteMemory(memoryId: string): Promise<boolean> {
-    const { error } = await this.client
+    const { error } = await this.adminClient
       .from('memories')
       .delete()
       .eq('id', memoryId);
@@ -272,47 +339,91 @@ export class SupabaseService {
 
   // === Hotwords Extraction ===
   async extractHotwords(userId: string): Promise<string[]> {
-    // Get user sessions
-    const sessions = await this.getUserSessions(userId, 20);
-    
-    // Simple frequency-based hotword extraction
-    const wordFreq: { [key: string]: number } = {};
-    
-    sessions.forEach(session => {
-      if (!session.transcript) return;
-      
-      // Tokenize Chinese text (simple character-based for now)
-      const words = session.transcript.match(/[\u4e00-\u9fa5]+/g) || [];
-      words.forEach(word => {
-        if (word.length >= 2 && word.length <= 4) {
-          wordFreq[word] = (wordFreq[word] || 0) + 1;
-        }
-      });
-    });
+    const snapshot = await this.getUserMemoryProfile(userId, 200, 20);
+    return snapshot.hotwords;
+  }
 
-    // Sort by frequency and return top 20
-    return Object.entries(wordFreq)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 20)
-      .map(([word]) => word);
+  async getUserMemoryProfile(
+    userId: string,
+    memoryLimit: number = 400,
+    sessionLimit: number = 120,
+  ): Promise<MemoryProfileSnapshot> {
+    const [memories, sessions] = await Promise.all([
+      this.getMemories(userId, memoryLimit),
+      this.getUserSessions(userId, sessionLimit),
+    ]);
+    const hotwords = this.collectHotwords(memories, sessions);
+
+    return {
+      memories,
+      sessions,
+      hotwords,
+      growth_profile: buildMemoryGrowthProfileSnapshot({
+        memories,
+        sessions,
+        hotwords,
+      }),
+      synced_at: new Date().toISOString(),
+    };
   }
 
   // === Analytics ===
-  async getUserStats(userId: string): Promise<any> {
-    const sessions = await this.getUserSessions(userId, 100);
-    const memories = await this.getMemories(userId, 1000);
-
-    const totalSessions = sessions.length;
-    const totalDuration = sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
-    const avgDuration = totalSessions > 0 ? totalDuration / totalSessions : 0;
+  async getUserStats(userId: string): Promise<Record<string, number | string | null>> {
+    const snapshot = await this.getUserMemoryProfile(userId, 400, 120);
+    const stats = snapshot.growth_profile.stats;
 
     return {
-      total_sessions: totalSessions,
-      total_duration_seconds: totalDuration,
-      avg_session_duration_seconds: avgDuration,
-      total_memories: memories.length,
-      last_session: sessions[0]?.start_time || null,
+      total_sessions: stats.totalSessions,
+      total_duration_seconds: stats.totalDurationSeconds,
+      avg_session_duration_seconds: stats.avgSessionDurationSeconds,
+      total_memories: stats.totalMemories,
+      total_training_attempts: stats.totalTrainingAttempts,
+      active_days: stats.activeDays,
+      current_training_streak: stats.currentTrainingStreak,
+      best_training_streak: stats.bestTrainingStreak,
+      rolling_clarity_average: stats.rollingClarityAverage,
+      improvement_slope: stats.improvementSlope,
+      total_confusion_patterns: stats.totalConfusionPatterns,
+      last_session: stats.lastSessionAt ? new Date(stats.lastSessionAt).toISOString() : null,
     };
+  }
+
+  private collectHotwords(memories: Memory[], sessions: Session[]): string[] {
+    const wordFreq: Record<string, number> = {};
+
+    const addWord = (word: string) => {
+      if (!word || word.length < 2 || word.length > 8) {
+        return;
+      }
+      wordFreq[word] = (wordFreq[word] || 0) + 1;
+    };
+
+    memories.forEach((memory) => {
+      const metadata = memory.metadata;
+      const keywords = Array.isArray(metadata?.keywords) ? metadata?.keywords : [];
+      keywords.forEach((keyword) => {
+        if (typeof keyword === 'string') {
+          addWord(keyword.trim());
+        }
+      });
+
+      const tokens = memory.content.match(/[\u4e00-\u9fa5]{2,8}/g) || [];
+      tokens.forEach(addWord);
+    });
+
+    sessions.forEach((session) => {
+      if (!session.transcript) {
+        return;
+      }
+
+      const tokens = session.transcript.match(/[\u4e00-\u9fa5]{2,8}/g) || [];
+      tokens.forEach(addWord);
+    });
+
+    return Object.entries(wordFreq)
+      .sort(([, left], [, right]) => right - left)
+      .slice(0, 20)
+      .map(([word]) => word);
   }
 
   // === Quick Phrases ===

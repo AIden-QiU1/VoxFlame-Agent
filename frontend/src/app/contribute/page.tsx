@@ -49,6 +49,22 @@ const FEEDBACK_STATUS_LABELS = {
   unclear: '系统未稳定听清',
 } as const
 
+function getTrainingClarityScore(status: MandarinTrainingFeedback['status']): number {
+  if (status === 'excellent') {
+    return 0.95
+  }
+
+  if (status === 'close') {
+    return 0.75
+  }
+
+  if (status === 'retry') {
+    return 0.45
+  }
+
+  return 0.2
+}
+
 function formatSeconds(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
@@ -61,6 +77,8 @@ function buildUploadMetadata(
   feedback: MandarinTrainingFeedback,
   consentToUpload: boolean,
 ) {
+  const clarityScore = getTrainingClarityScore(feedback.status)
+
   return {
     training_mode: 'mandarin_practice',
     exercise_id: exercise.id,
@@ -70,8 +88,18 @@ function buildUploadMetadata(
     keywords: exercise.keywords,
     recognized_text: transcript,
     feedback_status: feedback.status,
+    clarity_score: clarityScore,
     missing_chars: feedback.missingChars,
     extra_chars: feedback.extraChars,
+    target_pinyin: feedback.targetPinyinDisplay,
+    heard_pinyin: feedback.heardPinyinDisplay,
+    focus_syllables: feedback.focusSyllables,
+    articulation_tips: feedback.articulationTips,
+    pronunciation_initial_pairs: feedback.pronunciationInitialPairs,
+    pronunciation_final_pairs: feedback.pronunciationFinalPairs,
+    pronunciation_tone_pairs: feedback.pronunciationTonePairs,
+    pronunciation_targets: feedback.pronunciationTargets,
+    pronunciation_summary: feedback.pronunciationSummary,
     source_label: exercise.source.label,
     source_url: exercise.source.url,
     upload_consent: consentToUpload,
@@ -84,7 +112,9 @@ function buildTrainingMemoryContent(
   feedback: MandarinTrainingFeedback,
 ): string {
   const transcriptLabel = transcript || '系统未稳定听清'
-  return `训练记录：目标句“${exercise.text}”；系统听到“${transcriptLabel}”；结果为${FEEDBACK_STATUS_LABELS[feedback.status]}；重点标签：${exercise.focusTags.join('、')}。`
+  const focusLabel = feedback.focusSyllables.slice(0, 3).join('、') || exercise.focusTags.join('、')
+  const pronunciationLabel = feedback.pronunciationTargets[0] || focusLabel
+  return `训练记录：目标句“${exercise.text}”；系统听到“${transcriptLabel}”；结果为${FEEDBACK_STATUS_LABELS[feedback.status]}；重点：${pronunciationLabel}。`
 }
 
 function buildTrainingResultPayload(
@@ -93,6 +123,8 @@ function buildTrainingResultPayload(
   feedback: MandarinTrainingFeedback,
   consentToUpload: boolean,
 ) {
+  const clarityScore = getTrainingClarityScore(feedback.status)
+
   return {
     exercise_id: exercise.id,
     exercise_text: exercise.text,
@@ -101,8 +133,18 @@ function buildTrainingResultPayload(
     focus_tags: exercise.focusTags,
     recognized_text: transcript,
     feedback_status: feedback.status,
+    clarity_score: clarityScore,
     missing_chars: feedback.missingChars,
     extra_chars: feedback.extraChars,
+    target_pinyin: feedback.targetPinyinDisplay,
+    heard_pinyin: feedback.heardPinyinDisplay,
+    focus_syllables: feedback.focusSyllables,
+    articulation_tips: feedback.articulationTips,
+    pronunciation_initial_pairs: feedback.pronunciationInitialPairs,
+    pronunciation_final_pairs: feedback.pronunciationFinalPairs,
+    pronunciation_tone_pairs: feedback.pronunciationTonePairs,
+    pronunciation_targets: feedback.pronunciationTargets,
+    pronunciation_summary: feedback.pronunciationSummary,
     upload_consent: consentToUpload,
     source_label: exercise.source.label,
     source_url: exercise.source.url,
@@ -128,7 +170,9 @@ export default function ContributePage() {
     stopRecording,
     sendTrainingResult,
     disconnect,
-  } = useMandarinTrainingSession()
+  } = useMandarinTrainingSession({
+    anonymousUserId: anonymousId || undefined,
+  })
 
   const [selectedCategory, setSelectedCategory] = useState<TrainingCategoryFilter>('all')
   const [currentExerciseId, setCurrentExerciseId] = useState(MANDARIN_TRAINING_EXERCISES[0]?.id ?? '')
@@ -184,6 +228,15 @@ export default function ContributePage() {
 
     memoryService.init(memoryOwnerId)
   }, [memoryOwnerId])
+
+  useEffect(() => {
+    return () => {
+      const sessionKind = memoryService.peekSession()?.metadata?.kind
+      if (sessionKind === 'training') {
+        void memoryService.endSession()
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!toastMessage) {
@@ -243,7 +296,7 @@ export default function ContributePage() {
     setToastMessage(fromAutoUpload ? '录音已按你的授权加入匿名语料。' : '这次录音已加入匿名语料。')
   }
 
-  function persistTrainingMemory(
+  async function persistTrainingMemory(
     exercise: MandarinTrainingExercise,
     transcript: string,
     feedback: MandarinTrainingFeedback,
@@ -252,10 +305,20 @@ export default function ContributePage() {
       return
     }
 
+    const currentSessionKind = memoryService.peekSession()?.metadata?.kind
+    if (currentSessionKind && currentSessionKind !== 'training') {
+      await memoryService.endSession()
+    }
+
     const content = buildTrainingMemoryContent(exercise, transcript, feedback)
     memoryService.addMemoryEntry({
       type: 'episodic',
       content,
+      sessionMetadata: {
+        kind: 'training',
+        source: 'mandarin_practice',
+        category: exercise.category,
+      },
       metadata: {
         kind: 'training_result',
         exercise_id: exercise.id,
@@ -264,8 +327,18 @@ export default function ContributePage() {
         focus_tags: exercise.focusTags,
         recognized_text: transcript,
         feedback_status: feedback.status,
+        clarity_score: getTrainingClarityScore(feedback.status),
         missing_chars: feedback.missingChars,
         extra_chars: feedback.extraChars,
+        target_pinyin: feedback.targetPinyinDisplay,
+        heard_pinyin: feedback.heardPinyinDisplay,
+        focus_syllables: feedback.focusSyllables,
+        articulation_tips: feedback.articulationTips,
+        pronunciation_initial_pairs: feedback.pronunciationInitialPairs,
+        pronunciation_final_pairs: feedback.pronunciationFinalPairs,
+        pronunciation_tone_pairs: feedback.pronunciationTonePairs,
+        pronunciation_targets: feedback.pronunciationTargets,
+        pronunciation_summary: feedback.pronunciationSummary,
         source_label: exercise.source.label,
         source_url: exercise.source.url,
       },
@@ -308,7 +381,7 @@ export default function ContributePage() {
 
       setAttempt(nextAttempt)
       setCompletedCount((value) => value + 1)
-      persistTrainingMemory(currentExercise, transcript, feedback)
+      await persistTrainingMemory(currentExercise, transcript, feedback)
       sendTrainingResult(
         buildTrainingResultPayload(
           currentExercise,
@@ -373,14 +446,14 @@ export default function ContributePage() {
                 Mandarin Practice
               </span>
               <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">
-                先练真实沟通句，再决定是否匿名上传
+                先拿个体反馈，再决定是否匿名上传
               </span>
             </div>
             <h1 className="mt-5 max-w-3xl text-3xl font-semibold leading-tight text-gray-900 sm:text-4xl">
-              这不是泛化录音采集页，而是一条完整的中文训练闭环。
+              每录一条，都应该换回一条更具体的中文反馈。
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-gray-600">
-              每次练习都会展示目标句、拼音和本次重点。录音结束后，你可以看到系统听到的结果、差异提示，以及是否把这条样本匿名上传，用于后续中文语训和个体化建议。
+              这里先服务你的练习，而不是先服务我们的采集。每次录音都会给出目标句、拼音对照、重点音节、声母 / 韵母 / 声调差异和发声动作提示；匿名上传永远放在反馈之后，由你自己决定。
             </p>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -390,11 +463,9 @@ export default function ContributePage() {
                 <p className="mt-2 text-sm text-gray-600">本轮页面内练习次数</p>
               </div>
               <div className="rounded-3xl bg-orange-50 px-5 py-4">
-                <p className="text-sm text-orange-700">累计上传</p>
-                <p className="mt-2 text-3xl font-semibold text-gray-900">
-                  {contributor?.total_recordings ?? 0}
-                </p>
-                <p className="mt-2 text-sm text-gray-600">匿名贡献到语料库的录音数</p>
+                <p className="text-sm text-orange-700">这次会拿到</p>
+                <p className="mt-2 text-xl font-semibold text-gray-900">拼音对照 + 发音差异</p>
+                <p className="mt-2 text-sm text-gray-600">先知道声母 / 韵母 / 声调哪里容易混，再决定要不要上传</p>
               </div>
               <div className="rounded-3xl bg-stone-100 px-5 py-4">
                 <p className="text-sm text-stone-700">连接状态</p>
@@ -417,10 +488,19 @@ export default function ContributePage() {
           </div>
 
           <aside className="rounded-[32px] border border-amber-100 bg-[#fffaf2] p-7 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
-            <h2 className="text-lg font-semibold text-gray-900">匿名上传说明</h2>
+            <h2 className="text-lg font-semibold text-gray-900">先拿反馈，再决定是否贡献</h2>
             <p className="mt-3 text-sm leading-6 text-gray-600">
-              上传内容包括录音、目标句、练习标签和系统识别结果。未勾选授权时，这次练习只保留在当前页面反馈里，不会主动上传。
+              这页默认先把价值给你：目标拼音、系统听到的拼音、重点音节、声母 / 韵母 / 声调差异和发声动作提示。只有你明确授权后，这次录音才会进入匿名语料。
             </p>
+
+            <div className="mt-6 rounded-3xl border border-amber-200 bg-white px-4 py-4 text-sm leading-6 text-gray-700">
+              <p className="font-medium text-gray-900">当前你能得到的反馈</p>
+              <ul className="mt-2 space-y-2">
+                <li>- 目标句和系统听到的内容对照</li>
+                <li>- 目标拼音和系统听到的拼音对照</li>
+                <li>- 最值得先改的声母 / 韵母 / 声调和动作提示</li>
+              </ul>
+            </div>
 
             <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-3xl border border-amber-200 bg-white p-4">
               <input
@@ -437,6 +517,13 @@ export default function ContributePage() {
             <div className="mt-6 rounded-3xl border border-dashed border-amber-200 bg-white px-4 py-4 text-sm leading-6 text-gray-600">
               <p className="font-medium text-gray-900">上传策略</p>
               <p className="mt-2">默认 local-first。授权后才上传；如果网络或存储异常，会自动降级为本地暂存。</p>
+            </div>
+
+            <div className="mt-4 rounded-3xl bg-orange-50 px-4 py-4 text-sm leading-6 text-gray-700">
+              <p className="font-medium text-gray-900">当前匿名贡献</p>
+              <p className="mt-2">
+                你这台设备关联的累计匿名上传为 <span className="font-semibold text-gray-900">{contributor?.total_recordings ?? 0}</span> 条。
+              </p>
             </div>
 
             {isUploading ? (
@@ -562,7 +649,7 @@ export default function ContributePage() {
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">开始录音</h2>
                   <p className="mt-2 text-sm leading-6 text-gray-600">
-                    录音时会显示实时转写。停止后，我们会先给出对照反馈，再根据你的授权决定是否上传。
+                    录音时会显示实时转写。停止后，先看目标句、拼音、声母 / 韵母 / 声调差异和动作提示，再决定要不要把这条样本匿名贡献出去。
                   </p>
                 </div>
                 <div className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-gray-700">
@@ -590,8 +677,8 @@ export default function ContributePage() {
                     </p>
                     <p className="mt-2 text-sm text-gray-600">
                       {isRecording
-                        ? '录音结束后会自动生成对照反馈。'
-                        : '建议先看一遍拼音，再开始录音。'}
+                        ? '录音结束后会自动生成拼音对照、发音差异和动作提示。'
+                        : '建议先看一遍拼音，再按正常沟通节奏说一遍。'}
                     </p>
                   </div>
                 </div>
@@ -625,6 +712,20 @@ export default function ContributePage() {
                       {attempt.transcript || '这次系统还没有稳定拿到最终结果。'}
                     </p>
                   </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-3xl border border-stone-200 bg-white px-4 py-4">
+                      <p className="text-sm font-medium text-gray-900">目标拼音</p>
+                      <p className="mt-2 text-sm leading-7 text-stone-700">
+                        {attempt.feedback.targetPinyinDisplay}
+                      </p>
+                    </div>
+                    <div className="rounded-3xl border border-stone-200 bg-white px-4 py-4">
+                      <p className="text-sm font-medium text-gray-900">系统听到的拼音</p>
+                      <p className="mt-2 text-sm leading-7 text-stone-700">
+                        {attempt.feedback.heardPinyinDisplay}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-6 rounded-3xl border border-gray-200 bg-white px-5 py-4">
@@ -651,6 +752,50 @@ export default function ContributePage() {
                   </div>
                 </div>
 
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-4">
+                    <p className="text-sm font-medium text-gray-900">重点音节</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-700">
+                      {attempt.feedback.focusSyllables.join('、') || '本次先看整句节奏'}
+                    </p>
+                  </div>
+                  <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4">
+                    <p className="text-sm font-medium text-gray-900">易混声母</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-700">
+                      {attempt.feedback.pronunciationInitialPairs.join('、') || '这次没有看到明确的声母偏差'}
+                    </p>
+                  </div>
+                  <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                    <p className="text-sm font-medium text-gray-900">易混韵母</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-700">
+                      {attempt.feedback.pronunciationFinalPairs.join('、') || '这次没有看到明确的韵母偏差'}
+                    </p>
+                  </div>
+                  <div className="rounded-3xl border border-stone-200 bg-stone-50 px-5 py-4">
+                    <p className="text-sm font-medium text-gray-900">声调提醒</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-700">
+                      {attempt.feedback.pronunciationTonePairs.join('、') || '这次没有看到明确的声调偏差'}
+                    </p>
+                  </div>
+                  <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                    <p className="text-sm font-medium text-gray-900">发声动作提示</p>
+                    <ul className="mt-2 space-y-2 text-sm leading-6 text-gray-700">
+                      {attempt.feedback.articulationTips.length > 0 ? (
+                        attempt.feedback.articulationTips.map((tip) => (
+                          <li key={tip}>- {tip}</li>
+                        ))
+                      ) : (
+                        <li>- 先放慢，再把关键词单独说清楚。</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4">
+                  <p className="text-sm font-medium text-gray-900">发音差异摘要</p>
+                  <p className="mt-2 text-sm leading-6 text-gray-700">{attempt.feedback.pronunciationSummary}</p>
+                </div>
+
                 <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4">
                   <p className="text-sm font-medium text-gray-900">建议</p>
                   <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
@@ -661,11 +806,18 @@ export default function ContributePage() {
                 </div>
 
                 <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    onClick={() => moveExercise(1)}
+                    className="rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-black"
+                  >
+                    换一句继续练
+                  </button>
+
                   {!attempt.uploaded ? (
                     <button
                       onClick={() => uploadAttempt(currentExercise, attempt, false)}
                       disabled={isUploading || !attempt.recording}
-                      className="rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-full border border-gray-300 px-5 py-3 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       匿名上传这次录音
                     </button>
@@ -674,13 +826,6 @@ export default function ContributePage() {
                       这次录音已完成贡献
                     </span>
                   )}
-
-                  <button
-                    onClick={() => moveExercise(1)}
-                    className="rounded-full border border-gray-200 px-5 py-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
-                  >
-                    换一句继续练
-                  </button>
                 </div>
               </section>
             ) : null}
@@ -699,7 +844,7 @@ export default function ContributePage() {
             <div className="rounded-3xl bg-stone-100 px-5 py-4">
               <p className="text-sm font-medium text-gray-900">录后对照反馈</p>
               <p className="mt-2 text-sm leading-6 text-gray-600">
-                先做目标句、识别结果和训练标签级建议，不假装给出医学诊断。
+                先做目标句、拼音对照、重点音节、声母 / 韵母 / 声调差异和动作提示，不假装给出医学诊断。
               </p>
             </div>
             <div className="rounded-3xl bg-stone-100 px-5 py-4">

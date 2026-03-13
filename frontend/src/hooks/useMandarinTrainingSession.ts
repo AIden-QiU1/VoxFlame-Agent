@@ -40,7 +40,14 @@ function isIgnorableError(errorText?: string): boolean {
   ) || errorText.includes('NO_VALID_AUDIO_ERROR')
 }
 
-export function useMandarinTrainingSession() {
+interface UseMandarinTrainingSessionOptions {
+  anonymousUserId?: string
+}
+
+export function useMandarinTrainingSession(
+  options: UseMandarinTrainingSessionOptions = {},
+) {
+  const { anonymousUserId } = options
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [interimText, setInterimText] = useState('')
   const [finalText, setFinalText] = useState('')
@@ -123,6 +130,8 @@ export function useMandarinTrainingSession() {
     wsUrl.searchParams.set('suppress_greeting', '1')
     if (token) {
       wsUrl.searchParams.set('token', token)
+    } else if (anonymousUserId) {
+      wsUrl.searchParams.set('anon_id', anonymousUserId)
     }
 
     const client = new ASRClient(wsUrl.toString())
@@ -143,7 +152,7 @@ export function useMandarinTrainingSession() {
         setStatus('idle')
       },
     )
-  }, [handleMessage])
+  }, [anonymousUserId, handleMessage])
 
   const resetTexts = useCallback(() => {
     latestInterimRef.current = ''

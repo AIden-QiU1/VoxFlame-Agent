@@ -1,12 +1,10 @@
 /**
  * VoxFlame Backend Server
  * 
- * 单一 Agent 架构 - 后端只负责：
- * 1. 用户配置管理
- * 2. 工具执行（电话、智能家居）
- * 3. 记忆系统（FAISS + Supabase）
- * 4. 会话日志
- * 5. WebSocket 代理 (解决 VSCode 端口转发限制)
+ * 单一 Agent 架构 - 后端当前主要负责：
+ * 1. WebSocket 代理与身份注入
+ * 2. 记忆 / 短语 / 上传 API
+ * 3. 基础 HTTP 健康检查与 compat 接口
  * 
  * 语音处理（ASR/LLM/TTS）完全由 TEN Agent (8766) 负责
  */
@@ -60,9 +58,10 @@ wss.on('connection', async (clientWs, req) => {
   console.log('[WS Proxy] 新客户端连接，正在代理到 TEN Agent...')
   const clientUrl = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`)
   const suppressGreeting = clientUrl.searchParams.get('suppress_greeting') === '1'
+  const anonymousId = clientUrl.searchParams.get('anon_id')?.trim()
 
   // 1. 身份验证 (Auth)
-  let userProfile: any = null
+  let userProfile: Record<string, string | boolean> | null = null
   try {
     const token = clientUrl.searchParams.get('token')
 
@@ -73,12 +72,20 @@ wss.on('connection', async (clientWs, req) => {
         console.log(`[WS Proxy] 用户认证成功: ${user.email}`)
         userProfile = {
           id: user.id,
-          email: user.email,
-          name: user.user_metadata?.full_name || user.email?.split('@')[0]
+          email: user.email || '',
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || '用户'
         }
       } else {
         console.warn(`[WS Proxy] Token 验证失败: ${error?.message}`)
       }
+    } else if (anonymousId) {
+      userProfile = {
+        id: `anon:${anonymousId}`,
+        name: '访客',
+        email: '',
+        anonymous: true,
+      }
+      console.log(`[WS Proxy] 匿名身份注入: ${userProfile.id}`)
     } else {
       console.log('[WS Proxy] 无 Token 连接 (匿名模式)')
     }
@@ -204,15 +211,17 @@ app.get('/health', (req, res) => {
   })
 })
 
-// Agent API 路由 (用户配置、工具执行)
+// Agent API 路由 (用户画像与兼容层)
 app.use('/api/agent', agentRouter)
 
-// Session API 路由 (会话管理)
+// Session API 路由 (compat only; runtime sessions bootstrap via /ws/agent)
 app.use('/api/session', sessionRouter)
 
 // Memory API 路由 (记忆系统) - 需要认证
 const memoryRouter = express.Router()
+memoryRouter.post('/session', authMiddleware, memoryController.syncSession.bind(memoryController))
 memoryRouter.post('/add', authMiddleware, memoryController.addMemory.bind(memoryController))
+memoryRouter.get('/profile/:userId', authMiddleware, validateUserId, memoryController.getUserMemoryProfile.bind(memoryController))
 memoryRouter.get('/search', authMiddleware, memoryController.searchMemories.bind(memoryController))
 memoryRouter.get('/user/:userId', authMiddleware, validateUserId, memoryController.getUserMemories.bind(memoryController))
 memoryRouter.put('/:memoryId', authMiddleware, memoryController.updateMemory.bind(memoryController))
@@ -256,7 +265,7 @@ server.listen(PORT, () => {
   console.log('')
   console.log('🏗️ 单一 Agent 架构:')
   console.log('   - TEN Agent (8766): 语音识别 + LLM + 语音合成')
-  console.log('   - 本服务 (' + PORT + '): 用户配置 + 工具执行 + 记忆管理 + WS代理')
+  console.log('   - 本服务 (' + PORT + '): 身份注入 + API + 记忆管理 + WS代理')
   console.log('')
   console.log('📝 WebSocket 代理说明:')
   console.log('   前端连接 ws://localhost:' + PORT + '/ws/agent')
@@ -267,14 +276,28 @@ server.listen(PORT, () => {
   console.log('🤖 Agent API 端点:')
   console.log('   - GET  /api/agent/profile/:userId')
   console.log('   - PUT  /api/agent/profile/:userId')
-  console.log('   - POST /api/agent/tool/execute')
   console.log('   - GET  /api/agent/hotwords/:userId')
 
   console.log('')
+  console.log('⚠️ Compat API 端点:')
+  console.log('   - POST /api/session/start (compat: 501; use /ws/agent)')
+  console.log('   - POST /api/session/stop (compat: 501; use /ws/agent)')
+  console.log('   - POST /api/session/reload-hotwords (compat: 501)')
+  console.log('   - GET  /api/session/:sessionId (compat: 501)')
+  console.log('   - POST /api/agent/session/log (compat: 501)')
+  console.log('   - GET  /api/agent/session/history/:userId (compat: 501)')
+  console.log('   - POST /api/agent/tool/log (compat: 501)')
+  console.log('   - POST /api/agent/tool/execute (compat: 501)')
+
+  console.log('')
   console.log('💾 Memory API 端点:')
+  console.log('   - POST /api/memory/session')
+  console.log('   - GET  /api/memory/profile/:userId')
   console.log('   - POST /api/memory/add')
   console.log('   - GET  /api/memory/search?user_id=xxx&query=...')
-  console.log('   - GET  /api/memory/user/:userId')
+  console.log('   - GET  /api/memory/user/:userId (compat slice; use /profile)')
+  console.log('   - GET  /api/memory/hotwords/:userId (compat slice; use /profile)')
+  console.log('   - GET  /api/memory/stats/:userId (compat slice; use /profile)')
 
   console.log('')
   console.log('💬 Phrases API 端点:')

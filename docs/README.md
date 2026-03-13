@@ -10,8 +10,9 @@
 
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
-| [AI 编程指导体系](AI_ENGINEERING_SYSTEM.md) | 基于 Harness Engineering 收敛出的协作分层、计划标准、验证门禁与维护规则 | ⭐⭐⭐ |
+| [AI 编程指导体系](AI_ENGINEERING_SYSTEM.md) | 基于 Harness Engineering、AI 代码治理与安全 guardrails 收敛出的协作分层、收口方法、计划标准与维护规则，并约定最小机械守卫脚本与 CI | ⭐⭐⭐ |
 | [AI 执行计划模板](AI_EXECUTION_PLAN_TEMPLATE.md) | 非 trivial 任务的统一计划模板，明确目标、边界、验证与回退 | ⭐⭐ |
+| [治理 Prompt 模板](aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md) | 面向迁移 / 统一 / 废弃 / 兼容层任务的 AI 治理提示词模板 | ⭐⭐ |
 | [执行计划归档](plans/README.md) | 阶段性执行计划统一放在 `docs/plans/`，避免顶层继续膨胀 | ⭐⭐ |
 
 ### 想法与孵化
@@ -84,7 +85,8 @@
 **要推进 AI 编程协作体系**
 1. [AI 编程指导体系](AI_ENGINEERING_SYSTEM.md)
 2. [AI 执行计划模板](AI_EXECUTION_PLAN_TEMPLATE.md)
-3. [执行计划归档](plans/README.md)
+3. [治理 Prompt 模板](aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md)
+4. [执行计划归档](plans/README.md)
 
 **要记录或筛选外部灵感**
 1. [ideas 目录说明](../ideas/README.md)

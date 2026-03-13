@@ -3,7 +3,6 @@
 # SQLite + Markdown based local-first memory storage
 #
 
-import os
 import json
 import sqlite3
 import asyncio
@@ -11,6 +10,7 @@ from datetime import datetime, date
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import hashlib
+import re
 
 from .base import (
     MemoryStore,
@@ -50,8 +50,10 @@ class LocalStore(MemoryStore):
     }
 
     def __init__(self, base_path: str = "~/.voxflame", db_name: str = "memory.db"):
-        self.base_path = Path(base_path).expanduser()
-        self.db_path = self.base_path / db_name
+        self.root_path = Path(base_path).expanduser()
+        self.user_path = self.root_path
+        self.db_path = self.user_path / db_name
+        self.db_name = db_name
         self.user_id: str = ""
         self.agent_id: str = ""
         self.session_id: str = ""
@@ -64,6 +66,8 @@ class LocalStore(MemoryStore):
         self.user_id = user_id
         self.agent_id = agent_id
         self.session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        self.user_path = self._build_user_path(user_id)
+        self.db_path = self.user_path / self.db_name
 
         # Create directory structure
         self._ensure_directories()
@@ -73,14 +77,23 @@ class LocalStore(MemoryStore):
         
         # Load or create voice profile
         self._voice_profile = await self._load_voice_profile()
+        self._clarity_scores = [
+            item.score for item in self._voice_profile.clarity_trend[-100:]
+        ]
+
+    def _build_user_path(self, user_id: str) -> Path:
+        """Create a stable per-user path to avoid shared anonymous artifacts."""
+        normalized = re.sub(r"[^a-zA-Z0-9._-]+", "_", user_id).strip("._-") or "anonymous"
+        digest = hashlib.md5(user_id.encode("utf-8")).hexdigest()[:8]
+        return self.root_path / "users" / f"{normalized}_{digest}"
 
     def _ensure_directories(self) -> None:
         """Create directory structure if not exists"""
         dirs = [
-            self.base_path,
-            self.base_path / "sessions" / date.today().isoformat(),
-            self.base_path / "analytics",
-            self.base_path / "cache" / "embeddings",
+            self.user_path,
+            self.user_path / "sessions" / date.today().isoformat(),
+            self.user_path / "analytics",
+            self.user_path / "cache" / "embeddings",
         ]
         for d in dirs:
             d.mkdir(parents=True, exist_ok=True)
@@ -88,7 +101,9 @@ class LocalStore(MemoryStore):
     async def _init_database(self) -> None:
         """Initialize SQLite database with schema"""
         def _create_db():
-            self.db = sqlite3.connect(str(self.db_path))
+            # LocalStore uses executor threads for SQLite work, so the connection
+            # must be allowed to cross thread boundaries.
+            self.db = sqlite3.connect(str(self.db_path), check_same_thread=False)
             self.db.row_factory = sqlite3.Row
             
             # Create tables
@@ -237,8 +252,10 @@ class LocalStore(MemoryStore):
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, _load)
 
+        profile.clarity_trend.sort(key=lambda item: item.timestamp)
+
         # Load preferences from VOICE_PROFILE.md if exists
-        profile_path = self.base_path / "VOICE_PROFILE.md"
+        profile_path = self.user_path / "VOICE_PROFILE.md"
         if profile_path.exists():
             await self._load_profile_from_markdown(profile, profile_path)
 
@@ -300,7 +317,7 @@ class LocalStore(MemoryStore):
 
     async def _append_to_daily_log(self, turns: List[ConversationTurn]) -> None:
         """Append turns to daily markdown log"""
-        log_path = self.base_path / "sessions" / date.today().isoformat() / f"{self.session_id}.md"
+        log_path = self.user_path / "sessions" / date.today().isoformat() / f"{self.session_id}.md"
         
         def _write():
             with open(log_path, "a", encoding="utf-8") as f:
@@ -330,9 +347,9 @@ class LocalStore(MemoryStore):
                 """SELECT u.*, s.started_at as session_start 
                    FROM utterances u 
                    JOIN sessions s ON u.session_id = s.session_id
-                   WHERE u.final_text LIKE ? OR u.corrected_text LIKE ?
+                   WHERE s.user_id = ? AND (u.final_text LIKE ? OR u.corrected_text LIKE ? OR u.raw_asr LIKE ?)
                    ORDER BY u.created_at DESC LIMIT ?""",
-                (f"%{query}%", f"%{query}%", limit)
+                (self.user_id, f"%{query}%", f"%{query}%", f"%{query}%", limit)
             )
             
             for row in cursor.fetchall():
@@ -356,7 +373,10 @@ class LocalStore(MemoryStore):
     async def update_voice_profile(self, profile: VoiceProfile) -> None:
         """Update user's voice profile"""
         self._voice_profile = profile
-        
+        self._voice_profile.confusion_patterns.sort(
+            key=lambda pattern: (-pattern.correction_count, -pattern.confidence, pattern.target_phoneme)
+        )
+
         # Persist to database
         def _update():
             # Update hotwords
@@ -369,13 +389,18 @@ class LocalStore(MemoryStore):
                 )
 
             # Update confusion patterns
+            self.db.execute(
+                "DELETE FROM confusion_patterns WHERE user_id = ?",
+                (self.user_id,),
+            )
             for pattern in profile.confusion_patterns:
                 self.db.execute(
-                    """INSERT OR REPLACE INTO confusion_patterns 
-                       (user_id, source_phonemes, target_phoneme, confidence, examples, correction_count)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    """INSERT INTO confusion_patterns 
+                       (user_id, source_phonemes, target_phoneme, confidence, examples, correction_count, last_updated)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
                     (self.user_id, json.dumps(pattern.source_phonemes), pattern.target_phoneme,
-                     pattern.confidence, json.dumps(pattern.examples), pattern.correction_count)
+                     pattern.confidence, json.dumps(pattern.examples), pattern.correction_count,
+                     pattern.last_updated.isoformat())
                 )
             self.db.commit()
 
@@ -387,7 +412,7 @@ class LocalStore(MemoryStore):
 
     async def _write_voice_profile_markdown(self, profile: VoiceProfile) -> None:
         """Write voice profile to Markdown file"""
-        path = self.base_path / "VOICE_PROFILE.md"
+        path = self.user_path / "VOICE_PROFILE.md"
         
         def _write():
             with open(path, "w", encoding="utf-8") as f:
@@ -424,7 +449,13 @@ class LocalStore(MemoryStore):
                 if profile.preferences:
                     f.write("## 沟通偏好\n\n")
                     for pref, val in profile.preferences.items():
-                        f.write(f"- {pref}\n")
+                        if isinstance(val, bool):
+                            if val:
+                                f.write(f"- {pref}\n")
+                        elif isinstance(val, (int, float, str)) and str(val).strip():
+                            f.write(f"- {pref}：{val}\n")
+                        else:
+                            f.write(f"- {pref}\n")
 
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, _write)
@@ -476,13 +507,12 @@ class LocalStore(MemoryStore):
         # Calculate correction rate
         if len(raw) == 0:
             return
-        
+
         similarity = self._text_similarity(raw, corrected)
-        self._clarity_scores.append(similarity)
-        
-        # Keep rolling window
-        if len(self._clarity_scores) > 100:
-            self._clarity_scores = self._clarity_scores[-100:]
+        await self.add_clarity_score(
+            similarity,
+            correction_rate=max(0.0, 1.0 - similarity),
+        )
 
     def _text_similarity(self, text1: str, text2: str) -> float:
         """Calculate simple text similarity"""
@@ -513,6 +543,53 @@ class LocalStore(MemoryStore):
             ))
 
         await self.update_voice_profile(self._voice_profile)
+
+    async def add_clarity_score(
+        self,
+        score: float,
+        asr_confidence: float = 0.0,
+        correction_rate: float = 0.0,
+        session_id: str = "",
+    ) -> None:
+        """Persist one clarity score sample and refresh in-memory trend."""
+        normalized_score = max(0.0, min(1.0, float(score)))
+        target_session_id = session_id or self.session_id
+        timestamp = datetime.now()
+
+        def _insert():
+            self.db.execute(
+                """INSERT INTO clarity_scores
+                   (user_id, session_id, score, asr_confidence, correction_rate, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    self.user_id,
+                    target_session_id,
+                    normalized_score,
+                    asr_confidence,
+                    correction_rate,
+                    timestamp.isoformat(),
+                )
+            )
+            self.db.commit()
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _insert)
+
+        self._voice_profile.clarity_trend.append(
+            ClarityScore(
+                timestamp=timestamp,
+                score=normalized_score,
+                asr_confidence=asr_confidence,
+                correction_rate=correction_rate,
+                session_id=target_session_id,
+            )
+        )
+        self._voice_profile.clarity_trend = self._voice_profile.clarity_trend[-100:]
+        self._clarity_scores.append(normalized_score)
+        if len(self._clarity_scores) > 100:
+            self._clarity_scores = self._clarity_scores[-100:]
+
+        await self._write_voice_profile_markdown(self._voice_profile)
 
     async def get_clarity_score(self) -> float:
         """Get current clarity score (rolling average)"""

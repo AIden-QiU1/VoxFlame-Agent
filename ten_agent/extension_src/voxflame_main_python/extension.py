@@ -368,6 +368,27 @@ class VoxFlameMainExtension(AsyncExtension):
             for keyword in payload.get("keywords", [])
             if isinstance(keyword, str) and str(keyword).strip()
         ]
+        initial_pairs = [
+            str(item).strip()
+            for item in payload.get("pronunciation_initial_pairs", [])
+            if isinstance(item, str) and str(item).strip()
+        ]
+        final_pairs = [
+            str(item).strip()
+            for item in payload.get("pronunciation_final_pairs", [])
+            if isinstance(item, str) and str(item).strip()
+        ]
+        tone_pairs = [
+            str(item).strip()
+            for item in payload.get("pronunciation_tone_pairs", [])
+            if isinstance(item, str) and str(item).strip()
+        ]
+        pronunciation_targets = [
+            str(item).strip()
+            for item in payload.get("pronunciation_targets", [])
+            if isinstance(item, str) and str(item).strip()
+        ]
+        pronunciation_summary = str(payload.get("pronunciation_summary", "") or "").strip()
 
         summary = self._build_training_result_summary(
             target_text=target_text,
@@ -376,11 +397,20 @@ class VoxFlameMainExtension(AsyncExtension):
             category=category,
             focus_tags=focus_tags,
         )
-        clarity_score = self._map_training_status_to_clarity(status)
+        clarity_score = self._read_training_clarity(payload, status)
+        confusion_patterns = self._build_training_confusion_patterns(
+            initial_pairs=initial_pairs,
+            final_pairs=final_pairs,
+            tone_pairs=tone_pairs,
+            target_text=target_text,
+            recognized_text=recognized_text,
+            status=status,
+        )
 
         ten_env.log_info(
             f"[VoxFlameMain] Received training_result, client_id={client_id}, "
-            f"status={status}, category={category}, keywords={keywords[:3]}"
+            f"status={status}, category={category}, keywords={keywords[:3]}, "
+            f"confusions={len(confusion_patterns)}"
         )
 
         if not getattr(self.config, "enable_memory", False):
@@ -397,7 +427,7 @@ class VoxFlameMainExtension(AsyncExtension):
         )
 
         hotword_category = self._map_training_category_to_hotword(category)
-        if keywords:
+        if keywords or confusion_patterns or pronunciation_summary:
             try:
                 await send_cmd(
                     ten_env,
@@ -409,6 +439,13 @@ class VoxFlameMainExtension(AsyncExtension):
                             {"word": keyword, "category": hotword_category}
                             for keyword in keywords[:3]
                         ],
+                        "confusion_patterns": confusion_patterns,
+                        "clarity_score": clarity_score,
+                        "preferences": {
+                            "last_training_category": category or "中文训练",
+                            "last_pronunciation_summary": pronunciation_summary,
+                            "last_pronunciation_targets": " / ".join(pronunciation_targets[:4]),
+                        },
                     },
                 )
                 ten_env.log_info(
@@ -559,6 +596,13 @@ class VoxFlameMainExtension(AsyncExtension):
 
             if is_final and self.config.enable_correction:
                 session.last_asr_text = text
+
+                if getattr(self.config, "enable_memory", False):
+                    await self._refresh_memory_context_for_query(
+                        ten_env,
+                        client_id=client_id,
+                        query=text,
+                    )
 
                 ten_env.log_info(
                     f"[VoxFlameMain] Forwarding to corrector, client_id={client_id}: '{text}'"
@@ -926,6 +970,66 @@ class VoxFlameMainExtension(AsyncExtension):
         except Exception as e:
             ten_env.log_error(f"[VoxFlameMain] Error forwarding to corrector: {e}")
 
+    async def _refresh_memory_context_for_query(
+        self,
+        ten_env: AsyncTenEnv,
+        client_id: str,
+        query: str,
+    ) -> None:
+        """Retrieve query-specific memory context and send it to the corrector."""
+        context_lines: list[str] = []
+
+        try:
+            result, err = await send_cmd(
+                ten_env,
+                "search_memory",
+                "memory_layer",
+                {
+                    "client_id": client_id,
+                    "query": query,
+                    "limit": 5,
+                },
+            )
+            if err is not None or result is None or result.get_status_code() != StatusCode.OK:
+                ten_env.log_warn(
+                    f"[VoxFlameMain] Memory search failed, client_id={client_id}"
+                )
+            else:
+                result_json, _ = result.get_property_to_json(None)
+                payload = json.loads(result_json) if result_json else {}
+                results = payload.get("results", []) if isinstance(payload, dict) else []
+                seen: set[str] = set()
+                for item in results:
+                    if not isinstance(item, dict):
+                        continue
+                    content = str(item.get("content", "") or "").strip()
+                    if not content or content == query or content in seen:
+                        continue
+                    seen.add(content)
+                    context_lines.append(f"- {content}")
+                    if len(context_lines) >= 5:
+                        break
+        except Exception as e:
+            ten_env.log_warn(
+                f"[VoxFlameMain] Error retrieving memory context, client_id={client_id}: {e}"
+            )
+
+        try:
+            await send_data(
+                ten_env,
+                "memory_context",
+                "corrector",
+                {
+                    "client_id": client_id,
+                    "context": "\n".join(context_lines),
+                    "timestamp": int(time.time() * 1000),
+                },
+            )
+        except Exception as e:
+            ten_env.log_warn(
+                f"[VoxFlameMain] Error sending memory context to corrector, client_id={client_id}: {e}"
+            )
+
     async def _send_to_websocket(
         self,
         ten_env: AsyncTenEnv,
@@ -1035,6 +1139,79 @@ class VoxFlameMainExtension(AsyncExtension):
         if status == "retry":
             return 0.45
         return 0.2
+
+    def _read_training_clarity(self, payload: Dict[str, Any], status: str) -> float:
+        """Prefer explicit clarity_score from page feedback, fallback to status mapping."""
+        try:
+            explicit = float(payload.get("clarity_score"))
+        except (TypeError, ValueError):
+            explicit = None
+
+        if explicit is not None:
+            return max(0.0, min(1.0, explicit))
+
+        return self._map_training_status_to_clarity(status)
+
+    def _parse_confusion_pair(self, pair: str) -> Optional[tuple[str, str]]:
+        """Parse front-end pair text like 'zh → z' into target/heard tokens."""
+        normalized = pair.replace("->", "→")
+        if "→" not in normalized:
+            return None
+
+        parts = [item.strip() for item in normalized.split("→", 1)]
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            return None
+
+        return parts[0], parts[1]
+
+    def _build_training_confusion_patterns(
+        self,
+        initial_pairs: List[str],
+        final_pairs: List[str],
+        tone_pairs: List[str],
+        target_text: str,
+        recognized_text: str,
+        status: str,
+    ) -> List[Dict[str, Any]]:
+        """Convert Phase 3 pair strings into confusion patterns for memory layer."""
+        confidence_by_status = {
+            "excellent": 0.72,
+            "close": 0.78,
+            "retry": 0.9,
+            "unclear": 0.55,
+        }
+        base_confidence = confidence_by_status.get(status, 0.6)
+        example = f"目标:{target_text} | 听到:{recognized_text or '未稳定听清'}"
+        patterns: list[Dict[str, Any]] = []
+        seen: set[tuple[str, str]] = set()
+
+        def append_pattern(pair_values: List[str], kind: str) -> None:
+            for pair in pair_values[:4]:
+                parsed = self._parse_confusion_pair(pair)
+                if not parsed:
+                    continue
+
+                target_value, heard_value = parsed
+                # Frontend pair is target -> heard. ConfusionPattern needs heard -> target.
+                key = (heard_value, target_value)
+                if key in seen:
+                    continue
+                seen.add(key)
+                patterns.append(
+                    {
+                        "source_phonemes": [heard_value],
+                        "target_phoneme": target_value,
+                        "confidence": base_confidence,
+                        "correction_count": 1,
+                        "examples": [f"{kind} {target_value}→{heard_value}", example],
+                    }
+                )
+
+        append_pattern(initial_pairs, "声母")
+        append_pattern(final_pairs, "韵母")
+        append_pattern(tone_pairs, "声调")
+
+        return patterns
 
     def _map_training_category_to_hotword(self, category: str) -> str:
         """Map training category to memory hotword category."""

@@ -6,6 +6,7 @@
 import { useEffect, useCallback, useState } from 'react'
 import { memoryService, Memory, Session, ConversationTurn } from '@/lib/memory/memory-service'
 import { useAuth } from './useAuth'
+import { getAnonymousUserId } from '@/lib/identity/anonymous-user'
 
 export interface UseMemoryReturn {
   isInitialized: boolean
@@ -25,16 +26,17 @@ export function useMemory(): UseMemoryReturn {
   const [memories, setMemories] = useState<Memory[]>([])
   const [stats, setStats] = useState({ totalSessions: 0, totalTurns: 0, totalMemories: 0 })
 
-  // Initialize memory service when user is authenticated
   useEffect(() => {
-    if (isAuthenticated && userId) {
-      memoryService.init(userId)
-      setIsInitialized(true)
-      refreshStats()
-      console.log('[useMemory] Initialized for user:', userId)
-    } else {
+    const ownerId = isAuthenticated && userId ? userId : getAnonymousUserId()
+    if (!ownerId) {
       setIsInitialized(false)
+      return
     }
+
+    memoryService.init(ownerId)
+    setIsInitialized(true)
+    refreshStats()
+    console.log('[useMemory] Initialized for owner:', ownerId)
   }, [isAuthenticated, userId])
 
   const refreshStats = useCallback(() => {
@@ -68,7 +70,7 @@ export function useMemory(): UseMemoryReturn {
 
   return {
     isInitialized,
-    currentSession: memoryService.getSession(),
+    currentSession: isInitialized ? memoryService.peekSession() : null,
     memories,
     stats,
     addTurn,

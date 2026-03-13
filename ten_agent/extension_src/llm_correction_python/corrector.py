@@ -2,7 +2,7 @@
 # VoxFlame LLM Correction Extension
 # Copyright (c) 2025 VoxFlame. All rights reserved.
 #
-from typing import List, Optional
+from typing import Dict, List, Optional
 from openai import AsyncOpenAI
 
 from ten_runtime.async_ten_env import AsyncTenEnv
@@ -34,6 +34,7 @@ class LLMCorrector:
         self.system_prompt = system_prompt
         self.user_profile = user_profile
         self.vocabulary = vocabulary
+        self.confusion_rules: Dict[str, str] = {}
         self.memory_context = ""
         self.ten_env = ten_env
 
@@ -75,6 +76,23 @@ class LLMCorrector:
         self.vocabulary = list(dict.fromkeys(normalized))
         self.ten_env.log_info(f"Vocabulary updated: {len(self.vocabulary)} words")
 
+    def update_confusion_rules(self, confusion_rules: Dict[str, str]) -> None:
+        """Update personal pronunciation confusion hints."""
+        normalized: Dict[str, str] = {}
+        if isinstance(confusion_rules, dict):
+            for raw_source, raw_target in confusion_rules.items():
+                if not isinstance(raw_source, str) or not isinstance(raw_target, str):
+                    continue
+                source = raw_source.strip()
+                target = raw_target.strip()
+                if source and target:
+                    normalized[source] = target
+
+        self.confusion_rules = normalized
+        self.ten_env.log_info(
+            f"Confusion rules updated: {len(self.confusion_rules)} patterns"
+        )
+
     def update_memory_context(self, memory_context: str) -> None:
         """Update retrieved long-term memory context."""
         self.memory_context = (memory_context or "").strip()
@@ -94,6 +112,14 @@ class LLMCorrector:
         if self.vocabulary:
             vocab_str = "、".join(self.vocabulary[:20])  # Limit to 20 words
             prompt_parts.append(f"## 用户常用词汇\n{vocab_str}\n")
+
+        if self.confusion_rules:
+            confusion_lines = [
+                f"- 如果上下文匹配，优先把 {source} 理解成 {target}"
+                for source, target in list(self.confusion_rules.items())[:10]
+            ]
+            confusion_text = "\n".join(confusion_lines)
+            prompt_parts.append(f"## 个体混淆提示\n{confusion_text}\n")
 
         # Add recent context
         if context:

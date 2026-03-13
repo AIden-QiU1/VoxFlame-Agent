@@ -17,9 +17,10 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。项目的第一�
 
 1. 先看代码和现状，再提出方案，不要凭记忆猜仓库状态。
 2. 复杂任务先写计划，再改代码；计划优先使用 [docs/AI_EXECUTION_PLAN_TEMPLATE.md](docs/AI_EXECUTION_PLAN_TEMPLATE.md)。
-3. 以最小可运行切片推进，避免一次性横扫式重构。
-4. 每次改动都要给出对应验证，验证范围要覆盖实际改动面。
-5. 任务完成后，必须同步更新 `.claude-summary.md` 和 `.tasks/current.md`。
+3. 涉及迁移、统一、兼容层、废弃路径、新旧并存时，不要直接改代码；先盘点入口层 / 服务层 / 存储层 / 旁路层，明确唯一事实源，再开始收口。
+4. 以最小可运行切片推进，避免一次性横扫式重构。
+5. 每次改动都要给出对应验证，验证范围要覆盖实际改动面。
+6. 任务完成后，必须同步更新 `.claude-summary.md` 和 `.tasks/current.md`。
 
 ## Tool Routing
 
@@ -43,6 +44,9 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。项目的第一�
 - 前端使用 Next.js App Router，组件和状态设计保持小而清晰。
 - 后端坚持 Service / Controller 分层，避免把业务逻辑堆进路由。
 - Agent 侧改动必须考虑会话隔离、打断、内存上下文和容错。
+- 治理优先于叠加抽象：当某项能力已经有唯一事实源时，不再新增平级实现；优先封旧入口，而不是继续长新入口。
+- 兼容层必须显式标记角色与退出条件；`compat` 只做迁移适配，不承接新业务逻辑。
+- 安全默认值必须前置：最小权限、显式审批副作用操作、结构化输出驱动工具、Secrets 不进入 prompt / 日志 / 前端。
 - 非显而易见的函数或协议，补简短 JSDoc，而不是写大段空洞注释。
 - 不要把易变状态、历史结论、临时方案长期堆进入口文件。
 
@@ -51,6 +55,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。项目的第一�
 - 前端交互改动：至少做目标页面 smoke test；涉及 UI 状态时优先用 Playwright。
 - 后端接口改动：至少验证受影响的 API 或 WebSocket 路径。
 - TEN Agent / 纠错链路改动：至少验证消息流、日志或针对性脚本。
+- 迁移 / 重构 / 收口任务：至少验证唯一事实源是否明确、旧入口是否被封住、旁路系统是否仍依赖旧数据或旧事件。
 - Docker / 部署改动：至少验证相关 compose 命令或构建步骤。
 - 纯文档改动：运行 `bash scripts/check_ai_docs.sh`。
 
@@ -60,6 +65,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。项目的第一�
 
 - [docs/AI_ENGINEERING_SYSTEM.md](docs/AI_ENGINEERING_SYSTEM.md)：AI 编程指导体系的设计原则、分层结构、维护规则。
 - [docs/AI_EXECUTION_PLAN_TEMPLATE.md](docs/AI_EXECUTION_PLAN_TEMPLATE.md)：复杂任务执行计划模板。
+- [docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md](docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md)：迁移 / 统一 / 废弃 / 兼容层任务的治理 Prompt 模板。
 - [docs/README.md](docs/README.md)：项目文档导航。
 - [docs/FRONTEND_ARCHITECTURE.md](docs/FRONTEND_ARCHITECTURE.md)：前端结构与交互流。
 - [docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md](docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md)：纠错链路设计。
@@ -74,6 +80,9 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。项目的第一�
 
 - 不要把 `AGENTS.md` 当产品百科、任务日志或调研报告。
 - 不要依赖超长 prompt 取代仓库内的结构化文档。
+- 不要把“新增一套统一实现”误认为“已经完成治理”；真正要看的是旧路径是否被封住。
+- 不要让 `compat` 或 `deprecated` 路径继续新增业务逻辑。
+- 不要让不可信输入直接驱动工具、命令、SQL 或高权限写操作。
 - 不要跳过验证直接宣布完成。
 - 不要在没收敛问题边界前做大范围风格清洗或目录搬迁。
 - 不要让 `AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md` 三套规则长期漂移。

@@ -18,8 +18,9 @@ import {
 } from '@/lib/websocket/agent-client'
 import { AudioProcessor } from '@/lib/audio/audio-processor'
 import { config } from '@/lib/config'
-import { createClient, getValidToken } from '@/lib/supabase/client'
+import { getValidToken } from '@/lib/supabase/client'
 import { memoryService } from '@/lib/memory/memory-service'
+import { getAnonymousUserId } from '@/lib/identity/anonymous-user'
 
 export interface ConversationMessage {
   id: string
@@ -64,16 +65,41 @@ export interface AgentConnectOptions {
   suppressGreeting?: boolean
 }
 
+function getErrorMessage(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {
+    return null
+  }
+
+  if ('error' in error) {
+    const nested = (error as { error?: { message?: string } }).error
+    if (nested?.message) {
+      return nested.message
+    }
+  }
+
+  if ('message' in error) {
+    const message = (error as { message?: string }).message
+    return typeof message === 'string' ? message : null
+  }
+
+  return null
+}
+
 export function useAgent(options: UseAgentOptions = {}) {
   const { autoConnect = false, enableTTS = true, userId } = options
+  const [anonymousUserId, setAnonymousUserId] = useState<string | null>(null)
+  const memoryOwnerId = userId || anonymousUserId
 
-  // Initialize memory service when userId is available
   useEffect(() => {
-    if (userId) {
-      memoryService.init(userId)
-      console.log('[useAgent] Memory service initialized for user:', userId)
+    setAnonymousUserId(getAnonymousUserId())
+  }, [])
+
+  useEffect(() => {
+    if (memoryOwnerId) {
+      memoryService.init(memoryOwnerId)
+      console.log('[useAgent] Memory service initialized for owner:', memoryOwnerId)
     }
-  }, [userId])
+  }, [memoryOwnerId])
 
   const [state, setState] = useState<AgentState>({
     isConnected: false,
@@ -114,6 +140,8 @@ export function useAgent(options: UseAgentOptions = {}) {
       )
       if (token) {
         wsUrl.searchParams.set('token', token)
+      } else if (anonymousUserId) {
+        wsUrl.searchParams.set('anon_id', anonymousUserId)
       }
       if (options.suppressGreeting) {
         wsUrl.searchParams.set('suppress_greeting', '1')
@@ -134,12 +162,18 @@ export function useAgent(options: UseAgentOptions = {}) {
       const callbacks: AgentClientCallbacks = {
         onOpen: () => {
           console.log('[useAgent] Connected successfully!')
+          if (memoryOwnerId) {
+            memoryService.updateCurrentSessionMetadata({
+              kind: 'communication',
+              source: 'agent_chat',
+            })
+          }
           setState(prev => ({ ...prev, isConnected: true }))
 
           // Start session
           client.startSession({
             enableTTS,
-            userId
+            userId: memoryOwnerId || undefined,
           })
         },
 
@@ -166,7 +200,7 @@ export function useAgent(options: UseAgentOptions = {}) {
           console.log('[useAgent] ASR result:', data.text, 'is_final:', data.is_final)
 
           // Record to memory when final
-          if (data.is_final && userId) {
+          if (data.is_final && memoryOwnerId) {
             memoryService.addTurn('user', data.text)
           }
 
@@ -204,7 +238,7 @@ export function useAgent(options: UseAgentOptions = {}) {
 
             if (data.is_final && data.full_text) {
               // Record to memory
-              if (userId) {
+              if (memoryOwnerId) {
                 memoryService.addTurn('assistant', data.full_text)
               }
 
@@ -253,16 +287,14 @@ export function useAgent(options: UseAgentOptions = {}) {
           // 忽略 NO_VALID_AUDIO_ERROR - 用户没有说话时的正常情况
           const isNoValidAudioError =
             ('error' in error && error.error?.message?.includes?.('NO_VALID_AUDIO_ERROR')) ||
-            ('message' in error && (error as any).message?.includes?.('NO_VALID_AUDIO_ERROR'))
+            ('message' in error && typeof error.message === 'string' && error.message.includes('NO_VALID_AUDIO_ERROR'))
 
           if (isNoValidAudioError) {
             console.log('[useAgent] Ignoring NO_VALID_AUDIO_ERROR (user not speaking)')
             return
           }
 
-          const message = 'error' in error && error.error
-            ? error.error.message
-            : '连接错误'
+          const message = getErrorMessage(error) || '连接错误'
 
           // 只显示真正的连接错误，忽略 ASR 超时等暂时性错误
           setState(prev => ({ ...prev, error: message }))
@@ -270,6 +302,7 @@ export function useAgent(options: UseAgentOptions = {}) {
 
         onClose: () => {
           console.log('[useAgent] Disconnected')
+          void memoryService.endSession()
           setState(prev => ({
             ...prev,
             isConnected: false,
@@ -286,7 +319,7 @@ export function useAgent(options: UseAgentOptions = {}) {
       console.error('[useAgent] Connection failed:', error)
       setState(prev => ({ ...prev, error: '连接失败: ' + (error instanceof Error ? error.message : String(error)) }))
     }
-  }, [enableTTS, userId])
+  }, [anonymousUserId, enableTTS, memoryOwnerId, userId])
 
   // Disconnect
   const disconnect = useCallback(() => {
@@ -295,6 +328,7 @@ export function useAgent(options: UseAgentOptions = {}) {
       agentClientRef.current.close()
       agentClientRef.current = null
     }
+    void memoryService.endSession()
     setState(prev => ({
       ...prev,
       isConnected: false,
@@ -387,6 +421,10 @@ export function useAgent(options: UseAgentOptions = {}) {
       return
     }
 
+    if (memoryOwnerId) {
+      memoryService.addTurn('user', text)
+    }
+
     // Add user message to conversation
     setState(prev => ({
       ...prev,
@@ -402,7 +440,7 @@ export function useAgent(options: UseAgentOptions = {}) {
     }))
 
     agentClientRef.current.sendText(text)
-  }, [])
+  }, [memoryOwnerId])
 
   // Clear messages
   const clearMessages = useCallback(() => {

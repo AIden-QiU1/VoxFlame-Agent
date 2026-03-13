@@ -5,7 +5,9 @@
 
 import json
 import time
+import hashlib
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional, Dict, Any
 
 from ten_runtime import (
@@ -18,7 +20,7 @@ from ten_runtime import (
 )
 
 from .config import MemoryLayerConfig
-from .stores.base import ConversationTurn, VoiceProfile
+from .stores.base import ConversationTurn, VoiceProfile, ConfusionPattern
 from .stores.local_store import LocalStore
 
 
@@ -30,7 +32,7 @@ class MemorySessionContext:
     """Per-client memory session context."""
 
     client_id: str
-    user_id: str = "anonymous"
+    user_id: str = ""
     agent_id: str = "voxflame_voice_assistant"
     store: Optional[LocalStore] = None
     pending_corrections: list[dict[str, Any]] = field(default_factory=list)
@@ -158,7 +160,7 @@ class MemoryLayerExtension(AsyncExtension):
             return
 
         init_payload = {
-            "user_id": user.get("id", "anonymous"),
+            "user_id": user.get("id", self._build_anonymous_user_id(client_id)),
             "user_name": user.get("name", ""),
             "user_email": user.get("email", ""),
             "agent_id": self.config.agent_id,
@@ -174,7 +176,10 @@ class MemoryLayerExtension(AsyncExtension):
     ) -> None:
         """Initialize memory for one client session."""
         try:
-            user_id = str(cmd_data.get("user_id", "") or "").strip() or "anonymous"
+            user_id = (
+                str(cmd_data.get("user_id", "") or "").strip()
+                or self._build_anonymous_user_id(client_id)
+            )
             agent_id = str(cmd_data.get("agent_id", "") or "").strip() or self.config.agent_id
 
             session = self._get_or_create_session(client_id)
@@ -315,8 +320,31 @@ class MemoryLayerExtension(AsyncExtension):
             if "preferences" in update_data and isinstance(update_data["preferences"], dict):
                 profile.preferences.update(update_data["preferences"])
 
+            merged_patterns = 0
+            if isinstance(update_data.get("confusion_patterns"), list):
+                merged_patterns = self._merge_confusion_patterns(
+                    profile,
+                    update_data["confusion_patterns"],
+                )
+
+            clarity_score = self._read_float(update_data.get("clarity_score"))
+            if clarity_score is not None:
+                await session.store.add_clarity_score(
+                    clarity_score,
+                    correction_rate=max(0.0, 1.0 - clarity_score),
+                    session_id=str(update_data.get("session_id", "") or ""),
+                )
+
             await session.store.update_voice_profile(profile)
             await self._broadcast_voice_profile(ten_env, client_id, profile)
+            if clarity_score is not None:
+                score = await session.store.get_clarity_score()
+                await self._broadcast_clarity_score(ten_env, client_id, score)
+
+            ten_env.log_info(
+                f"[MemoryLayer] Voice profile updated: client_id={client_id}, "
+                f"merged_patterns={merged_patterns}, clarity={'yes' if clarity_score is not None else 'no'}"
+            )
 
             await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
 
@@ -415,6 +443,10 @@ class MemoryLayerExtension(AsyncExtension):
         await session.store.learn_from_corrections(
             threshold=self.config.learning.confusion_pattern_threshold
         )
+        profile = await session.store.get_voice_profile()
+        await self._broadcast_voice_profile(ten_env, client_id, profile)
+        score = await session.store.get_clarity_score()
+        await self._broadcast_clarity_score(ten_env, client_id, score)
         await self._flush_session(session)
 
     # ========================================
@@ -473,8 +505,16 @@ class MemoryLayerExtension(AsyncExtension):
                         "client_id": client_id,
                         "hotwords": profile.get_hotwords_for_asr(),
                         "confusion_rules": profile.get_confusion_rules(),
+                        "confusion_patterns": [
+                            pattern.to_dict() for pattern in profile.confusion_patterns[:12]
+                        ],
                         "speech_rate": profile.speech_rate,
                         "dysarthria_type": profile.dysarthria_type,
+                        "rolling_clarity": (
+                            sum(item.score for item in profile.clarity_trend[-7:]) / len(profile.clarity_trend[-7:])
+                            if profile.clarity_trend[-7:]
+                            else 0.0
+                        ),
                     }
                 ),
             )
@@ -539,9 +579,16 @@ class MemoryLayerExtension(AsyncExtension):
         normalized = client_id.strip() if client_id and client_id.strip() else DEFAULT_CLIENT_ID
         session = self.sessions.get(normalized)
         if session is None:
-            session = MemorySessionContext(client_id=normalized)
+            session = MemorySessionContext(
+                client_id=normalized,
+                user_id=self._build_anonymous_user_id(normalized),
+            )
             self.sessions[normalized] = session
         return session
+
+    def _build_anonymous_user_id(self, client_id: str) -> str:
+        normalized = client_id.strip() if client_id and client_id.strip() else DEFAULT_CLIENT_ID
+        return f"anonymous::{normalized.replace(':', '_')}"
 
     def _resolve_client_id_from_cmd(
         self,
@@ -578,6 +625,113 @@ class MemoryLayerExtension(AsyncExtension):
                 return nested.strip()
 
         return None
+
+    def _read_float(self, value: Any) -> Optional[float]:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+
+        return max(0.0, min(1.0, parsed))
+
+    def _normalize_confusion_pattern(
+        self,
+        payload: Dict[str, Any],
+    ) -> Optional[ConfusionPattern]:
+        raw_sources = payload.get("source_phonemes", [])
+        if not isinstance(raw_sources, list):
+            return None
+
+        source_phonemes: list[str] = []
+        for item in raw_sources:
+            if not isinstance(item, str):
+                continue
+            normalized = item.strip()
+            if normalized and normalized not in source_phonemes:
+                source_phonemes.append(normalized)
+
+        target_phoneme = str(payload.get("target_phoneme", "") or "").strip()
+        if not source_phonemes or not target_phoneme:
+            return None
+
+        confidence = self._read_float(payload.get("confidence"))
+        if confidence is None:
+            confidence = 0.0
+
+        examples: list[str] = []
+        if isinstance(payload.get("examples"), list):
+            for item in payload["examples"]:
+                if not isinstance(item, str):
+                    continue
+                normalized = item.strip()
+                if normalized and normalized not in examples:
+                    examples.append(normalized)
+
+        try:
+            correction_count = max(1, int(payload.get("correction_count", 1)))
+        except (TypeError, ValueError):
+            correction_count = 1
+
+        last_updated = payload.get("last_updated")
+        if isinstance(last_updated, str):
+            try:
+                last_updated_value = datetime.fromisoformat(last_updated)
+            except ValueError:
+                last_updated_value = datetime.now()
+        else:
+            last_updated_value = datetime.now()
+
+        digest = hashlib.md5(
+            f"{'/'.join(source_phonemes)}->{target_phoneme}".encode("utf-8")
+        ).hexdigest()[:12]
+
+        return ConfusionPattern(
+            pattern_id=str(payload.get("pattern_id", "") or digest),
+            source_phonemes=source_phonemes,
+            target_phoneme=target_phoneme,
+            confidence=confidence,
+            examples=examples[:6],
+            correction_count=correction_count,
+            last_updated=last_updated_value,
+        )
+
+    def _merge_confusion_patterns(
+        self,
+        profile: VoiceProfile,
+        payloads: list[Any],
+    ) -> int:
+        existing = {
+            (tuple(pattern.source_phonemes), pattern.target_phoneme): pattern
+            for pattern in profile.confusion_patterns
+        }
+        merged = 0
+
+        for item in payloads:
+            if not isinstance(item, dict):
+                continue
+
+            normalized = self._normalize_confusion_pattern(item)
+            if not normalized:
+                continue
+
+            key = (tuple(normalized.source_phonemes), normalized.target_phoneme)
+            current = existing.get(key)
+            if current:
+                total_count = max(1, current.correction_count) + max(1, normalized.correction_count)
+                weighted_confidence = (
+                    current.confidence * max(1, current.correction_count)
+                    + normalized.confidence * max(1, normalized.correction_count)
+                ) / total_count
+                current.confidence = min(1.0, weighted_confidence)
+                current.correction_count = total_count
+                current.examples = list(dict.fromkeys((current.examples + normalized.examples)))[:6]
+                current.last_updated = datetime.now()
+            else:
+                profile.confusion_patterns.append(normalized)
+                existing[key] = normalized
+            merged += 1
+
+        return merged
 
     def _load_json_from_cmd(self, cmd: Cmd) -> dict:
         """Best-effort command payload parser."""

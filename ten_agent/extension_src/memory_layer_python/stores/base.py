@@ -212,6 +212,17 @@ class MemoryStore(ABC):
         pass
 
     @abstractmethod
+    async def add_clarity_score(
+        self,
+        score: float,
+        asr_confidence: float = 0.0,
+        correction_rate: float = 0.0,
+        session_id: str = "",
+    ) -> None:
+        """Persist one clarity score sample"""
+        pass
+
+    @abstractmethod
     async def get_clarity_score(self) -> float:
         """Get current clarity score"""
         pass

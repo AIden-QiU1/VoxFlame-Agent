@@ -245,8 +245,8 @@ export default function ChatInterface({ userId, homeHref, onReturnHome }: ChatIn
                 </Link>
               )
             )}
-            <Link href="/ranyan" className="hidden sm:inline text-sm text-gray-600 hover:text-gray-900">
-              关于燃言
+            <Link href="/memory" className="hidden sm:inline text-sm text-gray-600 hover:text-gray-900">
+              进展与记忆
             </Link>
             <Link href="/contribute" className="hidden sm:inline text-sm text-gray-600 hover:text-gray-900">
               练习表达

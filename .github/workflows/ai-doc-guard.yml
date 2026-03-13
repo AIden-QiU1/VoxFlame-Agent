@@ -1,4 +1,4 @@
-name: AI Doc Guard
+name: AI Governance Guard
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  validate-ai-docs:
+  validate-ai-rules:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -15,3 +15,6 @@ jobs:
 
       - name: Validate AI documentation harness
         run: bash scripts/check_ai_docs.sh
+
+      - name: Validate AI governance guardrails
+        run: bash scripts/check_ai_governance.sh

@@ -211,6 +211,9 @@ class LLMCorrectionExtension(AsyncExtension):
                 hotwords = context.voice_profile.get("hotwords", [])
                 if isinstance(hotwords, list):
                     self.corrector.update_vocabulary(hotwords)
+                confusion_rules = context.voice_profile.get("confusion_rules", {})
+                if isinstance(confusion_rules, dict):
+                    self.corrector.update_confusion_rules(confusion_rules)
                 self.corrector.update_memory_context(context.memory_context)
 
             corrected_text = text
@@ -256,10 +259,14 @@ class LLMCorrectionExtension(AsyncExtension):
             hotwords = profile.get("hotwords", [])
             if isinstance(hotwords, list) and self.corrector:
                 self.corrector.update_vocabulary(hotwords)
+            confusion_rules = profile.get("confusion_rules", {})
+            if isinstance(confusion_rules, dict) and self.corrector:
+                self.corrector.update_confusion_rules(confusion_rules)
 
             ten_env.log_info(
                 f"Voice profile received for client_id={client_id}: "
-                f"{len(hotwords) if isinstance(hotwords, list) else 0} hotwords"
+                f"{len(hotwords) if isinstance(hotwords, list) else 0} hotwords, "
+                f"{len(confusion_rules) if isinstance(confusion_rules, dict) else 0} confusion rules"
             )
         except Exception as e:
             ten_env.log_error(f"Error handling voice_profile: {e}")
