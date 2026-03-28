@@ -1,0 +1,68 @@
+{
+  "sources": [
+    {
+      "id": "stanford_phrase_set",
+      "source": "https://hci.stanford.edu/research/speech/dataset.html",
+      "priority": 1.2,
+      "usage_weight": 1.2,
+      "note": "高频中文短语，适合补日常沟通起手句和常读短句"
+    },
+    {
+      "id": "chinese_aac_app_store",
+      "source": "https://apps.apple.com/sa/app/chinese-%E4%B8%AD%E6%96%87%E4%BA%A4%E6%B5%81-aac/id6754344554",
+      "priority": 1.4,
+      "usage_weight": 1.4,
+      "note": "中文AAC应用描述中的需求、学校、社区短句，适合补日常沟通"
+    },
+    {
+      "id": "aac_good_talk_app_store",
+      "source": "https://apps.apple.com/ng/app/aac%E5%A5%BD%E6%BA%9D%E9%80%9A-%E6%89%8B%E6%A9%9F%E7%89%88/id6482996583",
+      "priority": 1.35,
+      "usage_weight": 1.35,
+      "note": "全中文AAC沟通板，包含家庭、学校、社区、照护等场景说明"
+    },
+    {
+      "id": "railway_ticket_notice",
+      "source": "https://www.12306.cn/mormhweb/zxdt/202311/t20231114_40286.html",
+      "scene_hint": "出门办事",
+      "priority": 1.15,
+      "usage_weight": 1.1,
+      "note": "购票、改签、乘车、证件核验等出行表达"
+    },
+    {
+      "id": "apple_messages",
+      "source": "https://support.apple.com/zh-cn/guide/iphone/iph82fb73ba3/ios",
+      "priority": 1.15,
+      "usage_weight": 1.15,
+      "note": "发送与回复信息，适合补日常沟通和设备表达"
+    },
+    {
+      "id": "apple_siri_calls_messages",
+      "source": "https://support.apple.com/zh-cn/guide/iphone/iph80059011d/ios",
+      "priority": 1.2,
+      "usage_weight": 1.2,
+      "note": "拨打电话、朗读与回复短信，适合补联系家人、联系朋友等日常表达"
+    },
+    {
+      "id": "apple_carplay_messages",
+      "source": "https://support.apple.com/zh-cn/guide/iphone/iphb5d45624c/ios",
+      "priority": 1.05,
+      "usage_weight": 1.0,
+      "note": "车载收发短信，适合补出行和驾驶中的短句"
+    },
+    {
+      "id": "apple_driving_focus",
+      "source": "https://support.apple.com/zh-cn/guide/iphone/iphae754533b/ios",
+      "priority": 1.0,
+      "usage_weight": 0.95,
+      "note": "驾驶专注、自动回复等出行情境短句"
+    },
+    {
+      "id": "mccsd_2024",
+      "source": "https://mccs-2024.github.io/",
+      "priority": 1.05,
+      "usage_weight": 1.0,
+      "note": "带场景的中文句子，可补通信、购物、交通表达"
+    }
+  ]
+}

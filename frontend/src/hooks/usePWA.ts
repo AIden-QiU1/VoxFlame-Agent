@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
+let swRegistrationPromise: Promise<ServiceWorkerRegistration | null> | null = null
+
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[]
   readonly userChoice: Promise<{
@@ -19,6 +21,8 @@ interface PWAState {
   swRegistered: boolean
   hasUpdate: boolean
   installPlatform: string | null
+  isIOS: boolean
+  needsManualInstall: boolean
 }
 
 interface PWAActions {
@@ -38,9 +42,33 @@ export function usePWA(): UsePWAReturn {
   const [hasUpdate, setHasUpdate] = useState(false)
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null)
   const [installPlatform, setInstallPlatform] = useState<string | null>(null)
+  const [isIOS, setIsIOS] = useState(false)
+
+  const registerServiceWorker = useCallback(async (): Promise<ServiceWorkerRegistration | null> => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+      return null
+    }
+
+    if (!swRegistrationPromise) {
+      swRegistrationPromise = navigator.serviceWorker
+        .register('/sw.js', { scope: '/' })
+        .catch((error) => {
+          swRegistrationPromise = null
+          throw error
+        })
+    }
+
+    return swRegistrationPromise
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    const userAgent = window.navigator.userAgent || ''
+    const isiOSDevice =
+      /iPad|iPhone|iPod/.test(userAgent) ||
+      (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+    setIsIOS(isiOSDevice)
 
     const checkStandalone = () => {
       const isStandaloneMode = 
@@ -110,7 +138,9 @@ export function usePWA(): UsePWAReturn {
 
     const registerSW = async () => {
       try {
-        const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        const registration = await registerServiceWorker()
+        if (!registration) return
+
         setSwRegistered(true)
         setSwRegistration(registration)
 
@@ -139,7 +169,7 @@ export function usePWA(): UsePWAReturn {
       window.addEventListener('load', registerSW)
       return () => window.removeEventListener('load', registerSW)
     }
-  }, [])
+  }, [registerServiceWorker])
 
   const promptInstall = useCallback(async (): Promise<boolean> => {
     if (!deferredPrompt) return false
@@ -191,6 +221,8 @@ export function usePWA(): UsePWAReturn {
     swRegistered,
     hasUpdate,
     installPlatform,
+    isIOS,
+    needsManualInstall: isIOS && !isInstalled && !deferredPrompt,
     promptInstall,
     updateServiceWorker,
     clearCacheAndReload,

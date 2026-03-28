@@ -12,7 +12,7 @@ export interface StarterKitPhrase {
 }
 
 export interface StarterKitScene {
-  id: 'stranger' | 'medical' | 'caregiver' | 'emergency'
+  id: 'interview' | 'workplace' | 'stranger' | 'medical' | 'caregiver' | 'emergency'
   title: string
   icon: string
   description: string
@@ -76,6 +76,60 @@ export const STARTER_KIT_QUICK_ACTIONS: StarterKitPhrase[] = [
 ]
 
 export const STARTER_KIT_SCENES: StarterKitScene[] = [
+  {
+    id: 'interview',
+    title: '求职 / 面试',
+    icon: '💼',
+    description: '先说明沟通节奏，再把能力和判断说清楚。',
+    rationale: '高压陌生人场景里，先建立沟通预期并守住自己表达权，能显著降低被第一印象误伤的概率。',
+    phrases: [
+      {
+        id: 'interview-intro',
+        text: '我说话会慢一点，但我知道自己想表达什么，请先听我说完。',
+        note: '先说明说话节奏，同时守住表达主导权。',
+        sourceIds: ['asha-aac', 'asha-dysarthria'],
+      },
+      {
+        id: 'interview-repeat',
+        text: '如果你没听清，请直接告诉我，我可以重复或换一种方式说。',
+        note: '把误听转成明确反馈，而不是默认失败。',
+        sourceIds: ['asha-dysarthria', 'ppc-planning'],
+      },
+      {
+        id: 'interview-answer',
+        text: '这个问题我来回答，请直接和我沟通。',
+        note: '减少被同伴或陪同者替答。',
+        sourceIds: ['asha-aac', 'ppc-planning'],
+      },
+    ],
+  },
+  {
+    id: 'workplace',
+    title: '工作协作',
+    icon: '🧩',
+    description: '先让同事愿意听你把关键判断说完，再进入具体方案。',
+    rationale: '团队压力场景里，先守住发言权和澄清权，比堆更多解释更重要。',
+    phrases: [
+      {
+        id: 'workplace-listen',
+        text: '请先让我把关键点说完，再一起决定。',
+        note: '先争取完整表达的时间窗。',
+        sourceIds: ['asha-aac', 'ppc-planning'],
+      },
+      {
+        id: 'workplace-direct',
+        text: '如果你没听清，请直接问我，不用替我做决定。',
+        note: '降低被替代发言的概率。',
+        sourceIds: ['asha-aac', 'asha-dysarthria'],
+      },
+      {
+        id: 'workplace-core',
+        text: '我想表达的核心是这个方案有风险，请听我补充两句。',
+        note: '适合在会议或讨论里先抓住重点。',
+        sourceIds: ['asha-dysarthria'],
+      },
+    ],
+  },
   {
     id: 'stranger',
     title: '陌生人开口',
@@ -191,4 +245,3 @@ export const STARTER_KIT_SCENES: StarterKitScene[] = [
     ],
   },
 ]
-

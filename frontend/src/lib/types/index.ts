@@ -8,10 +8,3 @@ export interface RecognitionResult {
   }>
   isFinal: boolean
 }
-
-export interface WebSocketMessage {
-  type: 'connected' | 'result' | 'error' | 'end'
-  message?: string
-  data?: any
-  error?: string
-}

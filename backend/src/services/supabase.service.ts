@@ -3,6 +3,10 @@ import {
   buildMemoryGrowthProfileSnapshot,
   MemoryGrowthProfileSnapshot,
 } from './memory-growth.service';
+import {
+  rankExpressionKitSuggestions,
+  type WorkspaceSceneId,
+} from './expression-kit.service';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -55,8 +59,82 @@ export interface MemoryProfileSnapshot {
   memories: Memory[];
   sessions: Session[];
   hotwords: string[];
+  hotword_profiles: HotwordProfileRecord[];
   growth_profile: MemoryGrowthProfileSnapshot;
   synced_at: string;
+}
+
+export interface ProfileBundleItem {
+  id: string;
+  title: string;
+  content: string;
+  source: 'user_profile' | 'hotword_profile' | 'growth_profile' | 'memory' | 'session';
+  emphasis: 'high' | 'medium' | 'low';
+  tags?: string[];
+  updated_at?: string;
+}
+
+export interface ProfileBundleSnapshot {
+  static: ProfileBundleItem[];
+  dynamic: ProfileBundleItem[];
+  relevant: ProfileBundleItem[];
+}
+
+export interface SessionReviewSnapshot {
+  session_id: string | null;
+  headline: string;
+  summary: string;
+  focus: string[];
+  recent_win: string | null;
+  next_step: string | null;
+  updated_at: string;
+}
+
+export interface ExpressionKitSuggestion {
+  id: string;
+  text: string;
+  source: 'quick_phrase' | 'hotword_profile' | 'frequent_expression';
+  category: string;
+  note?: string;
+  priority: number;
+}
+
+export interface WorkspaceMemorySnapshot {
+  profile_bundle: ProfileBundleSnapshot;
+  session_review: SessionReviewSnapshot;
+  expression_kit: {
+    active_scene_id: WorkspaceSceneId | null;
+    personalized_phrases: ExpressionKitSuggestion[];
+    quick_phrases: QuickPhrase[];
+    hotword_profiles: HotwordProfileRecord[];
+    recommended_focus: string[];
+    communication_preferences: CommunicationPreferences;
+  };
+  synced_at: string;
+}
+
+export interface CommunicationPreferences {
+  opening_phrase?: string;
+  pace_hint?: string;
+  repair_phrase?: string;
+}
+
+export type HotwordCategory =
+  | 'medical'
+  | 'profession'
+  | 'family'
+  | 'daily'
+  | 'emergency'
+  | 'custom';
+
+export interface HotwordProfileRecord {
+  id: string;
+  phrase: string;
+  category: HotwordCategory;
+  scenario: string;
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export type PhraseCategory =
@@ -68,6 +146,98 @@ export type PhraseCategory =
   | 'dining'
   | 'transport'
   | 'custom';
+
+function normalizeCommunicationPreferences(value: unknown): CommunicationPreferences {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return {
+    opening_phrase: readString(value, 'opening_phrase') ?? undefined,
+    pace_hint: readString(value, 'pace_hint') ?? undefined,
+    repair_phrase: readString(value, 'repair_phrase') ?? undefined,
+  };
+}
+
+function dedupeStrings(values: string[], limit?: number): string[] {
+  const unique = Array.from(
+    new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)),
+  );
+
+  return typeof limit === 'number' ? unique.slice(0, limit) : unique;
+}
+
+function sortPhrasesForSuggestions(phrases: QuickPhrase[]): QuickPhrase[] {
+  return [...phrases].sort((left, right) => {
+    if (right.usage_count !== left.usage_count) {
+      return right.usage_count - left.usage_count;
+    }
+
+    return left.order_index - right.order_index;
+  });
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readString(record: JsonRecord | undefined, key: string): string | null {
+  const value = record?.[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function readNumber(record: JsonRecord | undefined, key: string): number | null {
+  const value = record?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function normalizeHotwordCategory(value: unknown): HotwordCategory {
+  if (
+    value === 'medical' ||
+    value === 'profession' ||
+    value === 'family' ||
+    value === 'daily' ||
+    value === 'emergency'
+  ) {
+    return value;
+  }
+
+  return 'custom';
+}
+
+function normalizeHotwordProfiles(value: unknown): HotwordProfileRecord[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const profiles: HotwordProfileRecord[] = [];
+
+  value.forEach((item) => {
+    if (!isRecord(item)) {
+      return;
+    }
+
+    const phrase = readString(item, 'phrase');
+    if (!phrase) {
+      return;
+    }
+
+    const createdAt = readNumber(item, 'createdAt') ?? Date.now();
+    const updatedAt = readNumber(item, 'updatedAt') ?? createdAt;
+
+    profiles.push({
+      id: readString(item, 'id') ?? `${phrase}_${createdAt}`,
+      phrase,
+      category: normalizeHotwordCategory(readString(item, 'category')),
+      scenario: readString(item, 'scenario') ?? '',
+      note: readString(item, 'note') ?? undefined,
+      createdAt,
+      updatedAt,
+    });
+  });
+
+  return profiles.sort((left, right) => right.updatedAt - left.updatedAt);
+}
 
 export class SupabaseService {
   private client: SupabaseClient;
@@ -158,6 +328,45 @@ export class SupabaseService {
       return null;
     }
     return data;
+  }
+
+  async getHotwordProfiles(userId: string): Promise<HotwordProfileRecord[]> {
+    const userProfile = await this.getUserProfile(userId);
+    const preferences = isRecord(userProfile?.preferences) ? userProfile?.preferences : undefined;
+    return normalizeHotwordProfiles(preferences?.hotword_profiles);
+  }
+
+  async saveHotwordProfiles(
+    userId: string,
+    profiles: HotwordProfileRecord[],
+  ): Promise<HotwordProfileRecord[]> {
+    await this.ensureUserProfile(userId);
+
+    const normalizedProfiles = normalizeHotwordProfiles(profiles);
+    const userProfile = await this.getUserProfile(userId);
+    const existingPreferences = isRecord(userProfile?.preferences)
+      ? userProfile?.preferences
+      : {};
+    const nextPreferences: JsonRecord = {
+      ...existingPreferences,
+      hotword_profiles: normalizedProfiles,
+    };
+    const nextHotwords = Array.from(
+      new Set(normalizedProfiles.map((profile) => profile.phrase)),
+    ).slice(0, 20);
+
+    const updated = await this.updateUserProfile(userId, {
+      preferences: nextPreferences,
+      hotwords: nextHotwords,
+    });
+
+    if (!updated) {
+      return [];
+    }
+
+    return normalizeHotwordProfiles(
+      isRecord(updated.preferences) ? updated.preferences.hotword_profiles : [],
+    );
   }
 
   // === Sessions ===
@@ -348,22 +557,60 @@ export class SupabaseService {
     memoryLimit: number = 400,
     sessionLimit: number = 120,
   ): Promise<MemoryProfileSnapshot> {
-    const [memories, sessions] = await Promise.all([
+    const [memories, sessions, userProfile, hotwordProfiles] = await Promise.all([
       this.getMemories(userId, memoryLimit),
       this.getUserSessions(userId, sessionLimit),
+      this.getUserProfile(userId),
+      this.getHotwordProfiles(userId),
     ]);
-    const hotwords = this.collectHotwords(memories, sessions);
+    const collectedHotwords = this.collectHotwords(memories, sessions);
+    const profileHotwords = Array.isArray(userProfile?.hotwords)
+      ? userProfile.hotwords.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      : [];
+    const hotwords = Array.from(
+      new Set([
+        ...hotwordProfiles.map((profile) => profile.phrase),
+        ...profileHotwords,
+        ...collectedHotwords,
+      ]),
+    ).slice(0, 20);
 
     return {
       memories,
       sessions,
       hotwords,
+      hotword_profiles: hotwordProfiles,
       growth_profile: buildMemoryGrowthProfileSnapshot({
         memories,
         sessions,
         hotwords,
       }),
       synced_at: new Date().toISOString(),
+    };
+  }
+
+  async getWorkspaceMemorySnapshot(
+    userId: string,
+    options: { sceneId?: WorkspaceSceneId } = {},
+  ): Promise<WorkspaceMemorySnapshot> {
+    const [profileSnapshot, userProfile, quickPhrases] = await Promise.all([
+      this.getUserMemoryProfile(userId, 400, 120),
+      this.getUserProfile(userId),
+      this.getUserPhrases(userId, undefined, 40),
+    ]);
+
+    const syncedAt = new Date().toISOString();
+
+    return {
+      profile_bundle: this.buildProfileBundle(profileSnapshot, userProfile),
+      session_review: this.buildSessionReview(profileSnapshot, syncedAt),
+      expression_kit: this.buildExpressionKit(
+        profileSnapshot,
+        quickPhrases,
+        userProfile,
+        options.sceneId,
+      ),
+      synced_at: syncedAt,
     };
   }
 
@@ -424,6 +671,278 @@ export class SupabaseService {
       .sort(([, left], [, right]) => right - left)
       .slice(0, 20)
       .map(([word]) => word);
+  }
+
+  private buildProfileBundle(
+    snapshot: MemoryProfileSnapshot,
+    userProfile: UserProfile | null,
+  ): ProfileBundleSnapshot {
+    const staticItems: ProfileBundleItem[] = [];
+    const dynamicItems: ProfileBundleItem[] = [];
+    const relevantItems: ProfileBundleItem[] = [];
+    const growthProfile = snapshot.growth_profile;
+    const nowIso = new Date().toISOString();
+    const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
+    const communicationPreferences = normalizeCommunicationPreferences(
+      preferences?.communication_preferences,
+    );
+
+    if (userProfile?.condition) {
+      staticItems.push({
+        id: 'condition',
+        title: '沟通背景',
+        content: userProfile.condition,
+        source: 'user_profile',
+        emphasis: 'high',
+        updated_at: userProfile.updated_at ?? nowIso,
+      });
+    }
+
+    if (snapshot.hotwords.length > 0) {
+      staticItems.push({
+        id: 'hotwords',
+        title: '关键热词',
+        content: snapshot.hotwords.slice(0, 8).join('、'),
+        source: 'user_profile',
+        emphasis: 'high',
+        tags: snapshot.hotwords.slice(0, 8),
+        updated_at: nowIso,
+      });
+    }
+
+    if (communicationPreferences.opening_phrase) {
+      staticItems.push({
+        id: 'opening-phrase',
+        title: '我的开场白',
+        content: communicationPreferences.opening_phrase,
+        source: 'user_profile',
+        emphasis: 'high',
+        updated_at: userProfile?.updated_at ?? nowIso,
+      });
+    }
+
+    if (communicationPreferences.pace_hint) {
+      staticItems.push({
+        id: 'pace-hint',
+        title: '我希望别人这样配合',
+        content: communicationPreferences.pace_hint,
+        source: 'user_profile',
+        emphasis: 'medium',
+        updated_at: userProfile?.updated_at ?? nowIso,
+      });
+    }
+
+    if (growthProfile.nextStep) {
+      dynamicItems.push({
+        id: 'next-step',
+        title: '当前最值得继续做的事',
+        content: growthProfile.nextStep,
+        source: 'growth_profile',
+        emphasis: 'high',
+        updated_at: nowIso,
+      });
+    }
+
+    if (growthProfile.frequentFocus.length > 0) {
+      dynamicItems.push({
+        id: 'frequent-focus',
+        title: '近期重点',
+        content: growthProfile.frequentFocus.slice(0, 4).map((item) => item.label).join('、'),
+        source: 'growth_profile',
+        emphasis: 'medium',
+        tags: growthProfile.frequentFocus.slice(0, 4).map((item) => item.label),
+        updated_at: nowIso,
+      });
+    }
+
+    if (growthProfile.frequentExpressions.length > 0) {
+      dynamicItems.push({
+        id: 'frequent-expressions',
+        title: '近期常用表达',
+        content: growthProfile.frequentExpressions.slice(0, 4).map((item) => item.label).join('、'),
+        source: 'growth_profile',
+        emphasis: 'medium',
+        tags: growthProfile.frequentExpressions.slice(0, 4).map((item) => item.label),
+        updated_at: nowIso,
+      });
+    }
+
+    snapshot.hotword_profiles.slice(0, 4).forEach((profile) => {
+      relevantItems.push({
+        id: `hotword-${profile.id}`,
+        title: profile.phrase,
+        content: profile.note || profile.scenario || '已进入个体表达画像',
+        source: 'hotword_profile',
+        emphasis: 'medium',
+        tags: dedupeStrings([profile.category, profile.scenario], 3),
+        updated_at: new Date(profile.updatedAt).toISOString(),
+      });
+    });
+
+    growthProfile.recentTraining.slice(0, 2).forEach((memory) => {
+      relevantItems.push({
+        id: `memory-${memory.id}`,
+        title: '最近训练记录',
+        content: memory.content,
+        source: 'memory',
+        emphasis: 'low',
+        updated_at: new Date(memory.updatedAt).toISOString(),
+      });
+    });
+
+    return {
+      static: staticItems,
+      dynamic: dynamicItems,
+      relevant: relevantItems,
+    };
+  }
+
+  private buildSessionReview(
+    snapshot: MemoryProfileSnapshot,
+    syncedAt: string,
+  ): SessionReviewSnapshot {
+    const latestSession = snapshot.growth_profile.recentSessions[0];
+    const recentWin =
+      snapshot.growth_profile.stats.improvementDirection === 'improving'
+        ? '训练清晰度趋势正在提升'
+        : snapshot.growth_profile.frequentExpressions[0]?.label ?? null;
+
+    if (!latestSession) {
+      return {
+        session_id: null,
+        headline: '还没有稳定的会话复盘',
+        summary: '先用 starter kit 和表达工具箱把第一句话说出去，系统会逐步积累你的个体表达画像。',
+        focus: snapshot.growth_profile.frequentFocus.slice(0, 3).map((item) => item.label),
+        recent_win: recentWin,
+        next_step: snapshot.growth_profile.nextStep || null,
+        updated_at: syncedAt,
+      };
+    }
+
+    const focus = dedupeStrings(
+      [
+        ...latestSession.topFocusTags,
+        ...latestSession.topFocusSyllables,
+        ...snapshot.growth_profile.frequentFocus.slice(0, 2).map((item) => item.label),
+      ],
+      4,
+    );
+
+    return {
+      session_id: latestSession.id,
+      headline: '最近一次沟通复盘',
+      summary: `最近一次 ${latestSession.kind} 会话共 ${latestSession.turnCount} 轮，持续 ${latestSession.durationSeconds} 秒，平均清晰度 ${Math.round(latestSession.avgClarityScore * 100)}%。`,
+      focus,
+      recent_win: recentWin,
+      next_step: snapshot.growth_profile.nextStep || null,
+      updated_at: syncedAt,
+    };
+  }
+
+  private buildExpressionKit(
+    snapshot: MemoryProfileSnapshot,
+    quickPhrases: QuickPhrase[],
+    userProfile?: UserProfile | null,
+    sceneId?: WorkspaceSceneId,
+  ): WorkspaceMemorySnapshot['expression_kit'] {
+    const suggestions: ExpressionKitSuggestion[] = [];
+    const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
+    const communicationPreferences = normalizeCommunicationPreferences(
+      preferences?.communication_preferences,
+    );
+
+    [
+      {
+        id: 'pref-opening',
+        text: communicationPreferences.opening_phrase,
+        category: 'opening',
+        note: '你希望陌生人先听到的第一句话',
+      },
+      {
+        id: 'pref-pace',
+        text: communicationPreferences.pace_hint,
+        category: 'pace',
+        note: '你希望对方如何配合你的沟通节奏',
+      },
+      {
+        id: 'pref-repair',
+        text: communicationPreferences.repair_phrase,
+        category: 'repair',
+        note: '当对方没听清时，你希望优先使用的补救表达',
+      },
+    ].forEach((item, index) => {
+      if (!item.text) {
+        return;
+      }
+
+      suggestions.push({
+        id: item.id,
+        text: item.text,
+        source: 'quick_phrase',
+        category: item.category,
+        note: item.note,
+        priority: 140 - index,
+      });
+    });
+
+    sortPhrasesForSuggestions(quickPhrases)
+      .slice(0, 6)
+      .forEach((phrase, index) => {
+        suggestions.push({
+          id: `quick-${phrase.id ?? index}`,
+          text: phrase.text,
+          source: 'quick_phrase',
+          category: phrase.category,
+          priority: 100 - index,
+        });
+      });
+
+    snapshot.hotword_profiles.slice(0, 4).forEach((profile, index) => {
+      suggestions.push({
+        id: `hotword-${profile.id}`,
+        text: profile.phrase,
+        source: 'hotword_profile',
+        category: profile.category,
+        note: profile.note || profile.scenario || undefined,
+        priority: 70 - index,
+      });
+    });
+
+    snapshot.growth_profile.frequentExpressions.slice(0, 4).forEach((item, index) => {
+      suggestions.push({
+        id: `expression-${item.label}-${index}`,
+        text: item.label,
+        source: 'frequent_expression',
+        category: 'frequent',
+        priority: 40 - index,
+      });
+    });
+
+    const personalizedPhrases = rankExpressionKitSuggestions(
+      suggestions
+      .filter((item, index, array) => array.findIndex((candidate) => candidate.text === item.text) === index)
+      .slice(0, 12),
+      sceneId,
+      communicationPreferences,
+    ).slice(0, 8);
+
+    const recommendedFocus = dedupeStrings(
+      [
+        snapshot.growth_profile.nextStep,
+        ...snapshot.growth_profile.frequentFocus.slice(0, 3).map((item) => item.label),
+        ...snapshot.hotword_profiles.slice(0, 2).map((profile) => profile.phrase),
+      ].filter((value): value is string => typeof value === 'string'),
+      6,
+    );
+
+    return {
+      active_scene_id: sceneId ?? null,
+      personalized_phrases: personalizedPhrases,
+      quick_phrases: sortPhrasesForSuggestions(quickPhrases).slice(0, 12),
+      hotword_profiles: snapshot.hotword_profiles.slice(0, 12),
+      recommended_focus: recommendedFocus,
+      communication_preferences: communicationPreferences,
+    };
   }
 
   // === Quick Phrases ===

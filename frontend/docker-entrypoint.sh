@@ -8,7 +8,7 @@ echo "Starting VoxFlame Frontend..."
 echo "HTTP will be available on port 3000"
 
 # Start HTTP server (always)
-node server.js 2>&1 | tee -a /app/logs/frontend.log &
+HOSTNAME=0.0.0.0 PORT="${PORT:-3000}" node server.js 2>&1 | tee -a /app/logs/frontend.log &
 
 # Optional: Start HTTPS server if certificates are available
 if [ -f /app/ssl/cert.pem ] && [ -f /app/ssl/key.pem ]; then

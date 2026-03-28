@@ -1,5 +1,11 @@
 import { Request, Response } from 'express';
-import { SupabaseService, Memory, Session } from '../services/supabase.service';
+import {
+  SupabaseService,
+  Memory,
+  Session,
+  HotwordProfileRecord,
+} from '../services/supabase.service';
+import { normalizeWorkspaceSceneId } from '../services/expression-kit.service';
 
 interface MemoryAddRequestBody {
   user_id?: string;
@@ -14,6 +20,11 @@ interface MemorySessionSyncRequestBody {
   session_id?: string;
   metadata?: Record<string, unknown>;
   session?: Partial<Session>;
+}
+
+interface MemoryHotwordSyncRequestBody {
+  user_id?: string;
+  profiles?: HotwordProfileRecord[];
 }
 
 function readNumber(record: Record<string, unknown> | undefined, key: string): number | undefined {
@@ -88,6 +99,44 @@ function buildSessionPayload(
 }
 
 export class MemoryController {
+  // POST /api/memory/hotwords - Replace structured custom hotword profiles
+  async syncHotwords(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { user_id, profiles } = req.body as MemoryHotwordSyncRequestBody;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (user_id && user_id !== authenticatedUserId) {
+        console.warn(`[MemoryController] User ID mismatch: token=${authenticatedUserId}, body=${user_id}`);
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      if (!Array.isArray(profiles)) {
+        res.status(400).json({ error: 'Missing required field: profiles[]' });
+        return;
+      }
+
+      const savedProfiles = await SupabaseService.getInstance().saveHotwordProfiles(
+        authenticatedUserId,
+        profiles,
+      );
+
+      res.json({
+        profiles: savedProfiles,
+        hotwords: savedProfiles.map((profile) => profile.phrase),
+        count: savedProfiles.length,
+      });
+    } catch (error) {
+      console.error('Error in syncHotwords:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
   // POST /api/memory/session - Upsert session metadata used by unified memory profile
   async syncSession(req: Request, res: Response): Promise<void> {
     try {
@@ -226,6 +275,27 @@ export class MemoryController {
       res.json(profile);
     } catch (error) {
       console.error('Error in getUserMemoryProfile:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // GET /api/memory/workspace/:userId - Workspace-ready profile bundle + session review + expression kit
+  async getWorkspaceMemorySnapshot(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const sceneId = normalizeWorkspaceSceneId(req.query.scene);
+
+      if (!userId) {
+        res.status(400).json({ error: 'Missing userId parameter' });
+        return;
+      }
+
+      const snapshot = await SupabaseService.getInstance().getWorkspaceMemorySnapshot(userId, {
+        sceneId,
+      });
+      res.json(snapshot);
+    } catch (error) {
+      console.error('Error in getWorkspaceMemorySnapshot:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

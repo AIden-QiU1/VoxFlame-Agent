@@ -1,0 +1,13 @@
+{
+  "params": {
+    "api_key": "${env:DASHSCOPE_API_KEY}",
+    "url": "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+    "model": "qwen3-tts-flash-realtime",
+    "voice": "Cherry",
+    "format": "pcm",
+    "sample_rate": 16000,
+    "mode": "server_commit",
+    "speed": 1.0,
+    "volume": 50
+  }
+}

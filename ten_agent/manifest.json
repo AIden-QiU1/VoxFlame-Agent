@@ -15,13 +15,21 @@
     },
     {
       "type": "extension",
-      "name": "aliyun_asr_bigmodel_python",
-      "version": "0.2.5"
+      "name": "agora_rtc",
+      "version": "=0.23.9-t1"
     },
     {
       "type": "extension",
-      "name": "cosy_tts_python",
-      "version": "0.4.0"
+      "name": "agora_rtm",
+      "version": "=0.11.2"
+    },
+    {
+      "type": "system",
+      "name": "nlohmann_json",
+      "version": "3.11.2"
     }
-  ]
+  ],
+  "scripts": {
+    "start": "scripts/start.sh"
+  }
 }

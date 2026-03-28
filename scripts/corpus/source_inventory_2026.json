@@ -1,0 +1,169 @@
+{
+  "sources": [
+    {
+      "id": "aishell_transcript",
+      "source": "/data/aishell/transcript/aishell_transcript_v0.8.txt",
+      "priority": 0.9,
+      "usage_weight": 0.7,
+      "note": "普通话读句基线，适合补规范读音和中短句"
+    },
+    {
+      "id": "st_cmds_transcript",
+      "source": "/data/stcmds/metadata.txt",
+      "scene_hint": "手机设备",
+      "priority": 1.1,
+      "usage_weight": 1.1,
+      "note": "短口令、设备指令、手机操作"
+    },
+    {
+      "id": "magicdata_read_transcript",
+      "source": "/data/magicdata/read/train_transcript.txt",
+      "priority": 1.0,
+      "usage_weight": 1.0,
+      "note": "日常句、短信、问答、设备控制"
+    },
+    {
+      "id": "wenetspeech_high_label",
+      "source": "/data/wenetspeech/high_label_transcript.txt",
+      "priority": 0.95,
+      "usage_weight": 0.9,
+      "note": "自然口语、多场景、多文体"
+    },
+    {
+      "id": "seniortalk_sentence_data",
+      "source": "https://huggingface.co/papers/2503.16578",
+      "priority": 1.15,
+      "usage_weight": 1.15,
+      "note": "高龄用户真实对话，适合贴近生活表达"
+    },
+    {
+      "id": "pts_outline",
+      "source": "https://www.moe.gov.cn/jyb_xxgk/gk_gbgg/moe_0/moe_9/moe_40/tnull_117.html",
+      "priority": 0.85,
+      "usage_weight": 0.55,
+      "note": "普通话规范测试框架，用于约束规范读音材料"
+    },
+    {
+      "id": "pts_reading_50",
+      "source": "https://www.htu.edu.cn/yw/2024/0321/c1671a301308/page.htm",
+      "priority": 0.8,
+      "usage_weight": 0.5,
+      "note": "朗读作品目录，适合补正式朗读文本来源"
+    },
+    {
+      "id": "stanford_phrase_set",
+      "source": "https://hci.stanford.edu/research/speech/dataset.html",
+      "priority": 1.1,
+      "usage_weight": 1.1,
+      "note": "移动输入常用短语，适合高频短句"
+    },
+    {
+      "id": "chinese_aac_app_store",
+      "source": "https://apps.apple.com/sa/app/chinese-%E4%B8%AD%E6%96%87%E4%BA%A4%E6%B5%81-aac/id6754344554",
+      "priority": 1.4,
+      "usage_weight": 1.4,
+      "note": "中文 AAC 沟通板描述里包含真实需求、情绪、学校、社区短句，适合补开口先说和家里需要"
+    },
+    {
+      "id": "chinese_aac_opening",
+      "source": "https://apps.apple.com/sa/app/chinese-%E4%B8%AD%E6%96%87%E4%BA%A4%E6%B5%81-aac/id6754344554",
+      "scene_hint": "开口先说",
+      "priority": 1.45,
+      "usage_weight": 1.45,
+      "note": "同一份 AAC 页面按开口先说方向抽取，可补求助、重复确认、起手表达"
+    },
+    {
+      "id": "chinese_aac_home",
+      "source": "https://apps.apple.com/sa/app/chinese-%E4%B8%AD%E6%96%87%E4%BA%A4%E6%B5%81-aac/id6754344554",
+      "scene_hint": "家里需要",
+      "priority": 1.45,
+      "usage_weight": 1.45,
+      "note": "同一份 AAC 页面按家里需要方向抽取，可补照护、休息、家庭高频表达"
+    },
+    {
+      "id": "common_voice_zh_cn_v24",
+      "source": "https://datacollective.mozillafoundation.org/datasets/cmj8u3q2n00vhnxxbzrjcugwc",
+      "priority": 1.0,
+      "usage_weight": 0.95,
+      "note": "社区脚本短句，可补高频读句和多口音来源"
+    },
+    {
+      "id": "primewords_set1",
+      "source": "https://www.openslr.org/47/",
+      "priority": 0.95,
+      "usage_weight": 0.8,
+      "note": "普通话手机录音语料，适合补规范转写中短句"
+    },
+    {
+      "id": "apple_accessibility",
+      "source": "https://support.apple.com/zh-cn/accessibility",
+      "scene_hint": "手机设备",
+      "priority": 1.2,
+      "usage_weight": 1.2,
+      "note": "无障碍和实时语音相关中文帮助语句"
+    },
+    {
+      "id": "apple_live_speech",
+      "source": "https://support.apple.com/zh-cn/guide/apple-vision-pro/tan9351d794e/visionos",
+      "scene_hint": "手机设备",
+      "priority": 1.1,
+      "usage_weight": 1.15,
+      "note": "实时语音 / 打字转说话场景"
+    },
+    {
+      "id": "apple_siri_calls_messages",
+      "source": "https://support.apple.com/zh-cn/guide/iphone/iph80059011d/ios",
+      "scene_hint": "手机设备",
+      "priority": 1.2,
+      "usage_weight": 1.25,
+      "note": "打电话、发消息、读短信等高频口语表达"
+    },
+    {
+      "id": "apple_messages",
+      "source": "https://support.apple.com/zh-cn/guide/iphone/iph82fb73ba3/ios",
+      "scene_hint": "手机设备",
+      "priority": 1.15,
+      "usage_weight": 1.15,
+      "note": "发送与回复信息、日常对话表达"
+    },
+    {
+      "id": "apple_iphone_support",
+      "source": "https://support.apple.com/zh-cn/iphone",
+      "scene_hint": "手机设备",
+      "priority": 1.0,
+      "usage_weight": 1.0,
+      "note": "手机设置、通话、更新、维修等生活设备语句"
+    },
+    {
+      "id": "redcross_aed_usage",
+      "source": "https://www.redcross.org.cn/html/2025-07/108778.html",
+      "scene_hint": "紧急情况",
+      "priority": 1.2,
+      "usage_weight": 1.1,
+      "note": "急救、呼救、现场处置场景"
+    },
+    {
+      "id": "medical_insurance_service_guide",
+      "source": "https://www.taizhou.gov.cn/ybj/bszn/art/2025/art_10e827b1c53a46f39cdedcce09855d73.html",
+      "scene_hint": "看病拿药",
+      "priority": 1.1,
+      "usage_weight": 1.05,
+      "note": "医保、参保、窗口办理和材料说明"
+    },
+    {
+      "id": "railway_ticket_notice",
+      "source": "https://www.12306.cn/mormhweb/zxdt/202311/t20231114_40286.html",
+      "scene_hint": "出门办事",
+      "priority": 1.1,
+      "usage_weight": 1.05,
+      "note": "购票、改签、乘车、证件核验等出行表达"
+    },
+    {
+      "id": "mccsd_2024",
+      "source": "https://mccs-2024.github.io/",
+      "priority": 1.0,
+      "usage_weight": 0.9,
+      "note": "7000 条带场景的中文句子，可补通信/交通/购物表达"
+    }
+  ]
+}

@@ -12,57 +12,45 @@
   "api": {
     "cmd_in": [
       {
-        "name": "init_memory",
-        "description": "Initialize memory for a user session"
+        "name": "init_memory"
       },
       {
-        "name": "save_conversation",
-        "description": "Save a conversation turn to memory"
+        "name": "save_conversation"
       },
       {
-        "name": "search_memory",
-        "description": "Search memory for relevant context"
+        "name": "search_memory"
       },
       {
-        "name": "get_voice_profile",
-        "description": "Get user voice profile (patterns, hotwords)"
+        "name": "get_voice_profile"
       },
       {
-        "name": "update_voice_profile",
-        "description": "Update voice profile with new patterns"
+        "name": "update_voice_profile"
       },
       {
-        "name": "flush",
-        "description": "Flush pending memory to storage"
+        "name": "flush"
       }
     ],
     "cmd_out": [],
     "data_in": [
       {
-        "name": "correction_event",
-        "description": "Correction event for learning (raw -> corrected)"
+        "name": "correction_event"
       },
       {
-        "name": "session_start",
-        "description": "New session started"
+        "name": "session_start"
       },
       {
-        "name": "session_end",
-        "description": "Session ended"
+        "name": "session_end"
       }
     ],
     "data_out": [
       {
-        "name": "voice_profile",
-        "description": "Voice profile data for ASR enhancement"
+        "name": "voice_profile"
       },
       {
-        "name": "memory_context",
-        "description": "Relevant memory context for LLM"
+        "name": "memory_context"
       },
       {
-        "name": "clarity_score",
-        "description": "Clarity score for current session"
+        "name": "clarity_score"
       }
     ]
   }

@@ -2,6 +2,8 @@
 
 > 目标：把三类 memory 体系整合为一个可落地、可迭代、可合规的统一方案，服务 VoxFlame 的“软硬件一体沟通系统”路线。
 
+> 补充：相关记忆机制研究已在 2026-03-26 收口为 [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)，进一步刷新了这份报告对 `本地事实源 / 结构化画像 / 上下文服务` 的分工理解。
+
 ---
 
 ## 1. 结论先行
@@ -12,8 +14,10 @@ VoxFlame 最合适的路线不是“单一记忆系统替代一切”，而是**
    - 以当前 `memory_layer_python + LocalStore(SQLite+Markdown)` 为主干。
    - 负责实时纠错学习、热词、混淆模式、短期上下文。
 
-2. **跨设备/跨会话长期记忆（服务化）**
-   - 以 `Supabase` 为主数据平面，逐步接入 **PowerMem / mem0 类能力**作为“关系与语义增强层”。
+2. **跨设备/跨会话长期记忆（结构化 + 服务化）**
+   - 以 `Supabase` 为主数据平面。
+   - 类型设计与提炼流程可借鉴 `memU`，把画像、事件、行为模式、知识分开。
+   - 上下文装配层可借鉴 `supermemory` 的 `profile/static/dynamic/searchResults` 契约。
    - 负责用户长期画像、结构化偏好、组织级知识与多 Agent 共享。
 
 3. **音频多模态记忆（异步增强，不进实时主链路）**
@@ -64,26 +68,29 @@ VoxFlame 最合适的路线不是“单一记忆系统替代一切”，而是**
 
 ## 3. 三类 Memory 如何分工融合
 
-## 3.1 传统记忆系统（TEN PowerMem / mem0）
+## 3.1 服务化记忆与上下文引擎（supermemory / PowerMem / mem0）
 
 定位：**服务化长期语义记忆与关系增强层**。
 
 推荐用法：
 
 1. 托管“跨会话、跨设备、跨 Agent”的长期事实与偏好。
-2. 在检索阶段做语义召回与可选 reranker。
-3. 以 `user_id + agent_id + session_id/run_id` 做作用域隔离。
+2. 对外提供稳定的 `profile bundle`，至少包含 `static / dynamic / relevant memories`。
+3. 在检索阶段做语义召回与可选 reranker。
+4. 以 `user_id + agent_id + session_id/run_id` 或 `container_tag` 做作用域隔离。
 
 与 VoxFlame 匹配点：
 
-1. 现有 TEN 示例（PowerMem/memU）已经验证“turn interval + idle timeout”自动持久化模式。
-2. mem0 提供开源可自托管，支持向量库与图关系能力，适合后续组织级扩展。
+1. `supermemory` 证明了“memory 不是只做搜索，还可以直接产出 profile/context bundle”。
+2. 现有 TEN 示例（PowerMem/memU）已经验证“turn interval + idle timeout”自动持久化模式。
+3. mem0 提供开源可自托管，支持向量库与图关系能力，适合后续组织级扩展。
 
 风险与控制：
 
 1. 外部依赖增加运维复杂度（尤其 Graph + reranker）。
 2. 必须把实时路径与服务化写入解耦，避免对话阻塞。
-3. 所有外部写入都需要可降级（失败时回落本地）。
+3. 不能把“system prompt 注入的上下文服务”当唯一事实源。
+4. 所有外部写入都需要可降级（失败时回落本地）。
 
 ## 3.2 OpenClaw 代表的本地文件记忆
 
@@ -106,7 +113,29 @@ VoxFlame 最合适的路线不是“单一记忆系统替代一切”，而是**
 1. 文件增长后检索质量受索引和切分策略影响。
 2. 需要明确 compaction 与归档规则，防止上下文膨胀。
 
-## 3.3 音频多模态记忆 / Audio RAG
+## 3.3 memU 代表的结构化、类型化、主动记忆
+
+定位：**结构化画像与事件层，不直接进入实时主链**。
+
+关键判断：
+
+1. `memU` 的精华不是“主动 agent”口号，而是 `resource -> item -> category` 的分层。
+2. 它把记忆拆成 `profile / event / knowledge / behavior / skill / tool` 等类型，适合长期演进。
+3. 写入不是直接 append，而是 `ingest -> preprocess -> extract -> dedupe -> categorize -> persist`。
+
+与 VoxFlame 匹配点：
+
+1. 适合把 `训练事件 / 沟通偏好 / 混淆模式 / 高价值知识` 区分开来。
+2. 适合作为 `voice_profile` 之外的结构化画像层设计来源。
+3. 适合后续主动陪练、场景提醒、个体化训练建议，但应放在异步层或控制面附近，而不是实时音频环内。
+
+风险与控制：
+
+1. 框架较重，不适合直接塞入低延迟执行面。
+2. 如果类型设计过早过细，会带来维护负担。
+3. 更适合作为“提炼后写入”的后台机制，而不是前端或实时链直接调用。
+
+## 3.4 音频多模态记忆 / Audio RAG
 
 定位：**高价值补充层，不是 MVP 主链路**。
 
@@ -159,15 +188,20 @@ VoxFlame 最合适的路线不是“单一记忆系统替代一切”，而是**
 3. **L2 云端结构化与语义层（Supabase + 可选 mem0/PowerMem）**
    - 会话元数据、用户画像、共享知识、跨端同步。
 
-4. **L3 多模态索引层（Qdrant，异步）**
+4. **L3 上下文服务层（可选 service/middleware）**
+   - 统一输出 `static / dynamic / relevant` 上下文包。
+   - 可借鉴 `supermemory` 的 profile/context API 思路。
+
+5. **L4 多模态索引层（Qdrant，异步）**
    - 文本向量、音频向量、说话人向量分集合管理。
    - 使用 on-disk + quantization 控制资源。
 
 ## 5.2 检索优先级
 
-1. 先查 L1/L2 文本语义（低延迟、可解释）。
-2. 不足时再触发 L3 音频相关召回。
-3. 最后将结果裁剪为 prompt 可承载片段（top-k + 时间衰减 + 去重）。
+1. 先查 L1/L2 文本语义与结构化画像（低延迟、可解释）。
+2. 需要时由 L3 组装 profile/context bundle。
+3. 不足时再触发 L4 音频相关召回。
+4. 最后将结果裁剪为 prompt 可承载片段（top-k + 时间衰减 + 去重）。
 
 ---
 
@@ -187,9 +221,10 @@ VoxFlame 最合适的路线不是“单一记忆系统替代一切”，而是**
 
 ## 阶段 B（V1/180天）：跨端个体化与可治理
 
-1. 引入 mem0/PowerMem 作为可插拔长期语义层。
-2. 建立记忆治理：同意层级、TTL、删除/导出审计。
-3. 引入关系记忆（图）用于“人-地点-事件”场景增强。
+1. 引入 `memU` 风格 typed memory taxonomy，先把画像、事件、行为模式分开。
+2. 引入 `supermemory / mem0 / PowerMem` 风格的可插拔上下文服务层。
+3. 建立记忆治理：同意层级、TTL、删除/导出审计。
+4. 引入关系记忆（图）用于“人-地点-事件”场景增强。
 
 ## 阶段 C（V2/365天）：多模态康复飞轮
 
@@ -204,7 +239,7 @@ VoxFlame 最合适的路线不是“单一记忆系统替代一切”，而是**
 1. 建立 Memory 端到端回归：覆盖写入、检索、广播、消费全链路。
 2. 统一 ID 规范：`user_id/session_id/agent_id` 在 TEN、Backend、Supabase 同名同语义。
 3. 将前端 `memory-service` 明确为“会话缓存 + 断线缓冲”，TEN LocalStore 作为事实源。
-4. 后端补齐语义检索增强（向量召回/重排）与 ownership 校验。
+4. 后端补齐统一 `profile bundle` 组装能力与 ownership 校验。
 5. 定义“音频索引触发器”（低置信纠错、高价值场景、训练样本）并异步化。
 
 ---
@@ -234,6 +269,13 @@ VoxFlame 最合适的路线不是“单一记忆系统替代一切”，而是**
 9. `openclaw/extensions/memory-core/index.ts`
 10. `ten-framework/ai_agents/agents/examples/voice-assistant-with-PowerMem/*`
 11. `ten-framework/ai_agents/agents/examples/voice-assistant-with-memU/*`
+12. `supermemory/README.md`
+13. `supermemory/packages/openai-sdk-python/src/supermemory_openai/tools.py`
+14. `supermemory/packages/openai-sdk-python/src/supermemory_openai/middleware.py`
+15. `supermemory/packages/agent-framework-python/src/supermemory_agent_framework/context_provider.py`
+16. `memU/src/memu/app/memorize.py`
+17. `memU/src/memu/app/retrieve.py`
+18. `memU/src/memu/database/models.py`
 
 ### 外部一手资料
 

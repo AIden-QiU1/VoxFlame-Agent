@@ -33,3 +33,9 @@ class VoxFlameMainConfig(BaseModel):
     supabase_url: str = ""
     supabase_key: str = ""
     enable_memory: bool = False
+
+    # Transcript output transport. `none` disables transcript fan-out entirely.
+    # The production runtime is RTC + RTM, so the default transport follows the
+    # active Agora RTM control path instead of the retired websocket path.
+    transcript_transport: str = "rtm"
+    transcript_transport_extension: str = "agora_rtm"

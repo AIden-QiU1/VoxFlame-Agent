@@ -33,6 +33,11 @@ export const getSupabase = (): SupabaseClient | null => {
  * 通用创建函数 (供新代码使用)
  */
 export const createClient = () => {
+  const client = getSupabase()
+  if (client) {
+    return client
+  }
+
   return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
@@ -110,7 +115,6 @@ export const AUDIO_BUCKET = 'voice-contributions'
 // 数据库表名
 export const TABLES = {
   CONTRIBUTIONS: 'voice_contributions',
-  CONTRIBUTORS: 'contributors',
   CORPUS: 'corpus_sentences',
 } as const
 
@@ -190,59 +194,6 @@ export async function saveContribution(contribution: VoiceContribution) {
   }
 
   return { data, error: null }
-}
-
-/**
- * 获取或创建贡献者
- */
-export async function getOrCreateContributor(anonymousId: string) {
-  const client = getSupabase()
-  if (!client) {
-    return { data: null, error: new Error('Supabase not configured') }
-  }
-
-  // 先查询是否存在
-  const { data: existing } = await client
-    .from(TABLES.CONTRIBUTORS)
-    .select('*')
-    .eq('anonymous_id', anonymousId)
-    .single()
-
-  if (existing) {
-    return { data: existing, error: null }
-  }
-
-  // 创建新贡献者
-  const { data, error } = await client
-    .from(TABLES.CONTRIBUTORS)
-    .insert({
-      anonymous_id: anonymousId,
-      created_at: new Date().toISOString(),
-    })
-    .select()
-    .single()
-
-  return { data, error }
-}
-
-/**
- * 更新贡献者统计
- */
-export async function updateContributorStats(
-  contributorId: string,
-  durationToAdd: number
-) {
-  const client = getSupabase()
-  if (!client) {
-    return { error: new Error('Supabase not configured') }
-  }
-
-  const { error } = await client.rpc('increment_contributor_stats', {
-    p_contributor_id: contributorId,
-    p_duration: durationToAdd,
-  })
-
-  return { error }
 }
 
 /**

@@ -1,115 +1,86 @@
 # VoxFlame Agent
 
-> 让声音不仅被听见，更被理解。  
-> A real-time communication system for people with dysarthric speech.
+> 让声音不仅被听见，更被理解。
 
-**更新时间**: 2026-03-09
+**更新时间**: 2026-03-26
 
----
+VoxFlame 是面向构音障碍沟通场景的主动沟通助手。当前目标不是做“通用语音助手”，而是把主链路收敛成一个真正可用的产品：先帮助用户说出第一句话，再帮助用户在实时沟通中被理解，并把练习与记忆沉淀成长期改进。
 
-## 项目目标
+当前产品判断已经明确吸收“创始人即用户”的一手研究：真正决定成败的，不只是识别准确率，而是用户在面试、工作协作、医疗沟通、陌生人求助这些高压时刻，能不能不被打断、不被忽视、不被别人替他说话。
 
-VoxFlame 不是“通用语音助手”，而是一个**软硬件一体的实时沟通解决方案**，优先服务：
-- 构音障碍、发音不清用户（首要）
-- 在突发、陌生人、高压场景下需要快速表达的人
+文档使用上也已经进一步收口：继续开发时，默认以本 README、[产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](/home/ubuntu/VoxFlame-Agent/.tasks/current.md) 为主入口；仓库研究结论现在优先看 [Runtime And Surface Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) 和 [Agent, Memory And Tooling Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) 这 2 份综合参考。
 
-目标不是“把用户改造成标准发音”，而是：
-- 在关键场景里，先帮助用户更容易主动开口
-- 在需要沟通时，快速把“难懂语音”转成“可理解表达”
-- 尽量保持用户自己的表达风格与声纹特征
-- 持续复盘，帮助用户长期提升沟通效果
+## 当前架构
 
-## 项目协作特色
+当前唯一事实源：
 
-除了代码、任务和架构文档，仓库里还保留了一个给产品想法使用的 `ideas/` 目录：
+```text
+Frontend RTC/RTM
+  -> Backend /api/rtc/session/*
+  -> TEN rtc graph
+  -> Qwen realtime ASR / TTS
+```
 
-- `ideas/DAILY_CAPTURE.md`
-  用来随手记下外部看到的好产品、好交互、好仓库、半成品念头
-- `ideas/LONG_TERM_TOPICS.md`
-  用来沉淀那些需要长期讨论、持续调研、暂时没有结论的问题
+- `Frontend`：Agora RTC 音频、Agora RTM 文本/控制、沟通页与训练页；PWA 已恢复为正式能力，默认随前端容器开启。
+- `Backend`：RTC session orchestration、memory API、phrases API、upload API。
+- `TEN Agent`：服务端 VAD、Qwen realtime ASR/TTS、LLM 纠错、memory layer。
+- 旧运行时 `websocket` 主链已经退役，不再作为兼容路径保留。
 
-它不是默认启动上下文，也不替代当前任务列表。只有当我们在讨论新想法、产品方向或长期调研时，才会按需读取。
+## 当前能力
 
----
+- 沟通页已跑通 `RTC audio + RTM text/control`。
+- 纯文本代播会显式返回 assistant transcript，不再只靠语音回放。
+- 训练页已能按需拉起 RTC worker，并通过 RTM 接收 `training_feedback` 与 `voice_profile_updated`。
+- Qwen realtime ASR/TTS 已完成单元测试和真实供应商 smoke。
+- memory、hotwords、confusion patterns 已能沿当前主链写回。
 
-## 核心判断（先把方向讲清楚）
+## 当前代码判断
 
-### 1) TEN 是数据驱动流，不是意图驱动流
+- 沟通主链已经能用；沟通页首屏已经从 `chat-first` 收成 `starter kit + live session + expression kit drawer`，首页、练习页和沟通档案页的顶层信息也开始从“说明书式页面”收成“任务入口 + 资源入口 + 低压力提示”。
+- 训练数据入口这轮也开始扎实起来：前端已围绕 `recording envelope -> recorder queue -> upload receipt` 收口，后端 `/api/upload/complete` 已开始按 `audio_path` 复用已有 contribution / manifest，减少补传和重试时的重复写入。
+- 本地待同步录音现在不再只是“有个数量提示”，而是会带 `syncStatus / syncAttempts / lastAttemptAt / lastError` 显式展示，后续 PWA、web 和 future companion 可以围绕同一套 recorder queue contract 继续扩展。
+- [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 同时承担会话启动、RTM 事件路由、字幕聚合、voice profile 同步和本地 memory session 管理，已经逼近“第二控制面”。
+- 长期用户状态目前分散在前端 [memory-service.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/memory-service.ts)、后端 [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 和 TEN 的 [memory_layer_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/memory_layer_python/extension.py)；方向没错，但还缺统一的 `profile bundle / session review` 读模型。
+- TEN 主控 [extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/voxflame_main_python/extension.py) 已同时背负 transport relay、训练结果处理、voice profile 转发和会话状态管理，近期应该停长产品语义，而不是继续堆功能。
 
-当前项目主链路是 TEN graph 编排：`音频 -> ASR -> 纠错 -> TTS -> WebSocket`。  
-它擅长低延迟、确定性管线；不擅长复杂的“LLM 自主规划 + 动态多工具编排”。
+## 当前重点
 
-### 2) Voice Agent 是实时系统，A2UI/Skill 不是第一优先级
+当前不再继续做 transport 大迁移。下一阶段重点是先把已有能力收成一个可长期扩展的产品和 contract：
 
-对实时语音场景，核心是：
-- 低延迟
-- 打断与抢话稳定性
-- 错误兜底
-- 连续可用性
+1. 首页与沟通工作台
+- 把首页改成高压场景优先的任务入口，再把 `starter kit + personalized phrases + live session` 收成一条“先开口，再持续沟通”的主路径。
 
-A2UI/Skill 更适合桌面辅助、复盘、训练阶段，在“实时对话主回路”里当前价值有限。
+2. 数据录入与上传地基
+- 继续把 `recording envelope / recorder queue / upload receipt / manifest` 收成稳定 contract，为 PWA、未来 app 和 companion 复用打地基。
 
-### 3) 产品路线应是三阶段
+3. 后端读模型
+- 把 `profile bundle / session review / expression kit merge` 做成 backend 正式 contract，减少页面自己拼记忆和画像。
 
-1. **实时沟通助手（当前主线）**: 能在真实场景里稳定帮用户说清楚
-2. **半智能助手（下一阶段）**: 会准备、会兜底、会复盘
-3. **全智能助手（远期）**: 在授权边界内主动参与对话与任务执行
+4. 前端变薄
+- 把会话 transport、字幕 reducer、短语动作和训练同步从巨型 hook 里拆开，避免前端继续长成第二控制面。
 
----
+5. 执行面去供应商化
+- 继续使用 `TEN + Agora` 跑现役主链，但产品层逐步改用 vendor-neutral 的 `session / transport / capability` 语言。
 
-## 技术难点与深度调研结论
+## 近期开发路径
 
-### A. 你构想中的关键技术难点
+1. 先改沟通页首屏，让 `CommunicationStarterKit` 成为正式入口，并把 `QuickPhrasesPanel` 降成表达工具箱的第二层。
+2. 继续把训练数据链路收口到 `recording envelope / recorder queue / upload/complete`，补 authenticated live smoke，并强化上传幂等性。
+   当前 web 端已经补到“队列状态可追踪、失败可解释、重试可见”，下一步重点是把真实登录态 smoke 和队列/manifest 落盘一起跑通。
+3. 在 backend 增加 `profile bundle` 和 `session review` 读写口，让沟通页、训练页、记忆页消费同一份长期画像。
+4. 重构前端 session hooks：保留当前 RTC/RTM 主链，但把 transport bootstrap、消息归并、memory sync 解耦。
+5. 在不替换 runtime 的前提下，收紧 TEN 主控职责，只保留 realtime orchestration，逐步把产品治理逻辑移回 backend/control plane。
 
-1. **低延迟 vs 高准确率冲突**
-- 构音障碍语音纠错通常需要上下文与个性化信息，但这会增加时延。
+## 快速开始
 
-2. **全双工交互 vs 稳定中断控制**
-- 用户和系统同时说话时，必须可靠实现 barge-in（用户打断系统）、重入、去抖。
-
-3. **实时沟通 vs 长时记忆治理**
-- “记录什么、何时记录、记录多久、如何遗忘”是产品和合规双重难题。
-
-4. **语音翻译/重表达 vs 工具调用并行**
-- 同一会话内兼顾语音对话、翻译、工具调用，容易出现状态竞争、上下文错配。
-
-5. **个性化语音模型训练数据稀缺**
-- 每位用户的发音模式差异极大，小样本个体化是硬问题。
-
-6. **软硬件协同难题**
-- 类 PLAUD + 翻译耳机形态涉及：收音阵列、降噪、回声消除、蓝牙链路、续航、端云协同。
-
-### B. 对“最先进语音多模态/全双工模型”的调研结论
-
-> 结论（截至 2026-03-04）：**没有单一模型可以在生产级同时完美覆盖“低延迟全双工对话 + 高质量语音翻译 + 稳定工具调用 + 个体化长期记忆”**。  
-> 可行方案仍然是“分层架构 + 能力解耦”。
-
-| 方案 | 实时语音 | 工具调用 | 关键限制（与你场景相关） |
-|---|---|---|---|
-| OpenAI Realtime API | 支持语音到语音 | 支持（含异步函数调用） | 长会话与上下文治理复杂；需要额外状态编排 |
-| Gemini Live API | 支持实时音频交互 | 支持函数调用 | 官方文档说明同一回复通常只输出一种模态（音频或文本） |
-| Qwen Realtime API | 支持实时语音，支持 text+audio 同回包 | Qwen 文档中工具调用主要走 Chat Completions；Realtime 工具链需额外验证 | 需自行做会话编排、工具状态同步 |
-| Kyutai Moshi/Hibiki（研究/开源） | 全双工低延迟很强 | 非工具调用导向 | 任务边界窄（如 Hibiki 当前是法英同传），不直接等于产品级 Agent |
-
-### C. 对 VoxFlame 的技术策略含义
-
-1. **短期**: TEN 保持实时主回路，避免把复杂 Agent 决策塞进回路里。
-2. **中期**: 在 TEN 旁路增加“策略层/编排层”（计划、记忆检索、工具仲裁）。
-3. **长期**: 再评估统一端到端语音多模态模型是否可替代部分分层组件。
-
----
-
-## 项目使用 / 部署
-
-### 1. 环境要求
+### 环境要求
 
 - Docker + Docker Compose
-- 可用的 Supabase 项目（Auth + DB）
-- 阿里云 DashScope API Key（ASR/LLM/TTS）
+- DashScope API Key
+- Agora App ID + App Certificate
+- Supabase 项目
 
-### 2. 环境变量
-
-至少确认以下文件已配置：
+### 环境变量
 
 ```bash
 cp .env.example .env
@@ -119,143 +90,80 @@ cp ten_agent/.env.example ten_agent/.env
 ```
 
 关键变量：
+
 - `DASHSCOPE_API_KEY`
+- `AGORA_APP_ID`
+- `AGORA_APP_CERTIFICATE` 或 `AGORA_CERTIFICATE`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_API_URL`
-- `NEXT_PUBLIC_WS_URL`（建议 `ws://localhost:3001/ws/agent`）
+- `NEXT_PUBLIC_API_URL`：本地开发时使用 `http://localhost:3001`
+- `FRONTEND_NEXT_PUBLIC_API_URL`：Docker 部署时推荐固定为 `/api`
+- `VOXFLAME_ENABLE_PWA`：默认 `1`；如需排查 `localhost` 缓存 / service worker 干扰，可临时设为 `0`
 
-### 3. Docker 启动（推荐）
+### 启动
 
 ```bash
 docker compose up -d --build
 docker compose ps
 ```
 
-常用运维命令：
+常用命令：
 
 ```bash
 docker compose logs -f frontend
 docker compose logs -f backend
 docker compose logs -f ten-agent
-
-docker compose restart frontend
-docker compose restart backend
-docker compose restart ten-agent
-
 docker compose down
 ```
 
-### 4. 访问入口
+### 访问入口
 
 - Frontend: `http://localhost:3000`
 - Backend health: `http://localhost:3001/health`
-- WS proxy: `ws://localhost:3001/ws/agent`
-- TEN Agent WS: `ws://localhost:8766`
+- RTC orchestration health: `http://localhost:3001/api/rtc/health`
+- TEN control server: `http://localhost:8080/health`
 
----
-
-## 基本结构
+## 目录
 
 ```text
 VoxFlame-Agent/
-├── frontend/                    # Next.js 14 前端
-│   └── src/app/
-│       ├── page.tsx             # 公共首页 + 沟通模式切换
-│       ├── chat/page.tsx        # 兼容路由（重定向到 /?mode=communicate）
-│       ├── contribute/page.tsx  # 中文语训 + 录后反馈 + 匿名上传页
-│       ├── ranyan/page.tsx      # 项目介绍页
-│       ├── (auth)/login/page.tsx
-│       └── auth/callback/route.ts
-├── backend/                     # Express + WS Proxy + API
-│   └── src/index.ts
-├── ten_agent/                   # TEN Runtime + Python extensions
-│   ├── property.json            # 图编排（数据流）
-│   └── extension_src/
-│       ├── websocket_server/
-│       ├── voxflame_main_python/
-│       ├── llm_correction_python/
-│       └── memory_layer_python/
-├── supabase/                    # 迁移脚本
-├── docs/                        # 架构与研究文档
+├── frontend/
+│   ├── src/app/
+│   ├── src/components/
+│   ├── src/hooks/
+│   └── src/lib/
+├── backend/
+│   └── src/
+├── ten_agent/
+│   ├── extension_src/
+│   ├── property.json
+│   └── manifest.json
+├── scripts/
+├── docs/
 └── docker-compose.yml
 ```
 
----
+## 关键入口
 
-## 项目现有进度（按代码现状）
+- 前端沟通会话：[frontend/src/hooks/useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts)
+- 前端训练会话：[frontend/src/hooks/useMandarinTrainingSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useMandarinTrainingSession.ts)
+- 后端 RTC orchestration：[backend/src/services/rtc-orchestration.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/rtc-orchestration.service.ts)
+- TEN runtime graph：[ten_agent/property.json](/home/ubuntu/VoxFlame-Agent/ten_agent/property.json)
+- TEN 主控扩展：[ten_agent/extension_src/voxflame_main_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/voxflame_main_python/extension.py)
 
-### 已可用
+## 验证脚本
 
-- `Frontend -> Backend -> TEN Agent` WebSocket 代理链路
-- Supabase 登录鉴权（前后端均已接入）
-- TEN 实时链路：ASR -> LLM 纠错 -> TTS
-- 首页已切换为公开产品首页：明确“现在沟通 / 练习表达 / 查看进展与记忆”，`/?mode=communicate` 进入沟通模式，`/chat` 保留兼容跳转
-- 多客户端会话隔离（`client_id` 维度）与定向消息回传
-- 纠错事件 + 会话 turn 写入 memory layer（local-first）
-- `voice_profile / memory_context` 已进入纠错链路
-- 常用短语 CRUD API（后端）
-- 主动沟通 Starter Kit 第一版：基于 AAC / 医疗 / 应急资料整理的中文场景卡片与第一句话代播
-- WebSocket 纯文本 `user_input -> TEN Agent -> TTS` 已打通，匿名 starter phrase 会自动连接并跳过默认问候
-- `/contribute` 已进入中文语训页第二阶段：高价值场景句、拼音、实时转写、录后反馈、匿名上传和训练结果写回已形成最小闭环
-- Docker 构建链路稳定（`docker compose build` 已验证通过）
+- Qwen ASR live smoke: `bash scripts/qwen_asr_live_smoke.sh`
+- Qwen TTS live smoke: `bash scripts/qwen_tts_live_smoke.sh`
+- AI 文档校验: `bash scripts/check_ai_docs.sh`
 
-### 部分可用 / 需实测
+## 协作入口
 
-- 真实麦克风端到端延迟、误打断率、弱网重连表现
-- Memory 检索质量与日级复盘效果（跨会话）
-- 用户身份上下文注入后的个性化纠错收益量化
-
-### 仍是占位/原型的能力
-
-- 工具执行接口（电话/设备/提醒）当前以模拟逻辑为主
-- 半智能复盘与训练教练流程尚未闭环
-
-
----
-
-## 下步计划（与你的产品构想对齐）
-
-### Phase 1: 实时沟通助手（P0）
-
-目标：先把“帮助用户主动开口并被理解”做到可用。
-
-- ✅ 首页信息架构已完成第一轮重构：公开首页先讲“现在沟通 / 练习表达 / 查看进展与记忆”，并保留 `/?mode=communicate` 沟通入口
-- ✅ 第一话 / 场景模板 / 快捷短语 / 一键代播闭环（第一版）
-- 🚧 中文训练页第二阶段已落地：目标句、拼音、录后反馈、匿名上传、训练结果写回已接通；趋势页与更细的拼音 / 音节反馈待补
-- 打断策略与时延治理（p95、误打断率、重连恢复）作为所有主功能的上线门槛
-- 全屏字幕保留，但降级为辅助显示能力，不再作为近期主叙事
-
-
-### Phase 2: 半智能助手（P1）
-
-目标：会准备、会复盘、会逐渐理解这个用户。
-
-- 会话前准备建议（基于历史习惯 + 场景）
-- 会话中兜底表达建议（用户确认后执行）
-- 个体沟通记忆（高频表达、混淆词、场景偏好、训练历史）
-- 每日复盘（遗漏信息、沟通风险点、改进建议）
-
-### Phase 3: 全智能助手（P2）
-
-目标：在强授权下主动参与对话，并开始连接外部场景。
-
-- 可控代理模式（白名单对象 + 白名单工具 + 可审计）
-- 多轮任务级沟通目标追踪
-- 用户成长模型（鼓励、训练计划、自适应难度）
-- 场景声音提醒与用户定义设备 / App 联动
-
----
-
-## 技术特点
-
-- **TEN 数据流核心**: 适合实时音频处理链路
-- **本地优先记忆**: 为长期个体化提供基础
-- **后端 WS 代理**: 解决前端到 Agent 的工程接入问题
-- **可演进架构**: 先实时稳定，再叠加半智能与全智能层
+- 当前任务：[.tasks/current.md](/home/ubuntu/VoxFlame-Agent/.tasks/current.md)
+- 项目摘要：[.claude-summary.md](/home/ubuntu/VoxFlame-Agent/.claude-summary.md)
+- 工程规范：[AGENTS.md](/home/ubuntu/VoxFlame-Agent/AGENTS.md)
+- 产品主文档：[docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
 
 ---
 

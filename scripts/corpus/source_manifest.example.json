@@ -1,0 +1,24 @@
+{
+  "sources": [
+    {
+      "id": "aishell_transcript",
+      "source": "/data/aishell/transcript/aishell_transcript_v0.8.txt",
+      "priority": 0.9,
+      "usage_weight": 0.7
+    },
+    {
+      "id": "st_cmds_transcript",
+      "source": "/data/stcmds/metadata.txt",
+      "scene_hint": "手机设备",
+      "priority": 1.1,
+      "usage_weight": 1.1
+    },
+    {
+      "id": "medical_guide",
+      "source": "https://example.com/official-medical-guide.html",
+      "scene_hint": "看病拿药",
+      "priority": 1.0,
+      "usage_weight": 1.0
+    }
+  ]
+}

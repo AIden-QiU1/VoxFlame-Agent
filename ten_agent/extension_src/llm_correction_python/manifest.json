@@ -14,20 +14,22 @@
       {
         "name": "asr_result",
         "property": {
-          "text": {
-            "type": "string"
-          },
-          "final": {
-            "type": "bool"
-          },
-          "start_ms": {
-            "type": "int64"
-          },
-          "duration_ms": {
-            "type": "int64"
-          },
-          "language": {
-            "type": "string"
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "final": {
+              "type": "bool"
+            },
+            "start_ms": {
+              "type": "int64"
+            },
+            "duration_ms": {
+              "type": "int64"
+            },
+            "language": {
+              "type": "string"
+            }
           }
         }
       }
@@ -36,36 +38,42 @@
       {
         "name": "text_data",
         "property": {
-          "text": {
-            "type": "string"
-          },
-          "end_of_segment": {
-            "type": "bool"
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "end_of_segment": {
+              "type": "bool"
+            }
           }
         }
       },
       {
         "name": "corrected_text",
         "property": {
-          "original": {
-            "type": "string"
-          },
-          "corrected": {
-            "type": "string"
-          },
-          "is_corrected": {
-            "type": "bool"
+          "properties": {
+            "original": {
+              "type": "string"
+            },
+            "corrected": {
+              "type": "string"
+            },
+            "is_corrected": {
+              "type": "bool"
+            }
           }
         }
       },
       {
         "name": "interim_text",
         "property": {
-          "text": {
-            "type": "string"
-          },
-          "is_interim": {
-            "type": "bool"
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "is_interim": {
+              "type": "bool"
+            }
           }
         }
       }

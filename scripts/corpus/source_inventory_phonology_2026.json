@@ -1,0 +1,67 @@
+{
+  "sources": [
+    {
+      "id": "shenglv_qimeng",
+      "source": "https://zh.wikisource.org/wiki/%E8%81%B2%E5%BE%8B%E5%95%9F%E8%92%99",
+      "priority": 1.3,
+      "usage_weight": 0.8,
+      "note": "经典声律材料，适合补平仄和押韵覆盖"
+    },
+    {
+      "id": "liweng_duiyun",
+      "source": "https://zh.wikisource.org/wiki/%E7%AC%A0%E7%BF%81%E5%B0%8D%E9%9F%BB",
+      "priority": 1.3,
+      "usage_weight": 0.75,
+      "note": "对偶和韵脚密集，适合做音韵强化句池"
+    },
+    {
+      "id": "mulan_poem",
+      "source": "https://zh.wikisource.org/wiki/%E6%9C%A8%E8%98%AD%E8%A9%A9",
+      "priority": 1.15,
+      "usage_weight": 0.7,
+      "note": "节奏稳定、短句多、适合拆分"
+    },
+    {
+      "id": "taohuayuanji",
+      "source": "https://zh.wikisource.org/wiki/%E6%A1%83%E8%8A%B1%E6%BA%90%E8%A8%98",
+      "priority": 1.1,
+      "usage_weight": 0.65,
+      "note": "经典短句较多，适合作为朗读补充"
+    },
+    {
+      "id": "yueyanglouji",
+      "source": "https://zh.wikisource.org/wiki/%E5%B2%B3%E9%99%BD%E6%A8%93%E8%A8%98",
+      "priority": 1.15,
+      "usage_weight": 0.65,
+      "note": "句式清晰，适合切成中短句"
+    },
+    {
+      "id": "zuowengtingji",
+      "source": "https://zh.wikisource.org/wiki/%E9%86%89%E7%BF%81%E4%BA%AD%E8%A8%98",
+      "priority": 1.1,
+      "usage_weight": 0.6,
+      "note": "节奏鲜明，适合朗读训练"
+    },
+    {
+      "id": "lantingjixu",
+      "source": "https://zh.wikisource.org/wiki/%E8%98%AD%E4%BA%AD%E9%9B%86%E5%BA%8F",
+      "priority": 1.05,
+      "usage_weight": 0.6,
+      "note": "语流和韵律变化丰富"
+    },
+    {
+      "id": "chushibiao",
+      "source": "https://zh.wikisource.org/wiki/%E5%87%BA%E5%B8%AB%E8%A1%A8",
+      "priority": 1.05,
+      "usage_weight": 0.6,
+      "note": "适合补功能词和句法节奏"
+    },
+    {
+      "id": "tengwanggexu",
+      "source": "https://zh.wikisource.org/wiki/%E6%BB%95%E7%8E%8B%E9%96%A3%E5%BA%8F",
+      "priority": 1.2,
+      "usage_weight": 0.6,
+      "note": "声调和节奏变化大，适合作为补充语料"
+    }
+  ]
+}

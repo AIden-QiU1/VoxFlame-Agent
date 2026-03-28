@@ -1,6 +1,19 @@
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { buildLoginPath } from '@/lib/auth/navigation'
+
+const PROTECTED_PATH_PREFIXES = ['/contribute', '/memory', '/chat']
+
+function requiresAuth(request: NextRequest): boolean {
+    const { pathname, searchParams } = request.nextUrl
+
+    if (PROTECTED_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+        return true
+    }
+
+    return pathname === '/' && searchParams.get('mode') === 'communicate'
+}
 
 export async function middleware(request: NextRequest) {
     let response = NextResponse.next({
@@ -34,7 +47,16 @@ export async function middleware(request: NextRequest) {
     )
 
     // Refresh Session if expired
-    await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (requiresAuth(request) && !user) {
+        const loginUrl = request.nextUrl.clone()
+        const nextValue = `${request.nextUrl.pathname}${request.nextUrl.search}`
+        const loginPath = buildLoginPath(nextValue)
+        loginUrl.pathname = '/login'
+        loginUrl.search = loginPath.includes('?') ? loginPath.slice(loginPath.indexOf('?')) : ''
+        return NextResponse.redirect(loginUrl)
+    }
 
     return response
 }

@@ -12,58 +12,160 @@
   "api": {
     "cmd_in": [
       {
-        "name": "on_user_connected",
-        "description": "Called when a user connects via WebSocket"
+        "name": "on_user_connected"
       },
       {
-        "name": "on_user_disconnected",
-        "description": "Called when a user disconnects"
+        "name": "on_user_disconnected"
       },
       {
-        "name": "flush",
-        "description": "Interrupt current TTS playback"
+        "name": "on_user_joined"
+      },
+      {
+        "name": "on_user_left"
+      },
+      {
+        "name": "on_connected"
+      },
+      {
+        "name": "on_connection_failure"
+      },
+      {
+        "name": "on_connection_error"
+      },
+      {
+        "name": "on_token_expired"
+      },
+      {
+        "name": "on_token_will_expire"
+      },
+      {
+        "name": "on_first_remote_video_frame"
+      },
+      {
+        "name": "on_first_remote_video_decoded"
+      },
+      {
+        "name": "on_first_remote_audio_frame"
+      },
+      {
+        "name": "on_first_remote_audio_decoded"
+      },
+      {
+        "name": "on_datastream_error"
+      },
+      {
+        "name": "on_subscribed_remote_users_changed"
+      },
+      {
+        "name": "onVideoPublishStateChanged"
+      },
+      {
+        "name": "onAudioPublishStateChanged"
+      },
+      {
+        "name": "system_init"
+      },
+      {
+        "name": "user_input"
+      },
+      {
+        "name": "training_result"
+      },
+      {
+        "name": "speech_activity"
+      },
+      {
+        "name": "start_of_sentence"
+      },
+      {
+        "name": "end_of_sentence"
+      },
+      {
+        "name": "end_audio"
+      },
+      {
+        "name": "flush"
       }
     ],
     "cmd_out": [
       {
-        "name": "flush",
-        "description": "Send flush command to TTS"
+        "name": "flush"
+      },
+      {
+        "name": "save_conversation"
+      },
+      {
+        "name": "search_memory"
+      },
+      {
+        "name": "init_memory"
+      },
+      {
+        "name": "update_voice_profile"
+      },
+      {
+        "name": "update_profile"
+      },
+      {
+        "name": "generate_training_feedback"
       }
     ],
     "data_in": [
       {
-        "name": "asr_result",
-        "description": "ASR recognition result from STT extension"
+        "name": "asr_result"
       },
       {
-        "name": "corrected_text",
-        "description": "Corrected text from LLM corrector"
+        "name": "corrected_text"
       },
       {
-        "name": "interim_text",
-        "description": "Interim ASR text for real-time display"
+        "name": "interim_text"
       },
       {
-        "name": "tts_audio_start",
-        "description": "TTS playback started"
+        "name": "tts_audio_start"
       },
       {
-        "name": "tts_audio_end",
-        "description": "TTS playback ended"
+        "name": "tts_audio_end"
+      },
+      {
+        "name": "speech_activity"
+      },
+      {
+        "name": "client_connection"
+      },
+      {
+        "name": "error"
+      },
+      {
+        "name": "system_init"
+      },
+      {
+        "name": "data"
+      },
+      {
+        "name": "rtm_message_event"
+      },
+      {
+        "name": "metrics"
+      },
+      {
+        "name": "training_feedback_result"
       }
     ],
     "data_out": [
       {
-        "name": "text_data",
-        "description": "Text to send to TTS for synthesis"
+        "name": "tts_text_input"
       },
       {
-        "name": "asr_result",
-        "description": "Forward ASR result to corrector"
+        "name": "asr_result"
       },
       {
-        "name": "transcript",
-        "description": "Transcript data for WebSocket display"
+        "name": "transcript"
+      },
+      {
+        "name": "memory_context"
+      },
+      {
+        "name": "correction_event"
       }
     ]
   }

@@ -50,6 +50,31 @@ export interface TrainingMemoryMetadata {
   sessionTurnCount?: number;
 }
 
+export interface TrainingProfileSummaryMetadata {
+  total_training_uploads?: number;
+  total_training_duration_seconds?: number;
+  current_training_streak?: number;
+  best_training_streak?: number;
+  rolling_clarity_average?: number;
+  improvement_slope?: number;
+  improvement_direction?: ImprovementDirection;
+  total_confusion_patterns?: number;
+  status_counts?: Partial<Record<FeedbackStatus, number>>;
+  dominant_categories?: MemoryLabelCount[];
+  frequent_focus?: MemoryLabelCount[];
+  frequent_syllables?: MemoryLabelCount[];
+  frequent_initial_pairs?: MemoryLabelCount[];
+  frequent_final_pairs?: MemoryLabelCount[];
+  frequent_tone_pairs?: MemoryLabelCount[];
+  frequent_confusions?: MemoryLabelCount[];
+  articulation_tips?: MemoryLabelCount[];
+  hotwords?: string[];
+  trends?: MemoryTrendPoint[];
+  next_step?: string;
+  last_pronunciation_summary?: string;
+  generated_at?: number;
+}
+
 export interface GrowthMemoryRecord {
   id: string;
   userId: string;
@@ -158,6 +183,61 @@ function readStringArray(record: JsonRecord | undefined, key: string): string[] 
   return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
 }
 
+function readLabelCounts(record: JsonRecord | undefined, key: string): MemoryLabelCount[] {
+  const value = record?.[key];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) {
+        return null;
+      }
+
+      const label = readString(item, 'label');
+      const count = readNumber(item, 'count');
+      if (!label || count === null) {
+        return null;
+      }
+
+      return { label, count };
+    })
+    .filter((item): item is MemoryLabelCount => item !== null);
+}
+
+function readTrendPoints(record: JsonRecord | undefined, key: string): MemoryTrendPoint[] {
+  const value = record?.[key];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) {
+        return null;
+      }
+
+      const date = readString(item, 'date');
+      if (!date) {
+        return null;
+      }
+
+      return {
+        date,
+        sessionCount: readNumber(item, 'sessionCount') ?? 0,
+        memoryCount: readNumber(item, 'memoryCount') ?? 0,
+        trainingAttempts: readNumber(item, 'trainingAttempts') ?? readNumber(item, 'uploadedCount') ?? 0,
+        excellent: readNumber(item, 'excellent') ?? 0,
+        close: readNumber(item, 'close') ?? 0,
+        retry: readNumber(item, 'retry') ?? 0,
+        unclear: readNumber(item, 'unclear') ?? 0,
+        avgClarityScore: readNumber(item, 'avgClarityScore') ?? 0,
+      };
+    })
+    .filter((item): item is MemoryTrendPoint => item !== null);
+}
+
 function toTimestamp(value: string | undefined, fallback: number): number {
   if (!value) {
     return fallback;
@@ -209,6 +289,10 @@ function toGrowthMemory(memory: StoredMemoryRecord): GrowthMemoryRecord {
 
 function toTrainingMetadata(memory: GrowthMemoryRecord): TrainingMemoryMetadata {
   return isRecord(memory.metadata) ? (memory.metadata as TrainingMemoryMetadata) : {};
+}
+
+function toTrainingSummaryMetadata(memory: GrowthMemoryRecord): TrainingProfileSummaryMetadata {
+  return isRecord(memory.metadata) ? (memory.metadata as TrainingProfileSummaryMetadata) : {};
 }
 
 function getMemorySessionId(memory: GrowthMemoryRecord): string | null {
@@ -602,71 +686,106 @@ export function buildMemoryGrowthProfileSnapshot(params: {
     (left, right) => toTimestamp(right.start_time, 0) - toTimestamp(left.start_time, 0),
   );
   const sessionSummaries = buildSessionSummaries(memories, sessions);
-  const trainingMemories = memories.filter((memory) => toTrainingMetadata(memory).kind === 'training_result');
-  const expressionMemories = memories.filter((memory) => toTrainingMetadata(memory).kind !== 'training_result');
+  const trainingSummaryMemories = memories.filter(
+    (memory) => toTrainingMetadata(memory).kind === 'training_profile_summary',
+  );
+  const granularTrainingMemories = memories.filter(
+    (memory) => toTrainingMetadata(memory).kind === 'training_result',
+  );
+  const trainingMemories =
+    trainingSummaryMemories.length > 0 ? trainingSummaryMemories : granularTrainingMemories;
+  const latestTrainingSummary = trainingSummaryMemories[0]
+    ? toTrainingSummaryMetadata(trainingSummaryMemories[0])
+    : null;
+  const expressionMemories = memories.filter((memory) => {
+    const kind = toTrainingMetadata(memory).kind;
+    return kind !== 'training_result' && kind !== 'training_profile_summary';
+  });
   const frequentExpressions = countValues(expressionMemories.map((memory) => memory.content), 5);
-  const frequentFocus = countValues(
-    trainingMemories.flatMap((memory) => toTrainingMetadata(memory).focus_tags ?? []),
-    5,
-  );
-  const frequentSyllables = countValues(
-    trainingMemories.flatMap((memory) => toTrainingMetadata(memory).focus_syllables ?? []),
-    6,
-  );
-  const frequentInitialPairs = countValues(
-    trainingMemories.flatMap((memory) => toTrainingMetadata(memory).pronunciation_initial_pairs ?? []),
-    6,
-  );
-  const frequentFinalPairs = countValues(
-    trainingMemories.flatMap((memory) => toTrainingMetadata(memory).pronunciation_final_pairs ?? []),
-    6,
-  );
-  const frequentTonePairs = countValues(
-    trainingMemories.flatMap((memory) => toTrainingMetadata(memory).pronunciation_tone_pairs ?? []),
-    6,
-  );
-  const frequentConfusions = countValues(
-    trainingMemories.flatMap((memory) => {
-      const metadata = toTrainingMetadata(memory);
-      return [
-        ...((metadata.pronunciation_initial_pairs ?? []).map((item) => `声母 ${item}`)),
-        ...((metadata.pronunciation_final_pairs ?? []).map((item) => `韵母 ${item}`)),
-        ...((metadata.pronunciation_tone_pairs ?? []).map((item) => `声调 ${item}`)),
-      ];
-    }),
-    8,
-  );
-  const articulationTips = countValues(
-    trainingMemories.flatMap((memory) => toTrainingMetadata(memory).articulation_tips ?? []),
-    4,
-  );
-  const keywordHotwords = countValues(
-    trainingMemories.flatMap((memory) => toTrainingMetadata(memory).keywords ?? []),
-  ).map((item) => item.label);
+  const frequentFocus = latestTrainingSummary
+    ? readLabelCounts(latestTrainingSummary as JsonRecord, 'frequent_focus')
+    : countValues(
+        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).focus_tags ?? []),
+        5,
+      );
+  const frequentSyllables = latestTrainingSummary
+    ? readLabelCounts(latestTrainingSummary as JsonRecord, 'frequent_syllables')
+    : countValues(
+        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).focus_syllables ?? []),
+        6,
+      );
+  const frequentInitialPairs = latestTrainingSummary
+    ? readLabelCounts(latestTrainingSummary as JsonRecord, 'frequent_initial_pairs')
+    : countValues(
+        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).pronunciation_initial_pairs ?? []),
+        6,
+      );
+  const frequentFinalPairs = latestTrainingSummary
+    ? readLabelCounts(latestTrainingSummary as JsonRecord, 'frequent_final_pairs')
+    : countValues(
+        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).pronunciation_final_pairs ?? []),
+        6,
+      );
+  const frequentTonePairs = latestTrainingSummary
+    ? readLabelCounts(latestTrainingSummary as JsonRecord, 'frequent_tone_pairs')
+    : countValues(
+        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).pronunciation_tone_pairs ?? []),
+        6,
+      );
+  const frequentConfusions = latestTrainingSummary
+    ? readLabelCounts(latestTrainingSummary as JsonRecord, 'frequent_confusions')
+    : countValues(
+        granularTrainingMemories.flatMap((memory) => {
+          const metadata = toTrainingMetadata(memory);
+          return [
+            ...((metadata.pronunciation_initial_pairs ?? []).map((item) => `声母 ${item}`)),
+            ...((metadata.pronunciation_final_pairs ?? []).map((item) => `韵母 ${item}`)),
+            ...((metadata.pronunciation_tone_pairs ?? []).map((item) => `声调 ${item}`)),
+          ];
+        }),
+        8,
+      );
+  const articulationTips = latestTrainingSummary
+    ? readLabelCounts(latestTrainingSummary as JsonRecord, 'articulation_tips')
+    : countValues(
+        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).articulation_tips ?? []),
+        4,
+      );
+  const keywordHotwords = latestTrainingSummary
+    ? readStringArray(latestTrainingSummary as JsonRecord, 'hotwords')
+    : countValues(
+        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).keywords ?? []),
+      ).map((item) => item.label);
   const hotwords = Array.from(new Set([...(params.hotwords ?? []), ...keywordHotwords])).slice(0, 12);
   const totalTurns = sessionSummaries.reduce((sum, session) => sum + session.turnCount, 0);
-  const totalDurationSeconds = sessionSummaries.reduce((sum, session) => sum + session.durationSeconds, 0);
+  const totalDurationSeconds = latestTrainingSummary
+    ? readNumber(latestTrainingSummary as JsonRecord, 'total_training_duration_seconds') ??
+      sessionSummaries.reduce((sum, session) => sum + session.durationSeconds, 0)
+    : sessionSummaries.reduce((sum, session) => sum + session.durationSeconds, 0);
   const activeDays = new Set([
     ...memories.map((memory) => toDayKey(memory.createdAt)),
     ...sessionSummaries.map((session) => toDayKey(session.startedAt)),
   ]).size;
   const lastSessionAt = sessionSummaries[0]?.startedAt ?? memories[0]?.createdAt ?? null;
+  const summaryStatusCounts = latestTrainingSummary && isRecord(latestTrainingSummary.status_counts as unknown)
+    ? latestTrainingSummary.status_counts as JsonRecord
+    : undefined;
   const statusCounts: Record<FeedbackStatus, number> = {
-    excellent: trainingMemories.filter(
+    excellent: readNumber(summaryStatusCounts, 'excellent') ?? granularTrainingMemories.filter(
       (memory) => toTrainingMetadata(memory).feedback_status === 'excellent',
     ).length,
-    close: trainingMemories.filter(
+    close: readNumber(summaryStatusCounts, 'close') ?? granularTrainingMemories.filter(
       (memory) => toTrainingMetadata(memory).feedback_status === 'close',
     ).length,
-    retry: trainingMemories.filter(
+    retry: readNumber(summaryStatusCounts, 'retry') ?? granularTrainingMemories.filter(
       (memory) => toTrainingMetadata(memory).feedback_status === 'retry',
     ).length,
-    unclear: trainingMemories.filter(
+    unclear: readNumber(summaryStatusCounts, 'unclear') ?? granularTrainingMemories.filter(
       (memory) => toTrainingMetadata(memory).feedback_status === 'unclear',
     ).length,
   };
 
-  const trainingScores = [...trainingMemories]
+  const trainingScores = [...granularTrainingMemories]
     .sort((left, right) => left.createdAt - right.createdAt)
     .map((memory) => {
       const metadata = toTrainingMetadata(memory);
@@ -676,17 +795,58 @@ export function buildMemoryGrowthProfileSnapshot(params: {
       );
     });
   const recentScores = trainingScores.slice(-7);
-  const rollingClarityAverage = average(recentScores);
-  const improvementSlope = Number(buildLinearSlope(trainingScores.slice(-12)).toFixed(4));
-  const improvementDirection = getImprovementDirection(improvementSlope);
-  const { currentTrainingStreak, bestTrainingStreak } = buildTrainingStreaks(trainingMemories);
+  const rollingClarityAverage = latestTrainingSummary
+    ? readNumber(latestTrainingSummary as JsonRecord, 'rolling_clarity_average') ?? average(recentScores)
+    : average(recentScores);
+  const improvementSlope = latestTrainingSummary
+    ? readNumber(latestTrainingSummary as JsonRecord, 'improvement_slope') ??
+      Number(buildLinearSlope(trainingScores.slice(-12)).toFixed(4))
+    : Number(buildLinearSlope(trainingScores.slice(-12)).toFixed(4));
+  const improvementDirection = latestTrainingSummary
+    ? (readString(latestTrainingSummary as JsonRecord, 'improvement_direction') as ImprovementDirection | null) ??
+      getImprovementDirection(improvementSlope)
+    : getImprovementDirection(improvementSlope);
+  const granularStreaks = buildTrainingStreaks(granularTrainingMemories);
+  const currentTrainingStreak = latestTrainingSummary
+    ? readNumber(latestTrainingSummary as JsonRecord, 'current_training_streak') ??
+      granularStreaks.currentTrainingStreak
+    : granularStreaks.currentTrainingStreak;
+  const bestTrainingStreak = latestTrainingSummary
+    ? readNumber(latestTrainingSummary as JsonRecord, 'best_training_streak') ??
+      granularStreaks.bestTrainingStreak
+    : granularStreaks.bestTrainingStreak;
+  const totalTrainingAttempts = latestTrainingSummary
+    ? readNumber(latestTrainingSummary as JsonRecord, 'total_training_uploads') ??
+      granularTrainingMemories.length
+    : granularTrainingMemories.length;
+  const trends = latestTrainingSummary
+    ? readTrendPoints(latestTrainingSummary as JsonRecord, 'trends')
+    : buildTrendPoints(memories, sessionSummaries);
+  const nextStep = latestTrainingSummary
+    ? readString(latestTrainingSummary as JsonRecord, 'next_step') ??
+      buildNextStep(
+        frequentInitialPairs,
+        frequentFinalPairs,
+        frequentTonePairs,
+        frequentSyllables,
+        frequentFocus,
+        improvementDirection,
+      )
+    : buildNextStep(
+        frequentInitialPairs,
+        frequentFinalPairs,
+        frequentTonePairs,
+        frequentSyllables,
+        frequentFocus,
+        improvementDirection,
+      );
 
   return {
     stats: {
       totalSessions: sessionSummaries.length,
       totalTurns,
       totalMemories: memories.length,
-      totalTrainingAttempts: trainingMemories.length,
+      totalTrainingAttempts,
       totalExpressionMemories: expressionMemories.length,
       totalDurationSeconds,
       avgSessionDurationSeconds:
@@ -698,7 +858,10 @@ export function buildMemoryGrowthProfileSnapshot(params: {
       rollingClarityAverage,
       improvementSlope,
       improvementDirection,
-      totalConfusionPatterns: frequentConfusions.length,
+      totalConfusionPatterns: latestTrainingSummary
+        ? readNumber(latestTrainingSummary as JsonRecord, 'total_confusion_patterns') ??
+          frequentConfusions.length
+        : frequentConfusions.length,
     },
     memories,
     trainingMemories,
@@ -715,15 +878,8 @@ export function buildMemoryGrowthProfileSnapshot(params: {
     articulationTips,
     statusCounts,
     hotwords,
-    trends: buildTrendPoints(memories, sessionSummaries),
-    nextStep: buildNextStep(
-      frequentInitialPairs,
-      frequentFinalPairs,
-      frequentTonePairs,
-      frequentSyllables,
-      frequentFocus,
-      improvementDirection,
-    ),
+    trends,
+    nextStep,
     generatedAt: Date.now(),
   };
 }

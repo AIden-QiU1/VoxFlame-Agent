@@ -1,6 +1,6 @@
 /**
  * Session Controller
- * Compat-only HTTP shell kept temporarily while callers migrate to /ws/agent.
+ * Compat-only HTTP shell kept temporarily while callers migrate to /api/rtc/session/*.
  */
 import { Request, Response, Router } from 'express'
 import { respondCompatNotImplemented } from './compat-response'
@@ -8,7 +8,7 @@ import { respondCompatNotImplemented } from './compat-response'
 const router = Router()
 
 const SESSION_COMPAT_GUIDANCE =
-  'Runtime sessions now bootstrap by opening /ws/agent directly with token or anon_id query params. Persist user state via /api/agent/profile, /api/memory, and /api/phrases.'
+  'Runtime sessions now bootstrap via /api/rtc/session/start and are maintained with /api/rtc/session/ping|stop. Persist user state via /api/agent/profile, /api/memory, and /api/phrases.'
 const SESSION_COMPAT_REMOVAL_TARGET =
   'Remove after remaining callers stop using legacy HTTP session bootstrap endpoints.'
 

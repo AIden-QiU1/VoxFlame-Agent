@@ -1,14 +1,12 @@
 'use client'
 
-import { usePWA } from '@/hooks/usePWA'
-
 interface UpdatePromptProps {
+  hasUpdate: boolean
+  onUpdate: () => void
   className?: string
 }
 
-export function UpdatePrompt({ className = '' }: UpdatePromptProps) {
-  const { hasUpdate, updateServiceWorker } = usePWA()
-
+export function UpdatePrompt({ hasUpdate, onUpdate, className = '' }: UpdatePromptProps) {
   if (!hasUpdate) return null
 
   return (
@@ -30,7 +28,7 @@ export function UpdatePrompt({ className = '' }: UpdatePromptProps) {
         </div>
         
         <button
-          onClick={updateServiceWorker}
+          onClick={onUpdate}
           className="bg-white text-amber-600 text-sm font-medium py-2 px-4 rounded-lg hover:bg-amber-50 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
         >
           更新

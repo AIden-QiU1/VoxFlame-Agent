@@ -2,6 +2,11 @@
 
 import { config } from '@/lib/config'
 import { getValidToken } from '@/lib/supabase/client'
+import {
+  buildTrainingVoiceProfilePayload,
+  getTrainingProfileSnapshot,
+} from '@/lib/training/training-profile'
+import { getTrainingGuidanceProfile } from '@/lib/training/training-guidance-profile'
 
 export type MemoryType = 'episodic' | 'semantic' | 'skill' | 'voice_profile'
 
@@ -41,12 +46,39 @@ export interface CreateMemoryInput {
   sessionMetadata?: Record<string, unknown>
 }
 
+export type HotwordCategory =
+  | 'medical'
+  | 'profession'
+  | 'family'
+  | 'daily'
+  | 'emergency'
+  | 'custom'
+
+export interface HotwordProfile {
+  id: string
+  phrase: string
+  category: HotwordCategory
+  scenario: string
+  note?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface HotwordProfileInput {
+  id?: string
+  phrase: string
+  category: HotwordCategory
+  scenario?: string
+  note?: string
+}
+
 const KEYS = {
   MEMORIES: 'voxflame_memories',
   SESSIONS: 'voxflame_sessions',
   CURRENT: 'voxflame_current_session',
   QUEUE: 'voxflame_sync_queue',
   SESSION_QUEUE: 'voxflame_session_sync_queue',
+  HOTWORDS: 'voxflame_hotword_profiles',
   PREFIX: 'voxflame_user_',
 }
 
@@ -71,6 +103,54 @@ function getSyncSessionId(metadata?: Record<string, unknown>): string {
   }
 
   return genId()
+}
+
+function normalizeHotwordCategory(value: unknown): HotwordCategory {
+  if (
+    value === 'medical' ||
+    value === 'profession' ||
+    value === 'family' ||
+    value === 'daily' ||
+    value === 'emergency'
+  ) {
+    return value
+  }
+
+  return 'custom'
+}
+
+function normalizeHotwordProfiles(value: unknown): HotwordProfile[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const profiles: HotwordProfile[] = []
+
+  for (const item of value) {
+    if (!isRecord(item)) {
+      continue
+    }
+
+    const phrase = readString(item, 'phrase')
+    if (!phrase) {
+      continue
+    }
+
+    const createdAt = readNumber(item, 'createdAt') ?? Date.now()
+    const updatedAt = readNumber(item, 'updatedAt') ?? createdAt
+
+    profiles.push({
+      id: readString(item, 'id') ?? genId(),
+      phrase,
+      category: normalizeHotwordCategory(readString(item, 'category')),
+      scenario: readString(item, 'scenario') ?? '',
+      note: readString(item, 'note') ?? undefined,
+      createdAt,
+      updatedAt,
+    })
+  }
+
+  return profiles.sort((left, right) => right.updatedAt - left.updatedAt)
 }
 
 const userKey = (uid: string, k: string) => `${KEYS.PREFIX}${uid}_${k}`
@@ -202,6 +282,139 @@ class MemoryService {
   getAllMemories(): Memory[] {
     if (!this.userId) return []
     return parseJson<Memory[]>(localStorage.getItem(userKey(this.userId, KEYS.MEMORIES)), []).sort((a, b) => b.createdAt - a.createdAt)
+  }
+
+  getHotwordProfiles(): HotwordProfile[] {
+    if (!this.userId) {
+      return []
+    }
+
+    const stored = parseJson<unknown>(
+      localStorage.getItem(userKey(this.userId, KEYS.HOTWORDS)),
+      [],
+    )
+
+    return normalizeHotwordProfiles(stored)
+  }
+
+  replaceHotwordProfiles(profiles: HotwordProfile[]): HotwordProfile[] {
+    if (!this.userId) {
+      return []
+    }
+
+    const normalized = normalizeHotwordProfiles(profiles)
+    localStorage.setItem(
+      userKey(this.userId, KEYS.HOTWORDS),
+      JSON.stringify(normalized),
+    )
+
+    return normalized
+  }
+
+  upsertHotwordProfile(input: HotwordProfileInput): HotwordProfile | null {
+    if (!this.userId) {
+      return null
+    }
+
+    const phrase = input.phrase.trim()
+    if (!phrase) {
+      return null
+    }
+
+    const now = Date.now()
+    const existing = this.getHotwordProfiles()
+    const previous = input.id
+      ? existing.find((profile) => profile.id === input.id)
+      : undefined
+    const nextProfile: HotwordProfile = {
+      id: previous?.id ?? input.id ?? genId(),
+      phrase,
+      category: normalizeHotwordCategory(input.category),
+      scenario: input.scenario?.trim() ?? previous?.scenario ?? '',
+      note: input.note?.trim() || previous?.note,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+    }
+
+    const nextProfiles = existing.filter((profile) => profile.id !== nextProfile.id)
+    nextProfiles.unshift(nextProfile)
+    this.replaceHotwordProfiles(nextProfiles)
+    return nextProfile
+  }
+
+  deleteHotwordProfile(profileId: string): HotwordProfile[] {
+    if (!this.userId) {
+      return []
+    }
+
+    const nextProfiles = this.getHotwordProfiles().filter(
+      (profile) => profile.id !== profileId,
+    )
+    return this.replaceHotwordProfiles(nextProfiles)
+  }
+
+  getHotwordStrings(): string[] {
+    return Array.from(
+      new Set(this.getHotwordProfiles().map((profile) => profile.phrase)),
+    ).slice(0, 20)
+  }
+
+  buildVoiceProfileSyncPayload():
+    | {
+        hotwords: Array<{ word: string; category: HotwordCategory }>
+        confusion_patterns?: Record<string, unknown>[]
+        clarity_score?: number
+        preferences: {
+          hotword_profiles: HotwordProfile[]
+          training_profile_summary?: Record<string, unknown>
+          dominant_training_categories?: string[]
+          training_data_volume?: {
+            uploaded_recordings: number
+            duration_seconds: number
+          }
+          next_training_step?: string
+        }
+      }
+    | null {
+    const profiles = this.getHotwordProfiles()
+    const trainingProfile = this.userId ? getTrainingProfileSnapshot(this.userId) : null
+    const trainingGuidanceProfile = this.userId
+      ? getTrainingGuidanceProfile(this.userId)
+      : null
+    const trainingVoiceProfile =
+      trainingProfile && trainingProfile.totalUploadedRecordings > 0
+        ? buildTrainingVoiceProfilePayload(trainingProfile, trainingGuidanceProfile)
+        : null
+
+    if (profiles.length === 0 && !trainingVoiceProfile) {
+      return null
+    }
+
+    const trainingHotwords = Array.isArray(trainingVoiceProfile?.hotwords)
+      ? trainingVoiceProfile.hotwords as Array<{ word: string; category: HotwordCategory }>
+      : []
+    const mergedHotwords = [
+      ...profiles.map((profile) => ({
+        word: profile.phrase,
+        category: profile.category,
+      })),
+      ...trainingHotwords,
+    ]
+
+    return {
+      hotwords: mergedHotwords,
+      confusion_patterns: Array.isArray(trainingVoiceProfile?.confusion_patterns)
+        ? trainingVoiceProfile.confusion_patterns as Record<string, unknown>[]
+        : undefined,
+      clarity_score:
+        typeof trainingVoiceProfile?.clarity_score === 'number'
+          ? trainingVoiceProfile.clarity_score
+          : undefined,
+      preferences: {
+        hotword_profiles: profiles,
+        ...(trainingVoiceProfile?.preferences as Record<string, unknown> | undefined),
+      },
+    }
   }
 
   addMemoryEntry(input: CreateMemoryInput): Memory | null {

@@ -1,0 +1,43 @@
+{
+  "type": "extension",
+  "name": "training_feedback_python",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.11"
+    }
+  ],
+  "api": {
+    "cmd_in": [
+      {
+        "name": "generate_training_feedback"
+      }
+    ],
+    "data_out": [
+      {
+        "name": "training_feedback_result",
+        "property": {
+          "properties": {
+            "feedback_request_id": { "type": "string" },
+            "exercise_id": { "type": "string" },
+            "exercise_text": { "type": "string" },
+            "recognized_text": { "type": "string" },
+            "feedback_status": { "type": "string" },
+            "summary": { "type": "string" },
+            "encouragement": { "type": "string" },
+            "primary_focus": { "type": "string" },
+            "primary_pinyin": { "type": "string" },
+            "articulation_tip": { "type": "string" },
+            "next_step": { "type": "string" },
+            "source": { "type": "string" }
+          }
+        }
+      }
+    ],
+    "cmd_out": [],
+    "data_in": []
+  }
+}
+

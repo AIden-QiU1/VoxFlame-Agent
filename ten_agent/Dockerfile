@@ -86,19 +86,19 @@ RUN mkdir -p ~/.tman && \
 # 先复制依赖定义文件，利用 Docker 缓存
 COPY manifest.json /app/
 COPY manifest-lock.json /app/
-
-# 安装 TEN 依赖包
-RUN set -eux; \
-    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY no_proxy NO_PROXY; \
-    rm -f /app/manifest-lock.json; \
-    tman install
+COPY vendor/base_image_ten_packages/ten_packages /app/ten_packages
 
 # =============================================
 # STEP 4: 安装本地扩展
 # =============================================
 
 COPY . /app
+RUN rm -rf /app/vendor/base_image_ten_packages /app/vendor/locked_ten_packages
 RUN cp -r extension_src/* ten_packages/extension/
+RUN rm -rf \
+    /app/ten_packages/extension/aliyun_asr_bigmodel_python \
+    /app/ten_packages/extension/cosy_tts_python
+RUN chmod +x /app/scripts/*.sh
 
 # =============================================
 # STEP 5: 编译 Go Runtime
@@ -106,9 +106,12 @@ RUN cp -r extension_src/* ten_packages/extension/
 
 # 配置 CGO 编译环境
 ENV CGO_CFLAGS="-I/app/ten_packages/system/ten_runtime_go/interface/ten_runtime -I/app/ten_packages/system/ten_runtime/include" \
-    CGO_LDFLAGS="-L/app/ten_packages/system/ten_runtime_go/lib -L/app/ten_packages/system/ten_runtime/lib -lten_runtime_go -lten_runtime -lten_utils"
+    CGO_LDFLAGS="-L/app/ten_packages/system/ten_runtime_go/lib -L/app/ten_packages/system/ten_runtime/lib -lten_runtime_go -lten_runtime -lten_utils" \
+    GOPROXY=https://goproxy.cn,direct \
+    GOSUMDB=sum.golang.google.cn
 
-RUN cd /app && go build -o bin/main
+RUN cd /app && go build -mod=mod -o bin/main
+RUN cd /app/vendor/ai_agents_server && go build -mod=mod -o /app/bin/api .
 
 # =============================================
 # STEP 6: 安装 Python 依赖
@@ -122,7 +125,9 @@ RUN python3 -m venv /app/venv && \
     pip install /app/ten_packages/system/ten_runtime_python && \
     pip install -r /app/ten_packages/system/ten_ai_base/requirements.txt && \
     find /app/ten_packages/extension -name "requirements.txt" -print -exec pip install -r {} \; && \
-    find /app/ten_packages/extension -maxdepth 1 -mindepth 1 -type d -print -exec pip install {} \; && \
+    find /app/ten_packages/extension -maxdepth 1 -mindepth 1 -type d \
+      \( -name "__pycache__" -prune \) -o \
+      \( -type d \( -exec test -f "{}/setup.py" \; -o -exec test -f "{}/pyproject.toml" \; \) -print -exec pip install {} \; \) && \
     pip install --no-cache-dir pydantic==2.10.3 tenacity==8.3.0
 
 # =============================================
@@ -141,5 +146,6 @@ ENV PATH=/app/venv/bin:$PATH \
     no_proxy="*"
 
 EXPOSE 8766
+EXPOSE 8080
 
-CMD ["/bin/bash", "-c", ". /app/venv/bin/activate && /app/scripts/start.sh"]
+CMD ["/bin/bash", "-c", ". /app/venv/bin/activate && /app/scripts/entrypoint.sh"]

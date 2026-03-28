@@ -3,8 +3,10 @@
 # Central coordinator for voice assistant with speech correction
 #
 
+import base64
 import time
 import json
+import uuid
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 
@@ -18,10 +20,31 @@ from ten_runtime import (
 )
 
 from .config import VoxFlameMainConfig
-from .helper import send_cmd, send_data
+from .helper import send_cmd, send_data, send_rtm_publish
 
 
 DEFAULT_CLIENT_ID = "default"
+AGORA_TRANSPORT_EVENTS = {
+    "on_connected",
+    "on_connection_failure",
+    "on_connection_error",
+    "on_token_expired",
+    "on_token_will_expire",
+    "on_first_remote_video_frame",
+    "on_first_remote_video_decoded",
+    "on_first_remote_audio_frame",
+    "on_first_remote_audio_decoded",
+    "on_datastream_error",
+    "on_subscribed_remote_users_changed",
+    "onVideoPublishStateChanged",
+    "onAudioPublishStateChanged",
+    "onAudioSubscribeStateChanged",
+    "onVideoSubscribeStateChanged",
+    "on_user_audio_track_state_changed",
+    "on_user_track_state_unsubscribed",
+    "on_user_info_updated",
+    "on_user_state_changed",
+}
 
 
 @dataclass
@@ -36,6 +59,8 @@ class SessionContext:
     conversation_history: List[Dict[str, Any]] = field(default_factory=list)
     user_profile: Optional[Dict[str, Any]] = None
     last_asr_text: str = ""
+    transport_state: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    runtime_metrics: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
 
 class VoxFlameMainExtension(AsyncExtension):
@@ -45,7 +70,7 @@ class VoxFlameMainExtension(AsyncExtension):
     Responsibilities:
     1. Coordinate data flow between ASR -> Corrector -> TTS
     2. Handle user speech interruption (flush TTS when user speaks)
-    3. Send transcripts to WebSocket for frontend display
+    3. Fan out transcripts through the configured realtime transport
     4. Manage conversation state and history
     5. Send correction events to memory layer for learning
     """
@@ -103,11 +128,15 @@ class VoxFlameMainExtension(AsyncExtension):
         Handle incoming commands.
 
         Supported commands:
-        - on_user_connected: User connected via WebSocket
-        - on_user_disconnected: User disconnected
+        - on_user_connected / on_user_joined: User connected to the active transport
+        - on_user_disconnected / on_user_left: User disconnected
         - system_init: User context from backend proxy
         - user_input: Text input from frontend for direct playback
         - training_result: Structured training feedback from /contribute
+        - speech_activity: Client-side speech activity notification for early barge-in
+        - start_of_sentence: Server-side VAD speech-start event
+        - end_of_sentence: Server-side VAD speech-end event
+        - end_audio: Explicit end-of-utterance signal to flush ASR tail latency
         - flush: Interrupt current TTS playback
         """
         cmd_name = cmd.get_name()
@@ -117,7 +146,7 @@ class VoxFlameMainExtension(AsyncExtension):
         ten_env.log_info(f"[VoxFlameMain] Received cmd: {cmd_name}, client_id={client_id}")
 
         try:
-            if cmd_name == "on_user_connected":
+            if cmd_name in ("on_user_connected", "on_user_joined"):
                 await self._handle_user_connected(
                     ten_env,
                     client_id,
@@ -125,7 +154,7 @@ class VoxFlameMainExtension(AsyncExtension):
                 )
                 await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
 
-            elif cmd_name == "on_user_disconnected":
+            elif cmd_name in ("on_user_disconnected", "on_user_left"):
                 await self._handle_user_disconnected(ten_env, client_id)
                 await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
 
@@ -141,12 +170,32 @@ class VoxFlameMainExtension(AsyncExtension):
                 await self._handle_training_result_cmd(ten_env, cmd, client_id)
                 await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
 
+            elif cmd_name == "speech_activity":
+                await self._handle_speech_activity_cmd(ten_env, cmd, client_id)
+                await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
+
+            elif cmd_name == "start_of_sentence":
+                await self._handle_server_vad_start_cmd(ten_env, client_id)
+                await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
+
+            elif cmd_name == "end_of_sentence":
+                await self._handle_server_vad_end_cmd(ten_env, client_id)
+                await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
+
+            elif cmd_name == "end_audio":
+                await self._handle_end_audio_cmd(ten_env, cmd, client_id)
+                await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
+
             elif cmd_name == "flush":
                 # If client_id is missing, flush globally.
                 if client_id_raw:
                     await self._handle_flush(ten_env, client_id)
                 else:
                     await self._handle_flush_all(ten_env)
+                await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
+
+            elif cmd_name in AGORA_TRANSPORT_EVENTS:
+                await self._handle_transport_event_cmd(ten_env, cmd_name, cmd)
                 await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
 
             else:
@@ -163,7 +212,7 @@ class VoxFlameMainExtension(AsyncExtension):
 
         Data flow:
         1. asr_result from STT -> Check for interrupt -> Forward to corrector
-        2. corrected_text from corrector -> Forward to TTS and WebSocket
+        2. corrected_text from corrector -> Forward to TTS and transcript transport
         3. tts_audio_start/end -> Track TTS state for interruption
         """
         data_name = data.get_name()
@@ -184,9 +233,30 @@ class VoxFlameMainExtension(AsyncExtension):
             elif data_name == "tts_audio_end":
                 await self._handle_tts_end(ten_env, data)
 
+            elif data_name == "speech_activity":
+                await self._handle_speech_activity_data(ten_env, data)
+
+            elif data_name == "training_feedback_result":
+                await self._handle_training_feedback_result(ten_env, data)
+
+            elif data_name == "client_connection":
+                await self._handle_client_connection_data(ten_env, data)
+
+            elif data_name == "metrics":
+                await self._handle_runtime_metrics(ten_env, data)
+
+            elif data_name == "error":
+                await self._handle_module_error(ten_env, data)
+
             elif data_name == "system_init":
                 # Backward compatibility: some runtimes may still deliver this as Data.
                 await self._handle_system_init_data(ten_env, data)
+
+            elif data_name == "data":
+                await self._handle_transport_data(ten_env, data)
+
+            elif data_name == "rtm_message_event":
+                await self._handle_transport_data(ten_env, data)
 
             else:
                 ten_env.log_debug(f"[VoxFlameMain] Unhandled data: {data_name}")
@@ -205,15 +275,38 @@ class VoxFlameMainExtension(AsyncExtension):
         payload: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Handle user connection."""
+        payload = payload or {}
+        suppress_greeting = bool(payload.get("suppress_greeting"))
+        if client_id == DEFAULT_CLIENT_ID and not self._payload_has_session_reference(payload):
+            ten_env.log_info(
+                "[VoxFlameMain] Deferring unbound transport connect until a "
+                "session-scoped payload arrives"
+            )
+            return
+
+        await self._ensure_session_connected(
+            ten_env,
+            client_id,
+            suppress_greeting=suppress_greeting,
+        )
+
+    async def _ensure_session_connected(
+        self,
+        ten_env: AsyncTenEnv,
+        client_id: str,
+        *,
+        suppress_greeting: bool,
+    ) -> SessionContext:
+        """Create/bind a session exactly once before realtime work starts."""
         session = self._get_or_create_session(client_id)
+        if session.user_connected:
+            return session
+
         session.user_connected = True
         session.conversation_history = []
         session.last_asr_text = ""
         session.is_tts_playing = False
         session.current_tts_request_id = None
-
-        payload = payload or {}
-        suppress_greeting = bool(payload.get("suppress_greeting"))
 
         ten_env.log_info(
             f"[VoxFlameMain] User connected, client_id={client_id}, "
@@ -230,7 +323,7 @@ class VoxFlameMainExtension(AsyncExtension):
                 f"[VoxFlameMain] Sending greeting to {client_id}: {self.config.greeting}"
             )
             await self._send_text_to_tts(ten_env, self.config.greeting, client_id)
-            await self._send_to_websocket(
+            await self._send_transcript_event(
                 ten_env,
                 role="assistant",
                 text=self.config.greeting,
@@ -240,6 +333,8 @@ class VoxFlameMainExtension(AsyncExtension):
 
         if getattr(self.config, "enable_memory", False):
             await self._send_session_event(ten_env, "session_start", client_id)
+
+        return session
 
     async def _handle_user_disconnected(self, ten_env: AsyncTenEnv, client_id: str) -> None:
         """Handle user disconnection."""
@@ -284,6 +379,15 @@ class VoxFlameMainExtension(AsyncExtension):
     ) -> None:
         """Handle typed user input from the frontend for direct relay / playback."""
         payload = self._read_cmd_payload(cmd)
+        await self._handle_user_input_payload(ten_env, payload, client_id)
+
+    async def _handle_user_input_payload(
+        self,
+        ten_env: AsyncTenEnv,
+        payload: Dict[str, Any],
+        client_id: str,
+    ) -> None:
+        """Handle typed user input from any realtime transport."""
         text = str(payload.get("text", "") or "").strip()
 
         if not text:
@@ -292,7 +396,11 @@ class VoxFlameMainExtension(AsyncExtension):
             )
             return
 
-        session = self._get_or_create_session(client_id)
+        session = await self._ensure_session_connected(
+            ten_env,
+            client_id,
+            suppress_greeting=True,
+        )
         session.last_user_speech_time = int(time.time() * 1000)
 
         if self.config.enable_interrupt and (
@@ -323,6 +431,17 @@ class VoxFlameMainExtension(AsyncExtension):
             )
 
         await self._send_text_to_tts(ten_env, text, client_id)
+        await self._send_transcript_event(
+            ten_env,
+            role="assistant",
+            text=text,
+            client_id=client_id,
+            is_final=True,
+            metadata={
+                "type": "relay",
+                "source": "user_input",
+            },
+        )
 
     async def _handle_flush(self, ten_env: AsyncTenEnv, client_id: str) -> None:
         """Handle per-client flush command - interrupt TTS."""
@@ -347,6 +466,15 @@ class VoxFlameMainExtension(AsyncExtension):
     ) -> None:
         """Persist one training result into memory and hotword profile."""
         payload = self._read_cmd_payload(cmd)
+        await self._handle_training_result_payload(ten_env, payload, client_id)
+
+    async def _handle_training_result_payload(
+        self,
+        ten_env: AsyncTenEnv,
+        payload: Dict[str, Any],
+        client_id: str,
+    ) -> None:
+        """Persist one training result into memory and hotword profile."""
         target_text = str(payload.get("exercise_text", "") or "").strip()
 
         if not target_text:
@@ -389,6 +517,7 @@ class VoxFlameMainExtension(AsyncExtension):
             if isinstance(item, str) and str(item).strip()
         ]
         pronunciation_summary = str(payload.get("pronunciation_summary", "") or "").strip()
+        exercise_id = str(payload.get("exercise_id", "") or "").strip()
 
         summary = self._build_training_result_summary(
             target_text=target_text,
@@ -413,21 +542,35 @@ class VoxFlameMainExtension(AsyncExtension):
             f"confusions={len(confusion_patterns)}"
         )
 
-        if not getattr(self.config, "enable_memory", False):
-            return
-
-        await self._save_conversation_turn(
-            ten_env,
-            role="assistant",
-            content=summary,
-            client_id=client_id,
-            raw_asr=recognized_text,
-            corrected_text=target_text,
-            clarity_score=clarity_score,
+        memory_enabled = bool(getattr(self.config, "enable_memory", False))
+        persisted = False
+        persistence_error: Optional[str] = None
+        profile_update_requested = bool(
+            keywords or confusion_patterns or pronunciation_summary
         )
+        profile_update_applied = False
+        profile_update_error: Optional[str] = None
+
+        if memory_enabled:
+            try:
+                await self._save_conversation_turn(
+                    ten_env,
+                    role="assistant",
+                    content=summary,
+                    client_id=client_id,
+                    raw_asr=recognized_text,
+                    corrected_text=target_text,
+                    clarity_score=clarity_score,
+                )
+                persisted = True
+            except Exception as e:
+                persistence_error = str(e)
+                ten_env.log_error(
+                    f"[VoxFlameMain] Error saving training_result turn, client_id={client_id}: {e}"
+                )
 
         hotword_category = self._map_training_category_to_hotword(category)
-        if keywords or confusion_patterns or pronunciation_summary:
+        if memory_enabled and profile_update_requested:
             try:
                 await send_cmd(
                     ten_env,
@@ -448,13 +591,183 @@ class VoxFlameMainExtension(AsyncExtension):
                         },
                     },
                 )
+                profile_update_applied = True
                 ten_env.log_info(
                     f"[VoxFlameMain] Updated voice profile from training_result, client_id={client_id}"
                 )
             except Exception as e:
+                profile_update_error = str(e)
                 ten_env.log_error(
                     f"[VoxFlameMain] Error updating voice profile from training_result: {e}"
                 )
+
+        await self._send_transport_event(
+            ten_env,
+            event_type="training_feedback",
+            client_id=client_id,
+            payload={
+                "exercise_id": exercise_id,
+                "exercise_text": target_text,
+                "recognized_text": recognized_text,
+                "feedback_status": status,
+                "exercise_category": category,
+                "clarity_score": clarity_score,
+                "summary": summary,
+                "focus_tags": focus_tags[:6],
+                "keywords": keywords[:6],
+                "pronunciation_summary": pronunciation_summary,
+                "confusion_patterns_count": len(confusion_patterns),
+                "persisted": persisted,
+                "memory_enabled": memory_enabled,
+                "voice_profile_update_requested": profile_update_requested,
+                "voice_profile_updated": profile_update_applied,
+                "error": persistence_error,
+            },
+            metadata={
+                "source": "training_result",
+                "voice_profile_error": profile_update_error,
+            },
+        )
+
+        if profile_update_applied:
+            await self._send_transport_event(
+                ten_env,
+                event_type="voice_profile_updated",
+                client_id=client_id,
+                payload={
+                    "source": "training_result",
+                    "exercise_id": exercise_id,
+                    "exercise_category": category,
+                    "hotword_count": min(len(keywords), 3),
+                    "confusion_patterns_count": len(confusion_patterns),
+                    "clarity_score": clarity_score,
+                    "last_training_category": category or "中文训练",
+                },
+            )
+
+    async def _handle_speech_activity_cmd(
+        self,
+        ten_env: AsyncTenEnv,
+        cmd: Cmd,
+        client_id: str,
+    ) -> None:
+        """Handle frontend VAD events for earlier interruption and ASR finalize."""
+        payload = self._read_cmd_payload(cmd)
+        await self._handle_speech_activity_payload(ten_env, client_id, payload)
+
+    async def _handle_speech_activity_data(
+        self,
+        ten_env: AsyncTenEnv,
+        data: Data,
+    ) -> None:
+        """Handle speech activity as data for transport-safe client routing."""
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            payload = json.loads(data_json) if data_json else {}
+        except Exception:
+            payload = {}
+
+        client_id = self._extract_client_id(payload, ten_env, "speech_activity")
+        await self._handle_speech_activity_payload(ten_env, client_id, payload)
+
+    async def _handle_speech_activity_payload(
+        self,
+        ten_env: AsyncTenEnv,
+        client_id: str,
+        payload: Dict[str, Any],
+    ) -> None:
+        """Shared speech-activity handling for cmd and data transport."""
+        state = str(payload.get("state", "") or "").strip().lower()
+        if not state:
+            ten_env.log_warn(
+                f"[VoxFlameMain] speech_activity without state, client_id={client_id}"
+            )
+            return
+
+        session = self._get_or_create_session(client_id)
+        session.last_user_speech_time = int(time.time() * 1000)
+
+        ten_env.log_info(
+            f"[VoxFlameMain] speech_activity state={state}, client_id={client_id}"
+        )
+
+        if state == "speech_started":
+            if self.config.enable_interrupt and (
+                session.is_tts_playing or session.current_tts_request_id is not None
+            ):
+                await self._flush_tts(ten_env, client_id)
+            return
+
+        if state == "speech_stopped" and bool(payload.get("auto_finalize", False)):
+            await self._finalize_asr_turn(ten_env, client_id, "vad")
+
+    async def _handle_training_feedback_result(
+        self,
+        ten_env: AsyncTenEnv,
+        data: Data,
+    ) -> None:
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            payload = json.loads(data_json) if data_json else {}
+            if not isinstance(payload, dict):
+                return
+
+            client_id = self._extract_client_id(
+                payload,
+                ten_env,
+                "training_feedback_result",
+            )
+            await self._send_transport_event(
+                ten_env,
+                event_type="training_feedback",
+                client_id=client_id,
+                payload=payload,
+            )
+        except Exception as e:
+            ten_env.log_error(
+                f"[VoxFlameMain] Error handling training feedback result: {e}"
+            )
+
+    async def _handle_end_audio_cmd(
+        self,
+        ten_env: AsyncTenEnv,
+        cmd: Cmd,
+        client_id: str,
+    ) -> None:
+        """Force the ASR extension to finalize the current utterance."""
+        payload = self._read_cmd_payload(cmd)
+        reason = str(payload.get("reason", "manual") or "manual").strip() or "manual"
+        await self._finalize_asr_turn(ten_env, client_id, reason)
+
+    async def _handle_transport_event_cmd(
+        self,
+        ten_env: AsyncTenEnv,
+        event_name: str,
+        cmd: Cmd,
+    ) -> None:
+        """Track RTC transport lifecycle emitted by agora_rtc."""
+        payload = self._read_cmd_payload(cmd)
+        client_id = self._extract_client_id(payload, ten_env, event_name)
+        should_bind_session = self._payload_has_session_reference(payload) or client_id in self.sessions
+
+        if should_bind_session:
+            session = self._get_or_create_session(client_id)
+            session.transport_state[event_name] = {
+                "timestamp": int(time.time() * 1000),
+                "payload": payload,
+            }
+
+        log_line = (
+            f"[VoxFlameMain] RTC transport event {event_name}, "
+            f"client_id={client_id if should_bind_session else 'unbound'}"
+        )
+        if payload:
+            log_line += f", payload={json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+
+        if event_name in {"on_connection_failure", "on_connection_error", "on_datastream_error"}:
+            ten_env.log_warn(log_line)
+        else:
+            ten_env.log_info(log_line)
 
     # ========================================
     # Data Handlers
@@ -471,6 +784,149 @@ class VoxFlameMainExtension(AsyncExtension):
         client_id = self._extract_client_id(payload, ten_env, "system_init")
         await self._handle_system_init_payload(ten_env, payload, client_id)
 
+    async def _handle_client_connection_data(
+        self,
+        ten_env: AsyncTenEnv,
+        data: Data,
+    ) -> None:
+        """Handle transport connect/disconnect as data to preserve client routing."""
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            payload = json.loads(data_json) if data_json else {}
+        except Exception:
+            payload = {}
+
+        client_id = self._extract_client_id(payload, ten_env, "client_connection")
+        state = str(payload.get("state", "") or "").strip().lower()
+
+        if state == "connected":
+            await self._handle_user_connected(ten_env, client_id, payload)
+            return
+
+        if state == "disconnected":
+            await self._handle_user_disconnected(ten_env, client_id)
+            return
+
+        ten_env.log_warn(
+            f"[VoxFlameMain] client_connection with unknown state='{state}', client_id={client_id}"
+        )
+
+    async def _handle_transport_data(
+        self,
+        ten_env: AsyncTenEnv,
+        data: Data,
+    ) -> None:
+        """Handle transport data envelopes from agora_rtc/agora_rtm."""
+        raw_payload = self._read_data_payload(data)
+        transport_payload = self._extract_transport_payload(raw_payload)
+        message_type = str(transport_payload.get("type", "") or "").strip().lower()
+
+        if not message_type:
+            ten_env.log_info(
+                f"[VoxFlameMain] Ignoring transport data without type: "
+                f"{json.dumps(raw_payload, ensure_ascii=False, separators=(',', ':'))}"
+            )
+            return
+
+        client_id = self._extract_client_id(transport_payload, ten_env, message_type)
+
+        if message_type == "system_init":
+            await self._handle_system_init_payload(ten_env, transport_payload, client_id)
+            return
+
+        if message_type == "user_input":
+            await self._handle_user_input_payload(ten_env, transport_payload, client_id)
+            return
+
+        if message_type == "training_result":
+            await self._handle_training_result_payload(
+                ten_env,
+                transport_payload,
+                client_id,
+            )
+            return
+
+        if message_type == "training_feedback_request":
+            await self._handle_training_feedback_request_payload(
+                ten_env,
+                transport_payload,
+                client_id,
+            )
+            return
+
+        if message_type == "update_voice_profile":
+            await self._handle_update_voice_profile_payload(
+                ten_env,
+                transport_payload,
+                client_id,
+            )
+            return
+
+        if message_type == "end_audio":
+            reason = (
+                str(transport_payload.get("reason", "") or "").strip() or "transport"
+            )
+            await self._finalize_asr_turn(ten_env, client_id, reason)
+            return
+
+        if message_type == "flush":
+            await self._flush_tts(ten_env, client_id)
+            return
+
+        ten_env.log_debug(
+            f"[VoxFlameMain] Unhandled transport data type={message_type}, "
+            f"payload={json.dumps(transport_payload, ensure_ascii=False, separators=(',', ':'))}"
+        )
+
+    async def _handle_update_voice_profile_payload(
+        self,
+        ten_env: AsyncTenEnv,
+        payload: Dict[str, Any],
+        client_id: str,
+    ) -> None:
+        """Forward updated voice profile payload to the memory layer."""
+        forwarded_payload = dict(payload)
+        forwarded_payload["client_id"] = client_id
+
+        try:
+            await send_cmd(
+                ten_env,
+                "update_voice_profile",
+                "memory_layer",
+                forwarded_payload,
+            )
+            ten_env.log_info(
+                f"[VoxFlameMain] Forwarded voice profile update, client_id={client_id}"
+            )
+        except Exception as e:
+            ten_env.log_warn(
+                f"[VoxFlameMain] Failed to forward voice profile update, client_id={client_id}: {e}"
+            )
+
+    async def _handle_training_feedback_request_payload(
+        self,
+        ten_env: AsyncTenEnv,
+        payload: Dict[str, Any],
+        client_id: str,
+    ) -> None:
+        forwarded_payload = dict(payload)
+        forwarded_payload["client_id"] = client_id
+
+        try:
+            await send_cmd(
+                ten_env,
+                "generate_training_feedback",
+                "training_feedback",
+                forwarded_payload,
+            )
+            ten_env.log_info(
+                f"[VoxFlameMain] Forwarded training feedback request, client_id={client_id}"
+            )
+        except Exception as e:
+            ten_env.log_warn(
+                f"[VoxFlameMain] Failed to forward training feedback request, client_id={client_id}: {e}"
+            )
+
     async def _handle_system_init_payload(
         self,
         ten_env: AsyncTenEnv,
@@ -481,7 +937,11 @@ class VoxFlameMainExtension(AsyncExtension):
         Handle system initialization with user context.
         Received from Backend Proxy upon connection.
         """
-        session = self._get_or_create_session(client_id)
+        session = await self._ensure_session_connected(
+            ten_env,
+            client_id,
+            suppress_greeting=bool(init_data.get("suppress_greeting")),
+        )
 
         user = init_data.get("user")
         if not isinstance(user, dict):
@@ -552,7 +1012,7 @@ class VoxFlameMainExtension(AsyncExtension):
         Key logic:
         1. If user is speaking and TTS is playing -> Interrupt TTS
         2. Forward ASR result to corrector for LLM correction
-        3. Send interim results to WebSocket for real-time display
+        3. Send interim results back over the active transport for real-time display
         """
         try:
             data_json, _ = data.get_property_to_json(None)
@@ -566,6 +1026,12 @@ class VoxFlameMainExtension(AsyncExtension):
 
             client_id = self._extract_client_id(asr_data, ten_env, "asr_result")
             session = self._get_or_create_session(client_id)
+            if not session.user_connected:
+                session = await self._ensure_session_connected(
+                    ten_env,
+                    client_id,
+                    suppress_greeting=True,
+                )
 
             ten_env.log_info(
                 f"[VoxFlameMain] ASR result client_id={client_id}: '{text}' (final={is_final})"
@@ -585,8 +1051,8 @@ class VoxFlameMainExtension(AsyncExtension):
                 )
                 await self._flush_tts(ten_env, client_id)
 
-            # Send interim/final text to WebSocket for display
-            await self._send_to_websocket(
+            # Fan out interim/final text through the configured transcript transport.
+            await self._send_transcript_event(
                 ten_env,
                 role="user",
                 text=text,
@@ -636,7 +1102,7 @@ class VoxFlameMainExtension(AsyncExtension):
 
         Forward to:
         1. TTS for speech synthesis
-        2. WebSocket for frontend display
+        2. Realtime transcript transport for frontend display
         3. Memory layer for learning (if correction occurred)
         """
         try:
@@ -663,7 +1129,7 @@ class VoxFlameMainExtension(AsyncExtension):
 
             await self._send_text_to_tts(ten_env, corrected_text, client_id)
 
-            await self._send_to_websocket(
+            await self._send_transcript_event(
                 ten_env,
                 role="assistant",
                 text=corrected_text,
@@ -721,7 +1187,7 @@ class VoxFlameMainExtension(AsyncExtension):
                 return
 
             client_id = self._extract_client_id(interim_data, ten_env, "interim_text")
-            await self._send_to_websocket(
+            await self._send_transcript_event(
                 ten_env,
                 role="user",
                 text=text,
@@ -776,6 +1242,71 @@ class VoxFlameMainExtension(AsyncExtension):
         except Exception as e:
             ten_env.log_error(f"[VoxFlameMain] Error handling TTS end: {e}")
 
+    async def _handle_module_error(self, ten_env: AsyncTenEnv, data: Data) -> None:
+        """Handle module-level runtime errors routed from upstream extensions."""
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            error_data = json.loads(data_json) if data_json else {}
+
+            module_name = str(error_data.get("module", "unknown"))
+            message = str(error_data.get("message", "unknown error"))
+            code = error_data.get("code")
+            metadata = error_data.get("metadata")
+            payload = error_data if isinstance(error_data, dict) else {}
+
+            client_id = self._extract_client_id(payload, ten_env, "error")
+            ten_env.log_warn(
+                f"[VoxFlameMain] Module error from {module_name}, "
+                f"client_id={client_id}, code={code}, message={message}"
+            )
+
+            if self.config.transcript_transport != "none":
+                await self._send_transcript_event(
+                    ten_env,
+                    role="system",
+                    text=f"{module_name} error: {message}",
+                    client_id=client_id,
+                    is_final=True,
+                    metadata={
+                        "type": "module_error",
+                        "module": module_name,
+                        "code": code,
+                        "error_metadata": metadata,
+                    },
+                )
+        except Exception as e:
+            ten_env.log_error(f"[VoxFlameMain] Error handling module error: {e}")
+
+    async def _handle_runtime_metrics(self, ten_env: AsyncTenEnv, data: Data) -> None:
+        """Track vendor/runtime metrics so RTC graphs do not drop observability events."""
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            metrics_data = json.loads(data_json) if data_json else {}
+            if not isinstance(metrics_data, dict):
+                return
+
+            module_name = str(metrics_data.get("module", "unknown") or "unknown")
+            vendor = str(metrics_data.get("vendor", "unknown") or "unknown")
+            payload_metrics = metrics_data.get("metrics")
+            metadata = metrics_data.get("metadata")
+            client_id = self._extract_client_id(metrics_data, ten_env, "metrics")
+
+            if client_id in self.sessions or self._payload_has_session_reference(metrics_data):
+                session = self._get_or_create_session(client_id)
+                session.runtime_metrics[module_name] = {
+                    "timestamp": int(time.time() * 1000),
+                    "vendor": vendor,
+                    "metrics": payload_metrics if isinstance(payload_metrics, dict) else {},
+                    "metadata": metadata if isinstance(metadata, dict) else {},
+                }
+
+            ten_env.log_info(
+                f"[VoxFlameMain] Runtime metrics module={module_name}, vendor={vendor}, "
+                f"client_id={client_id}, metrics={json.dumps(payload_metrics or {}, ensure_ascii=False, separators=(',', ':'))}"
+            )
+        except Exception as e:
+            ten_env.log_error(f"[VoxFlameMain] Error handling runtime metrics: {e}")
+
     # ========================================
     # Helper Methods
     # ========================================
@@ -805,6 +1336,28 @@ class VoxFlameMainExtension(AsyncExtension):
         except Exception:
             pass
 
+        try:
+            client_id_json, _ = cmd.get_property_to_json("client_id")
+            if client_id_json:
+                parsed = json.loads(client_id_json)
+                if isinstance(parsed, str) and parsed.strip():
+                    return parsed.strip()
+        except Exception:
+            pass
+
+        try:
+            metadata_json, _ = cmd.get_property_to_json("metadata")
+            metadata = json.loads(metadata_json) if metadata_json else {}
+            if isinstance(metadata, dict):
+                nested = metadata.get("client_id")
+                if isinstance(nested, str) and nested.strip():
+                    return nested.strip()
+                session_id = metadata.get("session_id")
+                if isinstance(session_id, str) and session_id.strip():
+                    return session_id.strip()
+        except Exception:
+            pass
+
         # Fallback: parse whole command payload.
         try:
             cmd_json, _ = cmd.get_property_to_json(None)
@@ -812,6 +1365,21 @@ class VoxFlameMainExtension(AsyncExtension):
             raw = cmd_data.get("client_id")
             if isinstance(raw, str) and raw.strip():
                 return raw.strip()
+            raw_session_id = cmd_data.get("session_id")
+            if isinstance(raw_session_id, str) and raw_session_id.strip():
+                return raw_session_id.strip()
+            for numeric_key in ("stream_id", "user_id", "remote_stream_id"):
+                numeric_value = cmd_data.get(numeric_key)
+                if isinstance(numeric_value, int) and numeric_value > 0:
+                    return str(numeric_value)
+            metadata = cmd_data.get("metadata")
+            if isinstance(metadata, dict):
+                nested = metadata.get("client_id")
+                if isinstance(nested, str) and nested.strip():
+                    return nested.strip()
+                session_id = metadata.get("session_id")
+                if isinstance(session_id, str) and session_id.strip():
+                    return session_id.strip()
         except Exception:
             pass
 
@@ -829,6 +1397,166 @@ class VoxFlameMainExtension(AsyncExtension):
 
         return {}
 
+    def _read_data_payload(self, data: Data) -> Dict[str, Any]:
+        """Parse the full data payload into a dict."""
+        payload: Dict[str, Any] = {}
+
+        try:
+            data_json, _ = data.get_property_to_json(None)
+            parsed_payload = json.loads(data_json) if data_json else {}
+            if isinstance(parsed_payload, dict):
+                payload.update(parsed_payload)
+        except Exception:
+            pass
+
+        for key in (
+            "data",
+            "payload",
+            "message",
+            "type",
+            "name",
+            "text",
+            "client_id",
+            "session_id",
+            "remote_user_id",
+            "user_id",
+            "stream_id",
+            "remote_stream_id",
+        ):
+            try:
+                value_json, _ = data.get_property_to_json(key)
+            except Exception:
+                continue
+
+            if not value_json:
+                continue
+
+            try:
+                payload[key] = json.loads(value_json)
+            except json.JSONDecodeError:
+                payload[key] = value_json
+
+        for key in ("data", "payload", "message"):
+            try:
+                value_buf, _ = data.get_property_buf(key)
+            except Exception:
+                continue
+
+            if not value_buf:
+                continue
+
+            decoded_payload = self._decode_transport_candidate(bytes(value_buf))
+            if decoded_payload is not None:
+                payload[key] = decoded_payload
+
+        try:
+            raw_buf = data.get_buf()
+            if raw_buf:
+                decoded_payload = self._decode_transport_candidate(bytes(raw_buf))
+                if decoded_payload is not None:
+                    payload["data"] = decoded_payload
+        except Exception:
+            pass
+
+        return payload
+
+    def _extract_transport_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Best-effort decode of RTC stream-message payloads delivered by agora_rtc."""
+        if not isinstance(payload, dict):
+            return {}
+
+        parsed = None
+        for key in ("payload", "message", "data"):
+            candidate = payload.get(key)
+            parsed = self._decode_transport_candidate(candidate)
+            if parsed is not None:
+                break
+
+        if parsed is None and (
+            isinstance(payload.get("type"), str) or isinstance(payload.get("name"), str)
+        ):
+            parsed = dict(payload)
+
+        if parsed is None:
+            return dict(payload)
+
+        if not isinstance(parsed, dict):
+            return {}
+
+        metadata = parsed.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        for key in (
+            "remote_user_id",
+            "user_id",
+            "stream_id",
+            "remote_stream_id",
+            "publisher",
+            "channelName",
+        ):
+            value = payload.get(key)
+            if value in (None, ""):
+                continue
+
+            if key in ("stream_id", "remote_stream_id") and isinstance(value, int) and value > 0:
+                parsed.setdefault("client_id", str(value))
+                metadata.setdefault(key, value)
+                continue
+
+            if isinstance(value, str) and value.strip():
+                metadata.setdefault(key, value.strip())
+                if key == "remote_user_id" and "client_id" not in parsed:
+                    parsed["client_id"] = value.strip()
+                if key == "publisher" and "client_id" not in parsed:
+                    parsed["client_id"] = value.strip()
+
+        if metadata:
+            parsed["metadata"] = metadata
+
+        return parsed
+
+    def _decode_transport_candidate(self, candidate: Any) -> Optional[Dict[str, Any]]:
+        """Decode nested RTC transport payloads from string/buffer/list forms."""
+        if isinstance(candidate, dict):
+            return dict(candidate)
+
+        if isinstance(candidate, list) and all(isinstance(item, int) for item in candidate):
+            try:
+                decoded_bytes = bytes(candidate)
+            except ValueError:
+                return None
+            return self._decode_transport_candidate(decoded_bytes)
+
+        if isinstance(candidate, (bytes, bytearray)):
+            try:
+                decoded_text = bytes(candidate).decode("utf-8")
+            except UnicodeDecodeError:
+                return None
+            return self._decode_transport_candidate(decoded_text)
+
+        if isinstance(candidate, str):
+            text = candidate.strip()
+            if not text:
+                return None
+
+            try:
+                parsed = json.loads(text)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+
+            try:
+                decoded_bytes = base64.b64decode(text, validate=True)
+            except Exception:
+                decoded_bytes = None
+
+            if decoded_bytes:
+                return self._decode_transport_candidate(decoded_bytes)
+
+        return None
+
     def _extract_client_id(
         self,
         payload: Dict[str, Any],
@@ -838,12 +1566,17 @@ class VoxFlameMainExtension(AsyncExtension):
         """Extract client_id from payload or nested metadata."""
         if isinstance(payload.get("client_id"), str) and payload["client_id"].strip():
             return self._normalize_client_id(payload["client_id"])
+        if isinstance(payload.get("session_id"), str) and payload["session_id"].strip():
+            return self._normalize_client_id(payload["session_id"])
 
         metadata = payload.get("metadata")
         if isinstance(metadata, dict):
             raw = metadata.get("client_id")
             if isinstance(raw, str) and raw.strip():
                 return self._normalize_client_id(raw)
+            session_id = metadata.get("session_id")
+            if isinstance(session_id, str) and session_id.strip():
+                return self._normalize_client_id(session_id)
 
         # If exactly one session is active, use it as deterministic fallback.
         if len(self.sessions) == 1:
@@ -869,6 +1602,24 @@ class VoxFlameMainExtension(AsyncExtension):
                 return mapped_client
 
         return self._normalize_client_id(None)
+
+    def _payload_has_session_reference(self, payload: Dict[str, Any]) -> bool:
+        """Return whether payload contains an explicit session/client reference."""
+        if isinstance(payload.get("client_id"), str) and payload["client_id"].strip():
+            return True
+        if isinstance(payload.get("session_id"), str) and payload["session_id"].strip():
+            return True
+        if isinstance(payload.get("remote_stream_id"), int) and payload["remote_stream_id"] > 0:
+            return True
+
+        metadata = payload.get("metadata")
+        if isinstance(metadata, dict):
+            if isinstance(metadata.get("client_id"), str) and metadata["client_id"].strip():
+                return True
+            if isinstance(metadata.get("session_id"), str) and metadata["session_id"].strip():
+                return True
+
+        return False
 
     def _get_or_create_session(self, client_id: str) -> SessionContext:
         """Return per-client session context, creating one if missing."""
@@ -1030,7 +1781,94 @@ class VoxFlameMainExtension(AsyncExtension):
                 f"[VoxFlameMain] Error sending memory context to corrector, client_id={client_id}: {e}"
             )
 
-    async def _send_to_websocket(
+    async def _finalize_asr_turn(
+        self,
+        ten_env: AsyncTenEnv,
+        client_id: str,
+        reason: str,
+    ) -> None:
+        """Prompt the realtime ASR stream to emit final text for the current turn."""
+        finalize_id = f"{client_id}_{reason}_{uuid.uuid4().hex[:12]}"
+        try:
+            await send_data(
+                ten_env,
+                "asr_finalize",
+                "stt",
+                {
+                    "finalize_id": finalize_id,
+                    "metadata": {
+                        "client_id": client_id,
+                        "reason": reason,
+                    },
+                },
+            )
+            ten_env.log_info(
+                f"[VoxFlameMain] Sent ASR finalize, client_id={client_id}, reason={reason}, finalize_id={finalize_id}"
+            )
+        except Exception as e:
+            ten_env.log_error(
+                f"[VoxFlameMain] Error sending ASR finalize, client_id={client_id}: {e}"
+            )
+
+    def _resolve_transcript_transport_target(self) -> Optional[str]:
+        """Return the configured transcript transport target or None when disabled."""
+        transport = getattr(self.config, "transcript_transport", "rtm")
+        if transport == "none":
+            return None
+
+        target = str(
+            getattr(self.config, "transcript_transport_extension", "agora_rtm")
+            or ""
+        ).strip()
+        if not target:
+            return None
+
+        return target
+
+    async def _send_transport_payload(
+        self,
+        ten_env: AsyncTenEnv,
+        payload: Dict[str, Any],
+    ) -> None:
+        """Send one JSON payload through the configured realtime text transport."""
+        target_extension = self._resolve_transcript_transport_target()
+        if target_extension is None:
+            return
+
+        if target_extension == "agora_rtm":
+            await send_rtm_publish(ten_env, target_extension, payload)
+            return
+
+        data_name = "data" if target_extension == "agora_rtc" else "data"
+        await send_data(ten_env, data_name, target_extension, payload)
+
+    async def _send_transport_event(
+        self,
+        ten_env: AsyncTenEnv,
+        event_type: str,
+        client_id: str,
+        payload: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Send one typed realtime event to the active transcript transport."""
+        try:
+            event_payload: Dict[str, Any] = {
+                "type": event_type,
+                "client_id": client_id,
+                "timestamp": int(time.time() * 1000),
+            }
+            if payload:
+                event_payload.update(payload)
+            if metadata:
+                event_payload["metadata"] = {**metadata, "client_id": client_id}
+
+            await self._send_transport_payload(ten_env, event_payload)
+        except Exception as e:
+            ten_env.log_error(
+                f"[VoxFlameMain] Error sending transport event {event_type}: {e}"
+            )
+
+    async def _send_transcript_event(
         self,
         ten_env: AsyncTenEnv,
         role: str,
@@ -1039,7 +1877,7 @@ class VoxFlameMainExtension(AsyncExtension):
         is_final: bool = True,
         metadata: Optional[dict] = None,
     ) -> None:
-        """Send transcript to WebSocket for frontend display."""
+        """Send transcript/error text to the configured realtime transport."""
         try:
             payload = {
                 "type": "transcript",
@@ -1052,9 +1890,9 @@ class VoxFlameMainExtension(AsyncExtension):
             if metadata:
                 payload["metadata"] = {**metadata, "client_id": client_id}
 
-            await send_data(ten_env, "transcript", "websocket_server", payload)
+            await self._send_transport_payload(ten_env, payload)
         except Exception as e:
-            ten_env.log_error(f"[VoxFlameMain] Error sending to WebSocket: {e}")
+            ten_env.log_error(f"[VoxFlameMain] Error sending transcript event: {e}")
 
     async def _send_correction_event(
         self,

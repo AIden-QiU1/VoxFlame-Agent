@@ -27,7 +27,7 @@ export TEN_PYTHON_LIB_PATH=${TEN_PYTHON_LIB_PATH:-/usr/local/lib/libpython3.10.s
 
 # 设置环境变量
 export PYTHONPATH="$BASE_DIR:$BASE_DIR/ten_packages:$BASE_DIR/ten_packages/extension:$BASE_DIR/ten_packages/system/ten_runtime_python/interface:$BASE_DIR/ten_packages/system/ten_ai_base/interface:$PYTHONPATH"
-export LD_LIBRARY_PATH="$BASE_DIR/ten_packages/system/ten_runtime_go/lib:$BASE_DIR/ten_packages/system/ten_runtime/lib:$BASE_DIR/ten_packages/system/ten_runtime_python/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$BASE_DIR/ten_packages/system/agora_rtc_sdk/lib:$BASE_DIR/ten_packages/extension/agora_rtm/lib:$BASE_DIR/ten_packages/system/ten_runtime_go/lib:$BASE_DIR/ten_packages/system/ten_runtime/lib:$BASE_DIR/ten_packages/system/ten_runtime_python/lib:$LD_LIBRARY_PATH"
 export LD_PRELOAD=/usr/local/lib/libpython3.10.so:$BASE_DIR/ten_packages/system/ten_runtime_python/lib/libten_runtime_python.so
 
 # Force runtime to look in ten_packages

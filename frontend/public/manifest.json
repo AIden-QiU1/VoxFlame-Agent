@@ -1,9 +1,10 @@
 {
   "name": "燃言 - 让每个声音都被听见",
   "short_name": "燃言",
-  "description": "专为构音障碍患者打造的开源语音识别项目，让AI听懂你的声音",
+  "description": "面向构音障碍用户的沟通与训练助手，帮助系统更快理解你的表达",
   "start_url": "/",
   "id": "/",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#FFFBEB",
@@ -44,21 +45,14 @@
       "type": "image/png",
       "form_factor": "wide",
       "label": "燃言主页"
-    },
-    {
-      "src": "/screenshots/home-narrow.png",
-      "sizes": "720x1280",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "燃言主页 - 移动端"
     }
   ],
   "shortcuts": [
     {
-      "name": "开始录音",
-      "short_name": "录音",
-      "description": "快速开始语音识别",
-      "url": "/?action=record",
+      "name": "立即沟通",
+      "short_name": "沟通",
+      "description": "快速进入沟通模式",
+      "url": "/?mode=communicate",
       "icons": [
         {
           "src": "/icons/shortcut-mic.png",
@@ -69,14 +63,28 @@
       ]
     },
     {
-      "name": "贡献声音",
-      "short_name": "贡献",
-      "description": "帮助我们收集语音数据",
+      "name": "练习表达",
+      "short_name": "练习",
+      "description": "进入中文训练与录后反馈",
       "url": "/contribute",
       "icons": [
         {
           "src": "/icons/shortcut-contribute.png",
           "sizes": "96x96",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "记忆系统",
+      "short_name": "记忆",
+      "description": "查看成长档案与场景热词",
+      "url": "/memory",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192",
           "type": "image/png",
           "purpose": "any"
         }

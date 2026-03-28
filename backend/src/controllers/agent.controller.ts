@@ -4,9 +4,13 @@ import { SupabaseService, UserProfile } from '../services/supabase.service'
 import { respondCompatNotImplemented } from './compat-response'
 
 const AGENT_COMPAT_GUIDANCE =
-  'Use /ws/agent for runtime agent interactions. Persist user data via /api/agent/profile, /api/memory, and /api/phrases.'
+  'Use /api/rtc/session/start for runtime RTC sessions. Persist user data via /api/agent/profile, /api/memory, and /api/phrases.'
 const AGENT_COMPAT_REMOVAL_TARGET =
-  'Remove after remaining callers migrate to /ws/agent plus persisted user APIs.'
+  'Remove after remaining callers migrate to RTC session APIs plus persisted user APIs.'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
 
 function buildDefaultProfile(userId: string): UserProfile {
   return {
@@ -65,10 +69,18 @@ async function updateUserProfile(req: Request, res: Response): Promise<void> {
     }
 
     const existing = await service.getUserProfile(userId)
+    const mergedPreferences =
+      isRecord(existing?.preferences) && isRecord(updates.preferences)
+        ? {
+            ...existing.preferences,
+            ...updates.preferences,
+          }
+        : updates.preferences ?? existing?.preferences
     const payload: UserProfile = {
       ...(existing ?? buildDefaultProfile(userId)),
       ...updates,
       id: userId,
+      preferences: mergedPreferences,
     }
 
     const profile = existing

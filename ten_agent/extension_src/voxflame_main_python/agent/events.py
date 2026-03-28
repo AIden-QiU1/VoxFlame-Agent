@@ -18,7 +18,7 @@ class AgentEventBase(BaseModel):
 # ==== CMD Events ====
 
 class UserConnectedEvent(AgentEventBase):
-    """Event triggered when a user connects via WebSocket."""
+    """Event triggered when a user transport session becomes available."""
     type: Literal["cmd"] = "cmd"
     name: Literal["on_user_connected"] = "on_user_connected"
 

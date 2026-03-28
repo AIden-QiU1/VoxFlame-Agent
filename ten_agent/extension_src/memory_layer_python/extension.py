@@ -153,7 +153,7 @@ class MemoryLayerExtension(AsyncExtension):
         client_id: str,
         cmd_data: Dict[str, Any],
     ) -> None:
-        """Handle system_init command directly from websocket server."""
+        """Handle transport-delivered system_init and bootstrap memory state."""
         user = cmd_data.get("user", {})
         if not isinstance(user, dict):
             await ten_env.return_result(CmdResult.create(StatusCode.OK, cmd))
@@ -600,6 +600,24 @@ class MemoryLayerExtension(AsyncExtension):
             from_property = cmd.get_property_string("client_id")
             if isinstance(from_property, str) and from_property.strip():
                 return from_property.strip()
+        except Exception:
+            pass
+
+        try:
+            from_property_json, _ = cmd.get_property_to_json("client_id")
+            if from_property_json:
+                parsed = json.loads(from_property_json)
+                if isinstance(parsed, str) and parsed.strip():
+                    return parsed.strip()
+        except Exception:
+            pass
+
+        try:
+            metadata_json, _ = cmd.get_property_to_json("metadata")
+            metadata = json.loads(metadata_json) if metadata_json else {}
+            nested = self._extract_client_id(metadata)
+            if nested:
+                return nested
         except Exception:
             pass
 

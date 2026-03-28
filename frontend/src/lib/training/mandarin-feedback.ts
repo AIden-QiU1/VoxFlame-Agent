@@ -1,4 +1,7 @@
-import { MandarinTrainingExercise } from '@/lib/corpus/mandarin-training'
+import {
+  MandarinTrainingExercise,
+  getTrainingTipsForCategory,
+} from '@/lib/corpus/mandarin-training'
 import {
   CharacterPinyinDetail,
   formatToneLabel,
@@ -37,22 +40,33 @@ interface AlignmentPair {
   heard: CharacterPinyinDetail | null
 }
 
-const TAG_HINTS: Record<string, string> = {
-  平翘舌: '这句重点看平翘舌，先把“说 / 事 / 处 / 助”这类字放慢。',
-  翘舌音: '这句有较多翘舌音，先把卷舌动作做足，再连成整句。',
-  前后鼻音: '这句容易把前后鼻音混在一起，先慢读带“ang / eng / ing”的词。',
-  边鼻音: '这句可以多留意 n/l 区分，先单独练关键词再回到整句。',
-  声调稳定: '先慢一点，把每个关键词的声调说稳，再整体连读。',
-  送气对比: '这句里有送气和不送气的对比，起音时可以更清楚一点。',
+const INITIAL_PAIR_HINTS: Record<string, string> = {
+  'zh → z': '这次卷舌音偏平了，舌尖可以再往上抬一点。',
+  'z → zh': '这次起音有点卷过头，先把 z 音放平一点。',
+  'ch → c': '先把送气和卷舌一起做足，别急着连到后面。',
+  'c → ch': '这次卷舌偏多，先把舌尖放平再出气。',
+  'sh → s': '先把舌尖轻轻往上卷，再把气送出来。',
+  's → sh': '这次卷舌偏重，先把 s 音说得更平一点。',
+  'n → l': '先确认鼻音有没有出来，n 和 l 要分开练。',
+  'l → n': '舌尖位置可以更稳一点，避免口腔音和鼻音混在一起。',
 }
 
-const ARTICULATION_HINTS: Record<string, string> = {
-  平翘舌: '发翘舌音时，舌尖轻轻往上卷一点，再把音送出来。',
-  翘舌音: '先慢起音，舌尖往上抬，避免舌头平着往前推。',
-  前后鼻音: '句尾鼻音先收住，给 ang / eng / ing 留一点鼻腔共鸣。',
-  边鼻音: '练 n/l 时先把舌尖顶住上牙龈，再分清鼻腔还是口腔出气。',
-  声调稳定: '先把元音拉稳，再落声调，不要一口气把整句冲过去。',
-  送气对比: '送气音起音前多留一点气流，不送气音则把起音收紧。',
+const FINAL_PAIR_HINTS: Record<string, string> = {
+  'ang → an': '后鼻音收尾偏短了，可以把鼻腔共鸣再留长一点。',
+  'an → ang': '这次尾音收得太后了，先把 an 收得更利落。',
+  'eng → en': '后鼻音不够明显，句尾可以再稳一点。',
+  'en → eng': '这次尾音偏重，先把 en 的收尾缩短一点。',
+  'ing → in': '先把舌位稍微往后带一点，再收鼻音。',
+  'in → ing': '这次收尾偏靠后，先把 in 的尾音收短。',
+  'uan → uang': '中间元音拉长了，先把口型收紧一点。',
+  'iao → iao': '这次韵母本身没问题，先看整句节奏。',
+}
+
+const TONE_PAIR_HINTS: Record<string, string> = {
+  '1声 → 4声': '起音不要太冲，先把高平调拉稳。',
+  '2声 → 3声': '上扬和拐弯有点混，先把第二声往上提清楚。',
+  '3声 → 2声': '第三声下拐不够，可以先把拐点做出来。',
+  '4声 → 2声': '落调不够干脆，句尾可以再收紧一点。',
 }
 
 function buildLcsTable(target: string[], heard: string[]): number[][] {
@@ -304,12 +318,22 @@ function buildFocusSyllables(
     .map((detail) => `${detail.char}(${detail.pinyin})`)
 }
 
-function buildArticulationTips(exercise: MandarinTrainingExercise): string[] {
-  const tips = exercise.focusTags
-    .map((tag) => ARTICULATION_HINTS[tag])
-    .filter(Boolean)
+function buildArticulationTips(
+  exercise: MandarinTrainingExercise,
+  initialPairs: string[],
+  finalPairs: string[],
+  tonePairs: string[],
+): string[] {
+  const observedTips = [
+    ...initialPairs.map((pair) => INITIAL_PAIR_HINTS[pair]),
+    ...finalPairs.map((pair) => FINAL_PAIR_HINTS[pair]),
+    ...tonePairs.map((pair) => TONE_PAIR_HINTS[pair]),
+  ].filter(Boolean)
 
-  return unique(tips).slice(0, 2)
+  return unique([
+    ...observedTips,
+    ...getTrainingTipsForCategory(exercise.category),
+  ]).slice(0, 3)
 }
 
 export function analyzeMandarinAttempt(
@@ -320,8 +344,14 @@ export function analyzeMandarinAttempt(
   const normalizedHeard = normalizeChineseText(heardText)
   const targetDetails = getExerciseCharPinyinPairs(exercise)
   const heardDetails = getCharacterPinyinDetails(heardText)
-  const articulationTips = buildArticulationTips(exercise)
   const pronunciationSummary = buildPronunciationSummary(targetDetails, heardDetails)
+  const articulationTips = buildArticulationTips(
+    exercise,
+    pronunciationSummary.initialPairs,
+    pronunciationSummary.finalPairs,
+    pronunciationSummary.tonePairs,
+  )
+  const categoryTips = getTrainingTipsForCategory(exercise.category)
 
   if (!normalizedHeard) {
     return {
@@ -347,7 +377,7 @@ export function analyzeMandarinAttempt(
       summary: buildSummary('unclear', [], []),
       suggestions: [
         '先确认麦克风权限和环境噪声，再重新录一遍。',
-        articulationTips[0] || exercise.coachingTip,
+        articulationTips[0] || categoryTips[0] || '先选安静环境，再慢慢读一遍。',
       ],
     }
   }
@@ -370,11 +400,6 @@ export function analyzeMandarinAttempt(
     suggestions.push(`这次多出了“${extraChars.join('、')}”，可以再慢一点，把停顿拉开。`)
   }
 
-  const focusHint = exercise.focusTags.map((tag) => TAG_HINTS[tag]).find(Boolean)
-  if (focusHint) {
-    suggestions.push(focusHint)
-  }
-
   if (pronunciationSummary.initialPairs[0]) {
     suggestions.push(`先把声母 ${pronunciationSummary.initialPairs[0]} 拆到单音节慢练。`)
   }
@@ -388,7 +413,7 @@ export function analyzeMandarinAttempt(
   }
 
   if (suggestions.length === 0) {
-    suggestions.push(exercise.coachingTip)
+    suggestions.push(categoryTips[0] || '先慢一点，把整句分成前后两段练。')
   }
 
   if (articulationTips.length > 0) {

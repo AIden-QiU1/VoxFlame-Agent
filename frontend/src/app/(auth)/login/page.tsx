@@ -1,7 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { buildLoginPath, normalizeNextPath } from '@/lib/auth/navigation'
+import {
+    buildLegalConsentSnapshot,
+    buildLegalConsentUserData,
+    persistLocalLegalConsent,
+} from '@/lib/auth/legal-consent'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,15 +64,62 @@ export default function LoginPage() {
     const [password, setPassword] = useState('')
     const [name, setName] = useState('')
     const [isLoading, setIsLoading] = useState(false)
+    const [privacyAccepted, setPrivacyAccepted] = useState(true)
+    const [dataCollectionAccepted, setDataCollectionAccepted] = useState(true)
 
     const { toast } = useToast()
     const router = useRouter()
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
+    const [nextPath, setNextPath] = useState('/')
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return
+        }
+
+        const params = new URLSearchParams(window.location.search)
+        setNextPath(normalizeNextPath(params.get('next')))
+    }, [])
+
+    useEffect(() => {
+        let cancelled = false
+
+        async function redirectIfLoggedIn() {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!cancelled && session?.user) {
+                router.replace(nextPath)
+                router.refresh()
+            }
+        }
+
+        void redirectIfLoggedIn()
+
+        return () => {
+            cancelled = true
+        }
+    }, [nextPath, router, supabase])
+
+    const ensureLegalConsent = (): boolean => {
+        if (privacyAccepted && dataCollectionAccepted) {
+            return true
+        }
+
+        toast({
+            variant: "destructive",
+            title: "请先确认授权文件",
+            description: "登录前需要先确认《用户隐私》与《数据采集说明》。",
+        })
+        return false
+    }
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!ensureLegalConsent()) {
+            return
+        }
         setIsLoading(true)
 
+        const consentSnapshot = buildLegalConsentSnapshot()
         const { error } = await supabase.auth.signInWithPassword({
             email,
             password,
@@ -82,7 +136,12 @@ export default function LoginPage() {
                 title: "登录成功",
                 description: "正在跳转...",
             })
-            router.push('/')
+            persistLocalLegalConsent(consentSnapshot)
+            await supabase.auth.updateUser({
+                data: buildLegalConsentUserData(consentSnapshot),
+            })
+            router.replace(nextPath)
+            router.refresh()
         }
 
         setIsLoading(false)
@@ -90,14 +149,19 @@ export default function LoginPage() {
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!ensureLegalConsent()) {
+            return
+        }
         setIsLoading(true)
 
-        const { error } = await supabase.auth.signUp({
+        const consentSnapshot = buildLegalConsentSnapshot()
+        const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
                 data: {
                     full_name: name,
+                    ...buildLegalConsentUserData(consentSnapshot),
                 },
             },
         })
@@ -108,12 +172,21 @@ export default function LoginPage() {
                 title: "注册失败",
                 description: getErrorMessage(error, 'register'),
             })
-        } else {
+        } else if (data.session) {
             toast({
                 title: "注册成功",
                 description: "已自动登录，正在跳转...",
             })
-            router.push('/')
+            persistLocalLegalConsent(consentSnapshot)
+            router.replace(nextPath)
+            router.refresh()
+        } else {
+            toast({
+                title: "注册成功",
+                description: "请先完成邮箱验证，然后再登录。",
+            })
+            persistLocalLegalConsent(consentSnapshot)
+            router.replace(buildLoginPath(nextPath))
         }
 
         setIsLoading(false)
@@ -122,8 +195,8 @@ export default function LoginPage() {
     const handleSubmit = mode === 'login' ? handleLogin : handleRegister
 
     return (
-        <div className="flex min-h-screen items-center justify-center p-4 bg-gray-50">
-            <Card className="w-full max-w-md shadow-lg border-0 bg-white/90 backdrop-blur-sm">
+        <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.14),_transparent_36%),linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_54%,_#f8f7f4_100%)] p-4">
+            <Card className="w-full max-w-md border border-amber-100 bg-white shadow-[0_24px_80px_rgba(120,53,15,0.10)]">
                 <CardHeader className="space-y-1">
                     <div className="flex justify-center mb-4">
                         <h1 className="text-4xl font-normal tracking-tight">
@@ -188,9 +261,47 @@ export default function LoginPage() {
                                 />
                             </div>
                         </div>
+                        <div className="rounded-3xl border border-stone-200 bg-stone-50 px-4 py-4">
+                            <div className="flex items-start gap-3">
+                                <input
+                                    id="privacy-consent"
+                                    type="checkbox"
+                                    checked={privacyAccepted}
+                                    onChange={(event) => setPrivacyAccepted(event.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                                />
+                                <Label htmlFor="privacy-consent" className="space-y-1 text-sm font-normal leading-6 text-gray-700">
+                                    <span className="block font-medium text-gray-900">我已阅读《用户隐私》</span>
+                                    <span className="block text-pretty text-gray-600">
+                                        了解燃言会保存哪些账号信息、训练数据如何隔离，以及你能如何停止使用或删除数据。
+                                    </span>
+                                    <Link href="/privacy" className="inline-flex text-amber-700 underline underline-offset-4">
+                                        查看用户隐私
+                                    </Link>
+                                </Label>
+                            </div>
+                            <div className="mt-4 flex items-start gap-3">
+                                <input
+                                    id="data-consent"
+                                    type="checkbox"
+                                    checked={dataCollectionAccepted}
+                                    onChange={(event) => setDataCollectionAccepted(event.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                                />
+                                <Label htmlFor="data-consent" className="space-y-1 text-sm font-normal leading-6 text-gray-700">
+                                    <span className="block font-medium text-gray-900">我已阅读《数据采集说明》</span>
+                                    <span className="block text-pretty text-gray-600">
+                                        了解录音样本如何进入训练语料、哪些字段会进入 manifest，以及本地待同步队列的行为边界。
+                                    </span>
+                                    <Link href="/data-collection" className="inline-flex text-amber-700 underline underline-offset-4">
+                                        查看数据采集说明
+                                    </Link>
+                                </Label>
+                            </div>
+                        </div>
                         <Button
                             type="submit"
-                            className="w-full h-11 text-base bg-amber-500 hover:bg-amber-600 border-none shadow-md transition-all active:scale-95"
+                            className="h-11 w-full border-none bg-amber-500 text-base shadow-md transition-all active:scale-95 hover:bg-amber-600"
                             disabled={isLoading}
                         >
                             {isLoading ? (
@@ -217,9 +328,8 @@ export default function LoginPage() {
                             {mode === 'login' ? '立即注册' : '直接登录'}
                         </button>
                     </p>
-                    <p className="text-xs text-center text-gray-400">
-                        登录即代表您同意我们的
-                        <a href="#" className="underline hover:text-gray-600">服务条款</a> 和 <a href="#" className="underline hover:text-gray-600">隐私政策</a>
+                    <p className="text-center text-xs leading-5 text-gray-400">
+                        登录完成后，训练页不再重复弹出授权勾选；录音、训练和反馈会直接围绕主任务展开。
                     </p>
                 </CardFooter>
             </Card>

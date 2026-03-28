@@ -38,10 +38,10 @@ class LLMCorrectionExtension(AsyncExtension):
     LLM Correction Extension for VoxFlame
 
     This extension receives ASR results, corrects them using LLM,
-    and outputs the corrected text to TTS and frontend.
+    and outputs the corrected text for downstream orchestration.
 
     Data Flow:
-        ASR (asr_result) -> LLMCorrection -> TTS (text_data) + WebSocket (corrected_text)
+        ASR (asr_result) -> LLMCorrection -> corrected_text
     """
 
     def __init__(self, name: str) -> None:
@@ -235,12 +235,10 @@ class LLMCorrectionExtension(AsyncExtension):
                 }
             )
 
-            await self._send_to_tts(ten_env, corrected_text, client_id)
             await self._send_corrected_text(ten_env, text, corrected_text, client_id)
 
         except Exception as e:
             ten_env.log_error(f"Error in correction: {e}")
-            await self._send_to_tts(ten_env, text, client_id)
             await self._send_corrected_text(ten_env, text, text, client_id)
 
     async def _handle_voice_profile(self, ten_env: AsyncTenEnv, data: Data) -> None:
@@ -295,25 +293,6 @@ class LLMCorrectionExtension(AsyncExtension):
         except Exception as e:
             ten_env.log_error(f"Error handling memory_context: {e}")
 
-    async def _send_to_tts(
-        self,
-        ten_env: AsyncTenEnv,
-        text: str,
-        client_id: str,
-    ) -> None:
-        """Send corrected text to TTS extension"""
-        try:
-            text_data = Data.create("text_data")
-            text_data.set_property_string("text", text)
-            text_data.set_property_bool("end_of_segment", True)
-            text_data.set_property_string("client_id", client_id)
-
-            await ten_env.send_data(text_data)
-            ten_env.log_debug(f"Sent to TTS client_id={client_id}: '{text}'")
-
-        except Exception as e:
-            ten_env.log_error(f"Error sending to TTS: {e}")
-
     async def _send_corrected_text(
         self,
         ten_env: AsyncTenEnv,
@@ -321,7 +300,7 @@ class LLMCorrectionExtension(AsyncExtension):
         corrected: str,
         client_id: str,
     ) -> None:
-        """Send corrected text to frontend via WebSocket."""
+        """Send corrected text back to the active transport for frontend rendering."""
         try:
             corrected_data = Data.create("corrected_text")
             corrected_data.set_property_string("original_text", original)

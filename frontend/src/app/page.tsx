@@ -5,16 +5,35 @@ import { useRouter } from 'next/navigation'
 import { ChatInterface } from '@/components/chat'
 import { HomeDashboard } from '@/components/home'
 import { useAuth } from '@/hooks/useAuth'
+import { buildLoginPath } from '@/lib/auth/navigation'
+import { STARTER_KIT_SCENES, type StarterKitScene } from '@/lib/communication/starter-kit'
+
+function resolveStarterSceneId(value: string | null): StarterKitScene['id'] | undefined {
+  return STARTER_KIT_SCENES.find((scene) => scene.id === value)?.id
+}
+
+function buildCommunicatePath(sceneId?: StarterKitScene['id']) {
+  const params = new URLSearchParams({ mode: 'communicate' })
+  if (sceneId) {
+    params.set('starter', sceneId)
+  }
+
+  return `/?${params.toString()}`
+}
 
 export default function HomePage() {
   const router = useRouter()
-  const { userId, isLoading: authLoading, isAuthenticated } = useAuth()
+  const { userId, isLoading: authLoading, isAuthenticated } = useAuth({
+    timeoutBehavior: 'guest',
+  })
   const [showCommunicateView, setShowCommunicateView] = useState(false)
+  const [starterSceneId, setStarterSceneId] = useState<StarterKitScene['id'] | undefined>(undefined)
 
   useEffect(() => {
     const syncModeFromLocation = () => {
       const params = new URLSearchParams(window.location.search)
       setShowCommunicateView(params.get('mode') === 'communicate')
+      setStarterSceneId(resolveStarterSceneId(params.get('starter')))
     }
 
     syncModeFromLocation()
@@ -23,15 +42,26 @@ export default function HomePage() {
     return () => window.removeEventListener('popstate', syncModeFromLocation)
   }, [])
 
-  const openCommunicateView = () => {
+  const openCommunicateView = (sceneId?: StarterKitScene['id']) => {
+    const communicatePath = buildCommunicatePath(sceneId)
+
+    if (!isAuthenticated) {
+      startTransition(() => {
+        router.push(buildLoginPath(communicatePath))
+      })
+      return
+    }
+
     setShowCommunicateView(true)
+    setStarterSceneId(sceneId)
     startTransition(() => {
-      router.push('/?mode=communicate')
+      router.push(communicatePath)
     })
   }
 
   const returnHome = () => {
     setShowCommunicateView(false)
+    setStarterSceneId(undefined)
     startTransition(() => {
       router.push('/')
     })
@@ -52,6 +82,8 @@ export default function HomePage() {
     return (
       <ChatInterface
         userId={userId || undefined}
+        isAuthenticated={isAuthenticated}
+        initialStarterSceneId={starterSceneId}
         homeHref="/"
         onReturnHome={returnHome}
       />

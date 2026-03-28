@@ -1,0 +1,11 @@
+{
+  "params": {
+    "api_key": "${env:DASHSCOPE_API_KEY}",
+    "url": "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+    "model": "qwen3-asr-flash-realtime",
+    "sample_rate": 16000,
+    "language_hints": ["zh"],
+    "turn_detection": "none",
+    "enable_interim": true
+  }
+}

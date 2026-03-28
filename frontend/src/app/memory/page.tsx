@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Brain, CalendarClock, LineChart, Mic, Sparkles } from 'lucide-react'
+import { ArrowLeft, Brain, CalendarClock, LineChart, Mic, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { getAnonymousUserId } from '@/lib/identity/anonymous-user'
+import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
+import { STARTER_KIT_SCENES, type StarterKitScene } from '@/lib/communication/starter-kit'
 import { getValidToken } from '@/lib/supabase/client'
 import { config } from '@/lib/config'
 import {
@@ -12,11 +13,55 @@ import {
   FeedbackStatus,
   MemoryGrowthProfile,
 } from '@/lib/memory/memory-growth'
-import { memoryService, Memory, Session } from '@/lib/memory/memory-service'
+import {
+  memoryService,
+  Memory,
+  Session,
+  HotwordCategory,
+  HotwordProfile,
+} from '@/lib/memory/memory-service'
+import {
+  getTrainingProfileSnapshot,
+  MIN_TRAINING_UPLOADS_FOR_PROFILE,
+} from '@/lib/training/training-profile'
+import { CHINESE_COMMUNICATION_RESOURCES } from '@/lib/support/user-support'
 
 interface RemoteMemoryProfileResponse {
   growth_profile?: MemoryGrowthProfile
+  hotword_profiles?: HotwordProfile[]
+  hotwords?: string[]
 }
+
+const HOTWORD_CATEGORY_LABELS: Record<HotwordCategory, string> = {
+  medical: '医疗康复',
+  profession: '专业术语',
+  family: '家庭照护',
+  daily: '日常表达',
+  emergency: '紧急场景',
+  custom: '自定义',
+}
+
+const HOTWORD_EXAMPLES: Array<{
+  title: string
+  description: string
+  items: string[]
+}> = [
+  {
+    title: '医疗康复',
+    description: '同样是“评估”或“训练”，在医院里常常对应完全不同的意思，先记下来会更稳。',
+    items: ['吞咽评估', '构音训练', '雾化治疗'],
+  },
+  {
+    title: '工作沟通',
+    description: '技术、制造、法律、财会等场景里，同音词一变，句子意思就会完全跑偏。',
+    items: ['容器镜像', '版本回滚', '结项汇报'],
+  },
+  {
+    title: '家庭照护',
+    description: '家庭里高频词往往短但关键，越早记下来，越不容易在关键时刻说乱。',
+    items: ['翻身', '吸痰', '喂药'],
+  },
+]
 
 const STATUS_LABELS: Record<FeedbackStatus, string> = {
   excellent: '匹配良好',
@@ -96,27 +141,72 @@ function renderLabelChips(items: Array<{ label: string; count: number }>, emptyT
   )
 }
 
+function renderStringChips(items: string[], emptyText: string, tone = 'stone') {
+  const toneClasses: Record<string, string> = {
+    stone: 'bg-stone-100 text-stone-700',
+    sky: 'bg-sky-50 text-sky-800',
+    amber: 'bg-amber-50 text-amber-800',
+    emerald: 'bg-emerald-50 text-emerald-800',
+  }
+
+  if (items.length === 0) {
+    return <div className="text-sm text-gray-600">{emptyText}</div>
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => (
+        <span
+          key={item}
+          className={`rounded-full px-4 py-2 text-sm ${toneClasses[tone] ?? toneClasses.stone}`}
+        >
+          {item}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function MemoryPage() {
-  const { userId, isAuthenticated, isLoading } = useAuth()
-  const [ownerId, setOwnerId] = useState<string | null>(null)
+  const { userId, isAuthenticated, isLoading } = useAuth({
+    redirectToLogin: true,
+    nextPath: '/memory',
+  })
   const [localMemories, setLocalMemories] = useState<Memory[]>([])
   const [localSessions, setLocalSessions] = useState<Session[]>([])
+  const [localHotwordProfiles, setLocalHotwordProfiles] = useState<HotwordProfile[]>([])
   const [remoteProfile, setRemoteProfile] = useState<MemoryGrowthProfile | null>(null)
+  const [remoteHotwordProfiles, setRemoteHotwordProfiles] = useState<HotwordProfile[]>([])
+  const [localTrainingProfile, setLocalTrainingProfile] = useState(() => (
+    userId ? getTrainingProfileSnapshot(userId) : null
+  ))
+  const [hotwordPhrase, setHotwordPhrase] = useState('')
+  const [hotwordCategory, setHotwordCategory] = useState<HotwordCategory>('custom')
+  const [hotwordScenario, setHotwordScenario] = useState('')
+  const [hotwordNote, setHotwordNote] = useState('')
+  const [hotwordStatus, setHotwordStatus] = useState<string | null>(null)
+  const [isSavingHotwords, setIsSavingHotwords] = useState(false)
+  const [prepSceneId, setPrepSceneId] = useState<StarterKitScene['id']>('interview')
+  const {
+    snapshot: workspaceSnapshot,
+    isLoading: isWorkspaceLoading,
+    refresh: refreshWorkspaceSnapshot,
+  } = useWorkspaceMemorySnapshot({
+    userId,
+    isAuthenticated,
+    sceneId: prepSceneId,
+  })
 
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading || !userId) {
       return
     }
 
-    const nextOwnerId = userId || getAnonymousUserId()
-    if (!nextOwnerId) {
-      return
-    }
-
-    setOwnerId(nextOwnerId)
-    memoryService.init(nextOwnerId)
+    memoryService.init(userId)
     setLocalMemories(memoryService.getAllMemories())
     setLocalSessions(memoryService.getAllSessions())
+    setLocalHotwordProfiles(memoryService.getHotwordProfiles())
+    setLocalTrainingProfile(getTrainingProfileSnapshot(userId))
   }, [isLoading, userId])
 
   useEffect(() => {
@@ -150,6 +240,12 @@ export default function MemoryPage() {
         }
 
         setRemoteProfile(data.growth_profile ?? null)
+        const syncedProfiles = data.hotword_profiles ?? []
+        setRemoteHotwordProfiles(syncedProfiles)
+        if (memoryService.getHotwordProfiles().length === 0 && syncedProfiles.length > 0) {
+          const localProfiles = memoryService.replaceHotwordProfiles(syncedProfiles)
+          setLocalHotwordProfiles(localProfiles)
+        }
       } catch (error) {
         console.error('[MemoryPage] Failed to load unified memory profile:', error)
       }
@@ -166,8 +262,9 @@ export default function MemoryPage() {
     buildMemoryGrowthProfile({
       memories: localMemories,
       sessions: localSessions,
+      hotwords: Array.from(new Set(localHotwordProfiles.map((profile) => profile.phrase))),
     })
-  ), [localMemories, localSessions])
+  ), [localHotwordProfiles, localMemories, localSessions])
 
   const profile = useMemo(() => {
     if (isAuthenticated && remoteProfile) {
@@ -177,17 +274,121 @@ export default function MemoryPage() {
     return localProfile
   }, [isAuthenticated, localProfile, remoteProfile])
 
-  if (isLoading || !ownerId) {
+  const activeHotwordProfiles = useMemo(() => {
+    if (isAuthenticated && remoteProfile) {
+      return localHotwordProfiles.length > 0 ? localHotwordProfiles : remoteHotwordProfiles
+    }
+
+    return localHotwordProfiles
+  }, [isAuthenticated, localHotwordProfiles, remoteHotwordProfiles, remoteProfile])
+  const activePrepScene = useMemo(
+    () => STARTER_KIT_SCENES.find((scene) => scene.id === (workspaceSnapshot?.expression_kit.active_scene_id ?? prepSceneId)),
+    [prepSceneId, workspaceSnapshot?.expression_kit.active_scene_id],
+  )
+
+  useEffect(() => {
+    if (!hotwordStatus) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setHotwordStatus(null)
+    }, 3200)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [hotwordStatus])
+
+  function resetHotwordDraft() {
+    setHotwordPhrase('')
+    setHotwordCategory('custom')
+    setHotwordScenario('')
+    setHotwordNote('')
+  }
+
+  async function syncHotwordsToBackend(nextProfiles: HotwordProfile[]) {
+    if (!isAuthenticated || !userId) {
+      setHotwordStatus('已保存到当前设备，并会在这台设备后续连接时参与理解。')
+      return
+    }
+
+    try {
+      const token = await getValidToken()
+      if (!token) {
+        setHotwordStatus('已保存到当前设备；登录态同步稍后会自动重试。')
+        return
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/memory/hotwords`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          profiles: nextProfiles,
+        }),
+      })
+
+      if (!response.ok) {
+        setHotwordStatus('已保存到当前设备；后端同步暂时失败。')
+        return
+      }
+
+      const data = await response.json() as { profiles?: HotwordProfile[] }
+      setRemoteHotwordProfiles(data.profiles ?? nextProfiles)
+      void refreshWorkspaceSnapshot(prepSceneId)
+      setHotwordStatus('热词已保存，并会在后续连接时同步到 agent 个体画像。')
+    } catch (error) {
+      console.error('[MemoryPage] Failed to sync hotwords:', error)
+      setHotwordStatus('已保存到当前设备；后端同步暂时失败。')
+    }
+  }
+
+  async function handleHotwordSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const phrase = hotwordPhrase.trim()
+    if (!phrase) {
+      setHotwordStatus('先填写一个你想让 agent 优先理解的词。')
+      return
+    }
+
+    setIsSavingHotwords(true)
+    memoryService.upsertHotwordProfile({
+      phrase,
+      category: hotwordCategory,
+      scenario: hotwordScenario,
+      note: hotwordNote,
+    })
+    const nextProfiles = memoryService.getHotwordProfiles()
+    setLocalHotwordProfiles(nextProfiles)
+    await syncHotwordsToBackend(nextProfiles)
+    resetHotwordDraft()
+    setIsSavingHotwords(false)
+  }
+
+  async function handleDeleteHotword(profileId: string) {
+    setIsSavingHotwords(true)
+    const nextProfiles = memoryService.deleteHotwordProfile(profileId)
+    setLocalHotwordProfiles(nextProfiles)
+    await syncHotwordsToBackend(nextProfiles)
+    setIsSavingHotwords(false)
+  }
+
+  if (isLoading || !userId) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,_#fffaf2_0%,_#fffdf9_46%,_#fff7ed_100%)]">
+      <div className="flex min-h-screen items-center justify-center bg-stone-50">
         <div className="text-center text-sm text-gray-600">正在整理你的进展与记忆...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_30%),linear-gradient(180deg,_#fffdf8_0%,_#fff9f0_48%,_#fff5eb_100%)]">
-      <header className="sticky top-0 z-30 border-b border-white/70 bg-white/85 backdrop-blur-xl">
+    <div className="min-h-screen bg-stone-50">
+      <header className="sticky top-0 z-30 border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900">
@@ -196,30 +397,36 @@ export default function MemoryPage() {
             </Link>
             <div className="hidden h-5 w-px bg-gray-200 sm:block" />
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600">Growth Profile</div>
-              <div className="text-lg font-semibold text-gray-900">进展与记忆</div>
+              <div className="text-sm font-medium text-amber-700">沟通档案</div>
+              <div className="text-lg font-semibold text-gray-900 text-balance">进展、复盘与下一次沟通准备</div>
             </div>
           </div>
 
-          <div className="rounded-full bg-white px-4 py-2 text-sm text-gray-600 shadow-sm">
-            {isAuthenticated ? '已登录，当前优先展示后端 growth profile' : '未登录，当前展示这台设备上的本地成长档案'}
+          <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-600">
+            下次面试、工作或就医前，先来这里看一眼
           </div>
         </div>
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
         <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[32px] border border-amber-100 bg-white/90 p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
+          <div className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
             <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700">
               <Sparkles className="h-4 w-4" />
-              这里不再只展示零散记忆，而是展示已经沉淀下来的成长档案
+              先把对下次真的有用的内容带走
             </div>
             <h1 className="mt-6 max-w-3xl text-3xl font-semibold leading-tight text-gray-900 sm:text-4xl">
-              不再只告诉你“录过几次”，而是告诉你最近在变好哪里、还卡在哪里。
+              这里先看三件事：最近更顺了什么、还卡在哪里、下次先准备哪一句。
             </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-gray-600">
-              这页统一展示训练记录、会话节奏、重点音节、易混声母 / 韵母 / 声调和热词。后续继续在这个 growth profile 上扩成长趋势，不再回到页面里各自拼接。
+            <p className="mt-4 max-w-3xl text-base leading-7 text-gray-600 text-pretty">
+              来这里不是为了看报表，而是为了在下次高压沟通前少一点慌、少一点临场硬撑。
             </p>
+
+            {localTrainingProfile && !localTrainingProfile.profileReady ? (
+              <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-900">
+                当前已累计 {localTrainingProfile.totalUploadedRecordings} 条训练样本，再积累 {localTrainingProfile.uploadsUntilReady} 条，后面的建议会更稳一些。
+              </div>
+            ) : null}
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <div className="rounded-3xl bg-amber-50 px-5 py-4">
@@ -323,12 +530,223 @@ export default function MemoryPage() {
             <div className="mt-6 rounded-3xl border border-dashed border-amber-200 bg-white px-4 py-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                 <Brain className="h-4 w-4 text-amber-600" />
-                当前记忆边界
+                如果你今天不想看太多数据
               </div>
               <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                <li>- 先聚焦真实可解释的 growth profile：训练记录、会话、趋势、热词和常见混淆点。</li>
-                <li>- 未登录时只看这台设备上的本地成长档案；登录后才合并后端已同步的数据。</li>
+                <li>- 先看最近说顺了哪些句子。</li>
+                <li>- 再看最影响理解的一个卡点。</li>
+                <li>- 最后带走下一次最该先准备的那句话。</li>
               </ul>
+            </div>
+          </aside>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <article className="rounded-[32px] border border-stone-200 bg-white p-8 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-sm font-medium text-amber-700">下一次高压沟通前</div>
+                <h2 className="mt-2 text-3xl font-semibold text-gray-900 text-balance">
+                  先准备场景，再准备表达
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-600 text-pretty">
+                  先把这次最可能用到的句子、最近的提醒和补救方式看一眼，再去沟通会更稳。
+                </p>
+              </div>
+              <Link
+                href={`/?mode=communicate${activePrepScene ? `&starter=${activePrepScene.id}` : ''}`}
+                className="inline-flex rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white"
+              >
+                按这个场景进入沟通
+              </Link>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              {STARTER_KIT_SCENES.map((scene) => {
+                const isActive = scene.id === activePrepScene?.id
+
+                return (
+                  <button
+                    key={scene.id}
+                    type="button"
+                    onClick={() => setPrepSceneId(scene.id)}
+                    className={`rounded-full px-4 py-2 text-sm transition ${
+                      isActive
+                        ? 'bg-amber-500 text-white'
+                        : 'border border-stone-200 bg-stone-50 text-stone-700 hover:border-amber-300 hover:text-amber-800'
+                    }`}
+                  >
+                    {scene.title}
+                  </button>
+                )
+              })}
+            </div>
+
+            {isWorkspaceLoading ? (
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-3xl bg-stone-100 p-5">
+                  <div className="h-4 w-28 animate-pulse rounded-full bg-stone-200" />
+                  <div className="mt-4 h-4 w-full animate-pulse rounded-full bg-stone-200" />
+                  <div className="mt-3 h-4 w-5/6 animate-pulse rounded-full bg-stone-200" />
+                </div>
+                <div className="rounded-3xl bg-stone-100 p-5">
+                  <div className="h-4 w-24 animate-pulse rounded-full bg-stone-200" />
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="h-9 w-28 animate-pulse rounded-full bg-stone-200" />
+                    <div className="h-9 w-32 animate-pulse rounded-full bg-stone-200" />
+                    <div className="h-9 w-24 animate-pulse rounded-full bg-stone-200" />
+                  </div>
+                </div>
+              </div>
+            ) : workspaceSnapshot ? (
+              <div className="mt-6 grid gap-4 lg:grid-cols-[0.95fr,1.05fr]">
+                <div className="space-y-4">
+                  <div className="rounded-3xl border border-stone-200 bg-stone-50 p-5">
+                    <div className="text-sm font-medium text-stone-700">
+                      {workspaceSnapshot.session_review.headline}
+                    </div>
+                    <p className="mt-3 text-sm leading-7 text-gray-700 text-pretty">
+                      {workspaceSnapshot.session_review.summary}
+                    </p>
+                    {workspaceSnapshot.session_review.recent_win ? (
+                      <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        最近亮点：{workspaceSnapshot.session_review.recent_win}
+                      </div>
+                    ) : null}
+                    {workspaceSnapshot.session_review.next_step ? (
+                      <div className="mt-4 text-sm text-gray-600">
+                        下一步：{workspaceSnapshot.session_review.next_step}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-3xl border border-stone-200 bg-white p-5">
+                    <div className="text-sm font-medium text-stone-700">当前最值得先记住的事</div>
+                    <div className="mt-4 space-y-3">
+                      {[
+                        ...workspaceSnapshot.profile_bundle.static,
+                        ...workspaceSnapshot.profile_bundle.dynamic,
+                      ].slice(0, 3).map((item) => (
+                        <div key={item.id} className="rounded-2xl bg-stone-50 px-4 py-4">
+                          <div className="text-sm font-medium text-gray-900">{item.title}</div>
+                          <p className="mt-2 text-sm leading-6 text-gray-600 text-pretty">{item.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-3xl border border-stone-200 bg-white p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-stone-700">个体化表达建议</div>
+                        <div className="mt-1 text-lg font-semibold text-gray-900">
+                          {activePrepScene ? `${activePrepScene.title} 场景优先` : '按当前场景优先'}
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+                        直接可用
+                      </span>
+                    </div>
+                    {workspaceSnapshot.expression_kit.personalized_phrases.length > 0 ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {workspaceSnapshot.expression_kit.personalized_phrases.slice(0, 6).map((phrase) => (
+                          <span
+                            key={phrase.id}
+                            className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-800"
+                            title={phrase.note}
+                          >
+                            {phrase.text}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4 text-sm leading-6 text-gray-600">
+                        还没有长出稳定的个体化表达建议。先去沟通页保存三句最重要的话，或者继续积累真实样本。
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-3xl border border-stone-200 bg-stone-50 p-5">
+                    <div className="text-sm font-medium text-stone-700">这次优先准备</div>
+                    <div className="mt-4">
+                      {renderStringChips(
+                        workspaceSnapshot.expression_kit.recommended_focus,
+                        '继续积累后，这里会告诉你下次高压沟通前最该先准备的词和提醒。',
+                        'amber',
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-3xl border border-dashed border-stone-300 bg-stone-50 px-5 py-6 text-sm leading-7 text-gray-600">
+                沟通画像还在同步中。先去沟通模式说出第一句话，或者继续完成今天的练习，这里会逐步长出更贴身的场景准备。
+              </div>
+            )}
+          </article>
+
+          <aside className="rounded-[32px] border border-stone-200 bg-white p-7 shadow-sm">
+            <div className="text-sm font-medium text-amber-700">你的个人沟通约定</div>
+            <h3 className="mt-2 text-2xl font-semibold text-gray-900 text-balance">
+              先留住那三句最能帮你减压的话
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-gray-600 text-pretty">
+              比如陌生人先听到什么、别人该怎么配合你、没听清时怎么补救。先把这三句固定下来，会很有用。
+            </p>
+
+            <div className="mt-6 space-y-3">
+              {workspaceSnapshot?.expression_kit.communication_preferences.opening_phrase ? (
+                <div className="rounded-3xl bg-amber-50 px-4 py-4">
+                  <div className="text-sm font-medium text-amber-800">陌生人先听到</div>
+                  <p className="mt-2 text-sm leading-6 text-amber-900">
+                    {workspaceSnapshot.expression_kit.communication_preferences.opening_phrase}
+                  </p>
+                </div>
+              ) : null}
+              {workspaceSnapshot?.expression_kit.communication_preferences.pace_hint ? (
+                <div className="rounded-3xl bg-stone-100 px-4 py-4">
+                  <div className="text-sm font-medium text-stone-800">我希望别人这样配合</div>
+                  <p className="mt-2 text-sm leading-6 text-stone-800">
+                    {workspaceSnapshot.expression_kit.communication_preferences.pace_hint}
+                  </p>
+                </div>
+              ) : null}
+              {workspaceSnapshot?.expression_kit.communication_preferences.repair_phrase ? (
+                <div className="rounded-3xl bg-emerald-50 px-4 py-4">
+                  <div className="text-sm font-medium text-emerald-800">没听清时怎么办</div>
+                  <p className="mt-2 text-sm leading-6 text-emerald-900">
+                    {workspaceSnapshot.expression_kit.communication_preferences.repair_phrase}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            {!workspaceSnapshot?.expression_kit.communication_preferences.opening_phrase &&
+            !workspaceSnapshot?.expression_kit.communication_preferences.pace_hint &&
+            !workspaceSnapshot?.expression_kit.communication_preferences.repair_phrase ? (
+              <div className="mt-6 rounded-3xl border border-dashed border-stone-300 bg-stone-50 px-4 py-4 text-sm leading-6 text-gray-600">
+                你还没有固定自己的沟通偏好。先去沟通页保存那三句最重要的话，这里和首屏表达建议都会马上跟上。
+              </div>
+            ) : null}
+
+            <div className="mt-6 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-4">
+              <div className="text-sm font-medium text-stone-800">顺手带走几个中文资源</div>
+              <div className="mt-3 space-y-3">
+                {CHINESE_COMMUNICATION_RESOURCES.slice(0, 3).map((resource) => (
+                  <a
+                    key={resource.id}
+                    href={resource.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block rounded-2xl border border-stone-200 bg-white px-4 py-3 transition hover:border-amber-300 hover:bg-amber-50"
+                  >
+                    <div className="text-sm font-medium text-gray-900">{resource.title}</div>
+                    <p className="mt-1 text-sm leading-6 text-gray-600 text-pretty">{resource.summary}</p>
+                  </a>
+                ))}
+              </div>
             </div>
           </aside>
         </section>
@@ -344,30 +762,51 @@ export default function MemoryPage() {
               <div className="mt-6 space-y-4">
                 {profile.recentTraining.map((memory) => {
                   const metadata = memory.metadata as Record<string, unknown> | undefined
+                  const isTrainingProfileSummary = metadata?.kind === 'training_profile_summary'
                   const focusSyllables = Array.isArray(metadata?.focus_syllables)
                     ? metadata.focus_syllables.filter((item): item is string => typeof item === 'string')
+                    : []
+                  const summarySyllables = Array.isArray(metadata?.frequent_syllables)
+                    ? metadata.frequent_syllables
+                        .map((item) =>
+                          item && typeof item === 'object' && 'label' in item && typeof item.label === 'string'
+                            ? item.label
+                            : null,
+                        )
+                        .filter((item): item is string => item !== null)
                     : []
                   const summary =
                     typeof metadata?.pronunciation_summary === 'string'
                       ? metadata.pronunciation_summary
+                      : typeof metadata?.last_pronunciation_summary === 'string'
+                        ? metadata.last_pronunciation_summary
                       : '先看目标句、重点音节和动作提示。'
+                  const uploadedCount =
+                    typeof metadata?.total_training_uploads === 'number' ? metadata.total_training_uploads : null
+                  const nextStep =
+                    typeof metadata?.next_step === 'string' ? metadata.next_step : null
 
                   return (
                     <article key={memory.id} className="rounded-3xl border border-stone-200 bg-stone-50 px-5 py-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="text-sm font-medium text-gray-900">{memory.content}</div>
                         <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700">
-                          {STATUS_LABELS[(metadata?.feedback_status as FeedbackStatus) ?? 'unclear']}
+                          {isTrainingProfileSummary
+                            ? `画像摘要${uploadedCount ? ` · ${uploadedCount} 条` : ''}`
+                            : STATUS_LABELS[(metadata?.feedback_status as FeedbackStatus) ?? 'unclear']}
                         </span>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
-                        {focusSyllables.slice(0, 4).map((syllable) => (
+                        {(isTrainingProfileSummary ? summarySyllables : focusSyllables).slice(0, 4).map((syllable) => (
                           <span key={syllable} className="rounded-full bg-white px-3 py-1">
                             {syllable}
                           </span>
                         ))}
                       </div>
                       <p className="mt-3 text-sm leading-6 text-gray-600">{summary}</p>
+                      {nextStep ? (
+                        <p className="mt-2 text-sm leading-6 text-amber-800">下一步：{nextStep}</p>
+                      ) : null}
                     </article>
                   )
                 })}
@@ -511,19 +950,159 @@ export default function MemoryPage() {
 
         <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <article className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
-            <div className="text-lg font-semibold text-gray-900">已学到的热词</div>
-            <div className="mt-6">
-              {profile.hotwords.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {profile.hotwords.map((hotword) => (
-                    <span key={hotword} className="rounded-full bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
-                      {hotword}
-                    </span>
-                  ))}
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-lg font-semibold text-gray-900">热词与场景词表</div>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
+                {activeHotwordProfiles.length} 条自定义
+              </span>
+            </div>
+
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-600">
+              中文里同音词很多，医疗、工作、家庭和紧急场景里更容易因为一个词听偏，整句就偏掉。
+              把自己的专业词、场景词和高频表达直接记下来，后面开口会更省力。
+            </p>
+
+            <div className="mt-6 grid gap-3 lg:grid-cols-3">
+              {HOTWORD_EXAMPLES.map((example) => (
+                <div key={example.title} className="rounded-3xl border border-stone-200 bg-stone-50 px-4 py-4">
+                  <div className="text-sm font-semibold text-gray-900">{example.title}</div>
+                  <p className="mt-2 text-xs leading-6 text-gray-600">{example.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {example.items.map((item) => (
+                      <span key={item} className="rounded-full bg-white px-3 py-1 text-xs text-gray-700">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            <form className="mt-6 grid gap-4 rounded-[28px] border border-amber-200 bg-[#fffaf2] p-5" onSubmit={handleHotwordSubmit}>
+              <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
+                <label className="space-y-2">
+                  <div className="text-sm font-medium text-gray-900">热词</div>
+                  <input
+                    value={hotwordPhrase}
+                    onChange={(event) => setHotwordPhrase(event.target.value)}
+                    placeholder="例如：吞咽评估、版本回滚、吸痰"
+                    className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-amber-400"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <div className="text-sm font-medium text-gray-900">词类</div>
+                  <select
+                    value={hotwordCategory}
+                    onChange={(event) => setHotwordCategory(event.target.value as HotwordCategory)}
+                    className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-amber-400"
+                  >
+                    {Object.entries(HOTWORD_CATEGORY_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+                <label className="space-y-2">
+                  <div className="text-sm font-medium text-gray-900">场景 / 专业</div>
+                  <input
+                    value={hotwordScenario}
+                    onChange={(event) => setHotwordScenario(event.target.value)}
+                    placeholder="例如：住院沟通、DevOps、家庭护理"
+                    className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-amber-400"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <div className="text-sm font-medium text-gray-900">备注</div>
+                  <input
+                    value={hotwordNote}
+                    onChange={(event) => setHotwordNote(event.target.value)}
+                    placeholder="可写常见搭配、同音词风险、使用提醒"
+                    className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-amber-400"
+                  />
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-xs leading-6 text-gray-600">
+                  保存后，这些词会先留在你的沟通档案里，后面做场景准备、表达建议和练习提醒时都会优先用到。
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSavingHotwords}
+                  className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Plus className="h-4 w-4" />
+                  {isSavingHotwords ? '保存中…' : '加入词表'}
+                </button>
+              </div>
+            </form>
+
+            {hotwordStatus ? (
+              <div className="mt-4 rounded-3xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+                {hotwordStatus}
+              </div>
+            ) : null}
+
+            <div className="mt-6 grid gap-3">
+              {activeHotwordProfiles.length > 0 ? (
+                activeHotwordProfiles.map((profileItem) => (
+                  <div key={profileItem.id} className="flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-semibold text-gray-900">{profileItem.phrase}</div>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs text-gray-700">
+                          {HOTWORD_CATEGORY_LABELS[profileItem.category]}
+                        </span>
+                        {profileItem.scenario ? (
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-800">
+                            {profileItem.scenario}
+                          </span>
+                        ) : null}
+                      </div>
+                      {profileItem.note ? (
+                        <div className="mt-2 text-sm leading-6 text-gray-600">{profileItem.note}</div>
+                      ) : (
+                        <div className="mt-2 text-sm leading-6 text-gray-500">
+                          这个词会在后续识别和纠错时作为个人词表提示被优先考虑。
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleDeleteHotword(profileItem.id)
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm text-gray-700 transition hover:border-rose-300 hover:text-rose-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      删除
+                    </button>
+                  </div>
+                ))
               ) : (
-                <div className="text-sm text-gray-600">训练和沟通继续积累后，这里会显示 agent 已经学到的关键词。</div>
+                <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 px-5 py-6 text-sm leading-6 text-gray-600">
+                  这里还没有自定义词表。你可以先加 3 到 5 个最容易被听错、但在自己场景里最关键的词。
+                </div>
               )}
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-dashed border-emerald-200 bg-emerald-50 px-4 py-4">
+              <div className="text-sm font-semibold text-gray-900">当前已进入 growth profile 的热词</div>
+              <div className="mt-3">
+                {profile.hotwords.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {profile.hotwords.map((hotword) => (
+                      <span key={hotword} className="rounded-full bg-white px-4 py-2 text-sm text-emerald-800">
+                        {hotword}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-600">训练和沟通继续积累后，这里会显示 agent 已经学到并开始优先参考的关键词。</div>
+                )}
+              </div>
             </div>
           </article>
 
@@ -547,7 +1126,7 @@ export default function MemoryPage() {
         </section>
 
         {profile.expressionMemories.length === 0 && profile.trainingMemories.length === 0 ? (
-          <section className="rounded-[32px] border border-dashed border-amber-200 bg-white/80 p-8 text-center shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
+          <section className="rounded-[32px] border border-dashed border-amber-200 bg-white p-8 text-center shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
             <div className="text-lg font-semibold text-gray-900">你的成长档案还没有开始积累</div>
             <p className="mt-3 text-sm leading-6 text-gray-600">
               先去沟通模式说出第一句话，或者去训练页练一条最常用的句子，这里就会开始长出真正属于你的进展与记忆。

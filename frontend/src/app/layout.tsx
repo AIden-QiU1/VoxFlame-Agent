@@ -1,11 +1,16 @@
 import type { Metadata, Viewport } from 'next'
+import { LocalRuntimeReset } from '@/components/pwa/LocalRuntimeReset'
+import { PWAStatusCenter } from '@/components/pwa'
 import { Toaster } from "@/components/ui/toaster"
 import './globals.css'
 
+const pwaEnabled = process.env.NEXT_PUBLIC_PWA_ENABLED === '1'
+
 export const metadata: Metadata = {
+  metadataBase: new URL('https://ranyan.app'),
   title: '燃言 - 让每个声音都被听见',
   description: '专为构音障碍患者打造的开源语音识别项目，让AI听懂你的声音',
-  manifest: '/manifest.json',
+  manifest: pwaEnabled ? '/manifest.json' : undefined,
   applicationName: '燃言',
   keywords: ['语音识别', '构音障碍', '无障碍', 'AI', '开源', 'dysarthria', 'speech recognition'],
   authors: [{ name: '燃言团队' }],
@@ -16,11 +21,13 @@ export const metadata: Metadata = {
     email: true,
     address: true,
   },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: '燃言',
-  },
+  appleWebApp: pwaEnabled
+    ? {
+        capable: true,
+        statusBarStyle: 'default',
+        title: '燃言',
+      }
+    : undefined,
   icons: {
     icon: [
       { url: '/icons/icon-32x32.png', sizes: '32x32', type: 'image/png' },
@@ -89,6 +96,7 @@ export default function RootLayout({
         {/* MS 应用磁贴配置 */}
         <meta name="msapplication-TileColor" content="#F59E0B" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
+        {pwaEnabled ? <meta name="mobile-web-app-capable" content="yes" /> : null}
       </head>
       <body className="antialiased">
         {/* Skip to main content link for accessibility */}
@@ -99,6 +107,8 @@ export default function RootLayout({
           跳转到主要内容
         </a>
         {children}
+        {!pwaEnabled ? <LocalRuntimeReset /> : null}
+        {pwaEnabled ? <PWAStatusCenter /> : null}
         <Toaster />
       </body>
     </html>

@@ -17,6 +17,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
+import { buildLoginPath, getCurrentPathWithSearch } from "@/lib/auth/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -28,6 +29,7 @@ export function UserNav() {
     const [mounted, setMounted] = useState(false)
     const router = useRouter()
     const supabase = createClient()
+    const loginHref = buildLoginPath(getCurrentPathWithSearch())
 
     useEffect(() => {
         setMounted(true)
@@ -64,17 +66,23 @@ export function UserNav() {
     if (!user) {
         return (
             <Button variant="ghost" asChild className="relative h-8 w-8 rounded-full">
-                <Link href="/login">登录</Link>
+                <Link href={loginHref}>登录</Link>
             </Button>
         )
     }
+
+    const avatarUrl = typeof user.user_metadata?.avatar_url === 'string'
+        ? user.user_metadata.avatar_url
+        : null
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.user_metadata?.avatar_url || "/avatars/01.png"} alt={user.email || ""} />
+                        {avatarUrl ? (
+                            <AvatarImage src={avatarUrl} alt={user.email || ""} />
+                        ) : null}
                         <AvatarFallback>{user.email?.slice(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                 </Button>

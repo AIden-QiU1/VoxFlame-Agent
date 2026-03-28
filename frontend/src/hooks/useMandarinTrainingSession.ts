@@ -1,254 +1,343 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AudioProcessor } from '@/lib/audio/audio-processor'
-import { config } from '@/lib/config'
-import { getValidToken } from '@/lib/supabase/client'
-import { ASRClient } from '@/lib/websocket/asr-client'
+import type { VoxFlameRecordingEnvelope } from '@/lib/recording/recording-contract'
+import { useRtcAgentSession } from './useRtcAgentSession'
 
 type SessionStatus = 'idle' | 'connecting' | 'ready' | 'recording' | 'processing' | 'error'
 
-interface TrainingMessageData {
-  text?: string
-  is_final?: boolean
-  role?: string
-}
-
-interface TrainingMessage {
-  type: string
-  name?: string
-  data?: TrainingMessageData
-  error?: string
-}
-
 interface StopRecordingResult {
   transcript: string
-  recording: {
-    blob: Blob
-    duration: number
-    sampleRate: number
-  } | null
-}
-
-function isIgnorableError(errorText?: string): boolean {
-  if (!errorText) {
-    return false
-  }
-
-  return (
-    errorText.includes('Missing') && errorText.includes('audio')
-  ) || errorText.includes('NO_VALID_AUDIO_ERROR')
+  recording: VoxFlameRecordingEnvelope | null
 }
 
 interface UseMandarinTrainingSessionOptions {
-  anonymousUserId?: string
+  userId?: string
+}
+
+function pickRecorderMimeType(): string {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+  ]
+
+  for (const mimeType of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mimeType)) {
+      return mimeType
+    }
+  }
+
+  return ''
 }
 
 export function useMandarinTrainingSession(
   options: UseMandarinTrainingSessionOptions = {},
 ) {
-  const { anonymousUserId } = options
-  const [status, setStatus] = useState<SessionStatus>('idle')
-  const [interimText, setInterimText] = useState('')
-  const [finalText, setFinalText] = useState('')
+  const { userId } = options
   const [error, setError] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isConnecting, setIsConnecting] = useState(false)
+  const sessionIdRef = useRef<string | null>(null)
+  const latestUserTranscriptRef = useRef('')
+  const currentASRTextRef = useRef('')
+  const recordingBaselineRef = useRef('')
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const recorderTrackRef = useRef<MediaStreamTrack | null>(null)
+  const recorderOwnsTrackRef = useRef(false)
+  const recordedChunksRef = useRef<Blob[]>([])
+  const recordingStartedAtRef = useRef<number | null>(null)
+  const recordingSampleRateRef = useRef<number>(16000)
 
-  const clientRef = useRef<ASRClient | null>(null)
-  const audioProcessorRef = useRef<AudioProcessor | null>(null)
-  const finalResolverRef = useRef<((value: string) => void) | null>(null)
-  const latestInterimRef = useRef('')
-  const latestFinalRef = useRef('')
+  const rtc = useRtcAgentSession({
+    userId,
+    mode: 'training',
+    connectionNotice: null,
+  })
+  const {
+    sessionId,
+    currentASRText,
+    latestUserTranscript,
+    lastTrainingFeedback,
+    lastVoiceProfileSync,
+    isRecording: rtcIsRecording,
+    isConnected,
+    error: rtcError,
+    startRecording: startRtcRecording,
+    stopRecording: stopRtcRecording,
+    sendControlEvent,
+    disconnect: disconnectRtc,
+    getMicrophoneStreamTrack,
+    getMicrophoneMediaStream,
+    analyser,
+  } = rtc
 
   useEffect(() => {
-    audioProcessorRef.current = new AudioProcessor()
+    sessionIdRef.current = sessionId
+  }, [sessionId])
 
-    return () => {
-      audioProcessorRef.current?.stop()
-      clientRef.current?.close()
+  useEffect(() => {
+    latestUserTranscriptRef.current = latestUserTranscript
+  }, [latestUserTranscript])
+
+  useEffect(() => {
+    currentASRTextRef.current = currentASRText
+  }, [currentASRText])
+
+  const beginLocalRecording = useCallback(() => {
+    const sourceStream = getMicrophoneMediaStream()
+    const sourceTrack = sourceStream?.getAudioTracks()[0] ?? getMicrophoneStreamTrack()
+    if (!sourceTrack) {
+      return null
     }
-  }, [])
 
-  const handleMessage = useCallback((message: TrainingMessage) => {
-    if (message.type === 'error') {
-      const errorText = message.error
-      if (!isIgnorableError(errorText)) {
-        setError(errorText || '训练连接出现错误')
-        setStatus('error')
+    if (typeof MediaRecorder === 'undefined') {
+      throw new Error('当前浏览器暂不支持训练录音保存，请换到较新的浏览器再试。')
+    }
+
+    let recorderTrack: MediaStreamTrack = sourceTrack
+    let ownsTrack = false
+
+    try {
+      recorderTrack = sourceTrack.clone()
+      ownsTrack = true
+    } catch {
+      recorderTrack = sourceTrack
+      ownsTrack = false
+    }
+
+    try {
+      const stream = new MediaStream([recorderTrack])
+      const mimeType = pickRecorderMimeType()
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+
+      recordedChunksRef.current = []
+      recorderTrackRef.current = recorderTrack
+      recorderOwnsTrackRef.current = ownsTrack
+      recordingStartedAtRef.current = Date.now()
+      recordingSampleRateRef.current = recorderTrack.getSettings().sampleRate || 16000
+
+      recorder.addEventListener('dataavailable', (event: BlobEvent) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data)
+        }
+      })
+
+      recorder.start(250)
+      recorderRef.current = recorder
+      return recorder
+    } catch (error) {
+      if (ownsTrack) {
+        try {
+          recorderTrack.stop()
+        } catch {
+          // ignore cleanup error
+        }
       }
-      return
+
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : '训练录音初始化失败，请再点一次；如果还是这样，就是本地录音链路还没接稳。'
+      throw new Error(message)
+    }
+  }, [getMicrophoneMediaStream, getMicrophoneStreamTrack])
+
+  const stopLocalRecording = useCallback(async (): Promise<StopRecordingResult['recording']> => {
+    const recorder = recorderRef.current
+    const startedAt = recordingStartedAtRef.current
+    recorderRef.current = null
+    recordingStartedAtRef.current = null
+
+    const finalize = async (): Promise<StopRecordingResult['recording']> => {
+      const chunks = recordedChunksRef.current
+      recordedChunksRef.current = []
+
+      const track = recorderTrackRef.current
+      recorderTrackRef.current = null
+      const ownsTrack = recorderOwnsTrackRef.current
+      recorderOwnsTrackRef.current = false
+      if (ownsTrack) {
+        track?.stop()
+      }
+
+      if (!chunks.length) {
+        return null
+      }
+
+      const blob = new Blob(chunks, {
+        type: recorder?.mimeType || 'audio/webm',
+      })
+      const stoppedAt = Date.now()
+      const durationMs = startedAt ? Math.max(300, stoppedAt - startedAt) : 0
+
+      return {
+        recordingId: crypto.randomUUID(),
+        sessionId: sessionIdRef.current ?? `training_local_${stoppedAt}`,
+        mode: 'training',
+        sourceSurface: 'web',
+        collectionMode: 'supervised',
+        createdAt: new Date(startedAt ?? stoppedAt).toISOString(),
+        startedAt: new Date(startedAt ?? stoppedAt).toISOString(),
+        stoppedAt: new Date(stoppedAt).toISOString(),
+        audio: {
+          blob,
+          format: recorder?.mimeType || 'audio/webm',
+          sampleRate: recordingSampleRateRef.current,
+          channelCount: 1,
+          durationMs,
+          durationSeconds: Math.max(1, Math.round(durationMs / 1000)),
+          fileSizeBytes: blob.size,
+          captureTransport: 'rtc_dup_track',
+        },
+      }
     }
 
-    if (message.type !== 'data') {
-      return
+    if (!recorder) {
+      return finalize()
     }
 
-    const payload = message.data
-    if (!payload?.text) {
-      return
-    }
-
-    if (message.name === 'interim_text') {
-      latestInterimRef.current = payload.text
-      setInterimText(payload.text)
-      return
-    }
-
-    if (message.name === 'text_data' && payload.is_final !== undefined) {
-      latestFinalRef.current = payload.text
-      latestInterimRef.current = payload.text
-      setFinalText(payload.text)
-      setInterimText(payload.text)
-      finalResolverRef.current?.(payload.text)
-      finalResolverRef.current = null
-      return
-    }
-
-    if (message.name === 'transcript' && payload.role === 'user') {
-      latestFinalRef.current = payload.text
-      latestInterimRef.current = payload.text
-      setFinalText(payload.text)
-      setInterimText(payload.text)
-      finalResolverRef.current?.(payload.text)
-      finalResolverRef.current = null
-    }
-  }, [])
-
-  const ensureConnection = useCallback(async () => {
-    if (clientRef.current?.isOpen()) {
-      setStatus((current) => (current === 'idle' ? 'ready' : current))
-      return
-    }
-
-    setStatus('connecting')
-    setError(null)
-
-    const token = await getValidToken()
-    const wsUrl = new URL(
-      config.api.agentWsUrl,
-      typeof window !== 'undefined' ? window.location.href : 'http://localhost',
-    )
-    wsUrl.searchParams.set('suppress_greeting', '1')
-    if (token) {
-      wsUrl.searchParams.set('token', token)
-    } else if (anonymousUserId) {
-      wsUrl.searchParams.set('anon_id', anonymousUserId)
-    }
-
-    const client = new ASRClient(wsUrl.toString())
-    clientRef.current = client
-
-    await client.connect(
-      () => {
-        setStatus('ready')
-      },
-      (message) => {
-        handleMessage(message as TrainingMessage)
-      },
-      () => {
-        setError('训练连接失败，请稍后重试。')
-        setStatus('error')
-      },
-      () => {
-        setStatus('idle')
-      },
-    )
-  }, [anonymousUserId, handleMessage])
-
-  const resetTexts = useCallback(() => {
-    latestInterimRef.current = ''
-    latestFinalRef.current = ''
-    setInterimText('')
-    setFinalText('')
-  }, [])
-
-  const waitForFinalText = useCallback(async (timeoutMs: number): Promise<string> => {
-    if (latestFinalRef.current) {
-      return latestFinalRef.current
+    if (recorder.state === 'inactive') {
+      return finalize()
     }
 
     return new Promise((resolve) => {
-      const fallbackTimer = window.setTimeout(() => {
-        if (finalResolverRef.current) {
-          finalResolverRef.current = null
-          resolve(latestFinalRef.current || latestInterimRef.current)
-        }
-      }, timeoutMs)
-
-      finalResolverRef.current = (value: string) => {
-        window.clearTimeout(fallbackTimer)
-        resolve(value)
-      }
+      recorder.addEventListener(
+        'stop',
+        () => {
+          void finalize().then(resolve)
+        },
+        { once: true },
+      )
+      recorder.stop()
     })
+  }, [])
+
+  const waitForFinalTranscript = useCallback(async (baseline: string): Promise<string> => {
+    const deadline = Date.now() + 5_000
+    while (Date.now() < deadline) {
+      const nextTranscript = latestUserTranscriptRef.current.trim()
+      if (nextTranscript && nextTranscript !== baseline.trim()) {
+        return nextTranscript
+      }
+
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 100)
+      })
+    }
+
+    return latestUserTranscriptRef.current.trim() || currentASRTextRef.current.trim()
   }, [])
 
   const startRecording = useCallback(async () => {
-    if (!audioProcessorRef.current) {
-      throw new Error('录音器未初始化')
-    }
-
-    await ensureConnection()
-    resetTexts()
+    setError(null)
+    setIsConnecting(true)
 
     try {
-      await audioProcessorRef.current.start((audioBuffer) => {
-        clientRef.current?.sendAudio(audioBuffer)
-      }, true)
-      setStatus('recording')
-    } catch (startError) {
-      setStatus(clientRef.current?.isOpen() ? 'ready' : 'error')
-      throw startError
+      recordingBaselineRef.current = latestUserTranscriptRef.current
+      await startRtcRecording({ suppressGreeting: true })
+      const recorder = beginLocalRecording()
+
+      if (!recorder) {
+        throw new Error('训练会话已连上，但录音没有真正开始。请再点一次；如果还是这样，就是代码链路还没接稳。')
+      }
+    } catch (recordingError) {
+      const message =
+        recordingError instanceof Error ? recordingError.message : '录音启动失败，请检查麦克风权限。'
+      setError(message)
+      void stopRtcRecording().catch(() => {
+        void disconnectRtc()
+      })
+      throw recordingError
+    } finally {
+      setIsConnecting(false)
     }
-  }, [ensureConnection, resetTexts])
+  }, [beginLocalRecording, disconnectRtc, startRtcRecording, stopRtcRecording])
 
   const stopRecording = useCallback(async (): Promise<StopRecordingResult> => {
-    if (!audioProcessorRef.current) {
+    setIsProcessing(true)
+
+    try {
+      const recordingPromise = stopLocalRecording()
+      await stopRtcRecording()
+      const [recording, transcript] = await Promise.all([
+        recordingPromise,
+        waitForFinalTranscript(recordingBaselineRef.current),
+      ])
+
       return {
-        transcript: '',
-        recording: null,
+        transcript,
+        recording,
       }
+    } finally {
+      setIsProcessing(false)
     }
-
-    setStatus('processing')
-    const recording = audioProcessorRef.current.stop()
-    clientRef.current?.endAudioStream()
-
-    const transcript = await waitForFinalText(1200)
-    setStatus(clientRef.current?.isOpen() ? 'ready' : 'idle')
-
-    return {
-      transcript,
-      recording,
-    }
-  }, [waitForFinalText])
+  }, [stopLocalRecording, stopRtcRecording, waitForFinalTranscript])
 
   const disconnect = useCallback(() => {
-    clientRef.current?.close()
-    clientRef.current = null
-    setStatus('idle')
-  }, [])
+    setError(null)
+    void stopLocalRecording()
+    void disconnectRtc()
+  }, [disconnectRtc, stopLocalRecording])
 
-  const sendTrainingResult = useCallback((payload: Record<string, unknown>) => {
-    if (!clientRef.current?.isOpen()) {
-      return
-    }
-
-    clientRef.current.send({
-      type: 'training_result',
-      ...payload,
+  const syncVoiceProfile = useCallback((payload: Record<string, unknown>) => {
+    void sendControlEvent('update_voice_profile', payload).catch((eventError: unknown) => {
+      const message =
+        eventError instanceof Error ? eventError.message : '训练画像同步失败'
+      setError(message)
     })
-  }, [])
+  }, [sendControlEvent])
+
+  const requestTrainingFeedback = useCallback((payload: Record<string, unknown>) => {
+    void sendControlEvent('training_feedback_request', payload).catch((eventError: unknown) => {
+      const message =
+        eventError instanceof Error ? eventError.message : '训练建议生成失败'
+      setError(message)
+    })
+  }, [sendControlEvent])
+
+  const sendSpeechActivity = useCallback((
+    state: 'speech_started' | 'speech_stopped',
+    autoFinalize: boolean = false,
+  ) => {
+    void sendControlEvent('speech_activity', {
+      state,
+      auto_finalize: autoFinalize,
+      detected_at: Date.now(),
+    }).catch((eventError: unknown) => {
+      console.warn('[useMandarinTrainingSession] speech activity send failed:', eventError)
+    })
+  }, [sendControlEvent])
+
+  const sessionError = error || rtcError
+  const status: SessionStatus = sessionError
+    ? 'error'
+    : isProcessing
+      ? 'processing'
+      : rtcIsRecording
+        ? 'recording'
+        : isConnecting
+          ? 'connecting'
+          : isConnected
+            ? 'ready'
+            : 'idle'
 
   return {
     status,
-    interimText,
-    finalText,
-    error,
-    isRecording: status === 'recording',
-    isProcessing: status === 'processing',
-    isConnected: status === 'ready' || status === 'recording' || status === 'processing',
+    interimText: currentASRText,
+    finalText: latestUserTranscript,
+    latestTrainingFeedback: lastTrainingFeedback,
+    latestVoiceProfileSync: lastVoiceProfileSync,
+    error: sessionError,
+    isRecording: rtcIsRecording,
+    isProcessing,
+    isConnected,
+    analyser,
     startRecording,
     stopRecording,
-    sendTrainingResult,
+    syncVoiceProfile,
+    requestTrainingFeedback,
+    sendSpeechActivity,
     disconnect,
   }
 }

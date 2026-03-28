@@ -1,0 +1,81 @@
+{
+  "sources": [
+    {
+      "id": "seniortalk_sentence_data",
+      "source": "https://huggingface.co/papers/2503.16578",
+      "priority": 1.25,
+      "usage_weight": 1.25,
+      "note": "超高龄老人真实对话，适合老人、照护、退休生活表达"
+    },
+    {
+      "id": "childmandarin_dataset",
+      "source": "https://huggingface.co/datasets/BAAI/ChildMandarin",
+      "priority": 1.2,
+      "usage_weight": 1.15,
+      "note": "3-5岁儿童自然对话，适合学生/儿童表达风格和课堂互动前期参考"
+    },
+    {
+      "id": "elderly_homecare_services",
+      "source": "https://www.zjg.gov.cn/zjgszwz/zcfglnr/202307/e5d22bcf50144ce9b36e8ba952ff3ada.shtml",
+      "priority": 1.15,
+      "usage_weight": 1.1,
+      "note": "居家养老服务项目，适合补老人照护、家庭支持、助浴助餐等表达"
+    },
+    {
+      "id": "elderly_care_standard",
+      "source": "https://www.beijing.gov.cn/ywdt/zybwdt/202211/t20221113_2857555.html",
+      "priority": 1.1,
+      "usage_weight": 1.0,
+      "note": "老年护理服务标准，适合补照护动作、服务流程和安全求助表达"
+    },
+    {
+      "id": "family_caregiver_training",
+      "source": "https://www.lg.gov.cn/bmzz/bjjdb/tbgz/content/post_10773661.html",
+      "priority": 1.05,
+      "usage_weight": 1.0,
+      "note": "家庭护老者培训，适合补照护、康复、中风日常等表达"
+    },
+    {
+      "id": "pep_textbook_words",
+      "source": "https://www.pep.com.cn/products/zhytu/gjshnj/csxp/tbcy/202307/t20230704_1984304.shtml",
+      "priority": 0.95,
+      "usage_weight": 0.85,
+      "note": "教材与课文相关页面，适合补学生朗读和课堂常见读句"
+    },
+    {
+      "id": "elder_friendly_language_guide",
+      "source": "https://www.fgrmyy.com/djgz/ydyf/content_6575848",
+      "priority": 1.2,
+      "usage_weight": 1.15,
+      "note": "医院老年友善礼貌用语指引，适合补老人沟通和照护场景的简洁表达"
+    },
+    {
+      "id": "smart_classroom_mobile",
+      "source": "https://apps.apple.com/cn/app/%E6%99%BA%E6%85%A7%E8%AF%BE%E5%A0%82-%E6%89%8B%E6%9C%BA%E7%89%88/id1510738055",
+      "priority": 1.15,
+      "usage_weight": 1.1,
+      "note": "学生课堂互动应用，适合补老师发布任务、学生作答、课堂广播等表达"
+    },
+    {
+      "id": "lizhi_classroom",
+      "source": "https://apps.apple.com/cn/app/%E7%AB%8B%E7%9F%A5%E8%AF%BE%E5%A0%82/id1507715553",
+      "priority": 1.1,
+      "usage_weight": 1.05,
+      "note": "在线课堂应用，适合补学生提问、老师作答、课前课后通知等课堂表达"
+    },
+    {
+      "id": "nurse_courtesy_service",
+      "source": "https://www.fchospital.com/info/1009/5833.htm",
+      "priority": 1.05,
+      "usage_weight": 1.0,
+      "note": "护士礼仪与服务要求页面，适合补医护岗位和照护沟通表达"
+    },
+    {
+      "id": "customer_service_phrases",
+      "source": "https://www.51ima.com/news/8439.html",
+      "priority": 0.95,
+      "usage_weight": 1.0,
+      "note": "客服常用语页面，适合补服务岗位的问候、解释、安抚类表达"
+    }
+  ]
+}

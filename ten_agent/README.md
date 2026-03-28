@@ -1,175 +1,117 @@
 # VoxFlame TEN Agent
 
-**燃言 Agent - 基于 TEN Framework 的语音处理管道**
+VoxFlame 当前的 TEN runtime 已收口到 `RTC + RTM + Backend API` 单一路径；旧 websocket runtime 已从默认镜像、默认入口和仓库现役代码中移除。
 
-## 技术栈
+## 当前运行态
 
-- **运行时**: TEN Framework (Go Runtime + Python Extensions)
-- **包管理**: tman (TEN Manager)
-- **扩展**: ASR + LLM + TTS
+- 当前 graph：`agora_rtc -> streamid_adapter -> voxflame_vad_python -> qwen_asr_realtime_python -> voxflame_main_python -> llm_correction_python -> qwen_tts_realtime_python`
+- 当前职责：
+  - `agora_rtc`：承接实时音频与最小 data stream 能力
+  - `agora_rtm`：承接可靠文本 / 控制消息
+  - `voxflame_vad_python`：服务端语音活动检测，驱动更早的 flush / finalize
+  - `qwen_asr_realtime_python`：基于 DashScope realtime ASR 协议的现役 ASR
+  - `llm_correction_python`：结合 `voice_profile` 做中文纠错
+  - `qwen_tts_realtime_python`：基于 DashScope realtime TTS 协议的现役 TTS
+  - `memory_layer_python`：会话、热词、混淆模式、clarity trend 持久化
+- 当前状态：
+  - 默认运行态只启动 TEN control server，由 backend `/api/rtc/session/*` 动态拉起 worker
+  - 沟通页已验证 `RTC audio + RTM text/control` 主链
+  - 训练页已恢复 RTC 会话能力，剩余重点是更完整的训练反馈与生命周期打磨
 
-## 当前功能 (v1.2)
+## 路径分类
 
-- 阿里云 ASR (Paraformer-realtime-v2)
-- 通义千问 LLM (Qwen3-max) 语音纠正
-- CosyVoice TTS 语音合成
-- WebSocket 服务 (端口 8766)
+- `current`
+  - `ten_agent/property.json`
+  - `ten_agent/extension_src/qwen_asr_realtime_python`
+  - `ten_agent/extension_src/qwen_tts_realtime_python`
+  - `ten_agent/extension_src/streamid_adapter`
+  - `ten_agent/extension_src/voxflame_vad_python`
+  - `ten_agent/extension_src/voxflame_main_python`
+  - `ten_agent/extension_src/llm_correction_python`
+  - `ten_agent/extension_src/memory_layer_python`
+- `removed / retired`
+  - 旧 websocket transport extension
+  - `aliyun_asr_bigmodel_python`
+  - `cosy_tts_python`
+  - 任何继续绕开 backend `/api/rtc/session/*` 的直连 runtime
 
-## 目录结构
+## 目录
 
-```
+```text
 ten_agent/
-├── extension_src/           # 自定义扩展源码
-│   ├── voxflame_main_python/   # 主控制扩展
-│   └── websocket_server/       # WebSocket 服务
-├── manifest.json            # 远程依赖声明
-├── property.json            # 运行时配置 (Graph)
-├── Dockerfile               # Docker 构建配置
+├── extension_src/
+│   ├── qwen_asr_realtime_python/
+│   ├── qwen_tts_realtime_python/
+│   ├── llm_correction_python/
+│   ├── memory_layer_python/
+│   ├── streamid_adapter/
+│   ├── voxflame_main_python/
+│   ├── voxflame_vad_python/
+│   └── message_collector2/
+├── manifest.json
+├── property.json
+├── Dockerfile
 └── scripts/
-    └── start.sh             # 启动脚本
 ```
 
-## 快速开始
+## 当前配置入口
 
-### Docker (推荐)
+- Runtime graph: [property.json](/home/ubuntu/VoxFlame-Agent/ten_agent/property.json)
+- 主控扩展: [extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/voxflame_main_python/extension.py)
+- VAD 扩展: [extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/voxflame_vad_python/extension.py)
+- Qwen ASR 扩展: [extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/qwen_asr_realtime_python/extension.py)
+- Qwen TTS 扩展: [extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/qwen_tts_realtime_python/extension.py)
+- 当前产品主文档: [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
+- 当前任务: [current.md](/home/ubuntu/VoxFlame-Agent/.tasks/current.md)
+
+## 开发原则
+
+- 不在 `aliyun_asr_bigmodel_python` / `cosy_tts_python` 上继续堆 `Qwen realtime` 临时兼容。
+- 不再恢复 websocket runtime 或任何基于 base64 PCM over websocket 的影子主链。
+- 生产主链固定为 `Frontend RTC/RTM -> Backend orchestration -> TEN RTC worker`，不接受“只改传输 URL”的伪迁移。
+
+## 运行
 
 ```bash
-# 从项目根目录
-sudo docker-compose up -d ten-agent
+sudo docker compose up -d --build ten-agent
+sudo docker compose logs -f ten-agent
 ```
 
-### 查看日志
+## Qwen ASR Live Smoke
+
+不依赖浏览器麦克风，直接把仓库里的 16k 中文 PCM 样本送进运行中的 `ten-agent` 容器，验证 DashScope realtime ASR 的 `connect -> append -> commit -> final transcript`：
 
 ```bash
-sudo docker-compose logs -f ten-agent
+bash scripts/qwen_asr_live_smoke.sh
 ```
 
-## 核心配置
-
-### manifest.json
-
-声明远程扩展依赖：
-
-```json
-{
-  "dependencies": [
-    { "type": "extension", "name": "aliyun_asr_bigmodel_python", "version": "0.1.0" },
-    { "type": "extension", "name": "openai_llm2_python", "version": "0.1.0" },
-    { "type": "extension", "name": "cosy_tts_python", "version": "0.1.0" }
-  ]
-}
-```
-
-### property.json
-
-定义扩展连接图 (Graph)：
-
-```
-websocket_server → aliyun_asr → voxflame_main → openai_llm → cosy_tts
-                                     ↓
-                              websocket_server (字幕 + 音频)
-```
-
-## 扩展说明
-
-### websocket_server
-
-WebSocket 服务，处理：
-- 接收前端音频流 (PCM 16kHz Base64)
-- 发送 ASR/LLM 文本结果
-- 发送 TTS 音频 (Base64)
-
-### voxflame_main_python
-
-主控制扩展，负责：
-- 协调 ASR → LLM → TTS 数据流
-- 用户打断检测 (flush TTS)
-- 发送字幕到前端
-
-### aliyun_asr_bigmodel_python
-
-阿里云 ASR 扩展：
-- 模型: Paraformer-realtime-v2
-- 实时流式识别
-- 支持中文
-
-### openai_llm2_python
-
-LLM 扩展 (使用 DashScope API)：
-- 模型: Qwen3-max
-- 语音纠正 Prompt
-- 流式输出
-
-### cosy_tts_python
-
-CosyVoice TTS 扩展：
-- 模型: CosyVoice v3
-- 音色: longxiaochun
-- 16kHz PCM 输出
-
-## 环境变量
+可选第二个参数用于断言最终转写里必须包含某段文本：
 
 ```bash
-# ten_agent/.env
-DASHSCOPE_API_KEY=sk-xxx
+bash scripts/qwen_asr_live_smoke.sh \
+  ten-framework/ai_agents/agents/integration_tests/asr_guarder/tests/test_data/16k_zh_cn.pcm \
+  日程管理
 ```
 
-## 开发经验
+## Qwen TTS Live Smoke
 
-### Pure Tman 模式
+直接在运行中的 `ten-agent` 容器里调用现役 realtime TTS client，验证 `connect -> input_text_buffer.append -> commit -> response.audio.delta -> response.done`：
 
-使用 `tman install` 安装远程扩展，本地扩展手动复制：
-
-```dockerfile
-# Dockerfile
-RUN tman install
-COPY extension_src/ ten_packages/extension/
+```bash
+bash scripts/qwen_tts_live_smoke.sh
 ```
 
-### 扩展注册机制
+可选第一个参数传入自定义文本：
 
-TEN Runtime 通过 Python import 发现扩展：
-
-```python
-from ten_runtime import register_addon_as_extension
-
-@register_addon_as_extension("websocket_server")
-class WebSocketServerExtension(AsyncExtension):
-    ...
+```bash
+bash scripts/qwen_tts_live_smoke.sh "请给我一点时间，我正在努力说清楚。"
 ```
 
-### 消息类型
+## 参考
 
-TEN Framework 消息格式：
-
-```json
-// 文本数据
-{ "type": "data", "name": "corrected_text", "data": { "text": "..." } }
-
-// 音频数据
-{ "type": "audio", "audio": "base64...", "metadata": { "sample_rate": 16000 } }
-
-// 错误
-{ "type": "error", "error": "..." }
-```
-
-### 常见问题
-
-**1. 扩展未找到**
-- 检查 `PYTHONPATH` 是否包含 `ten_packages`
-- 检查扩展目录结构是否正确
-
-**2. ASR 无响应**
-- 检查 `DASHSCOPE_API_KEY` 是否配置
-- 检查音频格式是否为 PCM 16kHz
-
-**3. TTS 无声音**
-- 检查 LLM 是否返回了文本
-- 检查前端 AudioContext 是否初始化
-
-## 相关文档
-
-- [主项目 README](../README.md)
-- [前端 README](../frontend/README.md)
-- [后端 README](../backend/README.md)
-- [TEN Framework 文档](https://docs.ten.ai)
+- TEN 官方示例：
+  - `ten-framework/ai_agents/agents/examples/voice-assistant-advanced`
+  - `ten-framework/ai_agents/agents/examples/rtm-transport`
+- 项目状态：
+  - [current.md](/home/ubuntu/VoxFlame-Agent/.tasks/current.md)
+  - [.claude-summary.md](/home/ubuntu/VoxFlame-Agent/.claude-summary.md)

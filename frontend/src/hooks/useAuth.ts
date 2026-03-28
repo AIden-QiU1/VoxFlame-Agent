@@ -8,16 +8,23 @@
  * 3. 监听登录/登出事件
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { User, Session } from '@supabase/supabase-js'
+import { buildLoginPath, getCurrentPathWithSearch } from '@/lib/auth/navigation'
 import { createClient } from '@/lib/supabase/client'
+
+const AUTH_INIT_TIMEOUT_MS = 3000
 
 export interface UseAuthOptions {
   /** 未登录时是否自动跳转到登录页 */
   redirectToLogin?: boolean
   /** 自定义登录页路径 */
   loginPath?: string
+  /** 登录后回跳的目标页，默认使用当前地址 */
+  nextPath?: string
+  /** 初始鉴权超时时，是否先按游客态继续渲染 */
+  timeoutBehavior?: 'wait' | 'guest'
 }
 
 export interface AuthState {
@@ -30,7 +37,12 @@ export interface AuthState {
 }
 
 export function useAuth(options: UseAuthOptions = {}): AuthState {
-  const { redirectToLogin = false, loginPath = '/login' } = options
+  const {
+    redirectToLogin = false,
+    loginPath = '/login',
+    nextPath,
+    timeoutBehavior = 'wait',
+  } = options
   
   const router = useRouter()
   const [state, setState] = useState<AuthState>({
@@ -45,10 +57,63 @@ export function useAuth(options: UseAuthOptions = {}): AuthState {
   useEffect(() => {
     const supabase = createClient()
 
+    const redirectToAuthPage = () => {
+      const targetPath = nextPath ?? getCurrentPathWithSearch()
+      router.replace(buildLoginPath(targetPath, loginPath))
+    }
+
+    const setAuthenticatedState = (session: Session) => {
+      setState({
+        user: session.user,
+        session,
+        userId: session.user.id,
+        isLoading: false,
+        isAuthenticated: true,
+        error: null,
+      })
+    }
+
+    const setSignedOutState = () => {
+      setState({
+        user: null,
+        session: null,
+        userId: null,
+        isLoading: false,
+        isAuthenticated: false,
+        error: null,
+      })
+    }
+
     // 获取当前用户
     const getInitialSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
+        const sessionResult = timeoutBehavior === 'guest'
+          ? await Promise.race([
+              supabase.auth.getSession().then((result) => ({
+                type: 'session' as const,
+                result,
+              })),
+              new Promise<{ type: 'timeout' }>((resolve) => {
+                window.setTimeout(() => resolve({ type: 'timeout' }), AUTH_INIT_TIMEOUT_MS)
+              }),
+            ])
+          : {
+              type: 'session' as const,
+              result: await supabase.auth.getSession(),
+            }
+
+        if (sessionResult.type === 'timeout') {
+          console.warn(`[useAuth] 初始化超时，${AUTH_INIT_TIMEOUT_MS}ms 后先以游客态继续渲染`)
+          setState(prev => ({
+            ...prev,
+            isLoading: false,
+            isAuthenticated: false,
+            error: null,
+          }))
+          return
+        }
+
+        const { data: { session }, error } = sessionResult.result
         
         if (error) {
           console.error('[useAuth] 获取 session 失败:', error)
@@ -62,26 +127,15 @@ export function useAuth(options: UseAuthOptions = {}): AuthState {
 
         if (session?.user) {
           console.log('[useAuth] 用户已登录:', session.user.email)
-          setState({
-            user: session.user,
-            session: session,
-            userId: session.user.id,
-            isLoading: false,
-            isAuthenticated: true,
-            error: null,
-          })
+          setAuthenticatedState(session)
         } else {
           console.log('[useAuth] 用户未登录')
-          setState(prev => ({ 
-            ...prev, 
-            isLoading: false,
-            isAuthenticated: false,
-          }))
+          setSignedOutState()
           
           // 如果需要跳转到登录页
           if (redirectToLogin) {
             console.log('[useAuth] 跳转到登录页:', loginPath)
-            router.push(loginPath)
+            redirectToAuthPage()
           }
         }
       } catch (err) {
@@ -101,33 +155,14 @@ export function useAuth(options: UseAuthOptions = {}): AuthState {
       (event, session) => {
         console.log('[useAuth] Auth 状态变化:', event)
 
-        if (event === 'SIGNED_IN' && session?.user) {
-          setState({
-            user: session.user,
-            session: session,
-            userId: session.user.id,
-            isLoading: false,
-            isAuthenticated: true,
-            error: null,
-          })
-        } else if (event === 'SIGNED_OUT') {
-          setState({
-            user: null,
-            session: null,
-            userId: null,
-            isLoading: false,
-            isAuthenticated: false,
-            error: null,
-          })
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.user) {
+          setAuthenticatedState(session)
+        } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session?.user)) {
+          setSignedOutState()
           
           if (redirectToLogin) {
-            router.push(loginPath)
+            redirectToAuthPage()
           }
-        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          setState(prev => ({
-            ...prev,
-            session: session,
-          }))
         }
       }
     )
@@ -135,7 +170,7 @@ export function useAuth(options: UseAuthOptions = {}): AuthState {
     return () => {
       authListener.subscription.unsubscribe()
     }
-  }, [redirectToLogin, loginPath, router])
+  }, [loginPath, nextPath, redirectToLogin, router, timeoutBehavior])
 
   return state
 }
