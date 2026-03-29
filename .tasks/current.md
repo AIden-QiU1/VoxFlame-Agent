@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-03-26
+> 最后更新: 2026-03-29
 >
 > 维护约定：
 > 1. 这里只保留当前主链状态、最近 3 天的有效结论、下一步优先级和最近仍有意义的验证结果。
@@ -17,6 +17,111 @@
 - `TEN + Agora` 当前仍是现役执行面，但后续应被视作过渡实现
 
 ## 最近 3 天有效结论
+
+### 2026-03-28
+
+1. 登录授权已前置到登录页，训练页不再重复做法律确认
+   - [login/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/(auth)/login/page.tsx) 现在在登录/注册前默认确认《用户隐私》与《数据采集说明》
+   - [legal-consent.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/auth/legal-consent.ts) 负责把授权记录同时写入本地与 Supabase 用户元数据，并为训练页提供统一读取
+   - 训练页现在只读取授权状态，不再把授权 checkbox 留在主路径里；缺失记录时只会关闭“保存训练样本”入口并提示重新登录一次
+
+2. 训练页已从“旧贡献历史页”重建成真正的训练工作台
+   - [contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 现围绕 `录音 -> 训练 -> 反馈` 主路径组织，旧贡献历史和提交统计已退出主叙事
+   - 页面主组织改为真实的 5 个录音分类：`日常与出行 / 看病与求助 / 人群与角色 / 设备与数字 / 发音与朗读`
+   - 句子搜索、当前句切换、大录音区、即时反馈、训练资产状态、本地待同步队列和训练设置都已回到一个页面里
+
+3. 数据采集与授权说明入口已补齐
+   - [privacy/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/privacy/page.tsx) 与 [data-collection/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/data-collection/page.tsx) 已接入登录页
+   - 数据采集说明页明确把训练数据链路收口到 `recording envelope -> recorder queue -> upload receipt -> manifest`
+   - 上传链路仍沿用现有 `upload/sign -> upload/complete` contract，训练页只把它降到第二层叙事
+
+4. 训练页当前验证状态已经比上一轮清楚
+   - `frontend` 的 `npm run build` 已通过
+   - `frontend` 的 `npm run lint` 仅剩仓库既有 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) `react-hooks/exhaustive-deps` warning
+   - 真实浏览器 smoke 已确认：登录页双授权可见；重新登录后训练页不再提示“需要重新登录一次才能保存样本”；训练页的 5 个分类、句子搜索和分类切换都能正常工作
+   - 在当前 headless 环境里点击录音，会明确提示“当前设备未检测到可用麦克风”；真实 `录音 -> transcript -> feedback -> 保存训练样本 -> manifest` 端到端仍需在有物理麦克风的浏览器里补 smoke
+
+### 2026-03-29
+
+1. localhost:3000 白页问题已定位到真实代码漂移
+   - 文档一直假设 `localhost` 会主动清理旧 `service worker / caches`
+   - 但现役 [layout.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/layout.tsx) 之前只有在 `PWA 关闭` 时才挂 [LocalRuntimeReset.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/pwa/LocalRuntimeReset.tsx)
+   - 与此同时 docker 默认使用 `VOXFLAME_ENABLE_PWA=1`，所以最容易受转发 localhost 污染的生产容器版前端，正好绕开了自愈逻辑
+
+2. localhost 自愈链已经补齐并部署到运行中的 3000
+   - [layout.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/layout.tsx) 现已新增 head 级 bootstrap，会在 `localhost / 127.0.0.1` 先清理旧 `service worker / caches` 再继续页面加载
+   - [LocalRuntimeReset.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/pwa/LocalRuntimeReset.tsx) 已从 sticky `localStorage` 标记改成 `sessionStorage` 级别，避免后续 localhost 再次脏掉时不触发自愈
+   - [usePWA.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/usePWA.ts) 现在会显式跳过 localhost 上的 SW 注册与安装提示
+   - `sudo docker compose up -d --build frontend` 已执行完成，运行中的 `localhost:3000` 已是新版本
+
+3. 这次“重启电脑后又好了”并不随机
+   - 更像是重启顺手清掉了本机浏览器 / 端口转发环境里的旧 localhost 运行态
+   - 这与本轮定位出来的 `forwarded localhost + stale SW/cache` 根因一致，不是代码无规律自愈
+
+4. 训练页已开始针对用户指出的两个真问题收口
+   - [useMandarinTrainingSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useMandarinTrainingSession.ts) 现在会在停录时先发送 `speech_stopped + auto_finalize`，再短等一拍后调用 RTC `end_audio`
+   - 同一个 hook 也不再把“第一个冒出来的短 final”直接当最终结果，而会等待更稳定、信息量更高的 transcript，并在必要时回退到本轮里观测到的更完整文本
+   - 目标是缓解“我说了一整句，但前端最后只显示一个‘嗯’”这类 turn finalize / transcript 过早收口的问题
+
+5. 反馈区已经贴近录音区
+   - [contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 已移除录音前的大段说明首屏
+   - 录后反馈卡现在直接放在右侧录音卡下方，停录后可在同一视区继续看 transcript、训练建议和资产状态
+   - 真实 `localhost:3000/contribute` Playwright smoke 已确认反馈预览就在录音区旁边，不再被推到页面更下方
+
+6. 训练样本保存主路径已从“手动按钮”收口到“停录即自动保存”
+   - [contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 现在在 `登录授权已确认 + 录音 envelope 完整` 时会在停录后直接自动保存监督样本
+   - 当前页面仍保留“重新保存这条训练样本”作为失败后的补救动作，但它不再是默认主路径
+   - 自动保存失败时会继续回退到本地待同步队列，不会让录音资产静默丢失
+
+7. 监督训练样本的标签 contract 已进一步写清
+   - [useVoiceUpload.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useVoiceUpload.ts) 现在会显式传 `recognizedText`
+   - [upload.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/upload.controller.ts) 与 [upload-artifact.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/upload-artifact.service.ts) 已把 manifest 收口成：目标句是监督标签，`recognized_text/raw_transcript` 只是反馈/诊断字段
+   - 这一步对齐了用户的新判断：云端要稳定保存的是 `目标句 + 录音音频`，而不是把本轮 ASR 结果误当监督标签
+
+8. 自动保存落地后的相关旧入口已继续清理
+   - [contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 现在只在 `queued_locally / failed` 状态下保留“同步 / 重新保存”补救按钮
+   - `auth_required` 已改成信息提示，不再伪装成可点击主操作
+   - [data-collection/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/data-collection/page.tsx) 已补“登录同意后自动保存”“目标句和识别句怎么分”的正式说明
+
+9. 训练资产后端这轮已补上“历史真样本可对账”和“DB 异常不静默丢样本”
+   - [upload-artifact.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/upload-artifact.service.ts) 现在会优先保证 `manifest.jsonl` 落盘，并在缺 `upload_receipt` 时先检查 OSS，尽量不重复追加 `manifest / transcripts.txt`
+   - 已新增 [reconcile_upload_artifacts.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/reconcile_upload_artifacts.ts) 与 `npm run reconcile:artifacts`
+   - 当前环境里缺 `upload_receipt` 的 6 条真实训练样本已全部补齐到 `voice_contributions.metadata.upload_receipt + dataset/{user_id}/manifest.jsonl`
+
+10. 训练 dataset 的去重规则已显式化
+   - 同一句目标句不会直接被去重，允许保留多次练习样本
+   - 只有同一条录音的重复上传 / 补传才会安全去重
+   - [contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx)、[data-collection/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/data-collection/page.tsx)、[useVoiceUpload.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useVoiceUpload.ts) 与 [upload-artifact.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/upload-artifact.service.ts) 现在已经统一按这条 contract 工作
+
+11. dataset 主文这轮已真正按现状清理，并继续推进到 review queue contract
+   - [VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md) 已删掉一整段已完成的“建议新增 recording_id / manifest / structured upload”旧改造项，只保留当前实现对照和剩余行动项
+   - 已新增 [training-sample-review.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/training-sample-review.ts)，上传后的样本 decision 现已收口成 `ready / sampled_for_review / retry_recommended`；只要音频完整，转录和目标句差很多也不会挡住上传，`recognized_text` 只影响反馈、复核和导出优先级
+   - backend 已新增 [dataset-review.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/dataset-review.service.ts) 与 [upload.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/upload.controller.ts) 上的受认证 `GET/PATCH /api/upload/review-queue*`，继续补齐 `reviewed_at / reviewer / rejection_reason / accepted_for_export`
+   - [list_dataset_review_queue.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/list_dataset_review_queue.ts) 与 `npm run review:queue` 已同步切到 `sampled_for_review / retry_recommended` 语义；当前在线脚本验证被 Supabase DNS `EAI_AGAIN` 挡住，等网络恢复后还需补一次真实队列读取
+
+12. 训练主路径这轮继续按“反馈服务用户，数据治理留后台”收口
+   - [contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 已把主反馈区里的“样本质量 / 复核状态”降成次级数据备注
+   - 页面现在会明确告诉用户：只要录音完整就会继续上传；这些字段只影响后续整理、复核和导出，不影响数据入链
+   - 训练页的主反馈仍然围绕发声动作、发音差异和下一步怎么练来组织，不把 review/export 语气放到主位
+
+13. dataset 导出与复核层已补第一版 export manifest
+   - backend 已新增 [dataset-export.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/dataset-export.service.ts) 与 [export_dataset_manifest.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/export_dataset_manifest.ts)
+   - `npm run export:manifest -- --limit 1` 已可正常生成统一字段语言的 export manifest
+   - 当前结果为 0 条，不是脚本没通，而是库里还没有被人工标记为 `accepted_for_export=true` 的样本
+
+14. review/export 回写链已补默认 dry-run 入口
+   - backend 已新增 [mark_dataset_review_decision.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/mark_dataset_review_decision.ts)
+   - `npm run review:mark -- --help` 已可正常展示脚本入口；默认只预览 payload，只有显式 `--write` 才会改真实样本数据
+   - 这让后续可以在不破坏现有样本的前提下先把 `accepted_for_export / reviewer / reviewed_at / rejection_reason` 的回写路径走通
+
+15. 训练反馈这轮继续往“发声教练”收口
+   - [mandarin-feedback.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/mandarin-feedback.ts) 现在会优先生成更简单的嘴巴动作、舌位、气息和节奏建议
+   - [contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 里的反馈卡标题也已改成更偏教练语言，不再把主反馈写得像拼音纠错器
+
+16. 文档主线这轮已按“多端可复用产品”重新收口
+   - [VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md) 现已明确：数据面只需要做到 `录音事实 / 样本治理 / 导出复核 / memory-safe 聚合` 四层，就够支撑训练、复核、画像和多端复用
+   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 现已把下一阶段判断收口成三条并行基础线：`runtime/surface/control`、`memory/agent tooling`、`dataset/review/export`
+   - [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) 已吸收产品运行时层的 control/capability 关键内容；[control-plane.md](/home/ubuntu/VoxFlame-Agent/docs/control-plane.md) 退回 backend 控制面实现深文档；[capability-registry.md](/home/ubuntu/VoxFlame-Agent/docs/capability-registry.md) 退回仓库协作 capability 盘点表
 
 ### 2026-03-26
 
@@ -77,6 +182,11 @@
    - [ChatInterface.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx) 不再在沟通主路径里展示 `CommunicationPreferenceCard`
    - 现役主位改成“场景优先的个体化表达建议”，并明确告诉用户“下面这些句子可以直接点、会直接代播”
    - 后续个人表达编辑应继续向 `表达工具箱 / 沟通档案 / scene-aware expression kit` 收口，而不是回到硬编码的三栏偏好表单
+
+12. dataset 容器日志这轮已收口到“能看懂幂等”
+   - [upload.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/upload.controller.ts) 现在会在 artifact persistence 完成后再打印上传日志，而不是在落盘前就提前打印 `Complete`
+   - 日志会显式带出 `reusedContribution / manifestAlreadySynced / transcriptAlreadySynced`，方便区分“正常重试命中幂等”和“真实重复写入”
+   - 当前 docker 日志里虽然还能看到 `manifest.jsonl / transcripts.txt` 的 append position retry，但暂时没有看到因此导致的 dataset 主链失败；dataset 线可以继续退到次主线，不再阻塞 runtime/surface
 
 ### 2026-03-25
 
@@ -219,6 +329,15 @@
    - 现在页面只会在真正 unmount 时才调用最新的 `disconnect`，不再因为 callback identity 变化提前清会话
    - 同时 `sessionId` 已改走 `sessionIdRef`，让 `stopLocalRecording` / `disconnect` 不再随着会话 ID 改变而重建
 
+17. 当前验证基线已同步到这轮训练页修复
+   - `frontend` 的 `npm run build` 已通过
+   - `frontend` 的 `npm run lint` 仍只剩仓库既有 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) warning
+   - `backend` 的 `npm run build` 已通过
+   - `sudo docker compose up -d --build backend frontend` 已执行，运行中的 `localhost:3000` 和 `:3001` 已是本轮训练页 / 上传链代码
+   - Playwright 已确认 `/contribute` 现在首屏直接进入 `选句 + 录音 + 贴近录音的反馈区`，并已显示“录完后如果登录授权已确认，这里会告诉你它是否已自动落盘”
+   - 用户已补充说明：真实前端录音 smoke 已做过，相关记录可在 docker / 后端链路里继续追踪；当前 headless 环境仍无物理麦克风，因此这里没有重复伪造真实录音样本
+   - 这轮补做的文案与补救分支清理已再次通过 `frontend` 的 `npm run lint` 与 `npm run build`
+
 ### 2026-03-23
 
 1. 已把 runtime / surface 的多份仓库分析稿收口成综合参考  
@@ -254,6 +373,7 @@
 - 沟通页首屏已切到 `starter kit` 主导，但 `expression kit / personalized recommendation / memory bundle` 仍未完全统一
 - `workspace` 现在已经被沟通页和记忆页共用，但训练页和首页摘要还没接进来
 - backend 已是控制面雏形，但 frontend session hook 和 TEN main extension 仍承担了过多产品编排责任
+- 文档主线已收口成三份主参考：`PRD`、`Runtime And Surface Reference`、`Agent Memory And Tooling Reference`
 
 ## 当前重点
 
@@ -279,7 +399,7 @@
    - 用真实麦克风继续验证 `RTC 上行音频 -> transcript -> training_feedback -> voice_profile`
    - 把训练页从“录音采集页”继续推进成“练今天真会说的话”的任务流
    - 让沟通工作台和训练工作台共享同一份 `profile bundle`
-   - 下一步优先补 authenticated live upload smoke，确认 `voice_contributions + manifest.jsonl + 本地待同步重试` 三段都在真实登录态下跑通，并继续验证数据库唯一键 / upsert contract 在补传和重试下的稳定性
+   - 训练页的 UI 主路径与登录授权边界已完成收口；下一步优先补 authenticated live upload smoke，确认 `voice_contributions + manifest.jsonl + 本地待同步重试` 三段都在真实登录态下跑通，并继续验证数据库唯一键 / upsert contract 在补传和重试下的稳定性
 
 5. 继续架构收口  
    - 把前端 hook 从“第二控制面”拉回 `transport client + UI reducer`
@@ -287,19 +407,65 @@
    - 在 `heavy realtime` 与 `light voice surface` 之间补更明确的 `session_strategy`
    - 为未来替换 `TEN + Agora` 预留 vendor-neutral `session / transport / capability` contract
 
+6. 让多端与记忆主线并行成立
+   - runtime / surface / control contract 不再只为 web 页面服务
+   - `workspace / profile bundle / expression kit / session review` 要继续推进成真正有用的产品上下文层
+   - dataset 继续只做到支撑训练、复核、画像和多端复用所需的四层，不扩成抽象大数据平台
+
 ## 下一步优先级
 
-1. 把共享 `workspace` contract 接到训练页和首页摘要，让“沟通 -> 练习 -> 沟通档案”真正共享同一份画像与复盘语言。
-2. 继续基于 `workspace` 聚合接口补更准的 `personalized starter phrases / recent wins / recommended phrases` 命中逻辑，让内容层不只是框架。
+1. 用真实麦克风补完当前 2026-03-29 训练页 `录音 -> transcript -> feedback -> 自动保存训练样本` 的新字段验证，重点确认 `sample_quality_* / confidence / latency_ms / review_* + upload receipt + manifest.jsonl + training profile sync` 一起成立。
+2. 在不改真实样本数据的前提下，先用 dry-run 方式把 `accepted_for_export` 回写路径演练清楚；等你确认后，再挑一条真实样本执行 `--write` 并用 `npm run export:manifest` 完成闭环验证。
+3. 继续把训练反馈往“肌肉运动 / 口型 / 舌位 / 节奏”的简单建议收口，必要时再减少训练页里对拼音差异本身的强调。
+3. 把共享 `workspace` contract 接到训练页和首页摘要，让“沟通 -> 练习 -> 沟通档案”真正共享同一份画像与复盘语言。
+4. 继续基于 `workspace` 聚合接口补更准的 `personalized starter phrases / recent wins / recommended phrases` 命中逻辑，让内容层不只是框架。
    - 下一步优先把“我的沟通偏好”与 `quick phrases / hotword profiles / recent wins / training profile` 做真正排序融合
-3. 继续补训练数据治理闭环，尤其是 authenticated live smoke、OSS 上传后的 `manifest.jsonl` 实际落盘验证，以及 recorder queue 的真实断网重试验证。
-4. 把 `profile bundle / session review / expression kit merge` 从当前最小实现继续推进到稳定 schema，让沟通页、训练页、记忆页共享同一份长期画像 contract。
-5. 重构前端 session hooks，把 RTC/RTM transport bootstrap、消息归并、memory sync 和训练反馈协调拆开，避免 [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 继续膨胀。
-6. 用真实麦克风再做一轮沟通页和训练页端到端验证，确认 RTC 上行音频、ASR transcript 和训练反馈在非 fake-mic 条件下稳定。
-7. 基于 [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) 和新 PRD，给控制面补 `session_strategy = heavy_realtime | light_voice` 的更明确 contract，并逐步抽 vendor-neutral `session / transport / capability` 语言。
+5. 继续补训练数据治理闭环，尤其是 authenticated live smoke、OSS 上传后的 `manifest.jsonl` 新字段落盘验证，以及 recorder queue 的真实断网重试验证。
+6. 把 `profile bundle / session review / expression kit merge` 从当前最小实现继续推进到稳定 schema，让沟通页、训练页、记忆页共享同一份长期画像 contract。
+7. 重构前端 session hooks，把 RTC/RTM transport bootstrap、消息归并、memory sync 和训练反馈协调拆开，避免 [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 继续膨胀。
+8. 用真实麦克风再做一轮沟通页和训练页端到端验证，确认 RTC 上行音频、ASR transcript 和训练反馈在非 fake-mic 条件下稳定。
+9. 基于 [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) 和新 PRD，给控制面补 `session_strategy = heavy_realtime | light_voice` 的更明确 contract，并逐步抽 vendor-neutral `session / transport / capability` 语言。
+10. 基于 [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) 继续补 `workspace / profile bundle / expression kit / session review` 的 owner、写入边界和 runtime context service。
 
 ## 最近关键验证
 
+- 2026-03-28 训练页与登录授权 smoke 已通过：
+  - 登录页可见《用户隐私》与《数据采集说明》两项确认，且链接指向真实页面
+  - 退出后重新登录可以写回新的授权记录；进入训练页后，“需要重新登录一次才能保存样本”的提示已消失
+  - 训练页已确认只保留 `录音 / 训练 / 反馈` 主路径，5 个真实分类、句子搜索和分类切换都可用
+  - 当前 headless 浏览器无物理麦克风，点击录音会明确提示“当前设备未检测到可用麦克风”，没有出现静默失败
+- 2026-03-29 localhost 修复验证已完成：
+  - `env VOXFLAME_ENABLE_PWA=1 npm run build` 通过
+  - `npm run lint` 通过，仍只剩 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) 既有 Hook warning
+  - `sudo docker compose up -d --build frontend` 已完成，运行中的 `localhost:3000` HTML 已确认带有 localhost runtime reset bootstrap
+- 2026-03-29 训练资产对账验证已完成：
+  - `backend` 的 `npm run build` 通过
+  - `npm run reconcile:artifacts -- --email 2307294809@qq.com --write` 已把测试账号现有监督录音补齐到 `upload_receipt + manifest.jsonl`
+  - `npm run reconcile:artifacts -- --limit 50 --write` 已把当前环境中其余 5 条缺 receipt 的 legacy 训练样本全部补齐
+  - 二次 dry-run 已确认当前 `voice_contributions` 待对账数量为 0
+  - 直接读取 OSS 已确认 `dataset/64758dee-5026-4b53-a063-1d02d0834f67/manifest.jsonl` 为 1 条，`dataset/v_gv7fxwrp/manifest.jsonl` 为 5 条
+- 2026-03-29 训练 dataset 去重规则已落到代码和文档：
+  - 同一句允许保留多条样本，当前不是按句子内容去重
+  - 同一条录音的重试与补传会按 `audio_path + recording_id/upload_receipt/manifest` 组合安全去重
+- 2026-03-29 dataset review queue contract 已落地：
+  - `backend` 的 `npm run build` 通过
+  - `frontend` 的 `npm run lint` 通过，仍只剩 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) 既有 Hook warning
+  - `npm run review:queue -- --status retry_recommended --limit 1` 已验证脚本入口和新状态枚举可执行，但当前环境被 Supabase DNS `EAI_AGAIN` 挡住，尚未补到真实在线队列读取结果
+  - 上传阶段语义已改成“音频完整就入链”，`retry_recommended` 只表示后续建议补录或复核，不再把说话不清的样本写成上传层 `rejected`
+- 2026-03-29 dataset export manifest 第一版已落地：
+  - `backend` 的 `npm run build` 通过
+  - `npm run export:manifest -- --limit 1` 已成功输出 `/tmp/dataset_export_2026-03-29T11-50-01-239Z.jsonl`
+  - 当前导出条数为 0，说明后续需要补一条真实 `accepted_for_export` 样本来完成这条链的最后验证
+- 2026-03-29 review/export dry-run 入口已落地：
+  - `backend` 的 `npm run build` 通过
+  - `npm run review:mark -- --help` 已正常输出脚本帮助
+  - 当前默认只做 dry-run 预览，仍未对真实样本做任何回写
+- 2026-03-29 训练反馈已继续收口到更简单的动作建议：
+  - `frontend` 的 `npm run lint` 通过，仍只剩 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) 既有 Hook warning
+  - 新反馈文案已更强调嘴巴动作、舌位、气息和节奏，而不是只强调拼音差异
+- `frontend` 当前构建状态：
+  - `npm run build` 通过
+  - `npm run lint` 仅剩仓库既有 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) Hook 依赖 warning
 - 文档一致性检查通过
 - Qwen ASR live smoke 通过
 - Qwen TTS live smoke 通过

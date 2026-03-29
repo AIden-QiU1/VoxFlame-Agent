@@ -88,7 +88,7 @@
 1. 真实录音开始/停止
 2. RTC 实时转写
 3. 本地反馈分析
-4. 上传授权
+4. 登录页前置授权后的自动样本保存
 5. 训练画像累计与 voice profile 同步
 
 这说明“训练不是空概念”，而是已有可深化的工作台。
@@ -105,70 +105,73 @@
 
 ## 2.2 当前最明显的产品漂移
 
-### A. 沟通页已经从 chat-first 收口到 task-first，但还没有完全吃透
+### A. 沟通页主路径已经成立，但首页到沟通页的“带任务进入”还没做透
 
-现在的 `ChatInterface` 已经完成了第一轮收口：
+现在的沟通页已经不再是旧的 chat-first 形态：
 
 1. `CommunicationStarterKit` 已进入主首屏
-2. `QuickPhrasesPanel` 已降级为表达工具箱的第二层
-3. 沟通工作台已经开始围绕“先开口，再持续沟通”组织
+2. `QuickPhrasesPanel` 已退到表达工具箱第二层
+3. `workspace` 已开始为 personalized phrase rail 和 session review 提供统一读模型
 
-但这还不是终点。下一步仍要继续推进：
+当前真正还没收住的，是首页如何把用户直接送进正确的 starter context：
 
-1. 场景选择要更直接映射到真实 starter context
-2. personalized phrase rail 需要更准，而不是只停留在基础聚合
-3. live session 区域仍要继续减弱旧聊天心智
+1. 首页高压场景还缺“点进去就带 scene / starter intent”
+2. personalized phrase rail 还没充分吸收 recent wins / hotwords / session review
+3. 沟通首屏还要继续削弱旧聊天壳，强化“先开口、再补救”
 
-### B. Starter Kit 已进入主路径，但还没和首页高压场景形成闭环
+### B. 训练页 UI 主线已经收口，但产品可靠性还没到 multi-surface-ready
 
-仓库里已经有 `CommunicationStarterKit` 和结构化的 `starter-kit.ts`，沟通主页面也已正式接入它。
+训练页这轮已经不是旧采集页：
 
-当前仍缺的不是“有没有 starter kit”，而是：
+1. 主叙事已收口到 `选句 -> 录音 -> 反馈`
+2. 反馈区已经贴近录音区
+3. 登录授权已前置，停录后已按主路径自动保存
 
-1. 首页高压场景如何带着 starter context 进入沟通页
-2. starter kit 如何进一步吸收用户偏好、recent wins 和 hotwords
-3. 沟通工作台和首页如何形成同一套任务心智
+当前更关键的问题已经从“页面像不像练习工作台”，变成：
 
-### C. 短语系统被拆成了两套心智
+1. `recording envelope -> upload receipt -> manifest` 是否对 web / PWA / future mobile / desktop companion 都成立
+2. 录完后的云端登记是否足够稳定，不再让用户背“手动同步”心智
+3. dataset review / sample quality / export contract 是否已经足够支撑训练、复核、画像和跨端复用
 
-当前同时存在：
+### C. 沟通档案已经开始吃同一份 `workspace`，但还没有成为真正的 owner 入口
 
-1. `starter kit`：策展式、场景式、高风险时刻优先
-2. `quick phrases`：用户可编辑、可排序、偏个人习惯
+当前记忆页已经不只是统计页：
 
-这两者都合理，但现在它们像两套平级系统，尚未合并成统一的“表达工具箱”。
+1. `profile_bundle / session_review / expression_kit` 已有统一读模型
+2. 沟通页、训练页、记忆页已经开始消费同一份 snapshot
 
-### D. 首页已经开始转向任务入口，但还需要更深的任务联动
+但接下来还缺：
 
-首页这轮已经完成第一步收口：
+1. expression kit 的正式编辑边界
+2. session review 的持续沉淀策略
+3. durable profile 的 owner 与写入规则
 
-1. 首屏前置高压场景
-2. 首屏前置 `开场 / 补救 / 准备`
-3. 三个一级入口已围绕真实任务重写
+### D. 文档与架构治理出现了新的漂移
 
-当前还需要继续补的，是从“静态任务入口”到“可直接进入正确沟通上下文”的第二步。
+当前不是功能缺文档，而是：
 
-### E. founder-user 研究已经把高压沟通场景推到了最前面
+1. `PRD`
+2. `Runtime And Surface Reference`
+3. `control-plane`
+4. `capability-registry`
 
-从 founder-user 研究看，首页当前必须优先承接的是：
+这几份文档对同一层问题有重叠叙述。
 
-1. 求职 / 面试
-2. 工作协作
-3. 医疗沟通
-4. 陌生人求助
+尤其 `capability-registry` 现在把“产品运行时能力”和“repo engineering capabilities”混写在一起，这对工程协作有帮助，但对产品和多端规划反而会制造噪音。
 
-如果首页仍然首先解释产品、架构或功能分区，用户会在最关键的 10 秒内看不到“我现在该点哪里”。
+### E. 多端准备的最大风险不是单点能力不够，而是三层基础还没一起成立
 
-### F. 训练页定位仍带着“录音采集页”痕迹
+从 CEO 视角看，下一阶段最大的风险不是某一层单独不够强，而是：
 
-文案和逻辑已经比以前好很多，但用户仍能感到：
+1. web、PWA、future mobile、future desktop 会不会各长一套会话启动协议
+2. recorder queue、upload receipt、manifest 会不会只停留在 web 端心智
+3. `workspace / profile bundle / expression kit / agent tooling boundary` 会不会仍然只停留在研究稿里
 
-- 这页既想服务我
-- 又想服务数据采集
+所以现在优先级应该是三件事一起收口：
 
-后续必须更明确：
-
-**训练页首先是用户的练习工作台，数据采集只是用户获益之后的、明确授权的副产物。**
+1. runtime / surface / control contract
+2. memory / agent tooling contract
+3. dataset / review / export contract
 
 ## 2.3 架构层的现状判断
 
@@ -201,7 +204,7 @@ TEN graph 内已经有：
 
 所以近期不应该把主精力放在“再换一套 runtime”，而应该把产品能力吃干榨尽。
 
-### D. 当前数据流是可用的，但还没有被统一成产品 contract
+### D. 当前数据流已经开始收口成产品 contract，但 owner 还没完全制度化
 
 现在长期用户状态主要落在三处：
 
@@ -209,7 +212,9 @@ TEN graph 内已经有：
 2. backend [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts)
 3. TEN [memory_layer_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/memory_layer_python/extension.py)
 
-这不是错误，但它目前更像“迁移中的分层”，还不是一个完成的产品 contract。
+这已经不再是纯粹“混乱状态”，因为 backend 已经开始向 `workspace / profile bundle / session review / expression kit` 收口。
+
+但它还不是一个完全制度化的 owner 模型。
 
 当前真正缺的不是更多存储点，而是更明确的所有权：
 
@@ -248,6 +253,32 @@ TEN graph 内已经有：
 1. 我现在要说一句很重要的话，VoxFlame 帮我说出去
 2. 别人没听懂我，VoxFlame 帮我更快补救
 3. 我想长期变好，VoxFlame 帮我看见进步并准备下一次沟通
+
+### CEO 对下一阶段基础设施的判断
+
+1. `Runtime And Surface Reference` 和 `Agent Memory And Tooling Reference` 都应该进入现役主线
+2. 前者负责回答：
+   - 多端 surface 如何共用一条 runtime / control 语言
+   - 会话怎么启动
+   - capability 怎么按 surface / mode 暴露
+3. 后者负责回答：
+   - 真正有用的产品上下文从哪里来
+   - `workspace / profile bundle / expression kit / session review` 谁来拥有
+   - agent / tool / workflow / MCP 的边界怎么定
+4. dataset 文档则负责回答：
+   - 样本怎么可靠保存
+   - 怎么复核、导出、沉淀成画像
+   - 数据面做到哪一层就够支撑产品，而不无限膨胀
+
+### CEO 对文档治理的决策
+
+1. `PRD` 继续是产品主文档
+2. `Runtime And Surface Reference` 升级为 multi-surface / control contract 的主参考
+3. `Agent Memory And Tooling Reference` 升级为 memory / agent / tooling contract 的主参考
+4. `control-plane.md` 继续保留，但定位收紧为 backend 控制面实现与 schema 深文档
+5. `capability-registry.md` 不再继续承担产品主参考角色
+   - 其中的产品运行时 capability 应逐步并回 `Runtime And Surface Reference`
+   - 其中的 repo engineering capabilities 应回到 `AGENTS.md` 与协作文档体系
 
 ## 3.2 Design 视角
 
@@ -500,7 +531,7 @@ Home
 只负责：
 
 1. 用户授权
-2. 录音与标注元数据
+2. 录音与监督标签元数据
 3. 质量控制
 4. 训练集 manifest
 
@@ -536,6 +567,9 @@ Home
 ### 练习工作台
 
 - 目标句和反馈是主角
+- 录完后如果登录授权已确认，目标句和录音应自动进入训练样本链路
+- ASR 识别句子只服务即时反馈，不应混成监督样本标签
+- 同一句允许保留多次练习样本；系统只对同一条录音的重试与补传做安全去重
 - 上传和系统解释是次级信息
 - 让用户读完一屏就知道自己下一步做什么
 
@@ -845,60 +879,74 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 
 ## 10. 分阶段路线图
 
-## Phase 0：产品对齐与主路径收口
+## Phase 0：产品语言与主路径收口
 
-1. 首页、README、docs、AGENTS 统一产品语言
-2. 把 starter kit 正式接入沟通页主首屏
-3. 明确 expression kit / profile bundle / dataset recorder 边界
-4. 清理旧计划归档，只保留 PRD 和 `.tasks/current.md` 作为现役计划入口
+当前状态：大部分已完成
 
-## Phase 1：沟通工作台成型
+1. 首页、README、docs、AGENTS 已基本统一到“主动沟通助手 + 练习工作台 + 沟通档案”
+2. 沟通页首屏已接入 starter kit
+3. expression kit / profile bundle / dataset recorder 边界已初步成立
+4. 旧 roadmap / reset / strategy 主文已退出现役维护
 
-1. 场景预设 + 第一话 + personalized phrase rail
-2. live session 区与补救动作区分层
-3. 沟通结束后增加轻量 session review
-4. 首页与沟通页改成更接近 Google 风格的干净、轻、可信任务工作台
+## Phase 1：沟通工作台继续变强
 
-## Phase 2：练习工作台升级
+当前状态：进行中
 
-1. 从句库页升级为任务流
-2. 把训练页和沟通档案打通
-3. 让“今天该练什么”由 profile bundle 驱动
+1. 首页高压场景直接带 starter intent 进入沟通页
+2. personalized phrase rail 继续吸收 `workspace` 与 recent review
+3. live session 区继续减弱聊天壳，强化“先开口 + 补救”
 
-## Phase 3：沟通档案升级
+## Phase 2：练习工作台升级为 multi-surface-ready 训练入口
 
-1. 从“统计页”升级为“下次准备页”
-2. 支持表达工具箱编辑
-3. 引入更明确的热词与场景偏好治理
+当前状态：进行中，优先级最高
 
-## Phase 4：轻入口与复盘教练
+1. 稳定 `recording envelope -> upload receipt -> manifest`
+2. 把样本质量、review queue、云端登记做成可信主链
+3. 让训练页继续服务用户练习，而不是暴露采集心智
 
-1. quick talk / light voice surface 原型
-2. 会话复盘与陪练模式
-3. 为 App / 硬件接入保留统一 contract
+## Phase 3：控制面与 surface contract 收口
+
+当前状态：下一阶段主任务
+
+1. 正式化 `session / transport / capability / session_strategy`
+2. 为 web / PWA / future mobile / future desktop 统一 surface 语言
+3. 把 `Runtime And Surface Reference` 升级成多端规划的主参考
+
+## Phase 4：沟通档案与 memory/tooling 深化
+
+当前状态：排在 runtime/surface 之后
+
+1. 让 `workspace` 真正成为 durable profile owner 入口
+2. 支持 expression kit 编辑与更清楚的 session review 治理
+3. 再继续深化 memory / tooling / future coach
 
 ## 10.1 按现状代码的最可行开发路径
 
 在当前仓库里，最可行的顺序不是“先换 runtime”，而是：
 
-1. 先改 [ChatInterface.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx)
-   - 把 `CommunicationStarterKit` 正式接进首屏
-   - 让 `QuickPhrasesPanel` 成为 `Expression Kit` 的第二层
-2. 再补 backend 读模型
+1. 先把训练数据链路做成 multi-surface-ready 基线
+   - `recording envelope`
+   - `upload receipt`
+   - `manifest`
+   - `review queue`
+2. 再把 runtime / surface / control contract 写实
+   - `session intent`
+   - `session strategy`
+   - `capability gating`
+   - `surface readiness`
+3. 再继续加固 backend `workspace`
    - `profile bundle`
    - `session review`
    - `expression kit merge`
-3. 再把前端 session hooks 变薄
+4. 再把前端 session hooks 变薄
    - transport bootstrap
    - transcript reducer
    - memory sync
    - training feedback sync
-4. 然后才处理 TEN main control 的瘦身
-   - 保留 realtime orchestration
-   - 停止继续增长产品治理逻辑
-5. 最后再评估执行面替换节奏
-   - 抽 vendor-neutral session contract
-   - 把 `Agora` 降级为当前 transport adapter
+5. 然后才评估轻入口与 future multi-surface 扩展
+   - `light voice`
+   - `mobile companion`
+   - `desktop companion`
 
 ---
 

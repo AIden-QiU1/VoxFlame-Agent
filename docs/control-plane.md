@@ -1,5 +1,11 @@
 # VoxFlame Control Plane
 
+> 状态：控制面实现深文档。
+>
+> 产品层关于 multi-surface、session_strategy、surface contract 的主参考，优先看 [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)。
+>
+> 本文档不再承担产品运行时主文角色；相关产品判断已经并回 runtime reference，这里只继续保留 backend 控制面实现、对象模型和风险收口。
+
 ## 为什么单独写这份文档
 
 `VoxFlame` 已经不只是“一个前端 + 一个 backend + 一个 TEN graph”。

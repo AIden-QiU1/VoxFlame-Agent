@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 
 let swRegistrationPromise: Promise<ServiceWorkerRegistration | null> | null = null
 
+function isLocalRuntimeOriginHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1'
+}
+
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[]
   readonly userChoice: Promise<{
@@ -43,9 +47,14 @@ export function usePWA(): UsePWAReturn {
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null)
   const [installPlatform, setInstallPlatform] = useState<string | null>(null)
   const [isIOS, setIsIOS] = useState(false)
+  const [isLocalOrigin, setIsLocalOrigin] = useState(false)
 
   const registerServiceWorker = useCallback(async (): Promise<ServiceWorkerRegistration | null> => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    if (
+      typeof window === 'undefined' ||
+      !('serviceWorker' in navigator) ||
+      isLocalRuntimeOriginHost(window.location.hostname)
+    ) {
       return null
     }
 
@@ -63,6 +72,8 @@ export function usePWA(): UsePWAReturn {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    setIsLocalOrigin(isLocalRuntimeOriginHost(window.location.hostname))
 
     const userAgent = window.navigator.userAgent || ''
     const isiOSDevice =
@@ -112,6 +123,10 @@ export function usePWA(): UsePWAReturn {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    if (isLocalRuntimeOriginHost(window.location.hostname)) {
+      return
+    }
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       const promptEvent = e as BeforeInstallPromptEvent
@@ -134,7 +149,13 @@ export function usePWA(): UsePWAReturn {
   }, [])
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
+    if (
+      typeof window === 'undefined' ||
+      !('serviceWorker' in navigator) ||
+      isLocalRuntimeOriginHost(window.location.hostname)
+    ) {
+      return
+    }
 
     const registerSW = async () => {
       try {
@@ -214,7 +235,7 @@ export function usePWA(): UsePWAReturn {
   }, [])
 
   return {
-    canInstall: !!deferredPrompt && !isInstalled,
+    canInstall: !isLocalOrigin && !!deferredPrompt && !isInstalled,
     isInstalled,
     isStandalone,
     isOnline,
@@ -222,7 +243,7 @@ export function usePWA(): UsePWAReturn {
     hasUpdate,
     installPlatform,
     isIOS,
-    needsManualInstall: isIOS && !isInstalled && !deferredPrompt,
+    needsManualInstall: !isLocalOrigin && isIOS && !isInstalled && !deferredPrompt,
     promptInstall,
     updateServiceWorker,
     clearCacheAndReload,

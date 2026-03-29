@@ -336,6 +336,55 @@ function buildArticulationTips(
   ]).slice(0, 3)
 }
 
+function buildMotorSuggestions(
+  status: MandarinFeedbackStatus,
+  missingChars: string[],
+  extraChars: string[],
+  pronunciationSummary: {
+    initialPairs: string[]
+    finalPairs: string[]
+    tonePairs: string[]
+  },
+  articulationTips: string[],
+  categoryTips: string[],
+): string[] {
+  const suggestions: string[] = []
+
+  if (status === 'unclear') {
+    suggestions.push('先把整句缩短一点、说慢一点，先求每个字都清楚出来。')
+  }
+
+  if (missingChars.length > 0) {
+    suggestions.push(`先只盯“${missingChars.join('、')}”这些字，嘴巴动作放慢，再回到整句。`)
+  }
+
+  if (extraChars.length > 0) {
+    suggestions.push(`这次有字连在一起了，下一遍每个字之间留半拍，不要急着往下冲。`)
+  }
+
+  if (pronunciationSummary.initialPairs[0]) {
+    suggestions.push(`先把舌尖位置放稳，再练 ${pronunciationSummary.initialPairs[0]} 这一组起音。`)
+  }
+
+  if (pronunciationSummary.finalPairs[0]) {
+    suggestions.push(`先把口型和句尾收住，再练 ${pronunciationSummary.finalPairs[0]} 这一组收尾。`)
+  }
+
+  if (pronunciationSummary.tonePairs[0]) {
+    suggestions.push(`先把节奏放慢，再把 ${pronunciationSummary.tonePairs[0]} 的声调起伏单独拉开。`)
+  }
+
+  if (articulationTips.length > 0) {
+    suggestions.push(articulationTips[0])
+  }
+
+  if (suggestions.length === 0) {
+    suggestions.push(categoryTips[0] || '先放慢、张口更明确一点，再把整句分成两段练。')
+  }
+
+  return unique(suggestions).slice(0, 3)
+}
+
 export function analyzeMandarinAttempt(
   exercise: MandarinTrainingExercise,
   heardText: string,
@@ -392,33 +441,14 @@ export function analyzeMandarinAttempt(
     status = 'close'
   }
 
-  const suggestions: string[] = []
-  if (status !== 'excellent' && missingChars.length > 0) {
-    suggestions.push(`先补齐“${missingChars.join('、')}”这些关键字，再回到整句。`)
-  }
-  if (status !== 'excellent' && extraChars.length > 0) {
-    suggestions.push(`这次多出了“${extraChars.join('、')}”，可以再慢一点，把停顿拉开。`)
-  }
-
-  if (pronunciationSummary.initialPairs[0]) {
-    suggestions.push(`先把声母 ${pronunciationSummary.initialPairs[0]} 拆到单音节慢练。`)
-  }
-
-  if (pronunciationSummary.finalPairs[0]) {
-    suggestions.push(`先把韵母 ${pronunciationSummary.finalPairs[0]} 的口型和收尾做稳。`)
-  }
-
-  if (pronunciationSummary.tonePairs[0]) {
-    suggestions.push(`先把声调 ${pronunciationSummary.tonePairs[0]} 单独拉开，再回到整句。`)
-  }
-
-  if (suggestions.length === 0) {
-    suggestions.push(categoryTips[0] || '先慢一点，把整句分成前后两段练。')
-  }
-
-  if (articulationTips.length > 0) {
-    suggestions.push(articulationTips[0])
-  }
+  const suggestions = buildMotorSuggestions(
+    status,
+    missingChars,
+    extraChars,
+    pronunciationSummary,
+    articulationTips,
+    categoryTips,
+  )
 
   return {
     status,
@@ -443,6 +473,6 @@ export function analyzeMandarinAttempt(
     pronunciationTargets: pronunciationSummary.targets,
     pronunciationSummary: pronunciationSummary.summary,
     summary: buildSummary(status, missingChars, extraChars),
-    suggestions: unique(suggestions).slice(0, 3),
+    suggestions,
   }
 }

@@ -142,6 +142,9 @@ recording envelope
 - 本地断网时录音先进入 `recorder queue`
 - 上传成功后前端拿到结构化 `UploadReceipt`
 - 后端现在会尽量复用已有 contribution / manifest，同一条录音重试时不再默认重复写入
+- `upload/complete` 已把 `manifest.jsonl` 视为训练资产第一事实源；即使 `voice_contributions` 暂时异常，也优先避免样本静默丢失
+- 历史缺 `upload_receipt` 的样本可通过 `backend` 下的 `npm run reconcile:artifacts -- --write` 补齐到当前 artifact 链
+- 同一句目标句允许保留多条新录音；只有同一条录音的重试 / 补传才会被安全去重
 
 ## 音频格式
 

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 
-const LOCAL_RUNTIME_RESET_KEY = 'voxflame-local-runtime-reset-v2'
+const LOCAL_RUNTIME_RESET_KEY = 'voxflame-local-runtime-reset-session-v1'
 
 export function LocalRuntimeReset() {
   useEffect(() => {
@@ -19,7 +19,7 @@ export function LocalRuntimeReset() {
     }
 
     const resetRuntimeState = async () => {
-      const hasReset = window.localStorage.getItem(LOCAL_RUNTIME_RESET_KEY) === '1'
+      const hasReset = window.sessionStorage.getItem(LOCAL_RUNTIME_RESET_KEY) === '1'
       const registrations =
         'serviceWorker' in navigator
           ? await navigator.serviceWorker.getRegistrations()
@@ -35,7 +35,7 @@ export function LocalRuntimeReset() {
         await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)))
       }
 
-      window.localStorage.setItem(LOCAL_RUNTIME_RESET_KEY, '1')
+      window.sessionStorage.setItem(LOCAL_RUNTIME_RESET_KEY, '1')
 
       if (hadRuntimeState && !hasReset) {
         window.location.reload()

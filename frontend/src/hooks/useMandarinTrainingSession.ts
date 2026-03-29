@@ -9,6 +9,7 @@ type SessionStatus = 'idle' | 'connecting' | 'ready' | 'recording' | 'processing
 interface StopRecordingResult {
   transcript: string
   recording: VoxFlameRecordingEnvelope | null
+  transcriptLatencyMs: number
 }
 
 interface UseMandarinTrainingSessionOptions {
@@ -31,6 +32,10 @@ function pickRecorderMimeType(): string {
   return ''
 }
 
+function transcriptLength(text: string): number {
+  return text.replace(/\s+/g, '').trim().length
+}
+
 export function useMandarinTrainingSession(
   options: UseMandarinTrainingSessionOptions = {},
 ) {
@@ -41,6 +46,7 @@ export function useMandarinTrainingSession(
   const sessionIdRef = useRef<string | null>(null)
   const latestUserTranscriptRef = useRef('')
   const currentASRTextRef = useRef('')
+  const bestObservedTranscriptRef = useRef('')
   const recordingBaselineRef = useRef('')
   const recorderRef = useRef<MediaRecorder | null>(null)
   const recorderTrackRef = useRef<MediaStreamTrack | null>(null)
@@ -78,11 +84,30 @@ export function useMandarinTrainingSession(
 
   useEffect(() => {
     latestUserTranscriptRef.current = latestUserTranscript
+    if (transcriptLength(latestUserTranscript) > transcriptLength(bestObservedTranscriptRef.current)) {
+      bestObservedTranscriptRef.current = latestUserTranscript
+    }
   }, [latestUserTranscript])
 
   useEffect(() => {
     currentASRTextRef.current = currentASRText
+    if (transcriptLength(currentASRText) > transcriptLength(bestObservedTranscriptRef.current)) {
+      bestObservedTranscriptRef.current = currentASRText
+    }
   }, [currentASRText])
+
+  const sendSpeechActivity = useCallback((
+    state: 'speech_started' | 'speech_stopped',
+    autoFinalize: boolean = false,
+  ) => {
+    void sendControlEvent('speech_activity', {
+      state,
+      auto_finalize: autoFinalize,
+      detected_at: Date.now(),
+    }).catch((eventError: unknown) => {
+      console.warn('[useMandarinTrainingSession] speech activity send failed:', eventError)
+    })
+  }, [sendControlEvent])
 
   const beginLocalRecording = useCallback(() => {
     const sourceStream = getMicrophoneMediaStream()
@@ -214,19 +239,56 @@ export function useMandarinTrainingSession(
   }, [])
 
   const waitForFinalTranscript = useCallback(async (baseline: string): Promise<string> => {
-    const deadline = Date.now() + 5_000
+    const baselineTrimmed = baseline.trim()
+    const deadline = Date.now() + 7_000
+    let settledTranscript = ''
+    let settledSince = 0
+
     while (Date.now() < deadline) {
-      const nextTranscript = latestUserTranscriptRef.current.trim()
-      if (nextTranscript && nextTranscript !== baseline.trim()) {
-        return nextTranscript
+      const latestFinal = latestUserTranscriptRef.current.trim()
+      const latestInterim = currentASRTextRef.current.trim()
+      const bestObserved = bestObservedTranscriptRef.current.trim()
+      const candidateFinal =
+        latestFinal && latestFinal !== baselineTrimmed
+          ? transcriptLength(bestObserved) >= transcriptLength(latestFinal) + 2
+            ? bestObserved
+            : latestFinal
+          : ''
+      const candidate =
+        candidateFinal ||
+        (transcriptLength(bestObserved) >= transcriptLength(latestInterim)
+          ? bestObserved
+          : latestInterim)
+
+      if (candidate) {
+        if (candidate !== settledTranscript) {
+          settledTranscript = candidate
+          settledSince = Date.now()
+        } else if (Date.now() - settledSince >= 650 && candidateFinal) {
+          return candidate
+        } else if (Date.now() > deadline - 1_200 && Date.now() - settledSince >= 500) {
+          return candidate
+        }
       }
 
       await new Promise((resolve) => {
-        window.setTimeout(resolve, 100)
+        window.setTimeout(resolve, 120)
       })
     }
 
-    return latestUserTranscriptRef.current.trim() || currentASRTextRef.current.trim()
+    const latestFinal = latestUserTranscriptRef.current.trim()
+    if (latestFinal && latestFinal !== baselineTrimmed) {
+      const bestObserved = bestObservedTranscriptRef.current.trim()
+      return transcriptLength(bestObserved) >= transcriptLength(latestFinal) + 2
+        ? bestObserved
+        : latestFinal
+    }
+
+    return (
+      bestObservedTranscriptRef.current.trim() ||
+      currentASRTextRef.current.trim() ||
+      latestFinal
+    )
   }, [])
 
   const startRecording = useCallback(async () => {
@@ -235,12 +297,15 @@ export function useMandarinTrainingSession(
 
     try {
       recordingBaselineRef.current = latestUserTranscriptRef.current
+      bestObservedTranscriptRef.current = ''
       await startRtcRecording({ suppressGreeting: true })
       const recorder = beginLocalRecording()
 
       if (!recorder) {
         throw new Error('训练会话已连上，但录音没有真正开始。请再点一次；如果还是这样，就是代码链路还没接稳。')
       }
+
+      sendSpeechActivity('speech_started')
     } catch (recordingError) {
       const message =
         recordingError instanceof Error ? recordingError.message : '录音启动失败，请检查麦克风权限。'
@@ -252,13 +317,18 @@ export function useMandarinTrainingSession(
     } finally {
       setIsConnecting(false)
     }
-  }, [beginLocalRecording, disconnectRtc, startRtcRecording, stopRtcRecording])
+  }, [beginLocalRecording, disconnectRtc, sendSpeechActivity, startRtcRecording, stopRtcRecording])
 
   const stopRecording = useCallback(async (): Promise<StopRecordingResult> => {
     setIsProcessing(true)
 
     try {
+      const finalizeStartedAt = Date.now()
       const recordingPromise = stopLocalRecording()
+      sendSpeechActivity('speech_stopped', true)
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 180)
+      })
       await stopRtcRecording()
       const [recording, transcript] = await Promise.all([
         recordingPromise,
@@ -268,11 +338,12 @@ export function useMandarinTrainingSession(
       return {
         transcript,
         recording,
+        transcriptLatencyMs: Math.max(0, Date.now() - finalizeStartedAt),
       }
     } finally {
       setIsProcessing(false)
     }
-  }, [stopLocalRecording, stopRtcRecording, waitForFinalTranscript])
+  }, [sendSpeechActivity, stopLocalRecording, stopRtcRecording, waitForFinalTranscript])
 
   const disconnect = useCallback(() => {
     setError(null)
@@ -293,19 +364,6 @@ export function useMandarinTrainingSession(
       const message =
         eventError instanceof Error ? eventError.message : '训练建议生成失败'
       setError(message)
-    })
-  }, [sendControlEvent])
-
-  const sendSpeechActivity = useCallback((
-    state: 'speech_started' | 'speech_stopped',
-    autoFinalize: boolean = false,
-  ) => {
-    void sendControlEvent('speech_activity', {
-      state,
-      auto_finalize: autoFinalize,
-      detected_at: Date.now(),
-    }).catch((eventError: unknown) => {
-      console.warn('[useMandarinTrainingSession] speech activity send failed:', eventError)
     })
   }, [sendControlEvent])
 

@@ -5,6 +5,46 @@ import { Toaster } from "@/components/ui/toaster"
 import './globals.css'
 
 const pwaEnabled = process.env.NEXT_PUBLIC_PWA_ENABLED === '1'
+const LOCAL_RUNTIME_RESET_SESSION_KEY = 'voxflame-local-runtime-reset-session-v1'
+const LOCAL_RUNTIME_RESET_BOOTSTRAP = `
+(() => {
+  if (typeof window === 'undefined') return;
+
+  const host = window.location.hostname;
+  if (host !== 'localhost' && host !== '127.0.0.1') return;
+
+  if (window.sessionStorage.getItem('${LOCAL_RUNTIME_RESET_SESSION_KEY}') === '1') {
+    return;
+  }
+
+  const resetRuntimeState = async () => {
+    const registrations =
+      'serviceWorker' in navigator
+        ? await navigator.serviceWorker.getRegistrations()
+        : [];
+    const cacheNames = 'caches' in window ? await caches.keys() : [];
+    const hadRuntimeState = registrations.length > 0 || cacheNames.length > 0;
+
+    if (registrations.length > 0) {
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+
+    if ('caches' in window && cacheNames.length > 0) {
+      await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+    }
+
+    window.sessionStorage.setItem('${LOCAL_RUNTIME_RESET_SESSION_KEY}', '1');
+
+    if (hadRuntimeState) {
+      window.location.reload();
+    }
+  };
+
+  void resetRuntimeState().catch((error) => {
+    console.error('[LocalRuntimeResetBootstrap] Failed to clear localhost runtime state:', error);
+  });
+})();
+`
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://ranyan.app'),
@@ -97,6 +137,7 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#F59E0B" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
         {pwaEnabled ? <meta name="mobile-web-app-capable" content="yes" /> : null}
+        <script dangerouslySetInnerHTML={{ __html: LOCAL_RUNTIME_RESET_BOOTSTRAP }} />
       </head>
       <body className="antialiased">
         {/* Skip to main content link for accessibility */}
@@ -107,7 +148,7 @@ export default function RootLayout({
           跳转到主要内容
         </a>
         {children}
-        {!pwaEnabled ? <LocalRuntimeReset /> : null}
+        <LocalRuntimeReset />
         {pwaEnabled ? <PWAStatusCenter /> : null}
         <Toaster />
       </body>

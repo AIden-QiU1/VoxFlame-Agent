@@ -42,6 +42,50 @@
 - 前端 [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 仍承担了过多 client-side orchestration
 - `session_strategy` 还没有成为正式 contract
 
+控制面至少还要明确负责：
+
+- session lifecycle
+- mode routing
+- runtime property overrides
+- diagnostics / health / provider status
+- surface 与 capability 的准入边界
+
+控制面不应该负责：
+
+- 直接执行 ASR / TTS / correction
+- 直接保存 dataset 样本事实
+- 承接页面级文案、提示和交互判断
+- 让 TEN 主控继续长成产品治理层
+
+后续讨论尽量围绕 3 个对象，而不是围绕某个 hook：
+
+- `Session Intent`
+  - `surface`
+  - `mode`
+  - `session_strategy`
+  - `scene`
+  - `requested_capabilities`
+  - `device_context`
+- `Session Runtime`
+  - `graph_name`
+  - `timeout_seconds`
+  - `property_overrides`
+  - `transport credentials`
+- `Session State`
+  - `created`
+  - `connecting`
+  - `active`
+  - `degraded`
+  - `ending`
+  - `stopped`
+  - `failed`
+
+当前最主要的控制面风险仍然是：
+
+- 前端 hook 长成第二控制面
+- TEN 主控继续吞产品治理
+- provider health / mode-capability matrix / last smoke status 还没正式化
+
 ### 2.2 Execution Plane
 
 当前 owner：
@@ -86,6 +130,28 @@
 
 - 先定义 capability contract，再谈谁来调用
 - 不让页面按钮或 prompt 文案直接成为能力定义方式
+
+当前真正该制度化的产品运行时 capability 是下面这些，而不是仓库协作能力表：
+
+| capability_id | owner | callers | side_effect_level | source_of_truth | status |
+|---|---|---|---|---|---|
+| `rtc_session_start` | backend control plane | web / pwa / future surface | `session_mutation` | [rtc-orchestration.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/rtc-orchestration.service.ts) | `active` |
+| `rtc_session_ping` | backend control plane | connected clients | `session_mutation` | [rtc.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/rtc.controller.ts) | `active` |
+| `rtc_session_stop` | backend control plane | web / pwa / future surface | `session_mutation` | [rtc.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/rtc.controller.ts) | `active` |
+| `rtm_send_control_event` | frontend rtc client | active realtime session | `session_mutation` | [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) | `active` |
+| `training_feedback_request` | TEN execution plane | training session runtime | `session_mutation` | [training_feedback_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/training_feedback_python/extension.py) | `active` |
+| `workspace_snapshot_read` | backend memory services | communication / training / memory surfaces | `read_only` | [memory.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/memory.controller.ts) | `active` |
+| `voice_profile_update` | training runtime + backend memory | training session runtime | `profile_mutation` | [training-profile.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/training-profile.ts) | `active` |
+| `upload_artifact_persist` | backend upload services | training surface | `profile_mutation` | [upload-artifact.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/upload-artifact.service.ts) | `active` |
+| `provider_health_check` | backend control plane | ops / future admin surface | `read_only` | planned | `planned` |
+
+这些 capability 至少要说清 5 件事：
+
+- 谁是 owner
+- 谁能调用
+- 运行在哪个 mode / surface
+- 副作用等级是什么
+- smoke / diagnostics 从哪里看
 
 ### 2.5 Surface Plane
 
@@ -166,30 +232,104 @@ session_strategy =
 
 - 近端优先把 PWA 做顺
 - 原生 App 不必抢 P0
-- 但 runtime / upload / profile contract 必须从现在就按 future app 复用来设计
+- 但 runtime / upload / profile contract 必须从现在就按 future multi-surface 复用来设计
 
-## 6. 对 PRD 和开发计划真正有用的结论
+## 6. 对 PRD 和多端产品规划真正有用的结论
 
-PRD 应长期引用这份文档的地方只有这些：
+PRD 和 future multi-surface 规划真正该长期引用这份文档的地方只有这些：
 
 1. 为什么首页、沟通、训练、档案要围绕同一条主链组织
 2. 为什么近期先稳 `control / upload / profile`，而不是重写 runtime
 3. 为什么 `TEN + Agora` 要被写成“过渡执行面”
 4. 为什么要引入 `session_strategy = heavy_realtime | light_voice`
 5. 为什么 PWA 现在重要，但原生 App 仍然保留价值
+6. 为什么 future mobile / desktop 的第一原则不是“各做各的入口”，而是共用同一套 `session / transport / capability` 语言
 
-## 7. 当前最可行的推进顺序
+## 7. 文档治理判断
+
+从当前代码和文档现状看，runtime 相关文档需要收口成明确分工：
+
+1. 本文档
+   - 继续作为 `runtime / surface / multi-surface planning` 的主参考
+2. [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
+   - 与本文档并行
+   - 负责 memory / agent / tooling contract
+3. [control-plane.md](/home/ubuntu/VoxFlame-Agent/docs/control-plane.md)
+   - 保留
+   - 但定位收紧为 backend 控制面实现、schema 与诊断深文档
+4. [capability-registry.md](/home/ubuntu/VoxFlame-Agent/docs/capability-registry.md)
+   - 不再承担产品主参考角色
+   - 其中的产品运行时 capability 应逐步并回本文档或其附录
+   - 其中的 repo engineering capabilities 应回到 `AGENTS.md` 与协作文档体系
+
+换句话说：
+
+- `control-plane` 适合做实施深文档
+- `capability-registry` 适合做临时治理表
+- 本文档才是 CEO / PM / Eng 共同对齐“多端 surface 到底沿哪条主链扩”的主入口
+- 记忆与 agent 的长期边界则由 memory/tooling 参考文档并行负责
+
+## 8. 为多端架构准备时，runtime 最先要成立的 contract
+
+### 8.1 Session Intent
+
+任何 surface 发起会话前，都应先被翻译成同一类对象：
+
+- `surface`
+- `mode`
+- `session_strategy`
+- `scene`
+- `requested_capabilities`
+- `device_context`
+
+这决定了 future mobile / desktop companion 不该直接复制 web 里的页面逻辑，而应共享控制面语言。
+
+### 8.2 Surface Readiness
+
+未来 web / PWA / mobile / desktop 至少要有统一的 readiness 语言：
+
+- 麦克风是否就绪
+- 网络是否允许实时主链
+- 是否允许后台同步 / 轻录制
+- 当前应该走 `heavy_realtime` 还是 `light_voice`
+
+目前这层还没有正式文档化，是接下来多端准备最值得补的一层。
+
+### 8.3 Capability Gating
+
+future surface 不应该自己猜“这个入口能不能做这件事”，而应由控制面明确：
+
+- 当前 surface 可请求哪些 capability
+- 当前 mode 默认开放哪些 side effects
+- 哪些能力需要登录、授权或显式确认
+
+### 8.4 Shared Recorder / Upload Contract
+
+任何新 surface 能不能接上主链，取决于它是否共用：
+
+- `recording envelope`
+- `upload receipt`
+- `manifest`
+- `review signals`
+
+也就是说，dataset 链路不是独立问题，而是 runtime / surface 扩张的地基。
+
+## 9. 当前最可行的推进顺序
 
 1. 先继续稳数据录入与上传 contract
    - `recording envelope`
    - `recorder queue`
    - `upload receipt`
    - `manifest`
-2. 继续收口 backend `workspace / profile bundle / session review`
-3. 再把前端巨型 hook 变薄
-4. 再给控制面补正式 `session_strategy`
+2. 再给控制面补正式 `session intent / session_strategy / capability gating`
+3. 与此同时并行推进 memory/tooling contract
+   - `workspace`
+   - `profile bundle`
+   - `expression kit`
+   - `session review`
+4. 再把前端巨型 hook 变薄
 5. 最后再评估下一代 execution plane 替换节奏
 
 一句话总结：
 
-`VoxFlame` 现在最需要的不是新的 runtime，而是更清楚的 runtime 语言和更稳的 surface / control / upload / profile contract。`
+`VoxFlame` 现在最需要的不是新的 runtime，而是更清楚的 runtime 语言、更明确的 surface contract，以及一条能和 memory/tooling、dataset 一起支撑多端产品的 control/upload/profile 主链。`

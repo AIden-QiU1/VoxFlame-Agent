@@ -188,7 +188,7 @@ MCP 更适合：
 - 产品级表达策略治理
 - 页面级文案与交互判断
 
-## 6. 对 PRD 真正有帮助的地方
+## 6. 对 PRD 和真正有用的产品真正有帮助的地方
 
 PRD 和后续开发真正该引用这份文档的地方是：
 
@@ -196,15 +196,43 @@ PRD 和后续开发真正该引用这份文档的地方是：
 2. 为什么训练页、沟通页、沟通档案要共享同一份 `workspace`
 3. 为什么 dataset / memory 必须分开
 4. 为什么 backend 应拥有 durable `profile bundle / session review`
-5. 为什么 future app / companion 也应该沿同一套 memory/tooling 边界扩展
+5. 为什么 future mobile / desktop companion 也应该沿同一套 memory/tooling 边界扩展
+6. 为什么“产品真的有用”不只靠 runtime 通了，还要靠：
+   - 当前该说什么
+   - 最近哪类场景更常用
+   - 哪些表达适合先给用户
+   - 哪些训练结果值得沉淀成下一次准备
 
-## 7. 当前最该继续做的下一步
+## 7. memory / agent 框架现在要推进到什么程度
 
-1. 继续收紧 upload contract 和 dataset persistence
-2. 继续把 `workspace` 真正变成 backend owner 的 durable contract
+对当前 `VoxFlame` 来说，memory / agent 框架不需要先做成“万能智能体平台”，但至少要做到下面 4 层：
+
+1. durable workspace
+   - `profile bundle`
+   - `session review`
+   - `expression kit`
+   - `communication preferences`
+2. write boundary
+   - 哪些训练结果自动进画像
+   - 哪些只保留为 dataset artifact
+   - 哪些需要阈值、抽样或人工确认
+3. runtime context service
+   - 每次沟通前按 scene 取 bundle
+   - 每次训练前按 focus 取 bundle
+4. tool / workflow boundary
+   - runtime tool 负责低延迟执行
+   - workflow 负责复核、导出、异步整理
+
+做到这一步，memory / agent 才足以支撑“真正有用的产品”；再往上做更复杂的自治 agent、多层 planner 或通用知识系统，都不该抢当前主线。
+
+## 8. 当前最该继续做的下一步
+
+1. 继续把 `workspace` 真正变成 backend owner 的 durable contract
+2. 补清 `expression kit / session review / profile bundle` 的写入边界
 3. 继续让前端只消费 `workspace` 和 upload receipt，而不是再长临时画像逻辑
 4. 继续限制 TEN 主控的职责增长
+5. 让 dataset -> profile summary 的沉淀路径更显式，而不是靠页面级胶水逻辑
 
 一句话总结：
 
-`VoxFlame` 的长期能力不该长成“一个万能 agent”，而应该长成“typed runtime capabilities + durable profile bundle + clear workflow boundary”的系统。`
+`VoxFlame` 的长期能力不该长成“一个万能 agent”，而应该长成“typed runtime capabilities + durable profile bundle + clear workflow boundary”的系统；而这套系统必须先服务一个真正有用的多端产品。`

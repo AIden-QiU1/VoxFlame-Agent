@@ -87,14 +87,45 @@
 - 后端已追加 `dataset/{user_id}/manifest.jsonl`
 - 指导录音仍兼容追加 `dataset/{user_id}/transcripts.txt`
 - 本地降级录音已进入 IndexedDB `recorder queue`
+- 训练页在登录授权已确认后，已开始按主路径自动保存监督样本，而不是再把“保存训练样本”做成主按钮
+- `/api/upload/complete` 现已优先保证 `manifest.jsonl` 落盘；`voice_contributions` 写入异常时，样本 artifact 不再跟着整条失败
+- 已新增 [reconcile_upload_artifacts.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/reconcile_upload_artifacts.ts)，可把历史缺 `upload_receipt / manifest` 的训练样本补齐到现役事实源
+- 当前环境中的历史真实样本已完成一次对账：测试账号的 1 条监督录音与 legacy `v_gv7fxwrp` 的 5 条录音现在都已具备 `upload_receipt + manifest.jsonl`
+- 训练样本现已显式区分两种 key：
+  - `prompt_group_key`
+    用来把“同一句/同一条 corpus prompt 的多次练习”归到同一组
+  - `recording_dedupe_key`
+    用来保证“同一条录音”的重试与补传不会重复写入
+- 训练样本现已开始显式写 `evaluation_status / review_queue / review_priority / review_reason_tags`
+- 已新增 [list_dataset_review_queue.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/list_dataset_review_queue.ts)，可把 `sampled_for_review / retry_recommended` 样本直接拉成 review queue
 
 当前主要缺口：
 
-- 已有最小 `recording schema`，但还需要 authenticated live smoke 证明整条链真正跑通
+- 创始人已在真实前端补过 smoke，且历史真实样本已证明 `voice_contributions + upload_receipt + manifest.jsonl + transcripts.txt(兼容)` 可以收口到同一条链；当前剩余的验证重点不再是“能不能保存”，而是确认 2026-03-29 这版新增的 `sample_quality_* / confidence / latency_ms / review_*` 会稳定进入新样本 manifest
 - `/api/upload/complete` 的最小幂等保护已经落在 backend service 层：同一条录音重试时会优先复用已有 contribution，并尽量避免重复追加 `manifest`
 - `voice_contributions` 的数据库唯一键 / upsert contract 已开始正式化，但还需要真实登录态 smoke 继续证明“补传 + 并发重试”一起稳定
 - `transcripts.txt` 现在只保留兼容导出角色，后续评测、质检、画像应继续以 `manifest.jsonl` 为准
 - recorder queue 已进入 IndexedDB，但仍要继续补 `最后尝试时间 / 重试次数 / 失败原因 / companion 共享边界`
+- 监督训练样本的 contract 还需要继续强调：云端 canonical label 是目标句，`recognized_text` 只作为前端反馈和样本诊断字段，不应与监督标签混用
+
+## 当前去重规则
+
+当前 dataset 链路不是按“句子内容相同”去重，而是分两层处理：
+
+1. 同一句 prompt 允许多次保存
+   - 同一个 `exercise_id / target_text`
+   - 不同录音尝试
+   - 这些样本都应继续保留，方便后续训练、对比和质检
+
+2. 同一条录音只保留一份
+   - 当前实际幂等主键仍是 `contributor_id + audio_path`
+   - `recording_id / recording_dedupe_key` 与 `upload_receipt` / `manifest` 检查会一起兜底
+   - 目标是允许“同一句多条样本”，但阻止“同一条录音重复补传”
+
+这意味着：
+
+- “我今天把同一句练了 5 遍”不会被系统压成 1 条
+- “同一条录音因为网络重试了 5 次”不会被系统写成 5 条
 
 ## VoxFlame 最小数据模型
 
@@ -184,7 +215,7 @@
 - `llm_feedback_version`
 - `rule_feedback_version`
 - `evaluation_status`
-  `pending | ready | sampled_for_review | rejected`
+  `pending | ready | sampled_for_review | retry_recommended`
 
 ### 6. Consent And Storage
 
@@ -246,7 +277,7 @@ type VoxFlameRecordingRecord = {
     focus_feedback?: string[]
     llm_feedback_version?: string
     rule_feedback_version?: string
-    evaluation_status?: 'pending' | 'ready' | 'sampled_for_review' | 'rejected'
+    evaluation_status?: 'pending' | 'ready' | 'sampled_for_review' | 'retry_recommended'
   }
   consent: {
     scope: 'training_only' | 'training_and_model_improvement' | 'evaluation_only'
@@ -258,106 +289,114 @@ type VoxFlameRecordingRecord = {
 }
 ```
 
-## Recorder Pipeline
+## Recorder Pipeline（现役 contract）
 
 ### 总体目标
 
-把 `训练页录音 -> 上传 -> 反馈 -> 聚合` 变成一条稳定且可扩展的链，而不是页面里临时拼几个 hook。
+把 `训练页录音 -> OSS 音频对象 -> upload receipt -> manifest -> review queue -> profile summary` 变成一条对 web、PWA、future mobile / desktop companion 都成立的统一链路。
 
-### Pipeline Stage 1: Capture
+这里的关键不是“多写几层”，而是确保任何一个 surface 录完音后，都能回答同一组问题：
 
-不同 surface 可以有不同录音技术，但都要产出同一份 recorder envelope：
+- 这条录音的唯一 ID 是什么
+- 它有没有进云端对象存储
+- 它有没有完成 dataset 登记
+- 它现在是可直接训练、待复核还是建议重录
+- 它有没有越界写进长期 memory
+
+### Stage 1: Capture
+
+当前 web 训练页已经能稳定产出 `recording envelope`：
 
 - `recording_id`
 - `session_id`
-- `started_at`
-- `stopped_at`
-- `sample_rate`
+- `mode`
 - `source_surface`
-- `capture_transport`
+- `collection_mode`
+- `started_at / stopped_at`
+- `sample_rate / channel_count / duration_ms / capture_transport`
+- 原始音频 `blob`
 
-当前 web 训练页可以继续沿用：
-[useMandarinTrainingSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useMandarinTrainingSession.ts)
+这层对多端架构最重要的价值是：
 
-但建议把它产出的 `recording` 对象扩成：
+- 录音对象已经不再依赖页面临时 state 命名
+- web / PWA / future companion 可以共享同一套 envelope 结构
+- 后续移动端或桌面端只需要替换 capture transport，不需要再改 dataset schema
 
-- `blob`
-- `duration_ms`
-- `sample_rate`
-- `channel_count`
-- `capture_transport`
-- `recording_id`
-- `local_cache_key`
+### Stage 2: Finalize
 
-### Pipeline Stage 2: Finalize
+当前停录后已经不是“只等 transcript”，而是并行完成：
 
-停止录音时，不要只等 transcript。
+1. 固化 `recording envelope`
+2. 等待更稳定的最终 transcript
+3. 生成本地训练反馈和样本质量判断
+4. 在授权已确认时直接进入自动保存主链
 
-应该同步做三件事：
+这一层已经明显更接近 `vocotype-cli` 的 session-style recorder，而不是页面里随手拼出来的一次性录音按钮。
 
-1. 固化录音 envelope
-2. 等待 RTC / ASR 最终 transcript
-3. 立即写本地 recorder manifest
+### Stage 3: Local Dataset Recorder
 
-这里借鉴 `vocotype-cli` 的地方是：
-先保证本地 session 资产完整，再做远端上传。
-
-### Pipeline Stage 3: Local Dataset Recorder
-
-这是最值得新增的一层。
-
-建议新增一个前端或 companion 共享的 recorder manifest 层，哪怕 web 端第一版先用 IndexedDB，也不要只靠 `localStorage` 临时数组。
-
-最小职责：
+这层已经从旧的临时缓存升级成现役 `IndexedDB recorder queue`：
 
 - 保存 `recording envelope`
 - 记录本地 blob 引用
-- 记录 `sync_status`
-- 记录上传失败原因
-- 提供重试队列
+- 记录 `syncStatus / syncAttempts / lastAttemptAt / lastError`
+- 记录授权范围与结构化 metadata
+- 在云端登记失败时保留自动补登入口
 
-这层就是 `vocotype-cli dataset_recorder` 在 `VoxFlame` 里的翻译。
+当前要强调的新产品判断是：
 
-### Pipeline Stage 4: Structured Upload
+- 这层存在的目的不是让用户手动同步
+- 它是系统的可靠性缓冲层
+- 训练页主路径不再围绕“留在本地，稍后自己同步”组织
 
-当前上传 hook：
-[useVoiceUpload.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useVoiceUpload.ts)
+### Stage 4: Structured Upload
 
-建议从“只传 text + duration + metadata”升级成显式上传 `recording record`。
+当前现役上传链已经收口成：
 
-第一步不需要一次性重构所有接口，先做这几个动作：
+```text
+recording envelope
+  -> upload/sign
+  -> OSS audio object
+  -> upload/complete
+  -> voice_contributions + upload_receipt + manifest.jsonl
+  -> transcripts.txt(兼容导出)
+```
 
-- `metadata` 内强制包含 `recording_id / session_id / mode / source_surface / collection_mode`
-- `duration` 统一换算为 `duration_ms`
-- 把 `sampleRate` 和 `capture_transport` 一起上送
-- 训练 prompt 的 `category / subcategory / prompt_text / target_focus` 一起上送
+其中已经成立的 contract：
 
-### Pipeline Stage 5: Async Derivation
+- 前端强制上送 `recording_id / session_id / mode / source_surface / collection_mode / consent_scope`
+- 监督训练目录收口到 `supervised/mandarin/{category}/{user_id}/{recording_id}.{ext}`
+- 弱监督沟通目录收口到 `weak-supervision/dialogue/{user_id}/{session_id}/{recording_id}.{ext}`
+- `target_text` 是监督标签
+- `recognized_text` 仅用于反馈显示、样本诊断和后续复核
+- `upload_receipt + manifest.jsonl` 才是“已进入训练资产链”的正式标志
 
-上传完成后，衍生层再异步做：
+### Stage 5: Dataset Review Signals
 
-- 训练反馈生成
-- 错误标签归纳
-- 画像聚合
-- 评测抽样
-- 数据集导出清单
+这层已经不是计划，而是现役 metadata contract 的一部分：
 
-这里要严格避免：
+- `sample_quality_score`
+- `sample_quality_tier`
+- `sample_quality_action`
+- `transcript_coverage_ratio`
+- `confidence`
+- `latency_ms`
+- `evaluation_status`
+- `review_queue`
+- `review_priority`
+- `review_reason_tags`
+- `review_summary`
 
-- 页面上传成功就直接把原始 transcript 写成长时记忆
-- 每句训练反馈都直接写进 memory plane
+当前差的不是字段定义，而是把它们继续推进成真正的 worker / export / 人工复核流程。
 
-正确做法是：
+### Stage 6: Memory-Safe Aggregation
 
-- 原始记录进入 dataset
-- 聚合摘要进入 memory
-- 训练建议保留为 session 级或样本级 artifact
+这一层仍然必须坚持：
 
-### Pipeline Stage 6: Memory-Safe Aggregation
+- dataset 保存样本事实
+- memory 保存提炼后的画像与摘要
 
-这一步和 [VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md) 对齐。
-
-建议只把这些聚合结果写入 memory / voice profile：
+当前允许继续写入 memory / voice profile 的只有：
 
 - 训练总量
 - 最近周期趋势
@@ -365,152 +404,134 @@ type VoxFlameRecordingRecord = {
 - 当前优先训练目标
 - 个体热词或高频表达偏好
 
-不要把：
+不允许直接写成长时记忆的仍然包括：
 
 - 单句原始 transcript
 - 单句完整反馈文本
 - 原始音频路径
 
-直接写成长时记忆。
+## 当前已经落地的部分
 
-## 对当前实现的具体改造建议
+以下内容已经不再属于“建议新增”：
 
-### A. 前端训练录音 hook
+1. recorder envelope
+   - [useMandarinTrainingSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useMandarinTrainingSession.ts)
+   - 已包含 `recording_id / session_id / duration_ms / sample_rate / channel_count / capture_transport`
 
-目标文件：
-[useMandarinTrainingSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useMandarinTrainingSession.ts)
+2. 自动上传主路径
+   - [useVoiceUpload.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useVoiceUpload.ts)
+   - 当前主路径已收口到“停录即上传”，失败时才进入后台自动补登
 
-建议新增：
+3. upload artifact persistence
+   - [upload.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/upload.controller.ts)
+   - [upload-artifact.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/upload-artifact.service.ts)
+   - 已同时处理 `voice_contributions / upload_receipt / manifest.jsonl / transcripts.txt(兼容)`
 
-- `recording_id`
-- `duration_ms`
-  当前是秒，后续数据治理更适合毫秒
-- `channel_count`
-- `capture_transport='rtc_dup_track'`
-- `session_id`
-  从 RTC 会话显式拿
+4. 历史样本对账
+   - [reconcile_upload_artifacts.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/reconcile_upload_artifacts.ts)
+   - 当前历史真实样本已补齐到现役 artifact 链
 
-建议改动方向：
+5. review queue 基础入口
+   - [training-sample-review.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/training-sample-review.ts)
+   - [list_dataset_review_queue.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/list_dataset_review_queue.ts)
+   - [mark_dataset_review_decision.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/mark_dataset_review_decision.ts)
+   - 当前已经能把 `sampled_for_review / retry_recommended` 样本拉出来，也能用默认 dry-run 的 review 标记脚本预览 `accepted_for_export / reviewer / reviewed_at / rejection_reason` 回写 payload
 
-- `StopRecordingResult.recording` 升级为 recorder envelope
-- 停止录音后立即调用本地 recorder manifest 写入
-- 把“等待 transcript”与“固化录音资产”并行化
+6. export manifest 第一版脚本
+   - [dataset-export.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/dataset-export.service.ts)
+   - [export_dataset_manifest.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/export_dataset_manifest.ts)
+   - 当前已能按 `accepted_for_export` 生成统一字段语言的 dataset export manifest；在当前环境里由于还没有被人工标记为 `accepted_for_export` 的样本，所以导出结果为 0 条
 
-### B. 前端上传 hook
+## 为多端架构与真正产品准备的进度判断
 
-目标文件：
-[useVoiceUpload.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useVoiceUpload.ts)
+### 已经达到 multi-surface-ready 基线的部分
 
-建议新增结构化字段：
+1. surface-agnostic recording schema 已经成立
+   - `recording envelope` 不再绑定单一页面实现
+2. cloud persistence contract 已经成立
+   - `OSS audio object + upload receipt + manifest.jsonl`
+3. queue fallback contract 已经成立
+   - `IndexedDB recorder queue + automatic background retry`
+4. dataset / memory 边界已经成立
+   - canonical label、review metadata、profile summary 各有边界
 
-- `recording_id`
-- `session_id`
-- `mode`
-- `source_surface`
-- `collection_mode`
-- `sample_rate`
-- `capture_transport`
-- `prompt_text`
-- `prompt_category`
-- `target_focus`
-- `consent_scope`
+### 还没有达到真正可复用产品基线的部分
 
-目录建议也进一步收口：
+1. 没有统一的 surface readiness contract
+   - 还缺 `web / pwa / mobile / desktop` 的录音权限、设备状态、后台能力矩阵
+2. 没有真正的 review worker
+   - 目前只有 metadata 和脚本入口，还没有复核状态机
+3. 没有统一的 sync daemon 语义
+   - 当前自动补登主要落在 web 端 hook，未来 app 需要更稳定的后台同步 owner
+4. dataset export contract 还没有完全跑通
+   - `accepted_for_export / reviewer / reviewed_at / rejection_reason` 和第一版 export manifest 脚本已经落地
+   - 还缺真实 accepted 样本验证、OSS audit trail 与后续导出 worker
 
-- 监督训练：
-  `supervised/mandarin/{category}/{user_id}/{recording_id}.{ext}`
-- 弱监督沟通：
-  `weak-supervision/dialogue/{user_id}/{session_id}/{recording_id}.{ext}`
-- 评测 / benchmark：
-  `benchmark/mandarin/{suite}/{user_id}/{recording_id}.{ext}`
+## 数据面到底要优化到哪里
 
-### C. 后端上传控制器
+数据面不该被无限上纲成“先做一个大而全的数据平台”。对当前 `VoxFlame` 来说，做到下面 4 层就够支撑真正有用的产品：
 
-目标文件：
-[upload.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/upload.controller.ts)
+1. 录音事实层
+   - `recording envelope`
+   - `audio object`
+   - `upload receipt`
+   - `manifest`
+2. 样本治理层
+   - `lineage`
+   - `dedupe`
+   - `sample_quality`
+   - `review_queue`
+3. 导出与复核层
+   - `accepted_for_export / rejected / reviewed_at / reviewer`
+   - dataset export manifest
+4. memory-safe 聚合层
+   - training profile summary
+   - confusion patterns
+   - recommended focus
 
-建议从“插一条 voice_contributions”升级到至少支持：
+超过这 4 层之后，再往上做更复杂的数据平台、通用特征仓或大规模离线流程，都不该抢当前主产品主线。
 
-- 保存 `recording_id`
-- 保存 `session_id`
-- 保存 `mode`
-- 保存 `source_surface`
-- 保存 `collection_mode`
-- 保存 `audio metadata`
-- 保存 `transcript metadata`
-- 保存 `consent`
+## `ququ` 与 `vocotype-cli` 现在还值得继续迁移什么
 
-`transcripts.txt` 仍然可以保留给传统监督数据导出，但应该并行增加：
+### 来自 `ququ`
 
-- `dataset/{user_id}/manifest.jsonl`
+更值得进入下一阶段多端产品设计的是：
 
-每条一行，对应完整 recording record 的瘦身版。
+1. recorder readiness manager
+2. 权限与设备降级状态
+3. 本地长期状态与页面态分层
 
-## 从 `ququ` 值得迁移的模块
+### 来自 `vocotype-cli`
 
-这些不一定马上写进当前 web 代码，但应该进入 `desktop / companion` 路线图：
+更值得继续推进到主链的是：
 
-1. readiness manager
-   麦克风、模型、本地服务、权限、热键都应有统一健康状态。
-2. raw first, optimize second
-   先把原始识别和用户反馈做快，再做润色或重写。
-3. fallback 设计
-   权限失败、自动输入失败、模型不可用时要有明确降级。
-4. 历史与设置分层
-   本地历史记录和长期用户画像不要混成一个表。
+1. 真正独立的 dataset review worker
+2. export manifest / audit trail
+3. 更明确的 async derivation 队列
 
-## 从 `vocotype-cli` 值得迁移的模块
+## 下一阶段实施优先级
 
-这些更适合尽快进入 `VoxFlame` 主线：
+### Phase A：把 web/PWA 版本做成真正的多端基线
 
-1. recorder manifest / dataset recorder
-2. session-style recording envelope
-3. async transcription / derivation queue
-4. `jsonl` manifest 输出
-5. `latency_ms + confidence + duration_ms` 作为默认指标
+1. 用真实物理麦克风补一次新的 `upload/sign -> OSS -> upload/complete` smoke
+   重点确认 `latency_ms / confidence / sample_quality_* / review_*` 稳定进入 `manifest.jsonl`
+2. 继续加固 `voice_contributions` 的唯一键 / 幂等 contract
+3. 把自动补登结果回写成更清楚的云端回执状态，而不是只在前端局部提示
 
-## 实施优先级
+### Phase B：把 dataset 治理层补齐
 
-### Phase 1: 先把 contract 做对
+1. 把 review queue 推进成真正的 worker contract
+2. 增加 `reviewed_at / reviewer / rejection_reason / accepted_for_export`
+3. 让对象存储目录、manifest 和 export 清单保持同一套字段语言
 
-当前状态：大部分已落地
+### Phase C：为 mobile / desktop companion 开路
 
-1. 把训练录音结果升级成 recorder envelope
-2. 把上传 metadata 收口到统一字段
-3. 后端为监督录音增加 `manifest.jsonl`
-4. 本地降级存储从 `localStorage` 临时对象升级为正式 recorder queue
-5. `/api/upload/complete` 对同一条录音的重试，默认优先复用已有 contribution / manifest
-
-### Phase 2: 继续沉淀数据资产
-
-当前状态：进行中
-
-1. 训练页保存 `raw_transcript / final_transcript / latency_ms / confidence`
-2. 增加评测和抽样复核字段
-3. 聚合层只写 training profile summary，不写逐句长记忆
-4. 让对象存储目录结构和导出清单统一
-
-### Phase 3: 为 app / companion 做准备
-
-当前状态：尚未进入实现，但 contract 已开始向这一步对齐
-
-1. 抽 `surface-agnostic recorder contract`
-2. 增加 `desktop_companion` 这个 surface
-3. 增加本地 recorder manifest 与后端 sync worker 的边界
-4. 让 web、PWA、desktop 共享同一套 recording schema
-
-## 下一步行动清单
-
-1. 用真实登录态补一次 `upload/sign -> OSS -> upload/complete` smoke，确认 `voice_contributions + manifest.jsonl + transcripts.txt(兼容)` 一起闭环。
-2. 为 `voice_contributions` 明确更强的唯一键 / upsert contract，进一步降低并发重试下的重复写入风险。
-3. 把训练反馈写入规则和 memory 写入规则分开，明确“样本 artifact”与“画像摘要”的边界。
-4. 让 recorder queue 继续支持更明确的失败原因、重试次数和最后同步时间。
-   当前 web 端已补到这一步，下一步应继续把这套队列状态推广成 web / PWA / future companion 可共享的 contract。
-5. 为后续 desktop companion 新增一份 `recorder readiness` 草图文档，提前消化 `ququ` 的权限/降级经验。
-6. 后续所有训练数据、benchmark 数据、弱监督数据都按本文件的 schema 评审，不再各写各的 metadata。
+1. 增加 `surface readiness` 文档与状态机
+2. 定义 companion / app 侧 `recorder sync worker` 与本地队列 owner
+3. 保持 web、PWA、mobile、desktop 共用同一套 recording schema 与 upload receipt contract
 
 ## 一句话结论
 
-`ququ` 告诉我们怎么把语音产品做成真正能用的桌面体验，`vocotype-cli` 告诉我们怎么把录音链顺手沉淀成长期可用的数据资产。
+`VoxFlame` 的 dataset 链路已经不再停留在“能录、能传、能存一条数据库记录”的阶段，而是已经具备了支撑多端产品复用的第一版骨架。
 
-对 `VoxFlame` 来说，眼下最该做的不是继续堆训练 prompt，而是先把 `recording contract + dataset schema + recorder queue + manifest` 收成一套稳定骨架。
+现在真正要推进的，不是继续发散更多训练句子，而是把 `recording envelope + upload receipt + manifest + review signals` 做成跨 surface 可复用的长期 contract。

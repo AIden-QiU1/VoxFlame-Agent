@@ -44,8 +44,8 @@
 | [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前产品设计与架构蓝图主文档 | ⭐⭐⭐ |
 | [Runtime And Surface Reference（2026-03-26）](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) | runtime、surface、迁移与 `session_strategy` 的综合参考 | ⭐⭐⭐ |
 | [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) | agent、memory、tooling 与 dataset/memory 边界的综合参考 | ⭐⭐⭐ |
-| [control-plane.md](control-plane.md) | 控制面的职责、边界与后续收口方向 | ⭐⭐⭐ |
-| [capability-registry.md](capability-registry.md) | 运行时能力与工程协作能力的 registry | ⭐⭐⭐ |
+| [control-plane.md](control-plane.md) | backend 控制面实现、schema 与诊断深文档 | ⭐⭐ |
+| [capability-registry.md](capability-registry.md) | 仓库协作 capability registry 盘点表 | ⭐⭐ |
 
 ### 训练数据与纠错
 

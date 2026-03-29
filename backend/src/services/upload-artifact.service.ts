@@ -7,6 +7,7 @@ export interface UploadCompletePayload {
   contributorId: string
   audioPath: string
   text: string
+  recognizedText?: string | null
   sentenceId?: string | null
   duration?: number | null
   source?: string
@@ -19,11 +20,20 @@ export interface UploadArtifactResult {
   manifestPath: string
   reusedContribution: boolean
   manifestAlreadySynced: boolean
+  transcriptAlreadySynced: boolean | null
 }
 
 interface ContributionRecord {
   id: string
   metadata: JsonRecord
+}
+
+interface UploadReceiptMetadata extends JsonRecord {
+  recording_id?: string
+  audio_path?: string
+  manifest_path?: string
+  manifest_synced?: boolean
+  synced_at?: string
 }
 
 const supabaseUrl = process.env.SUPABASE_URL
@@ -46,6 +56,11 @@ function readNumber(metadata: Record<string, unknown> | undefined, key: string):
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
+function readBoolean(metadata: Record<string, unknown> | undefined, key: string): boolean | undefined {
+  const value = metadata?.[key]
+  return typeof value === 'boolean' ? value : undefined
+}
+
 function readStringArray(metadata: Record<string, unknown> | undefined, key: string): string[] | undefined {
   const value = metadata?.[key]
   if (!Array.isArray(value)) {
@@ -56,13 +71,49 @@ function readStringArray(metadata: Record<string, unknown> | undefined, key: str
   return items.length > 0 ? items : undefined
 }
 
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+
+  return 'unknown_error'
+}
+
 function buildRecordingManifestEntry(
   contributorId: string,
   audioPath: string,
   text: string,
+  recognizedText: string | null | undefined,
   duration: number | null | undefined,
   metadata: Record<string, unknown> | undefined,
 ) {
+  const targetText = readString(metadata, 'target_text') || text
+  const alignedTranscript =
+    readString(metadata, 'prompt_aligned_transcript') ||
+    targetText
+  const recognizedTranscript =
+    recognizedText ||
+    readString(metadata, 'recognized_text') ||
+    readString(metadata, 'raw_transcript') ||
+    ''
+  const promptGroupKey =
+    readString(metadata, 'prompt_group_key') ||
+    readString(metadata, 'exercise_id') ||
+    targetText
+  const promptFingerprint =
+    readString(metadata, 'prompt_fingerprint') ||
+    targetText.replace(/\s+/g, '')
+  const recordingDedupeKey =
+    readString(metadata, 'recording_dedupe_key') ||
+    readString(metadata, 'recording_id') ||
+    audioPath
+  const duplicatePolicy =
+    readString(metadata, 'duplicate_policy') ||
+    'exact_recording_retry_only'
+  const repeatedPromptStrategy =
+    readString(metadata, 'repeated_prompt_strategy') ||
+    'keep_multiple_attempts'
+
   return {
     recording_id: readString(metadata, 'recording_id') || audioPath.split('/').pop()?.replace(/\.[^/.]+$/, '') || `${Date.now()}`,
     user_id: contributorId,
@@ -73,7 +124,7 @@ function buildRecordingManifestEntry(
     created_at: readString(metadata, 'timestamp') || new Date().toISOString(),
     prompt: {
       id: readString(metadata, 'exercise_id'),
-      text: readString(metadata, 'exercise_text') || text,
+      text: readString(metadata, 'exercise_text') || targetText,
       category: readString(metadata, 'exercise_category'),
       target_pinyin: readStringArray(metadata, 'target_pinyin'),
       target_focus: readStringArray(metadata, 'pronunciation_targets'),
@@ -89,28 +140,56 @@ function buildRecordingManifestEntry(
       capture_transport: readString(metadata, 'capture_transport') || 'rtc_dup_track',
     },
     transcript: {
-      raw: readString(metadata, 'recognized_text') || '',
-      final: text,
+      raw: recognizedTranscript,
+      final: targetText,
+      aligned: alignedTranscript,
       source: 'rtc_asr',
+      confidence: readNumber(metadata, 'confidence') ?? undefined,
+      latency_ms: readNumber(metadata, 'latency_ms') ?? undefined,
       language: 'zh-CN',
     },
     evaluation: {
       clarity_signals: {
         clarity_score: readNumber(metadata, 'clarity_score'),
         feedback_status: readString(metadata, 'feedback_status'),
+        sample_quality_score: readNumber(metadata, 'sample_quality_score'),
+        sample_quality_tier: readString(metadata, 'sample_quality_tier'),
+        sample_quality_action: readString(metadata, 'sample_quality_action'),
+        transcript_coverage_ratio: readNumber(metadata, 'transcript_coverage_ratio'),
+        confidence_source: readString(metadata, 'confidence_source'),
+        latency_ms: readNumber(metadata, 'latency_ms'),
       },
       error_tags: [
         ...(readStringArray(metadata, 'missing_chars') || []).map((item) => `missing:${item}`),
         ...(readStringArray(metadata, 'extra_chars') || []).map((item) => `extra:${item}`),
       ],
       focus_feedback: readStringArray(metadata, 'focus_syllables'),
-      evaluation_status: 'ready',
+      review: {
+        queue: readString(metadata, 'review_queue'),
+        priority: readString(metadata, 'review_priority'),
+        required: readBoolean(metadata, 'review_required'),
+        reason_tags: readStringArray(metadata, 'review_reason_tags'),
+        summary: readString(metadata, 'review_summary'),
+        recommended_action: readString(metadata, 'review_recommended_action'),
+        reviewer: readString(metadata, 'reviewer'),
+        reviewed_at: readString(metadata, 'reviewed_at'),
+        accepted_for_export: readBoolean(metadata, 'accepted_for_export'),
+        rejection_reason: readString(metadata, 'rejection_reason'),
+      },
+      evaluation_status: readString(metadata, 'evaluation_status') || 'ready',
     },
     consent: {
       scope: readString(metadata, 'consent_scope') || 'training_only',
       retention_tier: 'synced_hot',
       sync_status: 'uploaded',
       visibility: 'private',
+    },
+    lineage: {
+      prompt_group_key: promptGroupKey,
+      prompt_fingerprint: promptFingerprint,
+      recording_dedupe_key: recordingDedupeKey,
+      duplicate_policy: duplicatePolicy,
+      repeated_prompt_strategy: repeatedPromptStrategy,
     },
     metadata: metadata || {},
   }
@@ -121,7 +200,7 @@ function buildUploadReceiptMetadata(
   audioPath: string,
   recordingId: string,
   manifestSynced: boolean,
-): JsonRecord {
+): UploadReceiptMetadata {
   return {
     recording_id: recordingId,
     audio_path: audioPath,
@@ -129,6 +208,89 @@ function buildUploadReceiptMetadata(
     manifest_synced: manifestSynced,
     synced_at: new Date().toISOString(),
   }
+}
+
+function readUploadReceipt(metadata: JsonRecord): UploadReceiptMetadata {
+  return isRecord(metadata.upload_receipt)
+    ? metadata.upload_receipt as UploadReceiptMetadata
+    : {}
+}
+
+function hasManifestReceipt(
+  receipt: UploadReceiptMetadata,
+  recordingId: string,
+  manifestPath: string,
+): boolean {
+  return (
+    receipt.manifest_synced === true &&
+    receipt.recording_id === recordingId &&
+    receipt.manifest_path === manifestPath
+  )
+}
+
+function buildTranscriptExportLine(
+  contributorId: string,
+  audioPath: string,
+  text: string,
+  sentenceId?: string | null,
+): { path: string; line: string; uttId: string } | null {
+  if (!sentenceId) {
+    return null
+  }
+
+  const fileName = audioPath.split('/').pop() || `${sentenceId}_${Date.now()}.wav`
+  const uttId = fileName.replace(/\.[^/.]+$/, '')
+
+  return {
+    path: `dataset/${contributorId}/transcripts.txt`,
+    line: `${uttId}\t${audioPath}\t${text}`,
+    uttId,
+  }
+}
+
+async function manifestContainsEntry(
+  manifestPath: string,
+  recordingId: string,
+  audioPath: string,
+): Promise<boolean> {
+  const content = await ossService.getTextObject(manifestPath)
+  if (!content) {
+    return false
+  }
+
+  return content
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .some((line) => {
+      try {
+        const parsed = JSON.parse(line) as Record<string, unknown>
+        const audio = isRecord(parsed.audio) ? parsed.audio : {}
+        return parsed.recording_id === recordingId || audio.path === audioPath
+      } catch {
+        return line.includes(audioPath) || line.includes(`"recording_id":"${recordingId}"`)
+      }
+    })
+}
+
+async function transcriptExportContainsLine(
+  transcriptsPath: string,
+  expectedLine: string,
+  audioPath: string,
+  uttId: string,
+): Promise<boolean> {
+  const content = await ossService.getTextObject(transcriptsPath)
+  if (!content) {
+    return false
+  }
+
+  return content
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .some((line) => (
+      line === expectedLine ||
+      line.includes(`\t${audioPath}\t`) ||
+      line.startsWith(`${uttId}\t${audioPath}\t`)
+    ))
 }
 
 async function findExistingContribution(
@@ -166,26 +328,28 @@ async function upsertContributionSkeleton(payload: UploadCompletePayload): Promi
     return null
   }
 
+  const row = {
+    contributor_id: payload.contributorId,
+    audio_path: payload.audioPath,
+    transcript: payload.text,
+    sentence_id: payload.sentenceId || null,
+    is_free_recording: payload.source !== 'guided_recording',
+    duration_seconds: payload.duration,
+    metadata: payload.metadata || {},
+  }
+
   const { data, error } = await supabase
     .from('voice_contributions')
-    .upsert(
-      {
-        contributor_id: payload.contributorId,
-        audio_path: payload.audioPath,
-        transcript: payload.text,
-        sentence_id: payload.sentenceId || null,
-        is_free_recording: payload.source !== 'guided_recording',
-        duration_seconds: payload.duration,
-        metadata: payload.metadata || {},
-      },
-      {
-        onConflict: 'contributor_id,audio_path',
-      },
-    )
+    .insert(row)
     .select('id, metadata')
     .single()
 
   if (error) {
+    const existing = await findExistingContribution(payload.contributorId, payload.audioPath)
+    if (existing) {
+      return existing
+    }
+
     throw new Error(error.message)
   }
 
@@ -224,15 +388,25 @@ export class UploadArtifactService {
       payload.contributorId,
       payload.audioPath,
       payload.text,
+      payload.recognizedText,
       typeof payload.duration === 'number' ? payload.duration : null,
       payload.metadata || {},
     )
 
-    let existing = await findExistingContribution(payload.contributorId, payload.audioPath)
-    let reusedContribution = Boolean(existing)
+    let existing: ContributionRecord | null = null
+    let reusedContribution = false
 
-    if (!existing) {
-      existing = await upsertContributionSkeleton(payload)
+    try {
+      existing = await findExistingContribution(payload.contributorId, payload.audioPath)
+      reusedContribution = Boolean(existing)
+
+      if (!existing) {
+        existing = await upsertContributionSkeleton(payload)
+      }
+    } catch (error) {
+      console.warn(
+        `[UploadArtifactService] contribution persistence skipped for ${payload.audioPath}: ${toErrorMessage(error)}`,
+      )
     }
 
     const currentMetadata = existing?.metadata ?? {}
@@ -240,39 +414,77 @@ export class UploadArtifactService {
       ...currentMetadata,
       ...(payload.metadata || {}),
     }
-    const existingReceipt = isRecord(currentMetadata.upload_receipt)
-      ? currentMetadata.upload_receipt
-      : {}
-    const manifestAlreadySynced =
-      existingReceipt.manifest_synced === true &&
-      existingReceipt.recording_id === manifestEntry.recording_id
+    const existingReceipt = readUploadReceipt(currentMetadata)
+    let manifestAlreadySynced = hasManifestReceipt(
+      existingReceipt,
+      manifestEntry.recording_id,
+      manifestPath,
+    )
+
+    if (!manifestAlreadySynced) {
+      manifestAlreadySynced = await manifestContainsEntry(
+        manifestPath,
+        manifestEntry.recording_id,
+        payload.audioPath,
+      )
+    }
 
     if (!manifestAlreadySynced) {
       await ossService.appendTextLog(
         manifestPath,
         JSON.stringify(manifestEntry),
       )
+    }
 
-      if (payload.source === 'guided_recording' && payload.sentenceId) {
-        const fileName = payload.audioPath.split('/').pop() || `${payload.sentenceId}_${Date.now()}.wav`
-        const uttId = fileName.replace(/\.[^/.]+$/, '')
-        const line = `${uttId}\t${payload.audioPath}\t${payload.text}`
-        await ossService.appendTextLog(`dataset/${payload.contributorId}/transcripts.txt`, line)
+    const transcriptExport = payload.source === 'guided_recording'
+      ? buildTranscriptExportLine(
+        payload.contributorId,
+        payload.audioPath,
+        payload.text,
+        payload.sentenceId,
+      )
+      : null
+
+    let transcriptAlreadySynced: boolean | null = null
+
+    if (transcriptExport) {
+      transcriptAlreadySynced = await transcriptExportContainsLine(
+        transcriptExport.path,
+        transcriptExport.line,
+        payload.audioPath,
+        transcriptExport.uttId,
+      )
+
+      if (!transcriptAlreadySynced) {
+        await ossService.appendTextLog(transcriptExport.path, transcriptExport.line)
       }
+    }
 
-      if (existing?.id) {
+    if (existing?.id) {
+      const nextReceipt = hasManifestReceipt(existingReceipt, manifestEntry.recording_id, manifestPath)
+        ? {
+          ...existingReceipt,
+          audio_path: payload.audioPath,
+          manifest_path: manifestPath,
+          manifest_synced: true,
+        }
+        : buildUploadReceiptMetadata(
+          manifestPath,
+          payload.audioPath,
+          manifestEntry.recording_id,
+          true,
+        )
+
+      try {
         await updateContributionMetadata(existing.id, {
           ...mergedMetadata,
-          upload_receipt: buildUploadReceiptMetadata(
-            manifestPath,
-            payload.audioPath,
-            manifestEntry.recording_id,
-            true,
-          ),
+          upload_receipt: nextReceipt,
         })
+      } catch (error) {
+        console.warn(
+          `[UploadArtifactService] upload receipt update skipped for ${payload.audioPath}: ${toErrorMessage(error)}`,
+        )
       }
-    } else if (existing?.id && Object.keys(payload.metadata || {}).length > 0) {
-      await updateContributionMetadata(existing.id, mergedMetadata)
     }
 
     return {
@@ -281,6 +493,7 @@ export class UploadArtifactService {
       manifestPath,
       reusedContribution,
       manifestAlreadySynced,
+      transcriptAlreadySynced,
     }
   }
 }

@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "ts-node src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "reconcile:artifacts": "ts-node scripts/reconcile_upload_artifacts.ts",
+    "review:queue": "ts-node scripts/list_dataset_review_queue.ts",
+    "review:mark": "ts-node scripts/mark_dataset_review_decision.ts",
+    "export:manifest": "ts-node scripts/export_dataset_manifest.ts"
   },
   "dependencies": {
     "@alicloud/pop-core": "^1.7.13",

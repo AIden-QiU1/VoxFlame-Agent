@@ -105,6 +105,42 @@ export class OssService {
             }
         }
     }
+
+    /**
+     * Read a text object from OSS.
+     * Returns null when the object does not exist or OSS is not configured.
+     */
+    async getTextObject(name: string): Promise<string | null> {
+        if (!this.isConfigured) {
+            return null;
+        }
+
+        try {
+            const result = await this.client.get(name);
+            const content = result.content;
+
+            if (typeof content === 'string') {
+                return content;
+            }
+
+            if (Buffer.isBuffer(content)) {
+                return content.toString('utf8');
+            }
+
+            if (content instanceof Uint8Array) {
+                return Buffer.from(content).toString('utf8');
+            }
+
+            return null;
+        } catch (error: any) {
+            if (error?.status === 404 || error?.code === 'NoSuchKey') {
+                return null;
+            }
+
+            console.error(`[OSS] Failed to read ${name}:`, error);
+            throw error;
+        }
+    }
 }
 
 export const ossService = new OssService();

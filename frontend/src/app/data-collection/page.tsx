@@ -2,8 +2,24 @@ import Link from 'next/link'
 
 const DATA_COLLECTION_ITEMS = [
   {
+    title: '登录同意后怎么保存',
+    body: '只要你在登录页确认了《用户隐私》和《数据采集说明》，训练页在录完后就会自动把目标句和录音音频送入监督样本链路，不再把“手动保存样本”做成主操作。',
+  },
+  {
     title: '录音样本会记录什么',
     body: '训练录音会带上 recording_id、session_id、分类、采样率、时长和录音格式等结构化字段，方便后续上传、补传和 dataset manifest 追踪。',
+  },
+  {
+    title: '目标句和识别句怎么分',
+    body: '监督训练样本真正保存的标签是当前目标句；前端识别出来的句子只用于即时反馈、样本诊断和质检，不会直接拿来替代监督标签，也不会因为“识别和目标差很多”就把这条完整录音挡在上传链路外。',
+  },
+  {
+    title: '同一句会不会被去重',
+    body: '不会按“同一句目标句”直接去重。同一句允许保留多次练习样本；系统只会对同一条录音的重复上传或补传做安全去重，避免 manifest 被重复写入。',
+  },
+  {
+    title: '什么会进入复核队列',
+    body: '如果样本质量显示需要回看或建议重录，dataset metadata 会额外写入 evaluation_status、review_queue 和原因标签，方便后续抽样复核，而不是只停留在前端提示里。',
   },
   {
     title: '进入哪里',
@@ -11,7 +27,7 @@ const DATA_COLLECTION_ITEMS = [
   },
   {
     title: '断网时怎么办',
-    body: '如果网络或对象存储异常，录音会先保存在本地待同步队列。这样做的目的是避免样本直接丢失，而不是偷偷上传。',
+    body: '如果上传登记链短暂波动，系统会先把这条录音转成后台自动补登任务，等链路恢复后继续完成 manifest 与回执，不再让训练页主路径出现手动同步。',
   },
   {
     title: '后续用途',
@@ -34,8 +50,11 @@ export default function DataCollectionPage() {
         </div>
 
         <p className="mt-6 text-base leading-7 text-gray-600">
-          燃言的训练数据链路默认围绕 `recording envelope -> recorder queue -> upload receipt -> manifest`
-          组织。重点是把训练样本沉淀成可追踪资产，而不是让训练页继续背“提交历史”叙事。
+          燃言的训练数据链路默认围绕{' '}
+          <code className="rounded bg-stone-100 px-1.5 py-0.5 text-[0.95em] text-stone-700">
+            recording envelope -&gt; recorder queue -&gt; upload receipt -&gt; manifest
+          </code>{' '}
+          组织。重点是把训练样本沉淀成可追踪资产，而不是让训练页继续背“提交历史”叙事；登录授权一旦确认，训练页会优先按自动保存主路径工作。
         </p>
 
         <div className="mt-8 space-y-4">

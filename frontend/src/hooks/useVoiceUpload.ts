@@ -5,7 +5,7 @@
  * 支持 Supabase 云端上传和本地降级
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   enqueueRecorderQueueItem,
   getRecorderQueueItem,
@@ -25,6 +25,8 @@ import { config } from '@/lib/config'
 interface UploadOptions {
   /** 录音对应的文本内容 */
   text: string
+  /** 前端识别出的句子，仅用于反馈与样本诊断 */
+  recognizedText?: string
   /** 来源：guided_recording | free_recording | transcription_page */
   source?: string
   /** 句子ID（引导模式时） */
@@ -44,14 +46,14 @@ export interface UploadReceipt {
   storagePath?: string
   reusedContribution?: boolean
   manifestAlreadySynced?: boolean
-  source: 'cloud' | 'local_queue'
-  syncStatus: 'uploaded' | 'local_only'
+  source: 'cloud' | 'background_retry'
+  syncStatus: 'uploaded' | 'retrying'
   message: string
 }
 
 export interface UploadResult {
   ok: boolean
-  status: 'uploaded' | 'queued_locally' | 'auth_required' | 'failed'
+  status: 'uploaded' | 'retrying' | 'auth_required' | 'failed'
   receipt?: UploadReceipt
   errorMessage?: string
 }
@@ -76,6 +78,8 @@ export function useVoiceUpload() {
   const [localQueueCount, setLocalQueueCount] = useState(0)
   const [localQueueItems, setLocalQueueItems] = useState<VoxFlameRecorderQueueItem[]>([])
   const [lastUploadReceipt, setLastUploadReceipt] = useState<UploadReceipt | null>(null)
+  const autoRetryTimerRef = useRef<number | null>(null)
+  const syncLocalRecordingsRef = useRef<(silent?: boolean) => Promise<{ synced: number; total: number }>>(async () => ({ synced: 0, total: 0 }))
 
   const { userId, isAuthenticated } = useAuth()
 
@@ -125,20 +129,30 @@ export function useVoiceUpload() {
       await enqueueRecorderQueueItem(localRecord)
 
       await refreshLocalQueueCount()
-      setLastError('已保存到本地录音队列，网络恢复后可以继续同步')
+      setLastError(null)
       setUploadProgress(100)
       const receipt: UploadReceipt = {
         recordingId: options.recording.recordingId,
-        source: 'local_queue',
-        syncStatus: 'local_only',
+        source: 'background_retry',
+        syncStatus: 'retrying',
         message: existingItem
-          ? '这条录音已继续保存在本地待同步队列，上次同步没有成功，你可以稍后重试。'
-          : '录音已保存在本地待同步队列，网络恢复后仍可继续上传。',
+          ? '这条录音的云端登记还没补齐，系统正在后台继续自动重试。'
+          : '录音已先保留为后台补登任务，系统会自动继续上传与登记。',
       }
       setLastUploadReceipt(receipt)
+      if (typeof window !== 'undefined') {
+        if (autoRetryTimerRef.current !== null) {
+          window.clearTimeout(autoRetryTimerRef.current)
+        }
+
+        autoRetryTimerRef.current = window.setTimeout(() => {
+          autoRetryTimerRef.current = null
+          void syncLocalRecordingsRef.current(true)
+        }, 2000)
+      }
       return {
         ok: true,
-        status: 'queued_locally',
+        status: 'retrying',
         receipt,
       }
     } catch (err) {
@@ -255,6 +269,7 @@ export function useVoiceUpload() {
         body: JSON.stringify({
           audioPath: storagePath,
           text: options.text,
+          recognizedText: options.recognizedText || null,
           sentenceId: options.sentenceId || null,
           duration: options.recording.audio.durationSeconds,
           source: options.source,
@@ -309,8 +324,8 @@ export function useVoiceUpload() {
         source: 'cloud',
         syncStatus: 'uploaded',
         message: completePayload.manifestAlreadySynced
-          ? '这条录音已经在训练资产里了，这次重试已安全复用，不会重复写入 manifest。'
-          : '录音已上传并写入训练 manifest，可继续进入后续训练与质检流程。',
+          ? '同一条录音已经在训练资产里了，这次重试已安全复用；同一句的新录音仍会保留为独立样本。'
+          : '录音已上传并写入训练 manifest；同一句后续再练也会保留为新的样本。',
       }
       setLastUploadReceipt(receipt)
       return {
@@ -335,7 +350,11 @@ export function useVoiceUpload() {
   /**
    * 同步本地记录到云端
    */
-  const syncLocalRecordings = useCallback(async () => {
+  const syncLocalRecordings = useCallback(async (silent: boolean = false) => {
+    if (!silent) {
+      setLastError(null)
+    }
+
     setIsSyncingLocalQueue(true)
     const unsynced = await listRecorderQueueItems()
     if (unsynced.length === 0) {
@@ -363,6 +382,10 @@ export function useVoiceUpload() {
 
         const result = await uploadRecording(record.recording.audio.blob, {
           text: record.text,
+          recognizedText:
+            typeof record.metadata?.recognized_text === 'string'
+              ? record.metadata.recognized_text
+              : undefined,
           source: record.source,
           sentenceId: record.sentenceId,
           metadata: record.metadata || {},
@@ -382,20 +405,20 @@ export function useVoiceUpload() {
               ? {
                   ...current,
                   syncStatus: 'failed',
-                  lastError: result.errorMessage || '登录后才能继续同步本地录音。',
+                  lastError: result.errorMessage || '登录后才能继续自动补登录音。',
                 }
               : current
           ))
           break
         }
 
-        if (result.status === 'failed') {
+        if (result.status === 'failed' || result.status === 'retrying') {
           await updateRecorderQueueItem(record.recordingId, (current) => (
             current
               ? {
                   ...current,
-                  syncStatus: 'failed',
-                  lastError: result.errorMessage || '同步失败，请稍后重试。',
+                  syncStatus: result.status === 'retrying' ? 'upload_pending' : 'failed',
+                  lastError: result.errorMessage || '云端登记暂时异常，系统会继续自动重试。',
                 }
               : current
           ))
@@ -418,6 +441,58 @@ export function useVoiceUpload() {
 
     return { synced: syncedCount, total: unsynced.length }
   }, [refreshLocalQueueCount, uploadRecording])
+
+  syncLocalRecordingsRef.current = syncLocalRecordings
+
+  useEffect(() => {
+    if (!isAuthenticated || localQueueCount === 0) {
+      return
+    }
+
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    if (autoRetryTimerRef.current !== null) {
+      window.clearTimeout(autoRetryTimerRef.current)
+    }
+
+    autoRetryTimerRef.current = window.setTimeout(() => {
+      autoRetryTimerRef.current = null
+      void syncLocalRecordingsRef.current(true)
+    }, 1500)
+
+    return () => {
+      if (autoRetryTimerRef.current !== null) {
+        window.clearTimeout(autoRetryTimerRef.current)
+        autoRetryTimerRef.current = null
+      }
+    }
+  }, [isAuthenticated, localQueueCount, syncLocalRecordings])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const handleOnline = () => {
+      void syncLocalRecordingsRef.current(true)
+    }
+
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void syncLocalRecordingsRef.current(true)
+      }
+    }
+
+    window.addEventListener('online', handleOnline)
+    document.addEventListener('visibilitychange', handleVisible)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      document.removeEventListener('visibilitychange', handleVisible)
+    }
+  }, [syncLocalRecordings])
 
   /**
    * 获取本地未同步的记录数量

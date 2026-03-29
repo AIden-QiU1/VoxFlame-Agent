@@ -1,5 +1,12 @@
 # VoxFlame Capability Registry
 
+> 状态：过渡治理表。
+>
+> - 产品运行时 capability 的长期主参考应逐步收口到 [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)
+> - 仓库协作与 engineering capabilities 的长期入口应继续回到 `AGENTS.md` 与协作文档体系
+>
+> 本文档当前只保留 `repo engineering capabilities` 的盘点角色，不再维护产品运行时 capability 主表。
+
 ## 为什么现在就要建 registry
 
 `Capability Plane` 是当前 `VoxFlame` 五层里最薄的一层。
@@ -48,23 +55,9 @@
 - `external_effect`
   会对设备、第三方服务或用户外部环境产生明显副作用
 
-## 一、产品运行时 capability registry
+产品运行时 capability 现已并入 [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) 的 `Control Plane / Capability Plane` 部分。
 
-| capability_id | plane | owner | callers | mode_scope | surface_scope | side_effect_level | dependencies | source_of_truth | smoke_or_verification | status |
-|---|---|---|---|---|---|---|---|---|---|---|
-| `rtc_session_start` | control | backend rtc orchestration | web / pwa / future app | `communication, training` | `surface -> backend` | `session_mutation` | TEN control server, Agora token generation | [backend/src/services/rtc-orchestration.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/rtc-orchestration.service.ts) | `POST /api/rtc/session/start` + RTC smoke | `active` |
-| `rtc_session_ping` | control | backend rtc orchestration | connected clients | `communication, training` | `surface -> backend` | `session_mutation` | TEN control server | [backend/src/controllers/rtc.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/rtc.controller.ts) | `POST /api/rtc/session/ping` | `active` |
-| `rtc_session_stop` | control | backend rtc orchestration | web / pwa / future app | `communication, training` | `surface -> backend` | `session_mutation` | TEN control server | [backend/src/controllers/rtc.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/rtc.controller.ts) | `POST /api/rtc/session/stop` | `active` |
-| `rtm_send_control_event` | capability | frontend rtc client | connected authenticated user | `communication, training` | `rtc session only` | `session_mutation` | Agora RTM, valid session/channel | [frontend/src/hooks/useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) | Playwright + runtime log smoke | `active` |
-| `training_feedback_request` | execution | TEN training feedback path | training session runtime | `training` | `training surface only` | `session_mutation` | training mode property overrides, TEN graph | [ten_agent/extension_src/training_feedback_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/training_feedback_python/extension.py) | training session smoke | `active` |
-| `voice_profile_update` | memory | TEN + backend memory path | training runtime, backend memory layer | `training` | `training surface indirect` | `profile_mutation` | memory layer, profile summary, persistence | [frontend/src/lib/training/training-profile.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/training-profile.ts) | training feedback + profile update smoke | `active` |
-| `memory_profile_read` | memory | backend memory services | memory page, training/profile consumers | `communication, training` | `web / pwa` | `read_only` | supabase/local memory services | [backend/src/controllers/memory.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/memory.controller.ts) | API smoke + page smoke | `active` |
-| `memory_profile_write` | memory | backend memory services | authenticated product flows only | `communication, training` | `indirect only` | `profile_mutation` | memory-growth service, persistence layer | [backend/src/services/memory-growth.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/memory-growth.service.ts) | targeted API smoke | `active` |
-| `qwen_asr_live_smoke` | capability | engineering/runtime ops | repo agent, maintainers | `communication, training` | `repo ops` | `read_only` | running ten-agent container, valid qwen config | [scripts/qwen_asr_live_smoke.sh](/home/ubuntu/VoxFlame-Agent/scripts/qwen_asr_live_smoke.sh) | script itself | `active` |
-| `qwen_tts_live_smoke` | capability | engineering/runtime ops | repo agent, maintainers | `communication, training` | `repo ops` | `read_only` | running ten-agent container, valid qwen config | [scripts/qwen_tts_live_smoke.sh](/home/ubuntu/VoxFlame-Agent/scripts/qwen_tts_live_smoke.sh) | script itself | `active` |
-| `provider_health_check` | control | backend control plane | maintainers, future admin surface | `communication, training` | `ops / future admin` | `read_only` | provider clients, diagnostics endpoints | planned | planned endpoint + smoke | `planned` |
-
-## 二、工程协作 capability registry
+## 当前保留：工程协作 capability registry
 
 这一组不是产品运行时能力，而是仓库协作 agent 能调用的工程能力。它们应该被看成 `repo engineering capabilities`，而不是随手写在 prompt 里的偏好。
 
@@ -77,7 +70,7 @@
 | `frontend_design_polish` | capability | repo agent | maintainer / codex session | n/a | repo collaboration | `read_only` | `frontend-design`, `baseline-ui`, `fixing-accessibility`, `fixing-motion-performance` | [AGENTS.md](/home/ubuntu/VoxFlame-Agent/AGENTS.md) | visual smoke + review | `active` |
 | `issue_workflow_ops` | capability | repo agent | maintainer / codex session | n/a | repo collaboration | `external_effect` | Linear MCP | [AGENTS.md](/home/ubuntu/VoxFlame-Agent/AGENTS.md) | read/write issue smoke | `active` |
 
-## 三、当前边界规则
+## 当前边界规则
 
 ### Rule 1
 
@@ -104,7 +97,7 @@
 
 repo engineering capabilities 允许写在 `AGENTS.md` 里做路由，但它们仍然应该被视作 registry 中的正式能力，而不是临时技巧。
 
-## 四、下一步最小治理动作
+## 下一步最小治理动作
 
 ### 1. 先把 planned 项补到只读诊断
 
@@ -134,9 +127,9 @@ repo engineering capabilities 允许写在 `AGENTS.md` 里做路由，但它们�
 
 ## 当前结论
 
-`VoxFlame` 现在已经有很多能力，但还缺“能力治理语言”。
+`VoxFlame` 现在已经有很多工程协作能力，但还缺更清楚的入口治理语言。
 
-这份 registry 的意义不是增加流程负担，而是防止系统以后继续靠：
+这份 registry 剩下的意义不是增加流程负担，而是防止仓库协作以后继续靠：
 
 - 页面按钮
 - 零散事件名
