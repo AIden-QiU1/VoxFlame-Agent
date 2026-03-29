@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types \"src/**/*.test.ts\"",
+    "test:runtime": "node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types \"src/lib/realtime-audio/*.test.ts\""
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^9.2.0",

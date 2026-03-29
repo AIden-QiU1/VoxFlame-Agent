@@ -1,9 +1,7 @@
 'use client'
 
-import {
-  TrainingGuidanceProfile,
-  buildTrainingGuidanceProfileMetadata,
-} from '@/lib/training/training-guidance-profile'
+import { buildTrainingGuidanceProfileMetadata } from '@/lib/training/training-guidance-profile'
+import type { TrainingGuidanceProfile } from '@/lib/training/training-guidance-profile'
 
 export type TrainingFeedbackStatus = 'excellent' | 'close' | 'retry' | 'unclear'
 export type ImprovementDirection = 'improving' | 'stable' | 'declining'

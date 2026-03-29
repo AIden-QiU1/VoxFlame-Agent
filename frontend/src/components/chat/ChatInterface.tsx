@@ -15,10 +15,16 @@ import WaveformVisualizer from '@/components/WaveformVisualizer'
 import { CommunicationStarterKit } from '@/components/chat/CommunicationStarterKit'
 import { QuickPhrasesPanel } from '@/components/phrases'
 import { UserNav } from '@/components/ui/user-nav'
+import { SessionReadinessPanel } from '@/components/runtime/SessionReadinessPanel'
 import {
   STARTER_KIT_SCENES,
   type StarterKitScene,
 } from '@/lib/communication/starter-kit'
+import {
+  defaultCapabilitiesForMode,
+  defaultStrategyForMode,
+  type RtcScene,
+} from '@/lib/realtime-audio/session-contract'
 import { cn } from '@/lib/utils'
 import { BrainIcon, EarIcon, XIcon } from 'lucide-react'
 
@@ -30,6 +36,20 @@ interface ChatInterfaceProps {
   onReturnHome?: () => void
 }
 
+function mapStarterSceneToRuntimeScene(
+  sceneId: StarterKitScene['id'] | undefined,
+): RtcScene | undefined {
+  if (sceneId === 'workplace') {
+    return 'work'
+  }
+
+  if (sceneId === 'caregiver') {
+    return 'family'
+  }
+
+  return sceneId
+}
+
 export default function ChatInterface({
   userId,
   isAuthenticated = false,
@@ -37,6 +57,7 @@ export default function ChatInterface({
   homeHref,
   onReturnHome,
 }: ChatInterfaceProps) {
+  const requestedRuntimeScene = mapStarterSceneToRuntimeScene(initialStarterSceneId)
   const {
     isConnected,
     isRecording,
@@ -48,13 +69,20 @@ export default function ChatInterface({
     currentDualLine,
     messages,
     error,
+    sessionIntent,
+    sessionReadiness,
+    grantedCapabilities,
     analyser,
     connect,
     disconnect,
     stopRecording,
     toggleRecording,
     sendText,
-  } = useRtcAgentSession({ userId })
+  } = useRtcAgentSession({
+    userId,
+    surface: 'communication_workspace',
+    scene: requestedRuntimeScene,
+  })
 
   const [textInput, setTextInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -177,6 +205,17 @@ export default function ChatInterface({
     () => personalizedPhrases.length > 0 || recommendedFocus.length > 0 || Boolean(sessionReview),
     [personalizedPhrases.length, recommendedFocus.length, sessionReview],
   )
+  const runtimeScene = useMemo<RtcScene | undefined>(
+    () => mapStarterSceneToRuntimeScene(effectiveSceneId),
+    [effectiveSceneId],
+  )
+  const plannedIntent = useMemo(() => ({
+    surface: 'communication_workspace' as const,
+    mode: 'communication' as const,
+    sessionStrategy: defaultStrategyForMode('communication'),
+    requestedCapabilities: defaultCapabilitiesForMode('communication'),
+    scene: runtimeScene,
+  }), [runtimeScene])
 
   return (
     <div className="flex h-dvh bg-stone-50">
@@ -347,6 +386,14 @@ export default function ChatInterface({
               </div>
             </div>
           </section>
+
+          <SessionReadinessPanel
+            intent={sessionIntent}
+            readiness={sessionReadiness}
+            grantedCapabilities={grantedCapabilities}
+            plannedIntent={plannedIntent}
+            title="沟通前准备"
+          />
 
           {hasWorkspaceGuidance ? (
             <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">

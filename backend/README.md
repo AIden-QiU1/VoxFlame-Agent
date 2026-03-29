@@ -11,7 +11,7 @@ backend 当前是控制面和业务面，不再代理运行时 websocket 音频�
 ## 当前职责
 
 - RTC session orchestration
-- memory API
+- workspace / memory API
 - phrases API
 - upload API
 - compat 路由的受控兜底
@@ -65,17 +65,17 @@ Frontend (3000) → Backend (3001/api/rtc/*) → TEN Agent control server (8080)
 | `/api/rtc/session/ping` | POST | 保活 RTC 会话 |
 | `/api/rtc/session/stop` | POST | 停止 RTC 会话 |
 
-### 记忆系统 API (v2.1 新增)
+### Workspace / 记忆系统 API
 
 | 端点 | 方法 | 说明 | 认证 |
 |------|------|------|------|
+| `/api/memory/workspace/:userId` | GET | 统一 workspace 快照：`profile bundle + session review + expression kit` | ✅ |
+| `/api/memory/workspace/:userId/preferences` | PUT | 保存 durable `communication_preferences` | ✅ |
+| `/api/memory/profile/:userId` | GET | 统一 memory profile 聚合 | ✅ |
 | `/api/memory/add` | POST | 添加记忆 | ✅ |
 | `/api/memory/search` | GET | 语义检索记忆 | ✅ |
-| `/api/memory/user/:userId` | GET | 获取用户所有记忆 | ✅ |
 | `/api/memory/:memoryId` | PUT | 更新记忆 | ✅ |
 | `/api/memory/:memoryId` | DELETE | 删除记忆 | ✅ |
-| `/api/memory/hotwords/:userId` | GET | 获取用户热词 | ✅ |
-| `/api/memory/stats/:userId` | GET | 获取记忆统计 | ✅ |
 
 **添加记忆请求示例**:
 ```json
@@ -92,7 +92,16 @@ Frontend (3000) → Backend (3001/api/rtc/*) → TEN Agent control server (8080)
 GET /api/memory/search?user_id=xxx&query=用户偏好&limit=10
 ```
 
-### 常用短语 API (v2.0)
+### Agent Compat API
+
+| 端点 | 方法 | 说明 | 认证 |
+|------|------|------|------|
+| `/api/agent/session/log` | POST | compat-only，现仅返回迁移指引 | ✅ |
+| `/api/agent/session/history/:userId` | GET | compat-only，现仅返回迁移指引 | ✅ |
+| `/api/agent/tool/log` | POST | compat-only，现仅返回迁移指引 | ✅ |
+| `/api/agent/tool/execute` | POST | compat-only，现仅返回迁移指引 | ✅ |
+
+### 常用短语 API
 
 | 端点 | 方法 | 说明 | 认证 |
 |------|------|------|------|
@@ -125,6 +134,10 @@ QDRANT_URL=http://qdrant:6333  # Phase 3
 - 新实时能力应接在 `/api/rtc/session/*` 或明确的业务 API 下。
 - 不要恢复 backend 运行时 websocket proxy。
 - 训练、沟通、记忆相关状态应分别落在 service/controller 分层里，不要堆进 `index.ts`。
+- 新的 durable user state 默认应落到 `workspace owner`：
+  - 读：`/api/memory/workspace/:userId`
+  - 写：`/api/memory/workspace/:userId/preferences`
+- 旧的 `/api/agent/profile/:userId` 与 `/api/agent/hotwords/:userId` 已从服务中移除；若仍有外部调用，应改到 `workspace owner` 或 `memory profile`。
 
 ## 相关文档
 

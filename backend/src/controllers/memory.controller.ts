@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import {
   SupabaseService,
+  CommunicationPreferences,
   Memory,
   Session,
   HotwordProfileRecord,
+  normalizeCommunicationPreferences,
 } from '../services/supabase.service';
 import { normalizeWorkspaceSceneId } from '../services/expression-kit.service';
 
@@ -27,6 +29,11 @@ interface MemoryHotwordSyncRequestBody {
   profiles?: HotwordProfileRecord[];
 }
 
+interface MemoryCommunicationPreferencesRequestBody {
+  user_id?: string;
+  communication_preferences?: CommunicationPreferences;
+}
+
 function readNumber(record: Record<string, unknown> | undefined, key: string): number | undefined {
   const value = record?.[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -39,16 +46,6 @@ function readString(record: Record<string, unknown> | undefined, key: string): s
 
 function toIsoString(timestamp: number | undefined): string | undefined {
   return typeof timestamp === 'number' ? new Date(timestamp).toISOString() : undefined;
-}
-
-function markCompatMemorySlice(res: Response, route: string): void {
-  res.set({
-    'Cache-Control': 'no-store',
-    Deprecation: 'true',
-    'X-VoxFlame-Route-Class': 'compat',
-    'X-VoxFlame-Replacement': '/api/memory/profile/:userId',
-    'X-VoxFlame-Compat-Route': route,
-  });
 }
 
 function buildSessionPayload(
@@ -99,6 +96,46 @@ function buildSessionPayload(
 }
 
 export class MemoryController {
+  // PUT /api/memory/workspace/:userId/preferences - Persist durable communication preferences via workspace owner
+  async syncCommunicationPreferences(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { userId } = req.params;
+      const {
+        user_id,
+        communication_preferences,
+      } = req.body as MemoryCommunicationPreferencesRequestBody;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (!userId) {
+        res.status(400).json({ error: 'Missing userId parameter' });
+        return;
+      }
+
+      if (userId !== authenticatedUserId || (user_id && user_id !== authenticatedUserId)) {
+        console.warn(`[MemoryController] User ID mismatch: token=${authenticatedUserId}, param=${userId}, body=${user_id}`);
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      const savedPreferences = await SupabaseService.getInstance().saveCommunicationPreferences(
+        authenticatedUserId,
+        normalizeCommunicationPreferences(communication_preferences),
+      );
+
+      res.json({
+        communication_preferences: savedPreferences,
+      });
+    } catch (error) {
+      console.error('Error in syncCommunicationPreferences:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
   // POST /api/memory/hotwords - Replace structured custom hotword profiles
   async syncHotwords(req: Request, res: Response): Promise<void> {
     try {
@@ -331,31 +368,6 @@ export class MemoryController {
     }
   }
 
-  // GET /api/memory/user/:userId - Get all user memories
-  async getUserMemories(req: Request, res: Response): Promise<void> {
-    try {
-      // validateUserId 中间件已验证 userId 与 token 匹配
-      const { userId } = req.params;
-      const { limit } = req.query;
-
-      if (!userId) {
-        res.status(400).json({ error: 'Missing userId parameter' });
-        return;
-      }
-
-      markCompatMemorySlice(res, '/api/memory/user/:userId');
-      const memories = await SupabaseService.getInstance().getMemories(
-        userId,
-        limit ? parseInt(limit as string) : 50
-      );
-
-      res.json({ memories, count: memories.length });
-    } catch (error) {
-      console.error('Error in getUserMemories:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  }
-
   // PUT /api/memory/:memoryId - Update memory
   async updateMemory(req: Request, res: Response): Promise<void> {
     try {
@@ -439,47 +451,6 @@ export class MemoryController {
     }
   }
 
-  // GET /api/memory/hotwords/:userId - Extract hotwords from user sessions
-  async getHotwords(req: Request, res: Response): Promise<void> {
-    try {
-      // validateUserId 中间件已验证 userId 与 token 匹配
-      const { userId } = req.params;
-
-      if (!userId) {
-        res.status(400).json({ error: 'Missing userId parameter' });
-        return;
-      }
-
-      markCompatMemorySlice(res, '/api/memory/hotwords/:userId');
-      const hotwords = await SupabaseService.getInstance().extractHotwords(userId);
-
-      res.json({ hotwords, count: hotwords.length });
-    } catch (error) {
-      console.error('Error in getHotwords:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  }
-
-  // GET /api/memory/stats/:userId - Get user statistics
-  async getUserStats(req: Request, res: Response): Promise<void> {
-    try {
-      // validateUserId 中间件已验证 userId 与 token 匹配
-      const { userId } = req.params;
-
-      if (!userId) {
-        res.status(400).json({ error: 'Missing userId parameter' });
-        return;
-      }
-
-      markCompatMemorySlice(res, '/api/memory/stats/:userId');
-      const stats = await SupabaseService.getInstance().getUserStats(userId);
-
-      res.json(stats);
-    } catch (error) {
-      console.error('Error in getUserStats:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  }
 }
 
 export const memoryController = new MemoryController();

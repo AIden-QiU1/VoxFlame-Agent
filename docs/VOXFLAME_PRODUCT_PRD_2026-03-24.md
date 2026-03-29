@@ -113,11 +113,11 @@
 2. `QuickPhrasesPanel` 已退到表达工具箱第二层
 3. `workspace` 已开始为 personalized phrase rail 和 session review 提供统一读模型
 
-当前真正还没收住的，是首页如何把用户直接送进正确的 starter context：
+首页把用户直接送进正确 starter context 这一步已经打通；当前真正还没收住的，是 starter rail 的内容质量与 live session 的产品感：
 
-1. 首页高压场景还缺“点进去就带 scene / starter intent”
-2. personalized phrase rail 还没充分吸收 recent wins / hotwords / session review
-3. 沟通首屏还要继续削弱旧聊天壳，强化“先开口、再补救”
+1. personalized phrase rail 还没充分吸收 recent wins / hotwords / session review
+2. 沟通首屏还要继续削弱旧聊天壳，强化“先开口、再补救”
+3. 沟通、练习、档案三块还没围绕同一份“今天先做什么”组织成连续任务流
 
 ### B. 训练页 UI 主线已经收口，但产品可靠性还没到 multi-surface-ready
 
@@ -890,15 +890,15 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 
 ## Phase 1：沟通工作台继续变强
 
-当前状态：进行中
+当前状态：接近完成，剩内容质量与连续任务流
 
-1. 首页高压场景直接带 starter intent 进入沟通页
+1. 首页高压场景已可直接带 starter intent 进入沟通页
 2. personalized phrase rail 继续吸收 `workspace` 与 recent review
 3. live session 区继续减弱聊天壳，强化“先开口 + 补救”
 
 ## Phase 2：练习工作台升级为 multi-surface-ready 训练入口
 
-当前状态：进行中，优先级最高
+当前状态：基础 contract 已成立，进入收尾验证
 
 1. 稳定 `recording envelope -> upload receipt -> manifest`
 2. 把样本质量、review queue、云端登记做成可信主链
@@ -906,7 +906,7 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 
 ## Phase 3：控制面与 surface contract 收口
 
-当前状态：下一阶段主任务
+当前状态：进行中，当前主任务
 
 1. 正式化 `session / transport / capability / session_strategy`
 2. 为 web / PWA / future mobile / future desktop 统一 surface 语言
@@ -924,12 +924,11 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 
 在当前仓库里，最可行的顺序不是“先换 runtime”，而是：
 
-1. 先把训练数据链路做成 multi-surface-ready 基线
-   - `recording envelope`
-   - `upload receipt`
-   - `manifest`
-   - `review queue`
-2. 再把 runtime / surface / control contract 写实
+1. 先把训练数据链路补完最后一段真实验证
+   - 真实物理麦克风 smoke
+   - accepted sample -> export manifest 闭环
+   - uploader / queue / manifest 幂等稳定性
+2. 继续把 runtime / surface / control contract 写进真实 surface
    - `session intent`
    - `session strategy`
    - `capability gating`
@@ -938,7 +937,7 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
    - `profile bundle`
    - `session review`
    - `expression kit merge`
-4. 再把前端 session hooks 变薄
+4. 再把前端 session hooks 继续变薄
    - transport bootstrap
    - transcript reducer
    - memory sync

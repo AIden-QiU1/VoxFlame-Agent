@@ -62,13 +62,11 @@ memoryRouter.post('/hotwords', authMiddleware, memoryController.syncHotwords.bin
 memoryRouter.post('/session', authMiddleware, memoryController.syncSession.bind(memoryController))
 memoryRouter.post('/add', authMiddleware, memoryController.addMemory.bind(memoryController))
 memoryRouter.get('/workspace/:userId', authMiddleware, validateUserId, memoryController.getWorkspaceMemorySnapshot.bind(memoryController))
+memoryRouter.put('/workspace/:userId/preferences', authMiddleware, validateUserId, memoryController.syncCommunicationPreferences.bind(memoryController))
 memoryRouter.get('/profile/:userId', authMiddleware, validateUserId, memoryController.getUserMemoryProfile.bind(memoryController))
 memoryRouter.get('/search', authMiddleware, memoryController.searchMemories.bind(memoryController))
-memoryRouter.get('/user/:userId', authMiddleware, validateUserId, memoryController.getUserMemories.bind(memoryController))
 memoryRouter.put('/:memoryId', authMiddleware, memoryController.updateMemory.bind(memoryController))
 memoryRouter.delete('/:memoryId', authMiddleware, memoryController.deleteMemory.bind(memoryController))
-memoryRouter.get('/hotwords/:userId', authMiddleware, validateUserId, memoryController.getHotwords.bind(memoryController))
-memoryRouter.get('/stats/:userId', authMiddleware, validateUserId, memoryController.getUserStats.bind(memoryController))
 app.use('/api/memory', memoryRouter)
 
 // Phrases API 路由 (常用短语) - 需要认证
@@ -115,12 +113,6 @@ app.listen(PORT, () => {
   console.log('   - POST /api/rtc/session/stop')
 
   console.log('')
-  console.log('🤖 Agent API 端点:')
-  console.log('   - GET  /api/agent/profile/:userId')
-  console.log('   - PUT  /api/agent/profile/:userId')
-  console.log('   - GET  /api/agent/hotwords/:userId')
-
-  console.log('')
   console.log('⚠️ Compat API 端点:')
   console.log('   - POST /api/session/start (compat: 501; use /api/rtc/session/start)')
   console.log('   - POST /api/session/stop (compat: 501; use /api/rtc/session/stop)')
@@ -135,12 +127,10 @@ app.listen(PORT, () => {
   console.log('💾 Memory API 端点:')
   console.log('   - POST /api/memory/session')
   console.log('   - GET  /api/memory/workspace/:userId')
+  console.log('   - PUT  /api/memory/workspace/:userId/preferences')
   console.log('   - GET  /api/memory/profile/:userId')
   console.log('   - POST /api/memory/add')
   console.log('   - GET  /api/memory/search?user_id=xxx&query=...')
-  console.log('   - GET  /api/memory/user/:userId (compat slice; use /profile)')
-  console.log('   - GET  /api/memory/hotwords/:userId (compat slice; use /profile)')
-  console.log('   - GET  /api/memory/stats/:userId (compat slice; use /profile)')
 
   console.log('')
   console.log('💬 Phrases API 端点:')

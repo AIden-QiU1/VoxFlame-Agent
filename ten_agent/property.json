@@ -411,6 +411,14 @@
                       "extension": "corrector"
                     }
                   ]
+                },
+                {
+                  "name": "clarity_score",
+                  "dest": [
+                    {
+                      "extension": "main_control"
+                    }
+                  ]
                 }
               ]
             }

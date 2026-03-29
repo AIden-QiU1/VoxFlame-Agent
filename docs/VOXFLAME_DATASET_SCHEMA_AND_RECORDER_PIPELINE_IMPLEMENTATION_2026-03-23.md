@@ -459,8 +459,9 @@ recording envelope
 
 1. 没有统一的 surface readiness contract
    - 还缺 `web / pwa / mobile / desktop` 的录音权限、设备状态、后台能力矩阵
-2. 没有真正的 review worker
-   - 目前只有 metadata 和脚本入口，还没有复核状态机
+2. 还没有真正的 review worker
+   - 现在已经有 review service、受保护的 review queue 读写接口和 `reviewed_at / reviewer / rejection_reason / accepted_for_export` 状态机字段
+   - 但复核推进仍主要靠 API / 脚本调用，还没有独立 worker / audit 流
 3. 没有统一的 sync daemon 语义
    - 当前自动补登主要落在 web 端 hook，未来 app 需要更稳定的后台同步 owner
 4. dataset export contract 还没有完全跑通
@@ -511,7 +512,7 @@ recording envelope
 
 ## 下一阶段实施优先级
 
-### Phase A：把 web/PWA 版本做成真正的多端基线
+### Phase A：把 web/PWA 版本做成真正的多端基线收尾
 
 1. 用真实物理麦克风补一次新的 `upload/sign -> OSS -> upload/complete` smoke
    重点确认 `latency_ms / confidence / sample_quality_* / review_*` 稳定进入 `manifest.jsonl`
@@ -521,8 +522,8 @@ recording envelope
 ### Phase B：把 dataset 治理层补齐
 
 1. 把 review queue 推进成真正的 worker contract
-2. 增加 `reviewed_at / reviewer / rejection_reason / accepted_for_export`
-3. 让对象存储目录、manifest 和 export 清单保持同一套字段语言
+2. 让对象存储目录、manifest 和 export 清单保持同一套字段语言
+3. 用一条真实 accepted sample 完成 export manifest 闭环
 
 ### Phase C：为 mobile / desktop companion 开路
 
@@ -534,4 +535,4 @@ recording envelope
 
 `VoxFlame` 的 dataset 链路已经不再停留在“能录、能传、能存一条数据库记录”的阶段，而是已经具备了支撑多端产品复用的第一版骨架。
 
-现在真正要推进的，不是继续发散更多训练句子，而是把 `recording envelope + upload receipt + manifest + review signals` 做成跨 surface 可复用的长期 contract。
+现在真正要推进的，不是继续发散更多训练句子，而是把 `recording envelope + upload receipt + manifest + review signals` 做成跨 surface 可复用的长期 contract；等这条链收尾验证完成后，dataset 就应该退到次主线，主线转向 runtime / surface / workspace owner。

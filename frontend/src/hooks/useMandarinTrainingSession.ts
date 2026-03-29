@@ -58,6 +58,14 @@ export function useMandarinTrainingSession(
   const rtc = useRtcAgentSession({
     userId,
     mode: 'training',
+    surface: 'training_workspace',
+    requestedCapabilities: [
+      'transport_send_control',
+      'workspace_snapshot_read',
+      'training_feedback_request',
+      'voice_profile_update',
+      'upload_artifact_persist',
+    ],
     connectionNotice: null,
   })
   const {
@@ -390,6 +398,9 @@ export function useMandarinTrainingSession(
     isRecording: rtcIsRecording,
     isProcessing,
     isConnected,
+    sessionIntent: rtc.sessionIntent,
+    sessionReadiness: rtc.sessionReadiness,
+    grantedCapabilities: rtc.grantedCapabilities,
     analyser,
     startRecording,
     stopRecording,

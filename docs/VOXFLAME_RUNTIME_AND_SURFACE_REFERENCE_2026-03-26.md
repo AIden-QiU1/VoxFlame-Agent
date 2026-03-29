@@ -8,6 +8,11 @@
 > - `light-voice-surface.md`
 >
 > 它不是新的 PRD，而是给 PRD 和工程决策提供 runtime / surface / 迁移边界的统一参考。
+>
+> 状态说明：
+> - 这份文档仍是现役主参考，主体已经稳定，已进入最后工程收尾
+> - `session intent / readiness / capability gating` 的基础 contract 已经进代码
+> - 当前还在继续收尾的是：把剩余运行时实现继续从 hook 下沉，并只在必要时同步文档状态；`workspace owner` 与 legacy compat 清理已基本完成
 
 ## 1. 结论先行
 
@@ -295,6 +300,12 @@ PRD 和 future multi-surface 规划真正该长期引用这份文档的地方只
 
 目前这层还没有正式文档化，是接下来多端准备最值得补的一层。
 
+补充现状：
+
+- backend `/api/rtc/session/start` 已经会返回 `readiness / resolvedStrategy / grantedCapabilities`
+- frontend runtime state 里也已经携带这组字段
+- 当前真正缺的，不再是 schema 本身，而是把它变成各个 surface 都能看见、都按它决策的可见状态层
+
 ### 8.3 Capability Gating
 
 future surface 不应该自己猜“这个入口能不能做这件事”，而应由控制面明确：
@@ -316,18 +327,21 @@ future surface 不应该自己猜“这个入口能不能做这件事”，而�
 
 ## 9. 当前最可行的推进顺序
 
-1. 先继续稳数据录入与上传 contract
+1. 先继续稳数据录入与上传 contract 的最后验证
    - `recording envelope`
    - `recorder queue`
    - `upload receipt`
    - `manifest`
-2. 再给控制面补正式 `session intent / session_strategy / capability gating`
+2. 继续把控制面 contract 写进真实 surface
+   - `session intent / session_strategy / capability gating`
+   - `surface readiness`
+   - surface-visible runtime status
 3. 与此同时并行推进 memory/tooling contract
    - `workspace`
    - `profile bundle`
    - `expression kit`
    - `session review`
-4. 再把前端巨型 hook 变薄
+4. 再把前端巨型 hook 继续变薄
 5. 最后再评估下一代 execution plane 替换节奏
 
 一句话总结：

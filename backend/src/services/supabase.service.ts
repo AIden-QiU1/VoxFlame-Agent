@@ -147,7 +147,7 @@ export type PhraseCategory =
   | 'transport'
   | 'custom';
 
-function normalizeCommunicationPreferences(value: unknown): CommunicationPreferences {
+export function normalizeCommunicationPreferences(value: unknown): CommunicationPreferences {
   if (!isRecord(value)) {
     return {};
   }
@@ -369,6 +369,35 @@ export class SupabaseService {
     );
   }
 
+  async saveCommunicationPreferences(
+    userId: string,
+    preferences: CommunicationPreferences,
+  ): Promise<CommunicationPreferences> {
+    await this.ensureUserProfile(userId);
+
+    const normalizedPreferences = normalizeCommunicationPreferences(preferences);
+    const userProfile = await this.getUserProfile(userId);
+    const existingPreferences = isRecord(userProfile?.preferences)
+      ? userProfile.preferences
+      : {};
+    const nextPreferences: JsonRecord = {
+      ...existingPreferences,
+      communication_preferences: normalizedPreferences,
+    };
+
+    const updated = await this.updateUserProfile(userId, {
+      preferences: nextPreferences,
+    });
+
+    if (!updated) {
+      return {};
+    }
+
+    return normalizeCommunicationPreferences(
+      isRecord(updated.preferences) ? updated.preferences.communication_preferences : undefined,
+    );
+  }
+
   // === Sessions ===
   async ensureSession(session: Session): Promise<Session | null> {
     await this.ensureUserProfile(session.user_id);
@@ -546,12 +575,6 @@ export class SupabaseService {
     return true;
   }
 
-  // === Hotwords Extraction ===
-  async extractHotwords(userId: string): Promise<string[]> {
-    const snapshot = await this.getUserMemoryProfile(userId, 200, 20);
-    return snapshot.hotwords;
-  }
-
   async getUserMemoryProfile(
     userId: string,
     memoryLimit: number = 400,
@@ -611,27 +634,6 @@ export class SupabaseService {
         options.sceneId,
       ),
       synced_at: syncedAt,
-    };
-  }
-
-  // === Analytics ===
-  async getUserStats(userId: string): Promise<Record<string, number | string | null>> {
-    const snapshot = await this.getUserMemoryProfile(userId, 400, 120);
-    const stats = snapshot.growth_profile.stats;
-
-    return {
-      total_sessions: stats.totalSessions,
-      total_duration_seconds: stats.totalDurationSeconds,
-      avg_session_duration_seconds: stats.avgSessionDurationSeconds,
-      total_memories: stats.totalMemories,
-      total_training_attempts: stats.totalTrainingAttempts,
-      active_days: stats.activeDays,
-      current_training_streak: stats.currentTrainingStreak,
-      best_training_streak: stats.bestTrainingStreak,
-      rolling_clarity_average: stats.rollingClarityAverage,
-      improvement_slope: stats.improvementSlope,
-      total_confusion_patterns: stats.totalConfusionPatterns,
-      last_session: stats.lastSessionAt ? new Date(stats.lastSessionAt).toISOString() : null,
     };
   }
 

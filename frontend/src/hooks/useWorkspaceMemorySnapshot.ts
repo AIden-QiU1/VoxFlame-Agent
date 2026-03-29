@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { config } from '@/lib/config'
 import type { StarterKitScene } from '@/lib/communication/starter-kit'
-import { getValidToken } from '@/lib/supabase/client'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
+import { fetchWorkspaceSnapshot } from '@/lib/memory/workspace-client'
 
 interface UseWorkspaceMemorySnapshotOptions {
   userId?: string | null
@@ -18,15 +17,6 @@ interface UseWorkspaceMemorySnapshotResult {
   isLoading: boolean
   error: string | null
   refresh: (sceneId?: StarterKitScene['id']) => Promise<WorkspaceMemorySnapshot | null>
-}
-
-function buildWorkspaceSnapshotUrl(userId: string, sceneId?: StarterKitScene['id']): string {
-  const params = new URLSearchParams()
-  if (sceneId) {
-    params.set('scene', sceneId)
-  }
-
-  return `${config.api.baseUrl}/memory/workspace/${userId}${params.size > 0 ? `?${params.toString()}` : ''}`
 }
 
 export function useWorkspaceMemorySnapshot({
@@ -54,26 +44,7 @@ export function useWorkspaceMemorySnapshot({
     setError(null)
 
     try {
-      const token = await getValidToken()
-      if (!token) {
-        if (requestSequenceRef.current === requestId) {
-          setSnapshot(null)
-          setIsLoading(false)
-        }
-        return null
-      }
-
-      const response = await fetch(buildWorkspaceSnapshotUrl(userId, nextSceneId), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`workspace_snapshot_${response.status}`)
-      }
-
-      const data = await response.json() as WorkspaceMemorySnapshot
+      const data = await fetchWorkspaceSnapshot(userId, nextSceneId)
       if (requestSequenceRef.current === requestId) {
         setSnapshot(data)
         setIsLoading(false)

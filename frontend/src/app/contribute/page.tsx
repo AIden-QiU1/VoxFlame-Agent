@@ -9,6 +9,7 @@ import {
   UploadCloud,
 } from 'lucide-react'
 import { PWAStatusCenter } from '@/components/pwa/PWAStatusCenter'
+import { SessionReadinessPanel } from '@/components/runtime/SessionReadinessPanel'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/useAuth'
 import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
@@ -54,6 +55,11 @@ import {
   buildTrainingVoiceProfilePayload,
   markTrainingProfileSummarySynced,
 } from '@/lib/training/training-profile'
+import {
+  defaultCapabilitiesForMode,
+  defaultStrategyForMode,
+  type RtcScene,
+} from '@/lib/realtime-audio/session-contract'
 import {
   deriveTrainingSampleReviewDecision,
   type TrainingSampleReviewDecision,
@@ -306,6 +312,9 @@ export default function ContributePage() {
     latestVoiceProfileSync,
     isRecording,
     isProcessing,
+    sessionIntent,
+    sessionReadiness,
+    grantedCapabilities,
     startRecording,
     stopRecording,
     requestTrainingFeedback,
@@ -373,6 +382,28 @@ export default function ContributePage() {
     [categoryExercises, selectedExerciseId, visibleExercises],
   )
   const currentCategoryMeta = MANDARIN_TRAINING_CATEGORY_META[selectedCategory]
+  const runtimeScene = useMemo<RtcScene | undefined>(() => {
+    if (selectedCategory === '看病与求助') {
+      return 'medical'
+    }
+
+    if (selectedCategory === '日常与出行') {
+      return 'outing'
+    }
+
+    if (selectedCategory === '人群与角色') {
+      return 'home'
+    }
+
+    return undefined
+  }, [selectedCategory])
+  const plannedTrainingIntent = useMemo(() => ({
+    surface: 'training_workspace' as const,
+    mode: 'training' as const,
+    sessionStrategy: defaultStrategyForMode('training'),
+    requestedCapabilities: defaultCapabilitiesForMode('training'),
+    scene: runtimeScene,
+  }), [runtimeScene])
   const agentFeedback = useMemo(() => {
     if (!attempt || !latestTrainingFeedback) {
       return null
@@ -983,6 +1014,15 @@ export default function ContributePage() {
                   {sessionError}
                 </div>
               ) : null}
+
+              <SessionReadinessPanel
+                intent={sessionIntent}
+                readiness={sessionReadiness}
+                grantedCapabilities={grantedCapabilities}
+                plannedIntent={plannedTrainingIntent}
+                title="训练前准备"
+                className="mt-4"
+              />
             </section>
             <section className="rounded-[32px] border border-stone-200 bg-white p-8 shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
               {attempt ? (

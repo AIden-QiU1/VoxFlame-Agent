@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { CommunicationPreferences } from '@/lib/communication/communication-preferences'
-import { config } from '@/lib/config'
-import { getValidToken } from '@/lib/supabase/client'
+import { saveWorkspaceCommunicationPreferences } from '@/lib/memory/workspace-client'
 export type { CommunicationPreferences } from '@/lib/communication/communication-preferences'
 
 interface CommunicationPreferenceCardProps {
@@ -64,37 +63,19 @@ export function CommunicationPreferenceCard({
     setStatus(null)
 
     try {
-      const token = await getValidToken()
-      if (!token) {
-        setStatus('请先登录后再保存沟通偏好。')
-        return
-      }
-
       const preferences: CommunicationPreferences = {
         opening_phrase: openingPhrase.trim() || undefined,
         pace_hint: paceHint.trim() || undefined,
         repair_phrase: repairPhrase.trim() || undefined,
       }
 
-      const response = await fetch(`${config.api.baseUrl}/agent/profile/${userId}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          preferences: {
-            communication_preferences: preferences,
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        setStatus('保存失败了，请稍后再试。')
+      const savedPreferences = await saveWorkspaceCommunicationPreferences(userId, preferences)
+      if (!savedPreferences) {
+        setStatus('请先登录后再保存沟通偏好。')
         return
       }
 
-      onSaved?.(preferences)
+      onSaved?.(savedPreferences)
       setStatus('已保存，首屏表达建议会优先使用这三句话。')
     } catch (error) {
       console.error('[CommunicationPreferenceCard] Failed to save preferences:', error)

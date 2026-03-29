@@ -188,6 +188,40 @@
    - 日志会显式带出 `reusedContribution / manifestAlreadySynced / transcriptAlreadySynced`，方便区分“正常重试命中幂等”和“真实重复写入”
    - 当前 docker 日志里虽然还能看到 `manifest.jsonl / transcripts.txt` 的 append position retry，但暂时没有看到因此导致的 dataset 主链失败；dataset 线可以继续退到次主线，不再阻塞 runtime/surface
 
+13. runtime / surface 控制面第一版 contract 已经落地
+   - [rtc-orchestration.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/rtc-orchestration.service.ts) 现已支持 `surface / mode / sessionStrategy / requestedCapabilities / scene / deviceContext` 组成的 `SessionIntent`
+   - `/api/rtc/session/start` 返回里新增 `intent / readiness`，`/api/rtc/health` 也会暴露 `controlPlane` 能力矩阵，不再只是 `mode + graph + timeout`
+   - 当前 `light_voice` 仍是预留 contract，控制面会显式回退到 `heavy_realtime`；这一步的目标是先统一语言，而不是现在就替换 Agora/TEN 执行面
+   - [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 已改为按 surface 构造 session intent，并把 `session_intent / session_readiness` 透传到 TEN `system_init`
+   - [ChatInterface.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx) 与 [useMandarinTrainingSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useMandarinTrainingSession.ts) 现已显式声明各自 surface；[voxflame_main_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/voxflame_main_python/extension.py) 也已开始记录 `session_intent + granted_capabilities`
+
+14. `useRtcAgentSession` 已开始真正拆薄
+   - 新增 [session-bootstrap.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-bootstrap.ts)，把 `start/ping/stop` 和授权 header 从 hook 中抽出
+   - 新增 [session-state.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-state.ts) 与 [session-types.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-types.ts)，把共享 runtime types 和一批状态纯函数从 hook 中抽出
+   - [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 当前仍是 orchestration owner，但已不再自己同时承载全部 bootstrap API、共享类型和大段状态拼装
+   - `frontend` 的 `npm run lint` 与 `npm run build` 已通过；当前仍只剩仓库既有 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) warning
+
+15. transport adapter 已从 session hook 中独立出来，并补了真实容器 smoke
+   - 已新增 [agora-transport.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/agora-transport.ts)，把 Agora RTC/RTM 的 `join / subscribe / remote audio play / logout / leave` 从 [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 中抽出
+   - `frontend` 的 `npm run lint` 与 `npm run build` 继续通过，且已执行 `sudo docker compose up -d --build frontend`
+   - Playwright 已用真实登录态确认：沟通工作台可成功连接助手、进入 `已连接` 状态、点句即代播；TEN 日志已看到带 `surface=communication_workspace` 和 `session_strategy=heavy_realtime` 的 session payload
+   - Playwright 也已确认：训练工作台在当前 headless 无物理麦克风环境里点击录音，会明确提示“当前设备未检测到可用麦克风”，而不是静默失败
+   - 当前仅新增一条非阻塞残余观察：沟通会话断开后，TEN 仍会打印一次 `Failed to find destination of a 'data' message 'clarity_score' from graph`，后续可在 runtime/execution 收口时一起处理
+
+16. `useRtcAgentSession` 已继续收口成更明确的 orchestration owner
+   - 已新增 [session-runtime.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-runtime.ts)，统一承接 `start/stop/ping`、RTM control publish、chunked inbound envelope 解码、connect/disconnect orchestration 和 transport 建链
+   - [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 当前只保留 React state owner、麦克风资源生命周期、录音/发文本这些用户动作入口，文件已从 487 行继续压到 336 行
+   - 这轮顺手清掉了 hook 顶部已经失效的麦克风常量和新的 hook dependency warning；`frontend` 的 `npm run lint` 现在再次只剩仓库既有 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) warning
+   - `frontend` 的 `npm run build` 已通过；`sudo docker compose up -d --build frontend` 后，Playwright 已确认 `/?mode=communicate&starter=medical` 会成功触发 `POST /api/rtc/session/start`，并进入 `已连接 / 已经准备好 / 可以直接说话` 状态
+   - 当前仍可见一条非阻塞 Agora 浏览器 warning：`WebSocket ... closed before the connection is established`，但没有影响本轮 RTC/RTM 建链与页面连接态
+
+17. `useRtcAgentSession` 的用户动作层已从 hook 中继续下沉
+   - 已新增 [session-actions.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-actions.ts)，统一承接 `startRecording / stopRecording / sendText / clearMessages / getMicrophone*` 这组 UI-facing command
+   - [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 现在更接近 “refs + state + orchestration wiring”，文件长度从 336 行继续压到 329 行
+   - `frontend` 的 `npm run lint` 继续只剩仓库既有 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) warning；`frontend` 的 `npm run build` 通过
+   - 重新 `sudo docker compose up -d --build frontend` 后，Playwright 已再次确认沟通页点击“连接助手”可正常进入 `已连接 / 已经准备好沟通 / 可以直接说话`，网络面继续能看到 `POST /api/rtc/session/start => 200`
+   - 当前主 hook 里仍然保留的较重部分主要是 `refs` 组装、`connect/disconnect` wiring 和 `memoryService.init`；下一刀可以考虑把 refs/owner scaffolding 再压一层，但不必为了“更少行数”牺牲可读性
+
 ### 2026-03-25
 
 1. 已把“创始人即用户”的一手研究正式吸收进当前产品判断
@@ -405,6 +439,7 @@
    - 把前端 hook 从“第二控制面”拉回 `transport client + UI reducer`
    - 让 TEN main control 停止继续增长产品语义
    - 在 `heavy realtime` 与 `light voice surface` 之间补更明确的 `session_strategy`
+   - 把 `surface readiness / capability gating` 从 backend contract 继续写进真实 UI surface
    - 为未来替换 `TEN + Agora` 预留 vendor-neutral `session / transport / capability` contract
 
 6. 让多端与记忆主线并行成立
@@ -415,16 +450,14 @@
 ## 下一步优先级
 
 1. 用真实麦克风补完当前 2026-03-29 训练页 `录音 -> transcript -> feedback -> 自动保存训练样本` 的新字段验证，重点确认 `sample_quality_* / confidence / latency_ms / review_* + upload receipt + manifest.jsonl + training profile sync` 一起成立。
-2. 在不改真实样本数据的前提下，先用 dry-run 方式把 `accepted_for_export` 回写路径演练清楚；等你确认后，再挑一条真实样本执行 `--write` 并用 `npm run export:manifest` 完成闭环验证。
+2. 选一条真实样本完成 `accepted_for_export -> reviewer -> reviewed_at -> export manifest` 闭环；默认先 dry-run，得到你确认后再执行 `--write`。
 3. 继续把训练反馈往“肌肉运动 / 口型 / 舌位 / 节奏”的简单建议收口，必要时再减少训练页里对拼音差异本身的强调。
-3. 把共享 `workspace` contract 接到训练页和首页摘要，让“沟通 -> 练习 -> 沟通档案”真正共享同一份画像与复盘语言。
-4. 继续基于 `workspace` 聚合接口补更准的 `personalized starter phrases / recent wins / recommended phrases` 命中逻辑，让内容层不只是框架。
-   - 下一步优先把“我的沟通偏好”与 `quick phrases / hotword profiles / recent wins / training profile` 做真正排序融合
-5. 继续补训练数据治理闭环，尤其是 authenticated live smoke、OSS 上传后的 `manifest.jsonl` 新字段落盘验证，以及 recorder queue 的真实断网重试验证。
-6. 把 `profile bundle / session review / expression kit merge` 从当前最小实现继续推进到稳定 schema，让沟通页、训练页、记忆页共享同一份长期画像 contract。
-7. 重构前端 session hooks，把 RTC/RTM transport bootstrap、消息归并、memory sync 和训练反馈协调拆开，避免 [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 继续膨胀。
-8. 用真实麦克风再做一轮沟通页和训练页端到端验证，确认 RTC 上行音频、ASR transcript 和训练反馈在非 fake-mic 条件下稳定。
-9. 基于 [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) 和新 PRD，给控制面补 `session_strategy = heavy_realtime | light_voice` 的更明确 contract，并逐步抽 vendor-neutral `session / transport / capability` 语言。
+4. 继续把 `surface readiness / capability gating` 做成真实 UI owner，而不是只停在 control-plane 返回值；当前已完成“连接前 planned intent + 下一步提示”，下一步优先补“已连接后显示 resolved strategy / capability 差异”和更细的 scene-aware copy。
+5. 把共享 `workspace` contract 接到首页摘要与训练页任务提示，让“沟通 -> 练习 -> 沟通档案”真正共享同一份画像与复盘语言。
+6. 继续基于 `workspace` 聚合接口补更准的 `personalized starter phrases / recent wins / recommended phrases` 命中逻辑，让内容层不只是框架。
+7. 把 `profile bundle / session review / expression kit merge` 从当前最小实现继续推进到稳定 schema，让沟通页、训练页、记忆页共享同一份长期画像 contract。
+8. 重构前端 session hooks，把 RTC/RTM transport bootstrap、消息归并、memory sync 和训练反馈协调拆开，避免 [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 继续膨胀。
+9. 用真实麦克风再做一轮沟通页和训练页端到端验证，确认 RTC 上行音频、ASR transcript 和训练反馈在非 fake-mic 条件下稳定。
 10. 基于 [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) 继续补 `workspace / profile bundle / expression kit / session review` 的 owner、写入边界和 runtime context service。
 
 ## 最近关键验证
@@ -463,6 +496,46 @@
 - 2026-03-29 训练反馈已继续收口到更简单的动作建议：
   - `frontend` 的 `npm run lint` 通过，仍只剩 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) 既有 Hook warning
   - 新反馈文案已更强调嘴巴动作、舌位、气息和节奏，而不是只强调拼音差异
+- 2026-03-29 runtime / surface 文档与 UI 已继续收口：
+  - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)、[VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)、[VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md) 已删除一批过时阶段判断，把 `runtime/surface` 明确为当前主任务、`dataset` 明确为收尾中的次主线
+  - 已新增 [SessionReadinessPanel.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/runtime/SessionReadinessPanel.tsx)，沟通页和训练页都开始直接展示 `surface / mode / strategy / capability / readiness`
+  - `frontend` 的 `npm run lint`、`npm run build` 和 `bash scripts/check_ai_docs.sh` 通过；仍只剩 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) 既有 Hook warning
+  - `sudo docker compose up -d --build frontend` 后，Playwright 已确认 `/` 沟通页和 `/contribute` 训练页都能看到 readiness 面板
+- 2026-03-29 readiness UI 继续深化：
+  - 沟通页未连线前已能按 `starter` 场景显示 planned intent，Playwright 已确认 `?mode=communicate&starter=medical` 会展示 `communication_workspace / communication / heavy_realtime / medical / 实时发送 + 共享画像读取`
+  - 训练页未启动前也已能展示 planned intent，Playwright 已确认 `/contribute` 会展示 `training_workspace / training / heavy_realtime / outing` 与 5 个 capability，并明确提示“先点录音”
+  - 面向用户的默认呈现已进一步降复杂度：panel 现在优先只显示“现在状态 / 下一步 / 阻塞或提醒”，`surface / mode / strategy / capability` 已折叠进“查看技术细节”，标题也改成更产品化的 `沟通前准备 / 训练前准备`
+  - backend 已补最后一层产品化翻译： [rtc-orchestration.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/rtc-orchestration.service.ts) 现会在 `readiness` 内直接返回 `summary.status / label / detail / nextAction / blockerSummary / warningSummary`；前端真实会话连接后不再主要依赖本地规则拼 readiness 文案
+  - [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 这轮继续拆薄，新增 [session-audio.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-audio.ts)、[session-effects.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-effects.ts)、[session-profile.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-profile.ts)；hook 已从 736 行降到 487 行
+  - `backend` 的 `npm run build`、`frontend` 的 `npm run lint` / `npm run build` 和 `bash scripts/check_ai_docs.sh` 通过；`frontend` 仍只剩仓库既有 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) Hook warning
+  - `sudo docker compose up -d --build backend frontend` 后，Playwright 已确认真实登录态下沟通页连接成功，并显示 backend summary 生成的新文案 `这页已经满足沟通会话的基础条件，可以直接连接并开始表达。` 与 `可以直接连接助手或开始表达，不需要再做额外准备。`
+- 2026-03-29 workspace owner 已继续收口：
+  - backend 新增 `PUT /api/memory/workspace/:userId/preferences`，由 [memory.controller.ts](/home/ubuntu/VoxFlame-Agent/backend/src/controllers/memory.controller.ts) + [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 持久化 `communication_preferences`
+  - [CommunicationPreferenceCard.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/CommunicationPreferenceCard.tsx) 已切到新的 workspace API
+  - [memory/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/memory/page.tsx) 已接入真实可编辑的沟通偏好卡；保存后会刷新 `workspace snapshot`
+  - `backend` 的 `npm run build`、`frontend` 的 `npm run lint` / `npm run build`、`bash scripts/check_ai_docs.sh` 通过；Playwright 已确认 `/memory` 页面出现可编辑的“我的沟通偏好” owner 卡片
+  - `workspace-client.ts` 已新增，workspace 快照读取和沟通偏好写入现在都通过同一层 client 走，不再让 hook/组件各自拼 fetch
+  - compat 清理继续推进：旧的 `/api/agent/profile/:userId` 与 `/api/agent/hotwords/:userId` 已先降为 compat shell，随后这轮已从服务中移除；`backend` 的 `npm run build` 与 `bash scripts/check_ai_docs.sh` 通过
+  - `memory` compat slice 也已移除：`/api/memory/user/:userId`、`/api/memory/hotwords/:userId`、`/api/memory/stats/:userId` 不再挂载；`backend` 检索已确认 controller/service/README 中没有这批旧入口残留
+- 2026-03-29 runtime helper 验证基线已建立：
+  - `frontend/package.json` 已新增 `npm test` 与 `npm run test:runtime`，基于 Node 内建 test runner 和 [register-runtime-test-hooks.mjs](/home/ubuntu/VoxFlame-Agent/frontend/test/register-runtime-test-hooks.mjs) 处理 `@/` alias、`.ts/.tsx` 解析
+  - 已新增 [session-audio.test.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-audio.test.ts)、[session-actions.test.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-actions.test.ts)、[session-runtime.test.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-runtime.test.ts)
+  - 当前 helper 单测已覆盖麦克风错误翻译、未就绪提示、文字发送动作、消息清空、麦克风 stream 读取、runtime control message 发布和 chunked envelope 解码归并
+  - `cd frontend && npm test` 通过
+- 2026-03-29 runtime helper 测试还带出两个真实收尾项，并都已修正：
+  - [training-profile.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/training-profile.ts) 已改为 `import type { TrainingGuidanceProfile }`，修掉 Node ESM/runtime 下的类型导入错误
+  - [agora-transport.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/agora-transport.ts) 现在按环境收紧 RTC SDK 日志级别：production 用 `WARNING/ERROR`，development 保留 `INFO`
+- 2026-03-29 frontend Docker `npm ci` 兼容问题已收口：
+  - 根因是 `frontend/package-lock.json` 之前带有 npm 11 写入的空壳 nested package 记录，Docker 里的 Node 20 / npm 10 会报 `Invalid Version`
+  - 已使用 `sudo docker run ... node:20-slim npm install --package-lock-only` 重新生成 lockfile
+  - 已再次用同版本 `sudo docker run ... npm ci --loglevel warn` 验证通过
+  - 随后 `sudo docker compose up -d --build frontend` 已再次成功完成
+- 2026-03-29 runtime helper 最终 smoke 已补齐：
+  - `frontend` 的 `npm test`、`npm run build`、`npm run lint` 通过；`lint` 仍只剩仓库既有 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) Hook warning
+  - `bash scripts/check_ai_docs.sh` 通过
+  - Playwright 已再次确认 `/?mode=communicate&starter=medical` 可以成功 `连接助手 -> 已连接 -> 发送文字`
+  - 网络侧继续可见 `POST /api/rtc/session/start => 200`
+  - 控制台仍保留 1 条非阻塞 Agora vendor warning：`WebSocket ... closed before the connection is established`，但此前大量 `DEBUG` 噪音已消失
 - `frontend` 当前构建状态：
   - `npm run build` 通过
   - `npm run lint` 仅剩仓库既有 [WaveformVisualizer.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) Hook 依赖 warning

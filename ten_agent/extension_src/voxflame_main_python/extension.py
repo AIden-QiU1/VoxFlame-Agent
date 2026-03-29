@@ -58,6 +58,8 @@ class SessionContext:
     user_connected: bool = False
     conversation_history: List[Dict[str, Any]] = field(default_factory=list)
     user_profile: Optional[Dict[str, Any]] = None
+    session_intent: Optional[Dict[str, Any]] = None
+    granted_capabilities: List[str] = field(default_factory=list)
     last_asr_text: str = ""
     transport_state: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     runtime_metrics: Dict[str, Dict[str, Any]] = field(default_factory=dict)
@@ -244,6 +246,9 @@ class VoxFlameMainExtension(AsyncExtension):
 
             elif data_name == "metrics":
                 await self._handle_runtime_metrics(ten_env, data)
+
+            elif data_name == "clarity_score":
+                await self._handle_clarity_score(ten_env, data)
 
             elif data_name == "error":
                 await self._handle_module_error(ten_env, data)
@@ -951,6 +956,22 @@ class VoxFlameMainExtension(AsyncExtension):
             return
 
         session.user_profile = user
+        session_intent = init_data.get("session_intent")
+        if isinstance(session_intent, dict):
+            session.session_intent = session_intent
+
+        granted_capabilities = init_data.get("granted_capabilities")
+        if not isinstance(granted_capabilities, list) and isinstance(session_intent, dict):
+            nested_capabilities = session_intent.get("granted_capabilities")
+            if isinstance(nested_capabilities, list):
+                granted_capabilities = nested_capabilities
+
+        if isinstance(granted_capabilities, list):
+            session.granted_capabilities = [
+                capability
+                for capability in granted_capabilities
+                if isinstance(capability, str)
+            ]
 
         email = user.get("email", "unknown")
         name = user.get("name", "")
@@ -963,6 +984,17 @@ class VoxFlameMainExtension(AsyncExtension):
             ten_env.log_info(f"[VoxFlameMain] User Name: {name}")
         if user_id:
             ten_env.log_info(f"[VoxFlameMain] User ID: {user_id}")
+        if isinstance(session.session_intent, dict):
+            ten_env.log_info(
+                "[VoxFlameMain] Session Intent - "
+                f"surface={session.session_intent.get('surface')}, "
+                f"mode={session.session_intent.get('mode')}, "
+                f"strategy={session.session_intent.get('session_strategy') or session.session_intent.get('sessionStrategy')}"
+            )
+        if session.granted_capabilities:
+            ten_env.log_info(
+                f"[VoxFlameMain] Granted capabilities={session.granted_capabilities}, client_id={client_id}"
+            )
 
         # Update LLM Corrector with user profile.
         try:
@@ -1306,6 +1338,34 @@ class VoxFlameMainExtension(AsyncExtension):
             )
         except Exception as e:
             ten_env.log_error(f"[VoxFlameMain] Error handling runtime metrics: {e}")
+
+    async def _handle_clarity_score(self, ten_env: AsyncTenEnv, data: Data) -> None:
+        """Consume memory-layer clarity updates so the graph keeps a clean message path."""
+        try:
+            payload = self._read_data_payload(data)
+            client_id = self._extract_client_id(payload, ten_env, "clarity_score")
+
+            try:
+                score = float(payload.get("score", 0.0))
+            except (TypeError, ValueError):
+                score = 0.0
+
+            if client_id in self.sessions or self._payload_has_session_reference(payload):
+                session = self._get_or_create_session(client_id)
+                session.runtime_metrics["clarity_score"] = {
+                    "timestamp": int(time.time() * 1000),
+                    "vendor": "memory_layer",
+                    "metrics": {
+                        "score": score,
+                    },
+                    "metadata": payload if isinstance(payload, dict) else {},
+                }
+
+            ten_env.log_info(
+                f"[VoxFlameMain] Clarity score client_id={client_id}, score={score:.2f}"
+            )
+        except Exception as e:
+            ten_env.log_error(f"[VoxFlameMain] Error handling clarity_score: {e}")
 
     # ========================================
     # Helper Methods

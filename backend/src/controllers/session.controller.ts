@@ -8,7 +8,7 @@ import { respondCompatNotImplemented } from './compat-response'
 const router = Router()
 
 const SESSION_COMPAT_GUIDANCE =
-  'Runtime sessions now bootstrap via /api/rtc/session/start and are maintained with /api/rtc/session/ping|stop. Persist user state via /api/agent/profile, /api/memory, and /api/phrases.'
+  'Runtime sessions now bootstrap via /api/rtc/session/start and are maintained with /api/rtc/session/ping|stop. Persist workspace-owned user state via /api/memory/workspace/:userId and /api/memory/workspace/:userId/preferences, then use /api/memory and /api/phrases for memory and phrase data.'
 const SESSION_COMPAT_REMOVAL_TARGET =
   'Remove after remaining callers stop using legacy HTTP session bootstrap endpoints.'
 

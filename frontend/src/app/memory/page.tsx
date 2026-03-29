@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Brain, CalendarClock, LineChart, Mic, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
+import { CommunicationPreferenceCard } from '@/components/chat/CommunicationPreferenceCard'
 import { STARTER_KIT_SCENES, type StarterKitScene } from '@/lib/communication/starter-kit'
 import { getValidToken } from '@/lib/supabase/client'
 import { config } from '@/lib/config'
@@ -727,7 +728,7 @@ export default function MemoryPage() {
             !workspaceSnapshot?.expression_kit.communication_preferences.pace_hint &&
             !workspaceSnapshot?.expression_kit.communication_preferences.repair_phrase ? (
               <div className="mt-6 rounded-3xl border border-dashed border-stone-300 bg-stone-50 px-4 py-4 text-sm leading-6 text-gray-600">
-                你还没有固定自己的沟通偏好。先去沟通页保存那三句最重要的话，这里和首屏表达建议都会马上跟上。
+                你还没有固定自己的沟通偏好。直接在下面填好这三句后，这里和首屏表达建议都会马上跟上。
               </div>
             ) : null}
 
@@ -750,6 +751,16 @@ export default function MemoryPage() {
             </div>
           </aside>
         </section>
+
+        {userId ? (
+          <CommunicationPreferenceCard
+            userId={userId}
+            initialPreferences={workspaceSnapshot?.expression_kit.communication_preferences}
+            onSaved={() => {
+              void refreshWorkspaceSnapshot(prepSceneId)
+            }}
+          />
+        ) : null}
 
         <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <article className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">

@@ -148,6 +148,9 @@
         "name": "metrics"
       },
       {
+        "name": "clarity_score"
+      },
+      {
         "name": "training_feedback_result"
       }
     ],
