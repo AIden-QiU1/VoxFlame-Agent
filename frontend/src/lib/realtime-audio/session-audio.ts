@@ -1,15 +1,17 @@
 'use client'
-
 import type {
-  IAgoraRTCClient,
-  ILocalAudioTrack,
-} from 'agora-rtc-sdk-ng'
+  LocalAudioTrack as LiveKitLocalAudioTrack,
+  LocalTrackPublication,
+  Room as LiveKitRoom,
+} from 'livekit-client'
 import type {
   Dispatch,
   MutableRefObject,
   SetStateAction,
 } from 'react'
 import type { RtcSessionMode } from './session-contract'
+import type { SessionExecutionClient } from './session-execution'
+import type { SessionMicrophoneTrack } from './session-types'
 
 const MICROPHONE_CONSTRAINTS = {
   channelCount: 1,
@@ -19,7 +21,7 @@ const MICROPHONE_CONSTRAINTS = {
 } as const
 
 interface SessionAudioRefs {
-  micTrackRef: MutableRefObject<ILocalAudioTrack | null>
+  micTrackRef: MutableRefObject<SessionMicrophoneTrack | null>
   micStreamRef: MutableRefObject<MediaStream | null>
   preflightMicStreamRef: MutableRefObject<MediaStream | null>
   micAudioContextRef: MutableRefObject<AudioContext | null>
@@ -28,7 +30,7 @@ interface SessionAudioRefs {
 }
 
 interface EnsurePublishedMicrophoneTrackOptions extends SessionAudioRefs {
-  clientRef: MutableRefObject<IAgoraRTCClient | null>
+  clientRef: MutableRefObject<SessionExecutionClient | null>
   connectPromiseRef: MutableRefObject<Promise<void> | null>
   mode: RtcSessionMode
   setAnalyser: Dispatch<SetStateAction<AnalyserNode | null>>
@@ -174,9 +176,9 @@ export async function warmUpSessionMicrophone(
 
 export async function ensurePublishedMicrophoneTrack(
   options: EnsurePublishedMicrophoneTrackOptions,
-): Promise<ILocalAudioTrack> {
+): Promise<SessionMicrophoneTrack> {
   const existingTrack = options.micTrackRef.current
-  if (existingTrack && existingTrack.getMediaStreamTrack().readyState === 'live') {
+  if (existingTrack?.getMediaStreamTrack().readyState === 'live') {
     return existingTrack
   }
 
@@ -201,11 +203,8 @@ export async function ensurePublishedMicrophoneTrack(
 
   assertMicrophoneEnvironment()
 
-  const AgoraRTCModule = await import('agora-rtc-sdk-ng')
-  const AgoraRTC = AgoraRTCModule.default
-
   let mediaStream: MediaStream | null = null
-  let track: ILocalAudioTrack | null = null
+  let liveKitTrack: SessionMicrophoneTrack | null = null
   let audioContext: AudioContext | null = null
   let sourceNode: MediaStreamAudioSourceNode | null = null
   let analyserNode: AnalyserNode | null = null
@@ -236,21 +235,28 @@ export async function ensurePublishedMicrophoneTrack(
     analyserNode.smoothingTimeConstant = 0.85
     sourceNode.connect(analyserNode)
 
-    track = AgoraRTC.createCustomAudioTrack({
+    const LiveKitModule = await import('livekit-client')
+    const localAudioTrack = new LiveKitModule.LocalAudioTrack(
       mediaStreamTrack,
+      undefined,
+      true,
+      audioContext,
+    )
+    const publication = await client.room.localParticipant.publishTrack(localAudioTrack, {
+      source: LiveKitModule.Track.Source.Microphone,
     })
-    await client.publish([track])
+    liveKitTrack = createLiveKitMicrophoneTrack(client.room, localAudioTrack, publication)
+    options.micTrackRef.current = liveKitTrack
 
-    options.micTrackRef.current = track
     options.micStreamRef.current = mediaStream
     options.micAudioContextRef.current = audioContext
     options.micSourceNodeRef.current = sourceNode
     options.micAnalyserRef.current = analyserNode
     options.setAnalyser(analyserNode)
-    return track
+    return options.micTrackRef.current!
   } catch (error) {
     try {
-      track?.close()
+      liveKitTrack?.close()
     } catch {
       // ignore cleanup error
     }
@@ -271,5 +277,38 @@ export async function ensurePublishedMicrophoneTrack(
     }
     stopMediaStream(mediaStream)
     throw new Error(formatMicrophoneError(error))
+  }
+}
+
+function createLiveKitMicrophoneTrack(
+  room: LiveKitRoom,
+  track: LiveKitLocalAudioTrack,
+  publication: LocalTrackPublication,
+): SessionMicrophoneTrack {
+  return {
+    provider: 'livekit',
+    room,
+    rawTrack: track,
+    publication,
+    async setEnabled(enabled: boolean): Promise<void> {
+      if (enabled) {
+        await track.unmute()
+        return
+      }
+
+      await track.mute()
+    },
+    getMediaStreamTrack(): MediaStreamTrack {
+      return track.mediaStreamTrack
+    },
+    stop(): void {
+      track.stop()
+    },
+    close(): void {
+      void room.localParticipant.unpublishTrack(track).catch(() => {
+        // ignore cleanup error
+      })
+      track.stop()
+    },
   }
 }

@@ -47,7 +47,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 ### Workflow First
 
 - 默认先做 `workflow`，再考虑 runtime agent 或多 agent。
-- 先把单链路做稳定：`Frontend -> Backend -> TEN Agent`。
+- 先把单链路做稳定：`Frontend -> Backend -> livekit-server / livekit_agent`。
 - 只有当单 agent 已经稳定失败在上下文负担、工具选择或任务拆分上，才考虑 handoff / 多 agent。
 - 涉及 side effects 的动作，优先通过显式 tools、结构化参数、清晰退出条件来驱动，不要靠模糊自然语言隐式执行。
 
@@ -88,7 +88,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 - 核心目标：提升陌生人沟通成功率，而不是追求抽象的“模型更强”。
 - 优先级排序：可理解性 > 低延迟 > 可打断 > UI 精修。
 - 默认假设：local-first、最小必要存储、清晰的授权边界。
-- 任何新功能都不能破坏主链路：`Frontend -> Backend -> TEN Agent`。
+- 任何新功能都不能破坏主链路：`Frontend LiveKit -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`。
 - 如果某项能力不能改善真实沟通成功率、训练反馈质量或部署可靠性，默认不优先。
 - 涉及“用户怎么理解、怎么感受、怎么坚持使用、怎么信任系统”的功能时，默认先做心理学 / 设计学 / 用户需求研究，再决定功能形态；没有研究输入时，只能做低风险、可回退、显式标注假设的最小实现。
 - 这类用户研究输入可以由用户提供；agent 的职责是把原始访谈、观察、问卷、日记、可用性反馈整理成 `用户画像 / 场景任务 / 痛点 / 设计约束 / 验收信号`，再进入开发。
@@ -115,7 +115,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 - 后端坚持 Service / Controller 分层，避免把业务逻辑堆进路由。
 - Agent 侧改动必须考虑会话隔离、打断、内存上下文和容错。
 - 已有唯一事实源时，不再新增平级实现；优先封旧入口，而不是继续长新入口。
-- 当前运行时唯一事实源是 `Frontend RTC/RTM -> Backend /api/rtc/session/* -> TEN rtc graph`；不要恢复 websocket 主链。
+- 当前运行时唯一事实源是 `Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`；不要恢复 websocket 或 TEN/Agora 主链。
 - `compat` 只做迁移适配，不承接新业务逻辑，并且必须带退出条件。
 - 安全默认值前置：最小权限、显式审批副作用操作、结构化输出驱动工具、Secrets 不进入 prompt / 日志 / 前端。
 - 非显而易见的函数或协议，补简短 JSDoc，而不是写大段空洞注释。
@@ -125,7 +125,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 
 - 前端交互改动：至少做目标页面 smoke test；涉及 UI 状态、跳转、可见文本、console、网络行为时优先用 Playwright。
 - 后端接口改动：至少验证受影响的 API、RTC orchestration 或 RTM 控制路径。
-- TEN Agent / 纠错链路改动：至少验证消息流、日志或针对性脚本。
+- livekit_agent / 纠错链路改动：至少验证消息流、日志或针对性脚本。
 - 迁移 / 重构 / 收口任务：至少验证唯一事实源、旧入口封口情况和旁路系统依赖。
 - Docker / 部署改动：至少验证相关 compose 命令或构建步骤。
 - 在这个仓库里，容器验证默认先按文档使用 `docker compose`；如果当前机器的 Docker 需要 root 权限或普通命令失败，明确回退到 `sudo docker compose build ...`、`sudo docker compose up -d ...`、`sudo docker compose logs ...`，并在结论里说明使用了 sudo 路径。

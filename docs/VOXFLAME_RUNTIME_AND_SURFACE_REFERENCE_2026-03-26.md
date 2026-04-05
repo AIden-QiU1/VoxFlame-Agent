@@ -13,18 +13,24 @@
 > - 这份文档仍是现役主参考，主体已经稳定，已进入最后工程收尾
 > - `session intent / readiness / capability gating` 的基础 contract 已经进代码
 > - 当前还在继续收尾的是：把剩余运行时实现继续从 hook 下沉，并只在必要时同步文档状态；`workspace owner` 与 legacy compat 清理已基本完成
+> - `Agora/TEN -> LiveKit` 迁移已经完成主执行面切换；`ten_agent/` 目录已从仓库物理移除，文中出现的 TEN 路径仅用于历史复盘
 
 ## 1. 结论先行
 
 当前最重要的 runtime 判断只有 6 条：
 
-1. 现役唯一事实源仍然是  
-   `Frontend RTC/RTM -> Backend /api/rtc/session/* -> TEN rtc graph`
-2. `TEN + Agora` 是现役执行面，但必须被视作过渡实现，而不是长期不可替代底座。
+1. 现役唯一事实源已经是  
+   `Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`
+2. `TEN + Agora` 已经退役；现在继续保留的只是少量历史分析文档，而不是现役执行面。
 3. 架构讨论统一按五层进行：`Control / Execution / Memory / Capability / Surface`。
 4. 近期不要为了“更先进的 runtime”重写主链，先把控制面、上传链路、画像 contract 和页面任务流收稳。
 5. 中期所有新能力都要逐步改用供应商无关语言：`session / transport / capability / session_strategy`。
 6. `light voice surface` 要作为主执行面之外的轻入口策略存在，而不是第二套主产品。
+
+当前关于 `Agora/TEN -> LiveKit` 的正式迁移顺序，见：
+
+- [VOXFLAME_LIVEKIT_TRANSITION_PLAN_2026-03-31.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_TRANSITION_PLAN_2026-03-31.md)
+- [VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md)
 
 ## 2. 五层架构怎么落到当前代码
 
@@ -95,16 +101,17 @@
 
 当前 owner：
 
-- [property.json](/home/ubuntu/VoxFlame-Agent/ten_agent/property.json)
-- [voxflame_main_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/voxflame_main_python/extension.py)
-- [qwen_asr_realtime_python](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/qwen_asr_realtime_python)
-- [qwen_tts_realtime_python](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/qwen_tts_realtime_python)
-- [llm_correction_python](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/llm_correction_python)
+- [livekit_agent/app.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/app.py)
+- [livekit_agent/asr_runtime.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/asr_runtime.py)
+- [livekit_agent/tts_runtime.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/tts_runtime.py)
+- [livekit_agent/assistant_runtime.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/assistant_runtime.py)
 
 当前判断：
 
 - 现役主链已经能支撑 P0/P1 的沟通与训练
-- 近期更该停长产品语义，而不是继续把 governance、profile merge、表达策略塞回 TEN 主控
+- 近期更该继续补齐训练页、记忆页 AI parity，而不是重新引入第二套执行面
+- `livekit_agent` 已承接 `vad / asr / correction / tts / training_feedback` 主链
+- 当前剩余差距集中在更深的 `memory / session_review / preparation` 等价能力，而不是实时 transport
 
 ### 2.3 Memory Plane
 
@@ -197,6 +204,27 @@
 - `participant`
 - `capability`
 - `session_strategy`
+
+同时也要避免另一个误判：
+
+- LiveKit 迁移不是“只把 transport 从 Agora 换掉”
+- 对 VoxFlame 来说，最终要替掉的是整层 realtime execution host
+- 但删除 `TEN` 只能发生在 `LiveKit server + livekit_agent + DashScope-first capability parity` 真正跑通之后
+
+## 3.1 迁移目的不是“换新”，而是“把 execution 变得可控”
+
+这次迁移最该记住的不是供应商名，而是目标：
+
+1. `RTC / RTM` 执行层自主可控
+2. backend control plane 保持稳定
+3. 允许 `agora_ten` 与 `livekit` 在同一 session contract 下并行验证
+4. 只有 execution seam 稳定后，才继续大幅加深 memory / coach
+
+所以不推荐：
+
+- 直接重写一套新 runtime
+- 一边迁移 execution，一边重做页面主路径
+- 在 execution 仍不稳定时继续把 durable memory 深绑到现役执行面细节里
 
 ## 4. `light voice surface` 的正确位置
 

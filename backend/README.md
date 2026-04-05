@@ -21,7 +21,8 @@ backend 当前是控制面和业务面，不再代理运行时 websocket 音频�
 ```text
 Frontend
   -> Backend /api/rtc/session/*
-  -> TEN Agent control server
+  -> self-hosted livekit-server
+  -> livekit_agent
 ```
 
 ## 快速开始
@@ -47,10 +48,10 @@ npm run dev
 
 ### RTC orchestration
 
-当前 backend 负责 RTC + RTM 会话编排：
+当前 backend 负责 LiveKit 会话编排：
 
 ```
-Frontend (3000) → Backend (3001/api/rtc/*) → TEN Agent control server (8080)
+Frontend (3000) → Backend (3001/api/rtc/*) → LiveKit server + livekit_agent
 ```
 
 ### API 端点
@@ -118,7 +119,9 @@ GET /api/memory/search?user_id=xxx&query=用户偏好&limit=10
 ```bash
 # .env
 PORT=3001
-TEN_AGENT_SERVER_URL=http://ten-agent:8080
+LIVEKIT_URL=ws://127.0.0.1:7880
+LIVEKIT_API_KEY=devkey
+LIVEKIT_API_SECRET=secret
 
 # Supabase (认证 + 数据库)
 SUPABASE_URL=https://xxx.supabase.co
@@ -143,5 +146,5 @@ QDRANT_URL=http://qdrant:6333  # Phase 3
 
 - [主项目 README](../README.md)
 - [前端 README](../frontend/README.md)
-- [Agent README](../ten_agent/README.md)
+- [LiveKit Agent README](../livekit_agent/README.md)
 - [统一记忆系统报告](../docs/VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md)

@@ -381,7 +381,7 @@ compat 层必须同时具备：
 
 ### 7.1 产品判断
 
-- 任何治理动作都不能破坏主链路：`Frontend -> Backend -> TEN Agent`
+- 任何治理动作都不能破坏主链路：`Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`
 - 对构音障碍用户来说，可理解性和授权边界优先于“更自动”
 - local-first、最小必要存储、会话可打断保持不变
 

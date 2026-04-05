@@ -6,7 +6,7 @@
 
 - Next.js 14 App Router
 - React 18 + TypeScript + Tailwind CSS
-- Agora Web SDK
+- LiveKit client
 - PWA（默认开启，可按环境显式关闭）
 - Web Audio API
 
@@ -23,8 +23,8 @@
 ```text
 Frontend
   -> Backend /api/rtc/session/*
-  -> TEN Agent control server
-  -> Agora RTC + RTM
+  -> self-hosted livekit-server
+  -> livekit_agent
 ```
 
 ## 当前页面系统
@@ -40,7 +40,7 @@ Frontend
 
 ## 当前前端 contract
 
-- 运行时唯一事实源仍然是 `Frontend RTC/RTM -> Backend /api/rtc/session/* -> TEN rtc graph`
+- 运行时唯一事实源是 `Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`
 - 长期画像前端优先消费 backend `workspace` 聚合接口，而不是页面各自拼 memory
 - 训练录音前端统一围绕 `recording envelope -> recorder queue -> upload receipt` 组织
 - 默认优先走同源 `/api` rewrite，而不是让浏览器直接访问 `:3001`
@@ -97,7 +97,7 @@ npm run dev
 
 ### `useRtcAgentSession`
 
-管理 Agora RTC 音频会话和 RTM 文本/控制通道：
+管理 LiveKit RTC 音频会话和 room data 文本/控制通道：
 
 ```typescript
 const {
@@ -113,7 +113,7 @@ const {
 
 ### `useMandarinTrainingSession`
 
-训练页通过同一套 RTC + RTM transport 建会话，停止录音后回传 transcript 和本地录音 blob：
+训练页通过同一套 LiveKit transport 建会话，停止录音后回传 transcript 和本地录音 blob：
 
 ```typescript
 const {
@@ -205,4 +205,4 @@ PWA 还不能替代未来原生 App / companion 的部分：
 
 - [主项目 README](../README.md)
 - [后端 README](../backend/README.md)
-- [Agent README](../ten_agent/README.md)
+- [LiveKit Agent README](../livekit_agent/README.md)

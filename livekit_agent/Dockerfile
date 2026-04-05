@@ -1,0 +1,25 @@
+ARG LIVEKIT_AGENT_BASE_IMAGE=docker.m.daocloud.io/library/python:3.10-slim
+FROM ${LIVEKIT_AGENT_BASE_IMAGE}
+
+ARG LIVEKIT_AGENT_BOOTSTRAP_DEPS=1
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+RUN if [ "$LIVEKIT_AGENT_BOOTSTRAP_DEPS" = "1" ]; then \
+      pip install --upgrade pip setuptools wheel && \
+      pip install \
+        "livekit-agents==1.5.1" \
+        "python-dotenv>=1.0,<2.0" ; \
+    fi
+
+RUN pip install \
+    --no-deps \
+    "websockets>=15.0,<16.0"
+
+COPY . /app
+
+CMD ["python", "app.py", "start"]

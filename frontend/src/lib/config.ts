@@ -27,6 +27,12 @@ function isLoopbackApiUrl(value: string): boolean {
   return /^https?:\/\/(localhost|127(?:\.\d{1,3}){3})(?::\d+)?\/api$/i.test(value)
 }
 
+function normalizeRtcExecutionBackend(
+  value: string | undefined,
+): 'livekit' | undefined {
+  return value === 'livekit' ? value : undefined
+}
+
 export const config = {
   // API 端点配置
   api: {
@@ -66,6 +72,17 @@ export const config = {
 
       // 默认全部走同源 /api，由 Next rewrite 转到 backend 容器。
       return '/api'
+    },
+  },
+
+  rtc: {
+    /**
+     * 运行时执行面已完全收口到 `livekit`。
+     */
+    get executionBackend(): 'livekit' | undefined {
+      return normalizeRtcExecutionBackend(
+        process.env.NEXT_PUBLIC_RTC_EXECUTION_BACKEND,
+      ) ?? 'livekit'
     },
   },
 

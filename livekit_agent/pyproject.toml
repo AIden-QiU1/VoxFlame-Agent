@@ -1,0 +1,17 @@
+[project]
+name = "voxflame-livekit-agent"
+version = "0.1.0"
+description = "VoxFlame LiveKit agent runtime for communication, training, and memory execution"
+requires-python = ">=3.10"
+dependencies = [
+  "livekit-agents>=1.4,<2.0",
+  "python-dotenv>=1.0,<2.0",
+  "websockets>=15.0,<16.0",
+]
+
+[build-system]
+requires = ["setuptools>=59.6", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []

@@ -6,7 +6,7 @@ DEFAULT_FIXTURE="$ROOT_DIR/ten-framework/ai_agents/agents/integration_tests/asr_
 
 FIXTURE_PATH="${1:-$DEFAULT_FIXTURE}"
 EXPECTED_TEXT="${2:-}"
-CONTAINER_NAME="${QWEN_ASR_SMOKE_CONTAINER:-voxflame-ten-agent}"
+CONTAINER_NAME="${QWEN_ASR_SMOKE_CONTAINER:-voxflame-livekit-agent}"
 
 if [[ -n "${QWEN_ASR_SMOKE_EXEC:-}" ]]; then
   # shellcheck disable=SC2206
@@ -50,6 +50,7 @@ def load_module(module_name: str, module_path: str):
     if spec is None or spec.loader is None:
         raise RuntimeError(f'failed to load module: {module_path}')
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -66,7 +67,7 @@ async def main() -> int:
 
     client_module = load_module(
         'qwen_asr_realtime_smoke_client',
-        '/app/ten_packages/extension/qwen_asr_realtime_python/realtime_client.py',
+        '/app/asr_runtime.py',
     )
     client_cls = client_module.QwenRealtimeASRClient
 
@@ -116,7 +117,6 @@ async def main() -> int:
         api_key=api_key,
         connect_timeout_seconds=CONNECT_TIMEOUT_SECONDS,
         event_handler=handle_event,
-        logger=Logger(),
     )
 
     started_at = time.perf_counter()
@@ -146,7 +146,7 @@ async def main() -> int:
             print('[qwen-asr-smoke] timeout waiting for final transcription', file=sys.stderr)
             return 1
     finally:
-        await client.finish_session()
+        await client.stop()
 
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
     print(f'[qwen-asr-smoke] events={len(events)} elapsed_ms={elapsed_ms}')
@@ -170,6 +170,6 @@ PY
 
 cat "$FIXTURE_PATH" | "${DOCKER_EXEC[@]}" "$CONTAINER_NAME" /bin/bash -lc "
 set -euo pipefail
-source /app/venv/bin/activate
+cd /app
 python -c \"$PYTHON_CODE\" \"$EXPECTED_TEXT\"
 "

@@ -25,15 +25,27 @@ function createSession(): StartRtcSessionResponse {
     requestId: 'req_1',
     channelName: 'voxrtc_channel',
     graphName: 'voxflame_graph',
+    executionBackend: 'livekit',
     userUid: 1001,
     botUid: 2001,
-    appId: 'agora_app',
-    token: 'rtc_token',
+    appId: '',
+    token: 'participant_token',
     rtmUserId: 'rtm-user-1',
     rtmChannelName: 'voxrtc_channel',
-    rtmToken: 'rtm_token',
+    rtmToken: 'participant_token',
     timeoutSeconds: 90,
-    controlServerUrl: 'http://127.0.0.1:3001',
+    controlServerUrl: 'ws://127.0.0.1:3000',
+    transport: {
+      provider: 'livekit',
+      serverUrl: 'ws://127.0.0.1:3000',
+      roomName: 'voxrtc_channel',
+      participantIdentity: 'rtm-user-1',
+      participantName: 'vox-user-1001',
+      participantToken: 'participant_token',
+      participantMetadata: '{}',
+      participantAttributes: {},
+      agentDispatch: null,
+    },
     intent: {
       surface: 'communication_workspace',
       mode: 'communication',
@@ -42,15 +54,28 @@ function createSession(): StartRtcSessionResponse {
       requestedCapabilities: ['transport_send_control'],
       grantedCapabilities: ['transport_send_control'],
       deviceContext: {
-        client: 'web',
-        microphone: 'unknown',
         secureContext: true,
+        mediaDevicesSupported: true,
+        microphoneStatus: 'unknown',
+        networkOnline: true,
       },
     },
     readiness: {
       canStart: true,
+      requestedStrategy: 'heavy_realtime',
+      resolvedStrategy: 'heavy_realtime',
+      recommendedStrategy: 'heavy_realtime',
+      microphoneRequired: true,
       blockers: [],
       warnings: [],
+      summary: {
+        status: 'ready',
+        label: '已经准备好',
+        detail: '沟通会话可以开始。',
+        nextAction: '直接连接并开始表达。',
+        blockerSummary: null,
+        warningSummary: null,
+      },
     },
   }
 }
@@ -103,7 +128,7 @@ test('session-runtime publishes a structured control envelope through RTM when r
   assert.deepEqual(payload.metadata, {
     client_id: '1001',
     session_id: 'voxrtc_channel',
-    transport: 'agora_rtm',
+    transport: 'livekit_data',
     mode: 'communication',
     surface: 'communication_workspace',
     session_strategy: 'heavy_realtime',
@@ -141,4 +166,75 @@ test('session-runtime updates latest transcript, memory turns, and reduced state
   assert.deepEqual(addTurnCalls, [['user', '我想慢一点说']])
   assert.equal(harness.getState().messages.at(-1)?.content, '我想慢一点说')
   assert.equal(harness.getState().latestUserTranscript, '我想慢一点说')
+})
+
+test('session-runtime writes training feedback into current session metadata', () => {
+  const harness = createStateHarness()
+  const latestTranscriptRef = { current: '' }
+  const metadataUpdates: Array<Record<string, unknown>> = []
+  const memoryEntries: Array<Record<string, unknown>> = []
+  const originalUpdateCurrentSessionMetadata = memoryService.updateCurrentSessionMetadata
+  const originalAddMemoryEntry = memoryService.addMemoryEntry
+  memoryService.updateCurrentSessionMetadata = ((metadata: Record<string, unknown>) => {
+    metadataUpdates.push(metadata)
+  }) as typeof memoryService.updateCurrentSessionMetadata
+  memoryService.addMemoryEntry = ((input: Record<string, unknown>) => {
+    memoryEntries.push(input)
+    return null
+  }) as typeof memoryService.addMemoryEntry
+
+  try {
+    const handleMessage = createDecodedRtcMessageHandler({
+      memoryOwnerId: 'user-1',
+      latestUserTranscriptRef: latestTranscriptRef,
+      setState: harness.setState,
+    })
+
+    handleMessage({
+      type: 'training_feedback',
+      exercise_id: 'exercise-1',
+      feedback_status: 'close',
+      summary: '这次先重点看“请先听我说完”。',
+      next_step: '先单独慢练 2 次，再回整句。',
+      clarity_score: 0.76,
+      source: 'livekit_training_feedback',
+      focus_tags: ['请先听我说完'],
+      focus_syllables: ['请先', '说完'],
+      pronunciation_initial_pairs: ['q/j'],
+      pronunciation_targets: ['请先听我说完'],
+      articulation_tip: '先把关键词慢慢送出来。',
+      articulation_tips: ['先把关键词慢慢送出来。'],
+    })
+  } finally {
+    memoryService.updateCurrentSessionMetadata = originalUpdateCurrentSessionMetadata
+    memoryService.addMemoryEntry = originalAddMemoryEntry
+  }
+
+  assert.equal(metadataUpdates.length, 1)
+  assert.equal(memoryEntries.length, 1)
+  assert.equal(memoryEntries[0].type, 'voice_profile')
+  assert.equal(memoryEntries[0].content, '这次先重点看“请先听我说完”。')
+  assert.equal(
+    (memoryEntries[0].metadata as Record<string, unknown>).kind,
+    'training_result',
+  )
+  assert.equal(
+    (memoryEntries[0].sessionMetadata as Record<string, unknown>).kind,
+    'training',
+  )
+  assert.equal(
+    (memoryEntries[0].sessionMetadata as Record<string, unknown>).source,
+    'livekit_training_feedback',
+  )
+  assert.equal(metadataUpdates[0].lastTrainingFeedbackSource, 'livekit_training_feedback')
+  assert.equal(metadataUpdates[0].lastTrainingFeedbackStatus, 'close')
+  assert.equal(metadataUpdates[0].lastTrainingExerciseId, 'exercise-1')
+  assert.deepEqual(metadataUpdates[0].lastTrainingFocusSyllables, ['请先', '说完'])
+  assert.deepEqual(metadataUpdates[0].lastTrainingArticulationTips, ['先把关键词慢慢送出来。'])
+  assert.deepEqual(metadataUpdates[0].lastTrainingPronunciationTargets, ['请先听我说完'])
+  assert.equal(metadataUpdates[0].clarity_score, 0.76)
+  assert.equal(
+    harness.getState().lastTrainingFeedback?.summary,
+    '这次先重点看“请先听我说完”。',
+  )
 })

@@ -1,9 +1,13 @@
-import http from 'http'
-import https from 'https'
-import { URL } from 'url'
 import { v4 as uuidv4 } from 'uuid'
+import {
+  LiveKitConfigError,
+  LiveKitConfigService,
+  type LiveKitExecutionStatus,
+} from './livekit-config.service'
+import { LiveKitSessionService } from './livekit-session.service'
 
 export type RtcSessionMode = 'communication' | 'training' | 'quick_talk'
+export type RtcExecutionBackend = 'livekit'
 export type RtcSurface =
   | 'home_main'
   | 'communication_workspace'
@@ -78,16 +82,46 @@ export interface RtcSessionReadinessSummary {
 }
 
 export interface RtcControlPlaneStatus {
+  executionBackendStatus: Record<RtcExecutionBackend, RtcExecutionBackendStatus>
+  supportedExecutionBackends: RtcExecutionBackend[]
+  defaultExecutionBackend: RtcExecutionBackend
   supportedSurfaces: RtcSurface[]
   supportedSessionStrategies: RtcSessionStrategy[]
+  activeExecutionBackend: RtcExecutionBackend
   activeExecutionStrategy: RtcSessionStrategy
   capabilityMatrix: Record<RtcSessionMode, RtcCapabilityId[]>
 }
+
+export interface RtcExecutionBackendStatus {
+  configured: boolean
+  enabled: boolean
+  detail: string
+  serverUrl: string | null
+  missingEnv: string[]
+}
+
+export interface LiveKitTransportRuntime {
+  provider: 'livekit'
+  serverUrl: string
+  roomName: string
+  participantIdentity: string
+  participantName: string
+  participantToken: string
+  participantMetadata: string
+  participantAttributes: Record<string, string>
+  agentDispatch: {
+    agentName: string
+    metadata: string
+  } | null
+}
+
+export type RtcTransportRuntime = LiveKitTransportRuntime
 
 export interface StartRtcSessionInput {
   requestId?: string
   channelName?: string
   graphName?: string
+  executionBackend?: RtcExecutionBackend
   mode?: RtcSessionMode
   intent?: RtcSessionIntentInput
   userUid?: number
@@ -110,6 +144,7 @@ export interface RtcStartSessionResult {
   requestId: string
   channelName: string
   graphName: string
+  executionBackend: RtcExecutionBackend
   userUid: number
   botUid: number
   appId: string
@@ -119,21 +154,9 @@ export interface RtcStartSessionResult {
   rtmToken: string
   timeoutSeconds: number
   controlServerUrl: string
+  transport: RtcTransportRuntime
   intent: RtcResolvedSessionIntent
   readiness: RtcSessionReadiness
-}
-
-interface TenControlResponse<T> {
-  code: string
-  msg: string
-  data: T
-}
-
-interface TenTokenResponse {
-  appId: string
-  token: string
-  channel_name: string
-  uid: number
 }
 
 interface GraphSummary {
@@ -157,11 +180,10 @@ const SUPPORTED_SESSION_STRATEGIES: RtcSessionStrategy[] = [
   'light_voice',
 ]
 
+const SUPPORTED_EXECUTION_BACKENDS: RtcExecutionBackend[] = ['livekit']
+
 const MODE_CAPABILITY_MATRIX: Record<RtcSessionMode, RtcCapabilityId[]> = {
-  communication: [
-    'transport_send_control',
-    'workspace_snapshot_read',
-  ],
+  communication: ['transport_send_control', 'workspace_snapshot_read'],
   training: [
     'transport_send_control',
     'workspace_snapshot_read',
@@ -169,9 +191,7 @@ const MODE_CAPABILITY_MATRIX: Record<RtcSessionMode, RtcCapabilityId[]> = {
     'voice_profile_update',
     'upload_artifact_persist',
   ],
-  quick_talk: [
-    'transport_send_control',
-  ],
+  quick_talk: ['transport_send_control'],
 }
 
 export class RtcOrchestrationError extends Error {
@@ -185,24 +205,22 @@ export class RtcOrchestrationError extends Error {
 }
 
 export class RtcOrchestrationService {
-  private readonly controlServerUrl = (
-    process.env.TEN_AGENT_SERVER_URL || ''
-  ).trim()
-
+  private readonly liveKitConfig = new LiveKitConfigService()
+  private readonly liveKitSessionService = new LiveKitSessionService()
   private readonly defaultGraph =
-    (process.env.RTC_DEFAULT_GRAPH || 'voxflame_voice_assistant_rtc_preview').trim()
-
+    (process.env.RTC_DEFAULT_GRAPH || 'voxflame_livekit_agent').trim()
   private readonly defaultTimeoutSeconds = this.parseTimeout(
     process.env.RTC_DEFAULT_TIMEOUT,
     120,
   )
 
   public isConfigured(): boolean {
-    return this.controlServerUrl.length > 0
+    return this.liveKitConfig.getStatus().configured
   }
 
   public getControlServerUrl(): string {
-    return this.controlServerUrl
+    const status = this.liveKitConfig.getStatus()
+    return status.browserUrl ?? status.serverUrl ?? ''
   }
 
   public getDefaultGraph(): string {
@@ -214,9 +232,17 @@ export class RtcOrchestrationService {
   }
 
   public getControlPlaneStatus(): RtcControlPlaneStatus {
+    const liveKitStatus = this.liveKitConfig.getStatus()
+
     return {
+      executionBackendStatus: {
+        livekit: mapLiveKitExecutionStatus(liveKitStatus),
+      },
+      supportedExecutionBackends: [...SUPPORTED_EXECUTION_BACKENDS],
+      defaultExecutionBackend: 'livekit',
       supportedSurfaces: [...SUPPORTED_SURFACES],
       supportedSessionStrategies: [...SUPPORTED_SESSION_STRATEGIES],
+      activeExecutionBackend: 'livekit',
       activeExecutionStrategy: 'heavy_realtime',
       capabilityMatrix: {
         communication: [...MODE_CAPABILITY_MATRIX.communication],
@@ -227,16 +253,12 @@ export class RtcOrchestrationService {
   }
 
   public async listGraphs(): Promise<GraphSummary[]> {
-    this.ensureConfigured()
-    const response = await this.requestJson<GraphSummary[]>('/graphs', 'GET')
-    return Array.isArray(response.data) ? response.data : []
+    return []
   }
 
   public async startSession(
     input: StartRtcSessionInput,
   ): Promise<RtcStartSessionResult> {
-    this.ensureConfigured()
-
     const intent = resolveSessionIntent(input)
     const readiness = buildSessionReadiness(intent)
 
@@ -253,74 +275,57 @@ export class RtcOrchestrationService {
     const botUid = normalizeUid(input.botUid) ?? generateRtcUid(userUid)
     const timeoutSeconds =
       normalizePositiveInt(input.timeoutSeconds) ?? this.defaultTimeoutSeconds
-    const properties = mergePropertyOverrides(
-      buildModePropertyOverrides(intent.mode),
-      input.properties ?? {},
-    )
 
-    await this.requestJson<null>('/start', 'POST', {
-      request_id: requestId,
-      channel_name: channelName,
-      user_uid: userUid,
-      bot_uid: botUid,
-      graph_name: graphName,
-      timeout: timeoutSeconds,
-      properties,
+    const liveKitStatus = this.assertLiveKitCanStart()
+    const liveKitSession = await this.liveKitSessionService.createSession({
+      requestId,
+      roomName: channelName,
+      userUid,
+      timeoutSeconds,
+      intent,
+      readiness,
+      serverUrl: liveKitStatus.serverUrl!,
+      apiKey: process.env.LIVEKIT_API_KEY!.trim(),
+      apiSecret: process.env.LIVEKIT_API_SECRET!.trim(),
+      agentName: liveKitStatus.agentName,
     })
-
-    const tokenResponse = await this.requestJson<TenTokenResponse>(
-      '/token/generate',
-      'POST',
-      {
-        request_id: requestId,
-        channel_name: channelName,
-        uid: userUid,
-      },
-    )
 
     return {
       requestId,
       channelName,
       graphName,
+      executionBackend: 'livekit',
       userUid,
       botUid,
-      appId: tokenResponse.data.appId,
-      token: tokenResponse.data.token,
-      rtmUserId: String(userUid),
-      rtmChannelName: channelName,
-      rtmToken: tokenResponse.data.token,
+      appId: '',
+      token: liveKitSession.participantToken,
+      rtmUserId: liveKitSession.participantIdentity,
+      rtmChannelName: liveKitSession.roomName,
+      rtmToken: liveKitSession.participantToken,
       timeoutSeconds,
-      controlServerUrl: this.controlServerUrl,
+      controlServerUrl: liveKitStatus.browserUrl ?? liveKitStatus.serverUrl!,
+      transport: {
+        provider: 'livekit',
+        serverUrl: liveKitStatus.browserUrl ?? liveKitStatus.serverUrl!,
+        roomName: liveKitSession.roomName,
+        participantIdentity: liveKitSession.participantIdentity,
+        participantName: liveKitSession.participantName,
+        participantToken: liveKitSession.participantToken,
+        participantMetadata: liveKitSession.participantMetadata,
+        participantAttributes: liveKitSession.participantAttributes,
+        agentDispatch: liveKitSession.agentDispatch,
+      },
       intent,
       readiness,
     }
   }
 
-  public async stopSession(input: StopRtcSessionInput): Promise<void> {
-    this.ensureConfigured()
-
-    await this.requestJson<null>('/stop', 'POST', {
-      request_id: input.requestId?.trim() || uuidv4(),
-      channel_name: sanitizeChannelName(input.channelName),
-    })
+  public async stopSession(_input: StopRtcSessionInput): Promise<void> {
+    return
   }
 
-  public async pingSession(input: PingRtcSessionInput): Promise<void> {
-    this.ensureConfigured()
-
-    await this.requestJson<null>('/ping', 'POST', {
-      request_id: input.requestId?.trim() || uuidv4(),
-      channel_name: sanitizeChannelName(input.channelName),
-    })
-  }
-
-  private ensureConfigured(): void {
-    if (!this.controlServerUrl) {
-      throw new RtcOrchestrationError(
-        'TEN_AGENT_SERVER_URL is not configured. RTC orchestration is unavailable.',
-        503,
-      )
-    }
+  public async pingSession(_input: PingRtcSessionInput): Promise<void> {
+    return
   }
 
   private parseTimeout(value: string | undefined, fallback: number): number {
@@ -328,81 +333,31 @@ export class RtcOrchestrationService {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
   }
 
-  private async requestJson<T>(
-    path: string,
-    method: 'GET' | 'POST',
-    body?: Record<string, unknown>,
-  ): Promise<TenControlResponse<T>> {
-    const url = new URL(path, ensureTrailingSlash(this.controlServerUrl))
-    const payload = body ? JSON.stringify(body) : undefined
-    const transport = url.protocol === 'https:' ? https : http
-
-    return new Promise((resolve, reject) => {
-      const request = transport.request(
-        url,
-        {
-          method,
-          headers: payload
-            ? {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(payload),
-              }
-            : undefined,
-        },
-        (response) => {
-          const chunks: Buffer[] = []
-          response.on('data', (chunk) => {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-          })
-
-          response.on('end', () => {
-            const raw = Buffer.concat(chunks).toString('utf8')
-
-            if (response.statusCode && response.statusCode >= 400) {
-              reject(
-                new RtcOrchestrationError(
-                  `TEN agent control request failed (${response.statusCode}): ${raw || response.statusMessage || 'unknown error'}`,
-                  502,
-                ),
-              )
-              return
-            }
-
-            try {
-              const parsed = JSON.parse(raw) as TenControlResponse<T>
-              resolve(parsed)
-            } catch (error) {
-              reject(
-                new RtcOrchestrationError(
-                  `TEN agent control returned invalid JSON: ${String(error)}`,
-                  502,
-                ),
-              )
-            }
-          })
-        },
-      )
-
-      request.on('error', (error) => {
-        reject(
-          new RtcOrchestrationError(
-            `Failed to reach TEN agent control server: ${error.message}`,
-            502,
-          ),
-        )
-      })
-
-      if (payload) {
-        request.write(payload)
+  private assertLiveKitCanStart(): ReturnType<LiveKitConfigService['getStatus']> {
+    try {
+      const status = this.liveKitConfig.getStatus()
+      this.liveKitConfig.assertCanStart()
+      return status
+    } catch (error) {
+      if (error instanceof LiveKitConfigError) {
+        throw new RtcOrchestrationError(error.message, error.statusCode)
       }
 
-      request.end()
-    })
+      throw error
+    }
   }
 }
 
-function ensureTrailingSlash(value: string): string {
-  return value.endsWith('/') ? value : `${value}/`
+function mapLiveKitExecutionStatus(
+  status: LiveKitExecutionStatus,
+): RtcExecutionBackendStatus {
+  return {
+    configured: status.configured,
+    enabled: status.enabled,
+    detail: status.detail,
+    serverUrl: status.browserUrl ?? status.serverUrl,
+    missingEnv: [...status.missingEnv],
+  }
 }
 
 function normalizeUid(value: number | undefined): number | null {
@@ -439,24 +394,6 @@ function buildChannelName(mode: RtcSessionMode | undefined): string {
         ? 'voxquick'
         : 'voxrtc'
   return `${prefix}_${Date.now().toString(36)}_${uuidv4().slice(0, 8)}`
-}
-
-function buildModePropertyOverrides(
-  mode: RtcSessionMode | undefined,
-): RtcPropertyOverrides {
-  if (mode !== 'training') {
-    return {}
-  }
-
-  // Keep training on the same shared app/memory path, but turn off
-  // conversation-oriented behaviors that do not belong to practice mode.
-  return {
-    main_control: {
-      enable_greeting: false,
-      enable_correction: false,
-      enable_interrupt: false,
-    },
-  }
 }
 
 function resolveSessionIntent(input: StartRtcSessionInput): RtcResolvedSessionIntent {
@@ -625,70 +562,25 @@ function buildSessionReadinessSummary(input: {
 
   return {
     status: 'ready',
-    label: '已经准备好',
+    label: input.mode === 'training' ? '已经准备好训练' : '已经准备好沟通',
     detail:
       input.mode === 'training'
-        ? '这页已经满足训练会话的基础条件，可以直接开始这一句。'
+        ? '这页已经满足训练会话的基础条件，可以直接开始录音练习。'
         : '这页已经满足沟通会话的基础条件，可以直接连接并开始表达。',
     nextAction:
       input.mode === 'training'
-        ? '可以直接点录音开始，不需要再做额外准备。'
+        ? '可以直接开始这一句训练。'
         : '可以直接连接助手或开始表达，不需要再做额外准备。',
     blockerSummary,
     warningSummary,
   }
 }
 
-function mergePropertyOverrides(
-  base: RtcPropertyOverrides,
-  override: RtcPropertyOverrides,
-): RtcPropertyOverrides {
-  const merged: RtcPropertyOverrides = { ...base }
-
-  Object.entries(override).forEach(([extensionName, extensionProperties]) => {
-    merged[extensionName] = mergeNestedRecords(
-      merged[extensionName] ?? {},
-      extensionProperties,
-    )
-  })
-
-  return merged
-}
-
-function mergeNestedRecords(
-  base: Record<string, unknown>,
-  override: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...base }
-
-  Object.entries(override).forEach(([key, value]) => {
-    const existingValue = merged[key]
-    if (isPlainRecord(existingValue) && isPlainRecord(value)) {
-      merged[key] = mergeNestedRecords(existingValue, value)
-      return
-    }
-
-    merged[key] = value
-  })
-
-  return merged
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function sanitizeChannelName(channelName: string): string {
-  const sanitized = channelName
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-
-  if (!sanitized) {
-    throw new RtcOrchestrationError('channel_name is required', 400)
+function sanitizeChannelName(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    throw new RtcOrchestrationError('channelName is required', 400)
   }
 
-  return sanitized.slice(0, 64)
+  return trimmed.replace(/[^a-zA-Z0-9_-]/g, '_')
 }

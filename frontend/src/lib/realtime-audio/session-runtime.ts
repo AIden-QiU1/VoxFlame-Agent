@@ -5,16 +5,13 @@ import type {
   MutableRefObject,
   SetStateAction,
 } from 'react'
-import type {
-  IAgoraRTCClient,
-  ILocalAudioTrack,
-} from 'agora-rtc-sdk-ng'
-import { connectAgoraTransport, disconnectAgoraTransport } from './agora-transport'
+import { config } from '@/lib/config'
 import {
   buildClientDeviceContext,
   defaultCapabilitiesForMode,
   defaultStrategyForMode,
   type RtcCapabilityId,
+  type RtcExecutionBackend,
   type RtcScene,
   type RtcSessionIntent,
   type RtcSessionMode,
@@ -37,22 +34,33 @@ import {
   stopRtcSession,
 } from './session-bootstrap'
 import {
+  appendUploadedTrainingRecord,
+  buildTrainingProfileMemorySummary,
+  markTrainingProfileSummarySynced,
+} from '@/lib/training/training-profile'
+import {
   applyDisconnectedState,
   applyRtcError,
 } from './session-state'
+import {
+  connectSessionExecution,
+  disconnectSessionExecution,
+  type SessionExecutionClient,
+} from './session-execution'
 import type {
-  AgoraRtmClient,
   RtcAgentState,
   RtcMessageEnvelope,
   RtmMessageEvent,
+  SessionControlClient,
+  SessionMicrophoneTrack,
   StartRtcSessionResponse,
 } from './session-types'
 import { memoryService } from '@/lib/memory/memory-service'
 
 export interface SessionRuntimeRefs {
-  clientRef: MutableRefObject<IAgoraRTCClient | null>
-  rtmClientRef: MutableRefObject<AgoraRtmClient | null>
-  micTrackRef: MutableRefObject<ILocalAudioTrack | null>
+  clientRef: MutableRefObject<SessionExecutionClient | null>
+  rtmClientRef: MutableRefObject<SessionControlClient | null>
+  micTrackRef: MutableRefObject<SessionMicrophoneTrack | null>
   sessionRef: MutableRefObject<StartRtcSessionResponse | null>
   connectPromiseRef: MutableRefObject<Promise<void> | null>
   inboundRtmChunksRef: MutableRefObject<Map<string, ChunkAccumulator>>
@@ -77,6 +85,7 @@ interface StartRtcRuntimeConnectionOptions {
   surface?: RtcSurface
   scene?: RtcScene
   requestedCapabilities?: RtcCapabilityId[]
+  executionBackend?: RtcExecutionBackend
   connectionNotice: string | null
   suppressGreeting?: boolean
   setState: Dispatch<SetStateAction<RtcAgentState>>
@@ -142,6 +151,204 @@ export function createDecodedRtcMessageHandler({
       extractMemoryTurnsFromEnvelope(message).forEach((turn) => {
         memoryService.addTurn(turn.role, turn.content)
       })
+
+      if (message.type === 'training_feedback') {
+        const trainingSummary =
+          typeof message.summary === 'string' && message.summary.trim()
+            ? message.summary
+            : typeof message.pronunciation_summary === 'string'
+              ? message.pronunciation_summary
+              : ''
+
+        if (trainingSummary) {
+          memoryService.addMemoryEntry({
+            type: 'voice_profile',
+            content: trainingSummary,
+            metadata: {
+              kind: 'training_result',
+              exercise_id:
+                typeof message.exercise_id === 'string' ? message.exercise_id : undefined,
+              exercise_category:
+                typeof message.exercise_category === 'string'
+                  ? message.exercise_category
+                  : undefined,
+              recognized_text:
+                typeof message.recognized_text === 'string'
+                  ? message.recognized_text
+                  : undefined,
+              feedback_status:
+                typeof message.feedback_status === 'string'
+                  ? message.feedback_status
+                  : undefined,
+              clarity_score:
+                typeof message.clarity_score === 'number' ? message.clarity_score : undefined,
+              keywords: Array.isArray(message.keywords) ? message.keywords : [],
+              focus_tags: Array.isArray(message.focus_tags) ? message.focus_tags : [],
+              focus_syllables: Array.isArray(message.focus_syllables)
+                ? message.focus_syllables
+                : (
+                  typeof message.primary_pinyin === 'string' && message.primary_pinyin.trim()
+                    ? [message.primary_pinyin]
+                    : []
+                ),
+              pronunciation_summary:
+                typeof message.pronunciation_summary === 'string'
+                  ? message.pronunciation_summary
+                  : undefined,
+              articulation_tips:
+                Array.isArray(message.articulation_tips)
+                  ? message.articulation_tips
+                  : (
+                    typeof message.articulation_tip === 'string' && message.articulation_tip.trim()
+                      ? [message.articulation_tip]
+                      : []
+                  ),
+              pronunciation_initial_pairs: Array.isArray(message.pronunciation_initial_pairs)
+                ? message.pronunciation_initial_pairs
+                : [],
+              pronunciation_final_pairs: Array.isArray(message.pronunciation_final_pairs)
+                ? message.pronunciation_final_pairs
+                : [],
+              pronunciation_tone_pairs: Array.isArray(message.pronunciation_tone_pairs)
+                ? message.pronunciation_tone_pairs
+                : [],
+              pronunciation_targets: Array.isArray(message.pronunciation_targets)
+                ? message.pronunciation_targets
+                : [],
+            },
+            sessionMetadata: {
+              kind: 'training',
+              source: 'livekit_training_feedback',
+              category:
+                typeof message.exercise_category === 'string'
+                  ? message.exercise_category
+                  : undefined,
+            },
+          })
+
+          const uploadedRecord = appendUploadedTrainingRecord(memoryOwnerId, {
+            exerciseId:
+              typeof message.exercise_id === 'string' && message.exercise_id.trim()
+                ? message.exercise_id
+                : `livekit_training_${Date.now()}`,
+            exerciseCategory:
+              typeof message.exercise_category === 'string' && message.exercise_category.trim()
+                ? message.exercise_category
+                : '训练',
+            exerciseText:
+              typeof message.exercise_text === 'string' ? message.exercise_text : '',
+            status:
+              message.feedback_status === 'excellent' ||
+              message.feedback_status === 'close' ||
+              message.feedback_status === 'retry' ||
+              message.feedback_status === 'unclear'
+                ? message.feedback_status
+                : 'unclear',
+            clarityScore:
+              typeof message.clarity_score === 'number'
+                ? Math.max(0, Math.min(1, message.clarity_score))
+                : 0,
+            durationSeconds: 0,
+            focusTags: Array.isArray(message.focus_tags) ? message.focus_tags : [],
+            focusSyllables:
+              Array.isArray(message.focus_syllables)
+                ? message.focus_syllables
+                : (
+                  typeof message.primary_pinyin === 'string' && message.primary_pinyin.trim()
+                    ? [message.primary_pinyin]
+                    : []
+                ),
+            initialPairs: Array.isArray(message.pronunciation_initial_pairs)
+              ? message.pronunciation_initial_pairs
+              : [],
+            finalPairs: Array.isArray(message.pronunciation_final_pairs)
+              ? message.pronunciation_final_pairs
+              : [],
+            tonePairs: Array.isArray(message.pronunciation_tone_pairs)
+              ? message.pronunciation_tone_pairs
+              : [],
+            articulationTips:
+              Array.isArray(message.articulation_tips)
+                ? message.articulation_tips
+                : (
+                  typeof message.articulation_tip === 'string' && message.articulation_tip.trim()
+                    ? [message.articulation_tip]
+                    : []
+                ),
+            keywords: Array.isArray(message.keywords) ? message.keywords : [],
+            pronunciationSummary:
+              typeof message.pronunciation_summary === 'string'
+                ? message.pronunciation_summary
+                : trainingSummary,
+          })
+
+          if (uploadedRecord.shouldSyncSummary) {
+            const summary = buildTrainingProfileMemorySummary(uploadedRecord.snapshot)
+            memoryService.addMemoryEntry({
+              type: 'semantic',
+              content: summary.content,
+              metadata: summary.metadata,
+              sessionMetadata: {
+                kind: 'training',
+                source: 'training_profile_summary',
+                category:
+                  typeof message.exercise_category === 'string'
+                    ? message.exercise_category
+                    : undefined,
+              },
+            })
+            markTrainingProfileSummarySynced(
+              memoryOwnerId,
+              uploadedRecord.snapshot.totalUploadedRecordings,
+            )
+          }
+        }
+
+        memoryService.updateCurrentSessionMetadata({
+          lastTrainingFeedbackSource:
+            typeof message.source === 'string' ? message.source : 'unknown',
+          lastTrainingFeedbackAt: Date.now(),
+          lastTrainingFeedbackStatus:
+            typeof message.feedback_status === 'string' ? message.feedback_status : undefined,
+          lastTrainingFeedbackSummary:
+            typeof message.summary === 'string' ? message.summary : undefined,
+          lastTrainingFeedbackNextStep:
+            typeof message.next_step === 'string' ? message.next_step : undefined,
+          lastTrainingExerciseId:
+            typeof message.exercise_id === 'string' ? message.exercise_id : undefined,
+          lastTrainingFocusSyllables: Array.isArray(message.focus_syllables)
+            ? message.focus_syllables
+            : undefined,
+          lastTrainingArticulationTips: Array.isArray(message.articulation_tips)
+            ? message.articulation_tips
+            : (
+              typeof message.articulation_tip === 'string' && message.articulation_tip.trim()
+                ? [message.articulation_tip]
+                : undefined
+            ),
+          lastTrainingPronunciationTargets: Array.isArray(message.pronunciation_targets)
+            ? message.pronunciation_targets
+            : undefined,
+          clarity_score:
+            typeof message.clarity_score === 'number' ? message.clarity_score : undefined,
+        })
+      }
+
+      if (message.type === 'voice_profile_updated') {
+        memoryService.updateCurrentSessionMetadata({
+          lastVoiceProfileSource:
+            typeof message.source === 'string' ? message.source : 'unknown',
+          lastVoiceProfileUpdatedAt: Date.now(),
+          clarity_score:
+            typeof message.clarity_score === 'number' ? message.clarity_score : undefined,
+          communicationScene:
+            typeof message.exercise_category === 'string' ? message.exercise_category : undefined,
+          communicationConfusionPatternsCount:
+            typeof message.confusion_patterns_count === 'number'
+              ? message.confusion_patterns_count
+              : undefined,
+        })
+      }
     }
 
     setState((prev) => reduceRtcEnvelope(prev, message))
@@ -192,8 +399,8 @@ export async function disconnectRtcRuntime({
 
   setState((prev) => applyDisconnectedState(prev))
 
-  await disconnectAgoraTransport({
-    client,
+  await disconnectSessionExecution({
+    clientHandle: client,
     rtmClient,
     micTrack,
     session,
@@ -217,6 +424,7 @@ export async function startRtcRuntimeConnection({
   surface,
   scene,
   requestedCapabilities,
+  executionBackend,
   connectionNotice,
   suppressGreeting,
   setState,
@@ -240,19 +448,21 @@ export async function startRtcRuntimeConnection({
     deviceContext: buildClientDeviceContext(mode),
   }
 
-  const session = await startRtcSession(mode, sessionIntent)
-  let client: IAgoraRTCClient | null = null
-  let rtmClient: AgoraRtmClient | null = null
+  const session = await startRtcSession(mode, sessionIntent, {
+    executionBackend: executionBackend ?? config.rtc.executionBackend,
+  })
+  let client: SessionExecutionClient | null = null
+  let rtmClient: SessionControlClient | null = null
   let connectionError: Error | null = null
 
   try {
     const transportEventHandlers = createSessionTransportEventHandlers(setState)
-    const transport = await connectAgoraTransport({
+    const transport = await connectSessionExecution({
       session,
       onRtmMessage: handleRtmMessage,
       ...transportEventHandlers,
     })
-    client = transport.client
+    client = transport.clientHandle
     rtmClient = transport.rtmClient
 
     refs.clientRef.current = client
@@ -263,6 +473,11 @@ export async function startRtcRuntimeConnection({
       memoryService.updateCurrentSessionMetadata({
         kind: session.intent.mode === 'training' ? 'training' : 'communication',
         source: 'rtc_agent',
+        surface: session.intent.surface,
+        scene: session.intent.scene,
+        sessionStrategy: session.intent.sessionStrategy,
+        executionBackend: session.executionBackend,
+        transportProvider: session.transport.provider,
       })
     }
 
@@ -300,8 +515,8 @@ export async function startRtcRuntimeConnection({
       // ignore cleanup error
     }
 
-    await disconnectAgoraTransport({
-      client,
+    await disconnectSessionExecution({
+      clientHandle: client,
       rtmClient,
       micTrack: refs.micTrackRef.current,
       session,

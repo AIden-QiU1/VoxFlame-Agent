@@ -15,15 +15,16 @@ VoxFlame 是面向构音障碍沟通场景的主动沟通助手。当前目标�
 当前唯一事实源：
 
 ```text
-Frontend RTC/RTM
+Frontend LiveKit RTC/Data
   -> Backend /api/rtc/session/*
-  -> TEN rtc graph
-  -> Qwen realtime ASR / TTS
+  -> self-hosted livekit-server
+  -> livekit_agent
+  -> DashScope / Qwen ASR / TTS / correction
 ```
 
-- `Frontend`：Agora RTC 音频、Agora RTM 文本/控制、沟通页与训练页；PWA 已恢复为正式能力，默认随前端容器开启。
+- `Frontend`：LiveKit RTC 音频、room data 文本/控制、沟通页与训练页；PWA 已恢复为正式能力，默认随前端容器开启。
 - `Backend`：RTC session orchestration、memory API、phrases API、upload API。
-- `TEN Agent`：服务端 VAD、Qwen realtime ASR/TTS、LLM 纠错、memory layer。
+- `LiveKit Agent`：位于 [livekit_agent/](/home/ubuntu/VoxFlame-Agent/livekit_agent)；当前已承接沟通/训练的执行面主链。
 - 旧运行时 `websocket` 主链已经退役，不再作为兼容路径保留。
 
 ## 当前能力
@@ -40,8 +41,8 @@ Frontend RTC/RTM
 - 训练数据入口这轮也开始扎实起来：前端已围绕 `recording envelope -> recorder queue -> upload receipt` 收口，后端 `/api/upload/complete` 已开始按 `audio_path` 复用已有 contribution / manifest，减少补传和重试时的重复写入。
 - 本地待同步录音现在不再只是“有个数量提示”，而是会带 `syncStatus / syncAttempts / lastAttemptAt / lastError` 显式展示，后续 PWA、web 和 future companion 可以围绕同一套 recorder queue contract 继续扩展。
 - [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 同时承担会话启动、RTM 事件路由、字幕聚合、voice profile 同步和本地 memory session 管理，已经逼近“第二控制面”。
-- 长期用户状态目前分散在前端 [memory-service.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/memory-service.ts)、后端 [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 和 TEN 的 [memory_layer_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/memory_layer_python/extension.py)；方向没错，但还缺统一的 `profile bundle / session review` 读模型。
-- TEN 主控 [extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/voxflame_main_python/extension.py) 已同时背负 transport relay、训练结果处理、voice profile 转发和会话状态管理，近期应该停长产品语义，而不是继续堆功能。
+- 长期用户状态正在继续收口到前端 [memory-service.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/memory-service.ts) 与后端 [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 共同维护的 `workspace snapshot / memory profile / expression kit` 读写链，不再继续向旧执行面分叉。
+- 记忆系统当前重点不是继续堆训练复盘，而是把“用户画像、常见场景、即将面对场景的准备、热词、发音规律、补救策略”压缩成可直接服务沟通与训练的 owner 数据。
 
 ## 当前重点
 
@@ -60,7 +61,7 @@ Frontend RTC/RTM
 - 把会话 transport、字幕 reducer、短语动作和训练同步从巨型 hook 里拆开，避免前端继续长成第二控制面。
 
 5. 执行面去供应商化
-- 继续使用 `TEN + Agora` 跑现役主链，但产品层逐步改用 vendor-neutral 的 `session / transport / capability` 语言。
+- 继续围绕 `self-hosted LiveKit + livekit_agent` 收紧 vendor-neutral 的 `session / transport / capability` 语言。
 
 ## 近期开发路径
 
@@ -68,8 +69,8 @@ Frontend RTC/RTM
 2. 继续把训练数据链路收口到 `recording envelope / recorder queue / upload/complete`，补 authenticated live smoke，并强化上传幂等性。
    当前 web 端已经补到“队列状态可追踪、失败可解释、重试可见”，下一步重点是把真实登录态 smoke 和队列/manifest 落盘一起跑通。
 3. 在 backend 增加 `profile bundle` 和 `session review` 读写口，让沟通页、训练页、记忆页消费同一份长期画像。
-4. 重构前端 session hooks：保留当前 RTC/RTM 主链，但把 transport bootstrap、消息归并、memory sync 解耦。
-5. 在不替换 runtime 的前提下，收紧 TEN 主控职责，只保留 realtime orchestration，逐步把产品治理逻辑移回 backend/control plane。
+4. 继续收紧前端 session hooks：沿当前 LiveKit RTC/Data 主链，把 transport bootstrap、消息归并、memory sync 解耦。
+5. 在不再改变大架构的前提下，把训练页与记忆页的 AI 功能继续补齐，并清掉仓库里仍把 TEN/Agora 当现役主链的旧入口与旧叙事。
 
 ## 快速开始
 
@@ -77,7 +78,7 @@ Frontend RTC/RTM
 
 - Docker + Docker Compose
 - DashScope API Key
-- Agora App ID + App Certificate
+- LiveKit API Key + Secret（self-hosted server 自签）
 - Supabase 项目
 
 ### 环境变量
@@ -86,14 +87,15 @@ Frontend RTC/RTM
 cp .env.example .env
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
-cp ten_agent/.env.example ten_agent/.env
+cp livekit_agent/.env.example livekit_agent/.env
 ```
 
 关键变量：
 
 - `DASHSCOPE_API_KEY`
-- `AGORA_APP_ID`
-- `AGORA_APP_CERTIFICATE` 或 `AGORA_CERTIFICATE`
+- `LIVEKIT_URL`
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
@@ -104,17 +106,23 @@ cp ten_agent/.env.example ten_agent/.env
 ### 启动
 
 ```bash
-docker compose up -d --build
-docker compose ps
+sudo docker compose up -d --build livekit-server backend frontend livekit-agent
+sudo docker compose ps
 ```
 
 常用命令：
 
 ```bash
-docker compose logs -f frontend
-docker compose logs -f backend
-docker compose logs -f ten-agent
-docker compose down
+sudo docker compose logs -f frontend
+sudo docker compose logs -f backend
+sudo docker compose logs -f livekit-agent
+sudo docker compose down
+```
+
+可选服务默认不参与主链启动；如果需要再显式启用：
+
+```bash
+sudo docker compose --profile extras up -d qdrant redis
 ```
 
 ### 访问入口
@@ -122,7 +130,7 @@ docker compose down
 - Frontend: `http://localhost:3000`
 - Backend health: `http://localhost:3001/health`
 - RTC orchestration health: `http://localhost:3001/api/rtc/health`
-- TEN control server: `http://localhost:8080/health`
+- LiveKit signaling: `ws://localhost:3000/rtc`
 
 ## 目录
 
@@ -135,10 +143,7 @@ VoxFlame-Agent/
 │   └── src/lib/
 ├── backend/
 │   └── src/
-├── ten_agent/
-│   ├── extension_src/
-│   ├── property.json
-│   └── manifest.json
+├── livekit_agent/
 ├── scripts/
 ├── docs/
 └── docker-compose.yml
@@ -149,8 +154,7 @@ VoxFlame-Agent/
 - 前端沟通会话：[frontend/src/hooks/useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts)
 - 前端训练会话：[frontend/src/hooks/useMandarinTrainingSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useMandarinTrainingSession.ts)
 - 后端 RTC orchestration：[backend/src/services/rtc-orchestration.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/rtc-orchestration.service.ts)
-- TEN runtime graph：[ten_agent/property.json](/home/ubuntu/VoxFlame-Agent/ten_agent/property.json)
-- TEN 主控扩展：[ten_agent/extension_src/voxflame_main_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/voxflame_main_python/extension.py)
+- LiveKit runtime agent：[livekit_agent/app.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/app.py)
 
 ## 验证脚本
 

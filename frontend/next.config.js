@@ -30,11 +30,18 @@ const nextConfig = {
     NEXT_PUBLIC_PWA_ENABLED: pwaEnabled ? "1" : "0",
   },
   async rewrites() {
-    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:3001';
+    const backendUrl =
+      process.env.BACKEND_INTERNAL_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://backend:3001';
     return [
       {
         source: '/api/:path*',
         destination: `${backendUrl}/api/:path*`,
+      },
+      {
+        source: '/rtc/:path*',
+        destination: 'http://livekit-server:7880/rtc/:path*',
       }
     ]
   }

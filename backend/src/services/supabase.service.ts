@@ -102,6 +102,22 @@ export interface ExpressionKitSuggestion {
 export interface WorkspaceMemorySnapshot {
   profile_bundle: ProfileBundleSnapshot;
   session_review: SessionReviewSnapshot;
+  preparation: {
+    active_scene_id: WorkspaceSceneId | null;
+    profile_summary: string;
+    overview: string;
+    immediate_goal: string | null;
+    scene_brief: string | null;
+    common_scenarios: string[];
+    strong_phrases: string[];
+    risky_terms: string[];
+    pronunciation_patterns: string[];
+    listener_guidance: string[];
+    support_strategies: string[];
+    hotwords: string[];
+    next_step: string | null;
+    updated_at: string;
+  };
   expression_kit: {
     active_scene_id: WorkspaceSceneId | null;
     personalized_phrases: ExpressionKitSuggestion[];
@@ -165,6 +181,33 @@ function dedupeStrings(values: string[], limit?: number): string[] {
   );
 
   return typeof limit === 'number' ? unique.slice(0, limit) : unique;
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function readStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map((item) => item.trim());
+}
+
+function readFirstLabel(values: unknown): string | null {
+  if (!Array.isArray(values) || values.length === 0) {
+    return null;
+  }
+
+  const first = values[0];
+  if (!isRecord(first)) {
+    return null;
+  }
+
+  return readString(first, 'label');
 }
 
 function sortPhrasesForSuggestions(phrases: QuickPhrase[]): QuickPhrase[] {
@@ -627,6 +670,7 @@ export class SupabaseService {
     return {
       profile_bundle: this.buildProfileBundle(profileSnapshot, userProfile),
       session_review: this.buildSessionReview(profileSnapshot, syncedAt),
+      preparation: this.buildPreparationSnapshot(profileSnapshot, userProfile, options.sceneId, syncedAt),
       expression_kit: this.buildExpressionKit(
         profileSnapshot,
         quickPhrases,
@@ -757,6 +801,30 @@ export class SupabaseService {
       });
     }
 
+    if (growthProfile.articulationTips.length > 0) {
+      dynamicItems.push({
+        id: 'articulation-tip',
+        title: '当前动作提醒',
+        content: growthProfile.articulationTips[0].label,
+        source: 'growth_profile',
+        emphasis: 'high',
+        tags: growthProfile.articulationTips.slice(0, 3).map((item) => item.label),
+        updated_at: nowIso,
+      });
+    }
+
+    if (growthProfile.frequentConfusions.length > 0) {
+      dynamicItems.push({
+        id: 'confusion-spotlight',
+        title: '当前最容易卡住的点',
+        content: growthProfile.frequentConfusions[0].label,
+        source: 'growth_profile',
+        emphasis: 'medium',
+        tags: growthProfile.frequentConfusions.slice(0, 4).map((item) => item.label),
+        updated_at: nowIso,
+      });
+    }
+
     if (growthProfile.frequentExpressions.length > 0) {
       dynamicItems.push({
         id: 'frequent-expressions',
@@ -782,12 +850,22 @@ export class SupabaseService {
     });
 
     growthProfile.recentTraining.slice(0, 2).forEach((memory) => {
+      const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+      const nextStep = readString(metadata, 'next_step');
+      const pronunciationSummary =
+        readString(metadata, 'pronunciation_summary') ??
+        readString(metadata, 'last_pronunciation_summary');
+
       relevantItems.push({
         id: `memory-${memory.id}`,
-        title: '最近训练记录',
-        content: memory.content,
+        title: '最近训练复盘',
+        content: nextStep || pronunciationSummary || memory.content,
         source: 'memory',
         emphasis: 'low',
+        tags: dedupeStrings([
+          ...readStringList(metadata?.focus_syllables),
+          ...readStringList(metadata?.pronunciation_targets),
+        ], 4),
         updated_at: new Date(memory.updatedAt).toISOString(),
       });
     });
@@ -804,17 +882,47 @@ export class SupabaseService {
     syncedAt: string,
   ): SessionReviewSnapshot {
     const latestSession = snapshot.growth_profile.recentSessions[0];
+    const latestTrainingMemory = snapshot.growth_profile.recentTraining[0];
+    const latestTrainingMetadata = isRecord(latestTrainingMemory?.metadata)
+      ? latestTrainingMemory.metadata
+      : undefined;
+    const focusSpotlight =
+      readFirstLabel(latestTrainingMetadata?.frequent_focus) ??
+      readFirstLabel(latestTrainingMetadata?.frequent_syllables) ??
+      snapshot.growth_profile.frequentFocus[0]?.label ??
+      snapshot.growth_profile.frequentSyllables[0]?.label ??
+      null;
+    const articulationSpotlight =
+      readFirstLabel(latestTrainingMetadata?.articulation_tips) ??
+      snapshot.growth_profile.articulationTips[0]?.label ??
+      null;
     const recentWin =
       snapshot.growth_profile.stats.improvementDirection === 'improving'
-        ? '训练清晰度趋势正在提升'
-        : snapshot.growth_profile.frequentExpressions[0]?.label ?? null;
+        ? `最近 7 次训练清晰度已经回升到 ${formatPercent(snapshot.growth_profile.stats.rollingClarityAverage)}`
+        : articulationSpotlight ??
+          snapshot.growth_profile.frequentExpressions[0]?.label ??
+          null;
+    const trainingSummary =
+      readString(latestTrainingMetadata, 'last_pronunciation_summary') ??
+      readString(latestTrainingMetadata, 'pronunciation_summary') ??
+      latestTrainingMemory?.content ??
+      null;
+    const trainingUploads =
+      readNumber(latestTrainingMetadata, 'total_training_uploads') ??
+      snapshot.growth_profile.stats.totalTrainingAttempts;
 
     if (!latestSession) {
       return {
         session_id: null,
-        headline: '还没有稳定的会话复盘',
-        summary: '先用 starter kit 和表达工具箱把第一句话说出去，系统会逐步积累你的个体表达画像。',
-        focus: snapshot.growth_profile.frequentFocus.slice(0, 3).map((item) => item.label),
+        headline: trainingSummary ? '最近一次训练复盘' : '还没有稳定的会话复盘',
+        summary: trainingSummary
+          ? `${trainingSummary} 现在已经累计 ${trainingUploads} 条训练记录，近 7 次平均清晰度 ${formatPercent(snapshot.growth_profile.stats.rollingClarityAverage)}。`
+          : '先用 starter kit 和表达工具箱把第一句话说出去，系统会逐步积累你的个体表达画像。',
+        focus: dedupeStrings([
+          ...(focusSpotlight ? [focusSpotlight] : []),
+          ...snapshot.growth_profile.frequentFocus.slice(0, 3).map((item) => item.label),
+          ...snapshot.growth_profile.frequentSyllables.slice(0, 2).map((item) => item.label),
+        ], 4),
         recent_win: recentWin,
         next_step: snapshot.growth_profile.nextStep || null,
         updated_at: syncedAt,
@@ -832,11 +940,167 @@ export class SupabaseService {
 
     return {
       session_id: latestSession.id,
-      headline: '最近一次沟通复盘',
-      summary: `最近一次 ${latestSession.kind} 会话共 ${latestSession.turnCount} 轮，持续 ${latestSession.durationSeconds} 秒，平均清晰度 ${Math.round(latestSession.avgClarityScore * 100)}%。`,
+      headline:
+        latestSession.kind === 'training'
+          ? '最近一次训练复盘'
+          : '最近一次沟通复盘',
+      summary:
+        latestSession.kind === 'training' && trainingSummary
+          ? `${trainingSummary} 这次训练共 ${latestSession.turnCount} 轮，持续 ${latestSession.durationSeconds} 秒，平均清晰度 ${formatPercent(latestSession.avgClarityScore)}。`
+          : `最近一次 ${latestSession.kind} 会话共 ${latestSession.turnCount} 轮，持续 ${latestSession.durationSeconds} 秒，平均清晰度 ${formatPercent(latestSession.avgClarityScore)}。`,
       focus,
       recent_win: recentWin,
       next_step: snapshot.growth_profile.nextStep || null,
+      updated_at: syncedAt,
+    };
+  }
+
+  private buildPreparationSnapshot(
+    snapshot: MemoryProfileSnapshot,
+    userProfile: UserProfile | null,
+    sceneId: WorkspaceSceneId | undefined,
+    syncedAt: string,
+  ): WorkspaceMemorySnapshot['preparation'] {
+    const growthProfile = snapshot.growth_profile;
+    const latestTrainingMemory = growthProfile.recentTraining[0];
+    const latestTrainingMetadata = isRecord(latestTrainingMemory?.metadata)
+      ? latestTrainingMemory.metadata
+      : undefined;
+    const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
+    const communicationPreferences = normalizeCommunicationPreferences(
+      preferences?.communication_preferences,
+    );
+    const sceneBrief = sceneId
+      ? ({
+          interview: '这次重点是先稳住开场、节奏和结论，不求华丽，先求完整说完。',
+          workplace: '这次重点是先交代关键信息，再进入细节，避免一开始就陷进长解释。',
+          stranger: '这次重点是先说明自己的状态，再快速提出需求或问题。',
+          medical: '这次重点是先把症状、持续时间和你最需要的帮助讲清楚。',
+          caregiver: '这次重点是先说需求和节奏，避免家人或照护者替你抢答。',
+          emergency: '这次重点是先把求助、位置和风险说清楚。',
+        } satisfies Record<WorkspaceSceneId, string>)[sceneId]
+      : null;
+    const immediateGoal =
+      growthProfile.nextStep ||
+      readString(latestTrainingMetadata, 'next_step') ||
+      communicationPreferences.opening_phrase ||
+      null;
+    const supportStrategies = dedupeStrings(
+      [
+        communicationPreferences.opening_phrase
+          ? `先用固定开场白把节奏稳住：${communicationPreferences.opening_phrase}`
+          : '',
+        communicationPreferences.pace_hint
+          ? `提前告诉对方如何配合你：${communicationPreferences.pace_hint}`
+          : '',
+        communicationPreferences.repair_phrase
+          ? `没听清时优先用补救句：${communicationPreferences.repair_phrase}`
+          : '',
+        growthProfile.articulationTips[0]?.label
+          ? `动作提醒：${growthProfile.articulationTips[0].label}`
+          : '',
+      ],
+      4,
+    );
+    const listenerGuidance = dedupeStrings(
+      [
+        communicationPreferences.pace_hint
+          ? `希望对方这样配合：${communicationPreferences.pace_hint}`
+          : '',
+        communicationPreferences.repair_phrase
+          ? `没听清时优先这样补救：${communicationPreferences.repair_phrase}`
+          : '',
+        growthProfile.articulationTips[0]?.label
+          ? `当前最有效的动作提醒：${growthProfile.articulationTips[0].label}`
+          : '',
+      ],
+      3,
+    );
+    const strongPhrases = dedupeStrings(
+      [
+        ...growthProfile.frequentExpressions.slice(0, 4).map((item) => item.label),
+        ...snapshot.memories
+          .filter((memory) => {
+            const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+            return readString(metadata, 'kind') === 'training_result';
+          })
+          .slice(0, 2)
+          .map((memory) => memory.content),
+      ],
+      6,
+    );
+    const commonScenarios = dedupeStrings(
+      [
+        ...snapshot.hotword_profiles
+          .map((profile) => profile.scenario)
+          .filter((value) => value.trim().length > 0),
+        ...(sceneId ? [sceneId] : []),
+      ],
+      6,
+    );
+    const riskyTerms = dedupeStrings(
+      [
+        ...growthProfile.frequentConfusions.slice(0, 4).map((item) => item.label),
+        ...growthProfile.frequentInitialPairs.slice(0, 2).map((item) => item.label),
+        ...growthProfile.frequentFinalPairs.slice(0, 2).map((item) => item.label),
+      ],
+      6,
+    );
+    const pronunciationPatterns = dedupeStrings(
+      [
+        ...growthProfile.frequentFocus.slice(0, 3).map((item) => item.label),
+        ...growthProfile.frequentSyllables.slice(0, 3).map((item) => item.label),
+        ...growthProfile.articulationTips.slice(0, 2).map((item) => item.label),
+      ],
+      6,
+    );
+    const hotwords = dedupeStrings(
+      [
+        ...snapshot.hotword_profiles.slice(0, 6).map((profile) => profile.phrase),
+        ...snapshot.hotwords.slice(0, 6),
+      ],
+      8,
+    );
+    const profileSummary = (() => {
+      const focus = growthProfile.frequentFocus[0]?.label ?? growthProfile.frequentSyllables[0]?.label;
+      const confusion = growthProfile.frequentConfusions[0]?.label;
+      const trainingVolume = growthProfile.stats.totalTrainingAttempts;
+      const clarity = growthProfile.stats.rollingClarityAverage;
+
+      if (focus && confusion) {
+        return `你现在已经有比较稳定的个人表达规律：常见重点会落在“${focus}”，系统最容易听偏的是“${confusion}”。${
+          trainingVolume > 0
+            ? ` 目前累计 ${trainingVolume} 条训练记录，近 7 次平均清晰度 ${formatPercent(clarity)}。`
+            : ''
+        }`;
+      }
+
+      if (communicationPreferences.opening_phrase || communicationPreferences.pace_hint) {
+        return '你已经开始形成自己的沟通方式：先用固定开场白稳住节奏，再告诉对方怎样配合你，这会比临场硬撑更有效。';
+      }
+
+      return '这里会逐步压缩出你的个人表达画像：你最常面对什么场景、系统最容易听偏什么、什么表达和补救方式最适合你。';
+    })();
+    const overview = sceneBrief
+      ? `${sceneBrief}${immediateGoal ? ` 当前最该先准备的是：${immediateGoal}` : ''}`
+      : immediateGoal
+        ? `当前最该先准备的是：${immediateGoal}`
+        : '先固定一条开场白、一句补救句和 3 个最关键热词，现场会稳很多。';
+
+    return {
+      active_scene_id: sceneId ?? null,
+      profile_summary: profileSummary,
+      overview,
+      immediate_goal: immediateGoal,
+      scene_brief: sceneBrief,
+      common_scenarios: commonScenarios,
+      strong_phrases: strongPhrases,
+      risky_terms: riskyTerms,
+      pronunciation_patterns: pronunciationPatterns,
+      listener_guidance: listenerGuidance,
+      support_strategies: supportStrategies,
+      hotwords,
+      next_step: growthProfile.nextStep ?? null,
       updated_at: syncedAt,
     };
   }

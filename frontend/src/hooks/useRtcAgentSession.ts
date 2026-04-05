@@ -1,9 +1,5 @@
 'use client'
 
-import type {
-  IAgoraRTCClient,
-  ILocalAudioTrack,
-} from 'agora-rtc-sdk-ng'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { memoryService } from '@/lib/memory/memory-service'
 import {
@@ -21,6 +17,7 @@ import {
 } from '@/lib/realtime-audio/session-audio'
 import {
   type RtcCapabilityId,
+  type RtcExecutionBackend,
   type RtcScene,
   type RtcSessionMode,
   type RtcSurface,
@@ -35,9 +32,11 @@ import {
   publishRtcRuntimeControlMessage,
   startRtcRuntimeConnection,
 } from '@/lib/realtime-audio/session-runtime'
+import type { SessionExecutionClient } from '@/lib/realtime-audio/session-execution'
 import type {
-  AgoraRtmClient,
   RtcAgentState,
+  SessionControlClient,
+  SessionMicrophoneTrack,
   StartRtcSessionResponse,
 } from '@/lib/realtime-audio/session-types'
 export type {
@@ -54,6 +53,7 @@ interface UseRtcAgentSessionOptions {
   surface?: RtcSurface
   scene?: RtcScene
   requestedCapabilities?: RtcCapabilityId[]
+  executionBackend?: RtcExecutionBackend
   connectionNotice?: string | null
 }
 
@@ -70,6 +70,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
     surface,
     scene,
     requestedCapabilities,
+    executionBackend,
     connectionNotice = mode === 'training'
       ? null
       : '已连接，请点击下方麦克风开始说话，也可以先用文字或短语沟通。',
@@ -78,9 +79,9 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
 
   const [state, setState] = useState<RtcAgentState>(createInitialRtcAgentState)
 
-  const clientRef = useRef<IAgoraRTCClient | null>(null)
-  const rtmClientRef = useRef<AgoraRtmClient | null>(null)
-  const micTrackRef = useRef<ILocalAudioTrack | null>(null)
+  const clientRef = useRef<SessionExecutionClient | null>(null)
+  const rtmClientRef = useRef<SessionControlClient | null>(null)
+  const micTrackRef = useRef<SessionMicrophoneTrack | null>(null)
   const micStreamRef = useRef<MediaStream | null>(null)
   const preflightMicStreamRef = useRef<MediaStream | null>(null)
   const micAudioContextRef = useRef<AudioContext | null>(null)
@@ -147,6 +148,22 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
   }, [memoryOwnerId])
 
   const disconnect = useCallback(async () => {
+    if (memoryOwnerId) {
+      memoryService.updateCurrentSessionMetadata({
+        sessionEndedReason: 'rtc_disconnect',
+        latestUserTranscript: latestUserTranscriptRef.current || undefined,
+        latestCorrectionOriginal: state.currentDualLine?.originalText,
+        latestCorrectionText: state.currentDualLine?.correctedText,
+        lastVoiceProfileSource: state.lastVoiceProfileSync?.source,
+        clarity_score:
+          typeof state.lastVoiceProfileSync?.clarityScore === 'number'
+            ? state.lastVoiceProfileSync.clarityScore / 100
+            : undefined,
+        sessionTurnCount: state.messages.length,
+      })
+      await memoryService.endSession()
+    }
+
     await disconnectRtcRuntime({
       refs: {
         clientRef,
@@ -161,9 +178,9 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
       cleanupMicrophoneResources,
       setState,
     })
-  }, [cleanupMicrophoneResources, clearPing])
+  }, [cleanupMicrophoneResources, clearPing, memoryOwnerId, state.currentDualLine, state.lastVoiceProfileSync, state.messages.length])
 
-  const ensureMicrophoneTrack = useCallback(async (): Promise<ILocalAudioTrack> => {
+  const ensureMicrophoneTrack = useCallback(async (): Promise<SessionMicrophoneTrack> => {
     return ensurePublishedMicrophoneTrack({
       clientRef,
       connectPromiseRef,
@@ -216,6 +233,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
         surface,
         scene,
         requestedCapabilities,
+        executionBackend,
         connectionNotice,
         suppressGreeting: connectOptions.suppressGreeting,
         setState,
@@ -243,6 +261,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
     memoryOwnerId,
     mode,
     requestedCapabilities,
+    executionBackend,
     scene,
     surface,
     userId,

@@ -1226,7 +1226,7 @@ export default function ContributePage() {
 
                     {agentFeedback ? (
                       <div className="rounded-3xl border border-amber-200 bg-[#fffaf0] px-5 py-5">
-                        <p className="text-sm font-medium text-gray-900">TEN 训练反馈</p>
+                        <p className="text-sm font-medium text-gray-900">训练反馈</p>
                         <p className="mt-3 text-sm leading-6 text-gray-700">{agentFeedback.summary}</p>
                         <p className="mt-3 text-sm leading-6 text-gray-700">下一步：{agentFeedback.nextStep}</p>
                       </div>

@@ -1,5 +1,11 @@
 import type {
+  LocalAudioTrack,
+  LocalTrackPublication,
+  Room,
+} from 'livekit-client'
+import type {
   RtcCapabilityId,
+  RtcExecutionBackend,
   RtcResolvedSessionIntent,
   RtcSessionReadiness,
 } from './session-contract'
@@ -57,10 +63,28 @@ export interface VoiceProfileSyncEvent {
   timestamp: Date
 }
 
+export interface LiveKitTransportRuntime {
+  provider: 'livekit'
+  serverUrl: string
+  roomName: string
+  participantIdentity: string
+  participantName: string
+  participantToken: string
+  participantMetadata: string
+  participantAttributes: Record<string, string>
+  agentDispatch: {
+    agentName: string
+    metadata: string
+  } | null
+}
+
+export type RtcTransportRuntime = LiveKitTransportRuntime
+
 export interface StartRtcSessionResponse {
   requestId: string
   channelName: string
   graphName: string
+  executionBackend: RtcExecutionBackend
   userUid: number
   botUid: number
   appId: string
@@ -70,6 +94,7 @@ export interface StartRtcSessionResponse {
   rtmToken: string
   timeoutSeconds: number
   controlServerUrl: string
+  transport: RtcTransportRuntime
   intent: RtcResolvedSessionIntent
   readiness: RtcSessionReadiness
 }
@@ -84,6 +109,8 @@ export interface RtcMessageEnvelope {
   corrected_text?: string
   original_text?: string
   clarity_score?: number
+  state?: string
+  auto_finalize?: boolean
   is_final?: boolean
   error?: string
   message?: string
@@ -97,12 +124,18 @@ export interface RtcMessageEnvelope {
   exercise_category?: string
   summary?: string
   focus_tags?: string[]
+  focus_syllables?: string[]
   keywords?: string[]
   pronunciation_summary?: string
+  pronunciation_initial_pairs?: string[]
+  pronunciation_final_pairs?: string[]
+  pronunciation_tone_pairs?: string[]
+  pronunciation_targets?: string[]
   encouragement?: string
   primary_focus?: string
   primary_pinyin?: string
   articulation_tip?: string
+  articulation_tips?: string[]
   next_step?: string
   confusion_patterns_count?: number
   persisted?: boolean
@@ -125,7 +158,7 @@ export interface RtmStatusEvent {
   reason?: string
 }
 
-export interface AgoraRtmClient {
+export interface SessionControlClient {
   login(options?: { token?: string }): Promise<unknown>
   logout(): Promise<unknown>
   publish(
@@ -143,6 +176,17 @@ export interface AgoraRtmClient {
     eventName: 'message' | 'status',
     listener: ((event: RtmMessageEvent) => void) | ((event: RtmStatusEvent) => void),
   ): void
+}
+
+export interface SessionMicrophoneTrack {
+  provider: 'livekit'
+  rawTrack: LocalAudioTrack
+  publication: LocalTrackPublication
+  room: Room
+  setEnabled(enabled: boolean): Promise<void>
+  getMediaStreamTrack(): MediaStreamTrack
+  stop(): void
+  close(): void
 }
 
 export interface RtcAgentState {

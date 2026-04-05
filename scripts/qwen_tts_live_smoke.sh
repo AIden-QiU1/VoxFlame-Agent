@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TEXT_INPUT="${1:-请给我一点时间，我正在努力说清楚。}"
-CONTAINER_NAME="${QWEN_TTS_SMOKE_CONTAINER:-voxflame-ten-agent}"
+CONTAINER_NAME="${QWEN_TTS_SMOKE_CONTAINER:-voxflame-livekit-agent}"
 
 if [[ -n "${QWEN_TTS_SMOKE_EXEC:-}" ]]; then
   # shellcheck disable=SC2206
@@ -37,6 +37,7 @@ def load_module(module_name: str, module_path: str):
     if spec is None or spec.loader is None:
         raise RuntimeError(f'failed to load module: {module_path}')
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -53,9 +54,9 @@ async def main() -> int:
 
     client_module = load_module(
         'qwen_tts_realtime_smoke_client',
-        '/app/ten_packages/extension/qwen_tts_realtime_python/realtime_client.py',
+        '/app/tts_runtime.py',
     )
-    client_cls = client_module.QwenRealtimeTTSClient
+    client_cls = client_module.DashScopeRealtimeTTSClient
 
     total_audio_bytes = 0
     audio_chunks = 0
@@ -109,7 +110,6 @@ async def main() -> int:
         api_key=api_key,
         connect_timeout_seconds=CONNECT_TIMEOUT_SECONDS,
         event_handler=handle_event,
-        logger=Logger(),
     )
 
     await client.start(
@@ -155,6 +155,6 @@ PY
 
 "${DOCKER_EXEC[@]}" "$CONTAINER_NAME" /bin/bash -lc "
 set -euo pipefail
-source /app/venv/bin/activate
+cd /app
 python -c \"$PYTHON_CODE\" \"$TEXT_INPUT\"
 "

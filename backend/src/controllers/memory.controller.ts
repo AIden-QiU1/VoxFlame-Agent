@@ -225,7 +225,7 @@ export class MemoryController {
     }
   }
 
-  // POST /api/memory/add - Add new memory from TEN Agent
+  // POST /api/memory/add - Add new memory from runtime agent / background sync
   async addMemory(req: Request, res: Response): Promise<void> {
     try {
       // 从认证中间件获取用户 ID

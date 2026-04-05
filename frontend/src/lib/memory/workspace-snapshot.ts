@@ -35,6 +35,22 @@ export interface WorkspaceMemorySnapshot {
     next_step: string | null
     updated_at: string
   }
+  preparation: {
+    active_scene_id: StarterKitScene['id'] | null
+    profile_summary: string
+    overview: string
+    immediate_goal: string | null
+    scene_brief: string | null
+    common_scenarios: string[]
+    strong_phrases: string[]
+    risky_terms: string[]
+    pronunciation_patterns: string[]
+    listener_guidance: string[]
+    support_strategies: string[]
+    hotwords: string[]
+    next_step: string | null
+    updated_at: string
+  }
   expression_kit: {
     active_scene_id: StarterKitScene['id'] | null
     personalized_phrases: ExpressionKitSuggestion[]

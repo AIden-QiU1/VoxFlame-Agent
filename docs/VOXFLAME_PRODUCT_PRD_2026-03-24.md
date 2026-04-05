@@ -4,7 +4,7 @@
 >
 > 本文档基于三类输入重写：
 > - 2026-03-24 的产品笔记与外部产品观察
-> - 当前代码现状：`frontend -> backend -> TEN`
+> - 当前代码现状：`frontend -> backend -> self-hosted LiveKit + livekit_agent`
 > - 既有路线文档中的仍然有效部分
 
 ---
@@ -68,9 +68,9 @@
 
 ### A. 实时主链已经成立
 
-当前唯一事实源仍然是：
+当前唯一事实源已经是：
 
-`Frontend RTC/RTM -> Backend /api/rtc/session/* -> TEN rtc graph`
+`Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`
 
 这意味着项目并不是“还停留在想法阶段”，而是已经有明确执行面。
 
@@ -922,36 +922,58 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 
 ## 10.1 按现状代码的最可行开发路径
 
-在当前仓库里，最可行的顺序不是“先换 runtime”，而是：
+在当前仓库里，最可行的顺序已经调整为“先把 execution backend 迁移 seam 建立起来，再继续加深 memory”，但不是 big bang 重写：
 
-1. 先把训练数据链路补完最后一段真实验证
-   - 真实物理麦克风 smoke
-   - accepted sample -> export manifest 闭环
-   - uploader / queue / manifest 幂等稳定性
-2. 继续把 runtime / surface / control contract 写进真实 surface
+1. 先冻结上层 contract，不再让后续迁移打散产品语言
+   - `workspace owner`
+   - `dataset schema`
+   - `session intent / readiness / capability gating`
+2. 建立 `execution backend` 过渡 seam
+   - backend `/api/rtc/session/start` 接受 `executionBackend`
+   - frontend runtime 不再直接只认 Agora transport
+   - 默认仍保持 `agora_ten`
+3. 再继续把 runtime / surface / control contract 写进真实 surface
    - `session intent`
    - `session strategy`
    - `capability gating`
    - `surface readiness`
-3. 再继续加固 backend `workspace`
+4. 在不影响现役主链的前提下，引入 LiveKit communication path 并行验证
+   - 默认流量继续走 `agora_ten`
+   - `livekit` 仅通过显式实验入口启用
+   - 先只覆盖 `communication workspace`
+   - 当前 `livekit_agent` 已经能跑通 communication 文字改写，但还没有达到 `TEN + Agora` 的全能力等价，不能误写成已替代现役执行面
+5. 只有 execution layer 稳定后，再继续加固 backend `workspace`
    - `profile bundle`
    - `session review`
    - `expression kit merge`
-4. 再把前端 session hooks 继续变薄
+6. 再把前端 session hooks 继续变薄
    - transport bootstrap
    - transcript reducer
    - memory sync
    - training feedback sync
-5. 然后才评估轻入口与 future multi-surface 扩展
+7. 然后才评估轻入口与 future multi-surface 扩展
    - `light voice`
    - `mobile companion`
    - `desktop companion`
+
+补充约束（2026-04-02）：
+
+1. LiveKit 迁移现在必须按三个节点判断，而不是按“是否已经有 worker 目录”判断：
+   - 节点 1：`LiveKit server` 部署与开发基座
+   - 节点 2：补齐现役 `TEN` 执行链功能并跑通全链路
+   - 节点 3：完全删除 `TEN + Agora`
+2. 当前最多算节点 1 已完成第一版开发基座，节点 2/3 都还未完成。
+3. 现役模型/语音执行面仍然以 `DashScope / Qwen-first` 为准，所以 `LiveKit + OpenAI stub` 只能算迁移骨架，不能算现役替代方案。
+
+详细对照见：
+
+- [VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md)
 
 ---
 
 ## 11. 当前不优先
 
-1. 再造一套 runtime
+1. 不保兼容、直接切主链的 big bang runtime 重写
 2. 用硬件叙事替代主产品闭环
 3. 把听障辅助并入当前首页主线
 4. 复杂社交页 / feed 页

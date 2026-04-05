@@ -2,6 +2,7 @@ import { Request, Response, Router } from 'express'
 import {
   RtcCapabilityId,
   RtcDeviceContext,
+  RtcExecutionBackend,
   RtcOrchestrationError,
   RtcOrchestrationService,
   RtcPropertyOverrides,
@@ -14,6 +15,10 @@ import {
 
 const router = Router()
 const rtcService = new RtcOrchestrationService()
+
+function parseExecutionBackend(value: unknown): RtcExecutionBackend | undefined {
+  return value === 'livekit' ? value : undefined
+}
 
 function parseMode(value: unknown): RtcSessionMode | undefined {
   return value === 'training'
@@ -189,6 +194,9 @@ router.post('/session/start', async (req: Request, res: Response) => {
         typeof req.body?.channelName === 'string' ? req.body.channelName : undefined,
       graphName:
         typeof req.body?.graphName === 'string' ? req.body.graphName : undefined,
+      executionBackend: parseExecutionBackend(
+        req.body?.executionBackend ?? req.body?.execution_backend,
+      ),
       mode: parseMode(req.body?.mode),
       intent: parseSessionIntent(req.body?.intent),
       userUid: parseOptionalInteger(req.body?.userUid),

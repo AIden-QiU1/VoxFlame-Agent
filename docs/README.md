@@ -14,6 +14,8 @@
    当前页面系统、共享 `workspace` contract、训练资产链路与 PWA 边界。
 5. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
    当前数据录入、上传、manifest 和 recorder queue 的权威 contract。
+6. [长时表达模式执行计划（2026-04-05）](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
+   面向“5 天内验证高压、长时、结构化表达能力”的专项执行文档，明确 rehearsal / live / review 闭环和外部参考分析。
 
 ## 综合参考
 
@@ -23,6 +25,14 @@
    吸收 `TEN ceiling / 五层映射 / Agora 替换 / light voice surface` 后的统一 runtime 与 surface 参考。
 2. [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
    吸收 `memory mechanisms / voice-agent-tooling` 后的统一 agent、memory、tooling 参考。
+3. [LiveKit 迁移计划（2026-03-31）](VOXFLAME_LIVEKIT_TRANSITION_PLAN_2026-03-31.md)
+   说明为什么迁移到 LiveKit、哪些代码先不动、如何与现役 Agora/TEN 并行验证，以及何时开始更深的记忆系统实现。
+4. [LiveKit 替代路线图（2026-04-02）](VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md)
+   写清当前现状、与 `references/agents` 最佳实践的差距、`DashScope-first` 约束、三节点迁移顺序和删除旧代码门槛。
+5. [LiveKit communication 最小闭环计划（2026-04-02）](VOXFLAME_LIVEKIT_COMMUNICATION_MINIMAL_LOOP_PLAN_2026-04-02.md)
+   写清 communication workspace 的最小闭环完成定义、当前真实 blocker，以及下一轮最值得补的代码切片。
+6. [长时表达模式执行计划（2026-04-05）](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
+   说明为什么当前主线应转成“长时重要表达专项体验”，以及 5 天内最该做和不该做的事。
 
 ## 分类导航
 
@@ -43,6 +53,10 @@
 |------|------|--------|
 | [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前产品设计与架构蓝图主文档 | ⭐⭐⭐ |
 | [Runtime And Surface Reference（2026-03-26）](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) | runtime、surface、迁移与 `session_strategy` 的综合参考 | ⭐⭐⭐ |
+| [LiveKit 迁移计划（2026-03-31）](VOXFLAME_LIVEKIT_TRANSITION_PLAN_2026-03-31.md) | `Agora/TEN -> LiveKit` 的干净过渡、双跑验证与清退顺序 | ⭐⭐⭐ |
+| [LiveKit 替代路线图（2026-04-02）](VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md) | 当前差距盘点、三节点路线、`DashScope-first` 迁移约束 | ⭐⭐⭐ |
+| [LiveKit communication 最小闭环计划（2026-04-02）](VOXFLAME_LIVEKIT_COMMUNICATION_MINIMAL_LOOP_PLAN_2026-04-02.md) | communication 最小闭环的完成定义、当前 blocker 与下一刀代码切片 | ⭐⭐⭐ |
+| [长时表达模式执行计划（2026-04-05）](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md) | 围绕 `speech.md` 和外部参考，把 rehearsal / live / review 收成 5 天可执行专项计划 | ⭐⭐⭐ |
 | [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) | agent、memory、tooling 与 dataset/memory 边界的综合参考 | ⭐⭐⭐ |
 | [control-plane.md](control-plane.md) | backend 控制面实现、schema 与诊断深文档 | ⭐⭐ |
 | [capability-registry.md](capability-registry.md) | 仓库协作 capability registry 盘点表 | ⭐⭐ |
@@ -80,14 +94,14 @@
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
 | [数据库设计](database/) | 数据库 schema 与迁移说明 | ⭐ |
-| [Docker 部署说明（根目录）](../DOCKER_DEPLOY.md) | 容器部署与启动说明 | ⭐⭐ |
 
 ## 快速查找
 
 **继续开发应该先看什么**
 1. [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md)
 2. [当前任务状态](../.tasks/current.md)
-3. [主项目 README](../README.md)
+3. [长时表达模式执行计划（2026-04-05）](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
+4. [主项目 README](../README.md)
 
 **要判断 runtime / surface / PWA / App 方向**
 1. [Runtime And Surface Reference（2026-03-26）](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)

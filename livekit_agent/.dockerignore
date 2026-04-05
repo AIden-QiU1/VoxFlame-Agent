@@ -1,0 +1,10 @@
+.env
+.venv
+.venv_sys
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+tests
+UNKNOWN.egg-info

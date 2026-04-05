@@ -59,6 +59,7 @@ export function useMandarinTrainingSession(
     userId,
     mode: 'training',
     surface: 'training_workspace',
+    executionBackend: 'livekit',
     requestedCapabilities: [
       'transport_send_control',
       'workspace_snapshot_read',

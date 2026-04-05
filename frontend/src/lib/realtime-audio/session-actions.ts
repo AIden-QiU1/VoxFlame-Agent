@@ -5,7 +5,6 @@ import type {
   MutableRefObject,
   SetStateAction,
 } from 'react'
-import type { ILocalAudioTrack } from 'agora-rtc-sdk-ng'
 import { memoryService } from '@/lib/memory/memory-service'
 import {
   applyClearedMessages,
@@ -14,10 +13,14 @@ import {
   applyRecordingStopped,
   applyRtcError,
 } from './session-state'
-import type { RtcAgentState, StartRtcSessionResponse } from './session-types'
+import type {
+  RtcAgentState,
+  SessionMicrophoneTrack,
+  StartRtcSessionResponse,
+} from './session-types'
 
 interface SessionActionRefs {
-  micTrackRef: MutableRefObject<ILocalAudioTrack | null>
+  micTrackRef: MutableRefObject<SessionMicrophoneTrack | null>
   micStreamRef: MutableRefObject<MediaStream | null>
   preflightMicStreamRef: MutableRefObject<MediaStream | null>
   sessionRef: MutableRefObject<StartRtcSessionResponse | null>
@@ -28,7 +31,7 @@ interface StartRtcRecordingActionOptions {
   refs: SessionActionRefs
   setState: Dispatch<SetStateAction<RtcAgentState>>
   connect: (options?: { suppressGreeting?: boolean }) => Promise<void>
-  ensureMicrophoneTrack: () => Promise<ILocalAudioTrack>
+  ensureMicrophoneTrack: () => Promise<SessionMicrophoneTrack>
   warmUpMicrophoneStream: () => Promise<MediaStream>
   connectOptions?: { suppressGreeting?: boolean }
 }
@@ -123,7 +126,7 @@ export function clearRtcMessagesAction(
 }
 
 export function getRtcMicrophoneStreamTrack(
-  micTrackRef: MutableRefObject<ILocalAudioTrack | null>,
+  micTrackRef: MutableRefObject<SessionMicrophoneTrack | null>,
 ): MediaStreamTrack | null {
   return micTrackRef.current?.getMediaStreamTrack() ?? null
 }

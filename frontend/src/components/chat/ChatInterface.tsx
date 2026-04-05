@@ -82,6 +82,7 @@ export default function ChatInterface({
     userId,
     surface: 'communication_workspace',
     scene: requestedRuntimeScene,
+    executionBackend: 'livekit',
   })
 
   const [textInput, setTextInput] = useState('')

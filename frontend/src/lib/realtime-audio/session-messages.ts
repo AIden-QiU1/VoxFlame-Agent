@@ -10,11 +10,11 @@ import {
   applyVoiceProfileSync,
 } from './session-state'
 import type {
-  AgoraRtmClient,
   ConversationMessage,
   RtcAgentState,
   RtcMessageEnvelope,
   RtmMessageEvent,
+  SessionControlClient,
   StartRtcSessionResponse,
   TrainingFeedbackEvent,
   VoiceProfileSyncEvent,
@@ -145,7 +145,7 @@ export function decodeInboundMessage(
 }
 
 export async function publishSessionEnvelope(
-  rtmClient: AgoraRtmClient,
+  rtmClient: SessionControlClient,
   session: StartRtcSessionResponse,
   payload: Record<string, unknown>,
 ): Promise<void> {
@@ -162,7 +162,7 @@ export async function publishSessionControlMessage({
   type,
   payload = {},
 }: {
-  rtmClient: AgoraRtmClient
+  rtmClient: SessionControlClient
   session: StartRtcSessionResponse
   type: string
   payload?: Record<string, unknown>
@@ -176,7 +176,7 @@ export async function publishSessionControlMessage({
     metadata: {
       client_id: clientId,
       session_id: session.channelName,
-      transport: 'agora_rtm',
+      transport: 'livekit_data',
       mode: session.intent.mode,
       surface: session.intent.surface,
       session_strategy: session.intent.sessionStrategy,
@@ -269,6 +269,18 @@ export function reduceRtcEnvelope(
       timestamp: new Date(),
     }
     return applyVoiceProfileSync(prev, sync)
+  }
+
+  if (message.type === 'speech_activity') {
+    if (message.state === 'speech_started') {
+      return {
+        ...prev,
+        isSpeaking: false,
+        isThinking: false,
+      }
+    }
+
+    return prev
   }
 
   if (message.type === 'error' || message.error) {

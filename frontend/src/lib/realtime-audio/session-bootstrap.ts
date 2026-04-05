@@ -1,6 +1,10 @@
 import { config } from '@/lib/config'
 import { getValidToken } from '@/lib/supabase/client'
-import type { RtcSessionIntent, RtcSessionMode } from './session-contract'
+import type {
+  RtcExecutionBackend,
+  RtcSessionIntent,
+  RtcSessionMode,
+} from './session-contract'
 import type { StartRtcSessionResponse } from './session-types'
 
 function buildApiUrl(path: string): string {
@@ -19,9 +23,14 @@ export async function buildAuthorizedJsonHeaders(): Promise<Record<string, strin
   }
 }
 
+interface StartRtcSessionOptions {
+  executionBackend?: RtcExecutionBackend
+}
+
 export async function startRtcSession(
   mode: RtcSessionMode,
   intent: RtcSessionIntent,
+  options: StartRtcSessionOptions = {},
 ): Promise<StartRtcSessionResponse> {
   const headers = await buildAuthorizedJsonHeaders()
   const response = await fetch(buildApiUrl('/rtc/session/start'), {
@@ -30,6 +39,9 @@ export async function startRtcSession(
     body: JSON.stringify({
       mode,
       intent,
+      ...(options.executionBackend
+        ? { executionBackend: options.executionBackend }
+        : {}),
     }),
   })
 

@@ -6,7 +6,7 @@
  * 2. 记忆 / 短语 / 上传 API
  * 3. 基础 HTTP 健康检查与 compat 接口
  * 
- * 语音处理（RTC/ASR/LLM/TTS）完全由 TEN Agent 负责
+ * 语音处理（RTC/ASR/LLM/TTS）由 LiveKit + livekit_agent 承接
  */
 
 import express from 'express'
@@ -26,9 +26,6 @@ dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 3001
-const TEN_AGENT_SERVER_URL = process.env.TEN_AGENT_SERVER_URL || ''
-
-
 // 中间件
 app.use(cors())
 app.use(express.json())
@@ -41,8 +38,8 @@ app.get('/health', (req, res) => {
     version: '2.2.0',
     architecture: 'RTC-native Agent Orchestration',
     rtcOrchestration: {
-      enabled: TEN_AGENT_SERVER_URL.length > 0,
-      target: TEN_AGENT_SERVER_URL || null,
+      enabled: true,
+      target: process.env.LIVEKIT_BROWSER_URL || process.env.LIVEKIT_URL || null,
     }
   })
 })
@@ -83,7 +80,7 @@ app.use('/api/phrases', phrasesRouter)
 // Upload API 路由 (OSS 签名)
 app.use('/api/upload', authMiddleware, uploadRouter)
 
-// Webhook 端点 - 接收 TEN Agent 的 text_webhook 回调
+// Webhook 端点 - 预留给后续外部异步回调
 app.post('/api/webhook/conversation', (req, res) => {
   const { text, is_final, data_type, conversation_id, message_id } = req.body
   console.log('[Webhook] ' + (data_type || 'message') + ': ' + (text?.substring(0, 50) || '') + '...')
@@ -102,8 +99,8 @@ app.listen(PORT, () => {
 
   console.log('')
   console.log('🏗️ RTC-native 架构:')
-  console.log('   - TEN Agent (RTC graph): Agora RTC + Qwen realtime + memory')
-  console.log('   - 本服务 (' + PORT + '): RTC orchestration + API + 记忆管理')
+  console.log('   - LiveKit server + livekit_agent: RTC + ASR/TTS + 纠错 + memory')
+  console.log('   - 本服务 (' + PORT + '): session orchestration + API + 记忆管理')
   console.log('')
   console.log('🎛️ RTC Orchestration 端点:')
   console.log('   - GET  /api/rtc/health')

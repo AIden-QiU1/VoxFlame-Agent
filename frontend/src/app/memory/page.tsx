@@ -604,6 +604,45 @@ export default function MemoryPage() {
                 <div className="space-y-4">
                   <div className="rounded-3xl border border-stone-200 bg-stone-50 p-5">
                     <div className="text-sm font-medium text-stone-700">
+                      我的表达画像
+                    </div>
+                    <p className="mt-3 text-sm leading-7 text-gray-700 text-pretty">
+                      {workspaceSnapshot.preparation.profile_summary}
+                    </p>
+                    {workspaceSnapshot.preparation.listener_guidance.length > 0 ? (
+                      <div className="mt-4">
+                        {renderStringChips(
+                          workspaceSnapshot.preparation.listener_guidance,
+                          '继续积累后，这里会压缩出最适合你的现场配合方式。',
+                          'sky',
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-3xl border border-amber-200 bg-[#fffaf2] p-5">
+                    <div className="text-sm font-medium text-amber-800">当前重要表达准备</div>
+                    <p className="mt-3 text-sm leading-7 text-gray-700 text-pretty">
+                      {workspaceSnapshot.preparation.overview}
+                    </p>
+                    {workspaceSnapshot.preparation.immediate_goal ? (
+                      <div className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm text-gray-800">
+                        现在最该先准备：{workspaceSnapshot.preparation.immediate_goal}
+                      </div>
+                    ) : null}
+                    {workspaceSnapshot.preparation.support_strategies.length > 0 ? (
+                      <div className="mt-4">
+                        {renderStringChips(
+                          workspaceSnapshot.preparation.support_strategies,
+                          '继续积累后，这里会给出最适合你自己的补救和节奏策略。',
+                          'emerald',
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-3xl border border-stone-200 bg-white p-5">
+                    <div className="text-sm font-medium text-stone-700">
                       {workspaceSnapshot.session_review.headline}
                     </div>
                     <p className="mt-3 text-sm leading-7 text-gray-700 text-pretty">
@@ -639,6 +678,45 @@ export default function MemoryPage() {
 
                 <div className="space-y-4">
                   <div className="rounded-3xl border border-stone-200 bg-white p-5">
+                    <div className="text-sm font-medium text-stone-700">对这次最有用的规律</div>
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.18em] text-gray-500">最稳表达</div>
+                        <div className="mt-3">
+                          {renderStringChips(
+                            workspaceSnapshot.preparation.strong_phrases,
+                            '继续积累后，这里会浮出你最稳、最适合直接带走的表达。',
+                            'amber',
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.18em] text-gray-500">常见场景</div>
+                        <div className="mt-3">
+                          {renderStringChips(
+                            workspaceSnapshot.preparation.common_scenarios,
+                            '继续积累后，这里会开始浮出你最常面对、最该提前准备的场景。',
+                            'sky',
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.18em] text-gray-500">高风险词和发音点</div>
+                        <div className="mt-3">
+                          {renderStringChips(
+                            [
+                              ...workspaceSnapshot.preparation.risky_terms,
+                              ...workspaceSnapshot.preparation.pronunciation_patterns,
+                            ],
+                            '继续积累后，这里会告诉你哪些词和哪些规律最容易让系统听偏。',
+                            'stone',
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-stone-200 bg-white p-5">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-medium text-stone-700">个体化表达建议</div>
@@ -673,7 +751,10 @@ export default function MemoryPage() {
                     <div className="text-sm font-medium text-stone-700">这次优先准备</div>
                     <div className="mt-4">
                       {renderStringChips(
-                        workspaceSnapshot.expression_kit.recommended_focus,
+                        [
+                          ...workspaceSnapshot.expression_kit.recommended_focus,
+                          ...workspaceSnapshot.preparation.hotwords,
+                        ].slice(0, 8),
                         '继续积累后，这里会告诉你下次高压沟通前最该先准备的词和提醒。',
                         'amber',
                       )}

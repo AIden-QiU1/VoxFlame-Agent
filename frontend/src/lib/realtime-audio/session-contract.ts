@@ -1,4 +1,5 @@
 export type RtcSessionMode = 'communication' | 'training' | 'quick_talk'
+export type RtcExecutionBackend = 'livekit'
 
 export type RtcSurface =
   | 'home_main'

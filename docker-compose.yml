@@ -3,6 +3,25 @@ x-npm-args: &npm-args
   npm_config_registry: https://registry.npmmirror.com
 
 services:
+  livekit-server:
+    image: ${LIVEKIT_SERVER_IMAGE:-docker.m.daocloud.io/livekit/livekit-server:v1.10.1}
+    container_name: voxflame-livekit-server
+    command:
+      - --config
+      - /etc/livekit/livekit.yaml
+      - --bind
+      - 0.0.0.0
+      - --dev
+    ports:
+      - "7880:7880"
+      - "7881:7881/tcp"
+      - "7881:7881/udp"
+    volumes:
+      - ./infra/livekit/livekit.dev.yaml:/etc/livekit/livekit.yaml:ro
+    restart: unless-stopped
+    networks:
+      - voxflame-network
+
   frontend:
     build:
       context: ./frontend
@@ -11,6 +30,7 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_API_URL: ${FRONTEND_NEXT_PUBLIC_API_URL:-/api}
+        NEXT_PUBLIC_RTC_EXECUTION_BACKEND: ${NEXT_PUBLIC_RTC_EXECUTION_BACKEND:-livekit}
         BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:3001}
         VOXFLAME_ENABLE_PWA: ${VOXFLAME_ENABLE_PWA:-1}
         <<: *npm-args
@@ -22,6 +42,8 @@ services:
       - NODE_ENV=production
       - BACKEND_INTERNAL_URL=http://backend:3001
       - VOXFLAME_ENABLE_PWA=${VOXFLAME_ENABLE_PWA:-1}
+      - NEXT_PUBLIC_RTC_EXECUTION_BACKEND=${NEXT_PUBLIC_RTC_EXECUTION_BACKEND:-livekit}
+      - LIVEKIT_SIGNAL_PROXY_TARGET=${LIVEKIT_SIGNAL_PROXY_TARGET:-http://livekit-server:7880}
       - npm_config_registry=https://registry.npmmirror.com
     volumes:
       - ./logs:/app/logs
@@ -54,13 +76,17 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - TEN_AGENT_SERVER_URL=http://ten-agent:8080
       - RTC_DEFAULT_GRAPH=voxflame_voice_assistant_rtc_preview
       - RTC_DEFAULT_TIMEOUT=120
+      - LIVEKIT_URL=${LIVEKIT_URL:-ws://livekit-server:7880}
+      - LIVEKIT_BROWSER_URL=${LIVEKIT_BROWSER_URL:-ws://localhost:3000}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-}
+      - LIVEKIT_AGENT_NAME=${LIVEKIT_AGENT_NAME:-voxflame-agent}
     volumes:
       - ./logs:/app/logs
     depends_on:
-      - ten-agent
+      - livekit-server
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
@@ -70,32 +96,35 @@ services:
     networks:
       - voxflame-network
 
-  # TEN Agent (本地构建，包含 manifest/system/扩展)
-  ten-agent:
+  livekit-agent:
     build:
-      context: ./ten_agent
+      context: ./livekit_agent
       dockerfile: Dockerfile
       args:
-        # 禁用代理构建，避免容器内访问 127.0.0.1:7897 失败
-        http_proxy: ""
-        https_proxy: ""
-        HTTP_PROXY: ""
-        HTTPS_PROXY: ""
-        no_proxy: "*"
-    container_name: voxflame-ten-agent
-    ports:
-      - "8080:8080"  # TEN control server
+        LIVEKIT_AGENT_BASE_IMAGE: ${LIVEKIT_AGENT_BASE_IMAGE:-docker.m.daocloud.io/library/python:3.10-slim}
+        LIVEKIT_AGENT_BOOTSTRAP_DEPS: ${LIVEKIT_AGENT_BOOTSTRAP_DEPS:-1}
     env_file:
-      - ./ten_agent/.env
+      - ./livekit_agent/.env
+    container_name: voxflame-livekit-agent
     environment:
-      - TEN_AGENT_ENABLE_API_SERVER=${TEN_AGENT_ENABLE_API_SERVER:-1}
-      - SERVER_PORT=8080
-      - LOG_PATH=/app/logs/ten-agent-server
-      - LOG_STDOUT=true
-      - WORKERS_MAX=4
-      - WORKER_QUIT_TIMEOUT_SECONDS=120
-    volumes:
-      - ./logs:/app/logs
+      - LIVEKIT_URL=${LIVEKIT_DOCKER_URL:-ws://livekit-server:7880}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-voxflame_livekit_dev_secret_32chars}
+      - LIVEKIT_AGENT_NAME=${LIVEKIT_AGENT_NAME:-voxflame-agent}
+      - VOXFLAME_LIVEKIT_AGENT_MODE=${VOXFLAME_LIVEKIT_AGENT_MODE:-communication_stub}
+      - LOG_LEVEL=${LIVEKIT_AGENT_LOG_LEVEL:-info}
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - http_proxy=
+      - https_proxy=
+      - ALL_PROXY=
+      - all_proxy=
+      - NO_PROXY=127.0.0.1,localhost,livekit-server
+      - no_proxy=127.0.0.1,localhost,livekit-server
+      - DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+      - DASHSCOPE_TIMEOUT_SECONDS=15
+    depends_on:
+      - livekit-server
     restart: unless-stopped
     networks:
       - voxflame-network
@@ -104,6 +133,8 @@ services:
   qdrant:
     image: docker.m.daocloud.io/qdrant/qdrant:latest
     container_name: voxflame-qdrant
+    profiles:
+      - extras
     ports:
       - "6333:6333"
       - "6334:6334"
@@ -119,6 +150,8 @@ services:
   redis:
     image: docker.m.daocloud.io/library/redis:alpine
     container_name: voxflame-redis
+    profiles:
+      - extras
     ports:
       - "6379:6379"
     volumes:
