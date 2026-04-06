@@ -55,6 +55,23 @@ export interface TrainingProfileSummaryMetadata {
   generated_at?: number
 }
 
+export interface SessionCompactionMetadata {
+  kind?: string
+  scene?: string
+  clarity_score?: number
+  risky_terms?: string[]
+  fallback_phrases?: string[]
+  pronunciation_patterns?: string[]
+  support_strategies?: string[]
+  hotwords?: string[]
+  latest_correction_original?: string
+  latest_correction_text?: string
+  interruption_count?: number
+  barge_in_count?: number
+  next_step?: string
+  summary?: string
+}
+
 export interface MemoryLabelCount {
   label: string
   count: number
@@ -363,6 +380,10 @@ function toTrainingMetadata(memory: Memory): TrainingMemoryMetadata {
 
 function toTrainingSummaryMetadata(memory: Memory): TrainingProfileSummaryMetadata {
   return isRecord(memory.metadata) ? (memory.metadata as TrainingProfileSummaryMetadata) : {}
+}
+
+function toSessionCompactionMetadata(memory: Memory): SessionCompactionMetadata {
+  return isRecord(memory.metadata) ? (memory.metadata as SessionCompactionMetadata) : {}
 }
 
 function getMemorySessionId(memory: Memory): string | null {
@@ -688,20 +709,36 @@ export function buildMemoryGrowthProfile(params: {
   const granularTrainingMemories = memories.filter(
     (memory) => toTrainingMetadata(memory).kind === 'training_result',
   )
+  const sessionCompactionMemories = memories.filter(
+    (memory) => toTrainingMetadata(memory).kind === 'session_compaction',
+  )
   const trainingMemories =
     trainingSummaryMemories.length > 0 ? trainingSummaryMemories : granularTrainingMemories
   const latestTrainingSummary = trainingSummaryMemories[0]
     ? toTrainingSummaryMetadata(trainingSummaryMemories[0])
     : null
+  const latestSessionCompaction = sessionCompactionMemories[0]
+    ? toSessionCompactionMetadata(sessionCompactionMemories[0])
+    : null
   const expressionMemories = memories.filter((memory) => {
     const kind = toTrainingMetadata(memory).kind
-    return kind !== 'training_result' && kind !== 'training_profile_summary'
+    return kind !== 'training_result' && kind !== 'training_profile_summary' && kind !== 'session_compaction'
   })
-  const frequentExpressions = countValues(expressionMemories.map((memory) => memory.content), 5)
+  const frequentExpressions = countValues([
+    ...expressionMemories.map((memory) => memory.content),
+    ...sessionCompactionMemories.flatMap((memory) =>
+      readStringArray(toSessionCompactionMetadata(memory) as Record<string, unknown>, 'fallback_phrases'),
+    ),
+  ], 5)
   const frequentFocus = latestTrainingSummary
     ? readLabelCounts(latestTrainingSummary as Record<string, unknown>, 'frequent_focus')
     : countValues(
-        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).focus_tags ?? []),
+        [
+          ...granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).focus_tags ?? []),
+          ...sessionCompactionMemories.flatMap((memory) =>
+            readStringArray(toSessionCompactionMetadata(memory) as Record<string, unknown>, 'pronunciation_patterns'),
+          ),
+        ],
         5,
       )
   const frequentSyllables = latestTrainingSummary
@@ -731,27 +768,44 @@ export function buildMemoryGrowthProfile(params: {
   const frequentConfusions = latestTrainingSummary
     ? readLabelCounts(latestTrainingSummary as Record<string, unknown>, 'frequent_confusions')
     : countValues(
-        granularTrainingMemories.flatMap((memory) => {
-          const metadata = toTrainingMetadata(memory)
-          return [
-            ...(metadata.pronunciation_initial_pairs ?? []).map((item) => `声母 ${item}`),
-            ...(metadata.pronunciation_final_pairs ?? []).map((item) => `韵母 ${item}`),
-            ...(metadata.pronunciation_tone_pairs ?? []).map((item) => `声调 ${item}`),
-          ]
-        }),
+        [
+          ...granularTrainingMemories.flatMap((memory) => {
+            const metadata = toTrainingMetadata(memory)
+            return [
+              ...(metadata.pronunciation_initial_pairs ?? []).map((item) => `声母 ${item}`),
+              ...(metadata.pronunciation_final_pairs ?? []).map((item) => `韵母 ${item}`),
+              ...(metadata.pronunciation_tone_pairs ?? []).map((item) => `声调 ${item}`),
+            ]
+          }),
+          ...sessionCompactionMemories.flatMap((memory) =>
+            readStringArray(toSessionCompactionMetadata(memory) as Record<string, unknown>, 'risky_terms'),
+          ),
+        ],
         8,
       )
   const articulationTips = latestTrainingSummary
     ? readLabelCounts(latestTrainingSummary as Record<string, unknown>, 'articulation_tips')
     : countValues(
-        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).articulation_tips ?? []),
+        [
+          ...granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).articulation_tips ?? []),
+          ...sessionCompactionMemories.flatMap((memory) =>
+            readStringArray(toSessionCompactionMetadata(memory) as Record<string, unknown>, 'support_strategies'),
+          ),
+        ],
         4,
       )
   const keywordHotwords = latestTrainingSummary
     ? readStringArray(latestTrainingSummary as Record<string, unknown>, 'hotwords')
-    : countValues(
-        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).keywords ?? []),
-      ).map((item) => item.label)
+    : Array.from(
+        new Set([
+          ...countValues(
+            granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).keywords ?? []),
+          ).map((item) => item.label),
+          ...sessionCompactionMemories.flatMap((memory) =>
+            readStringArray(toSessionCompactionMetadata(memory) as Record<string, unknown>, 'hotwords'),
+          ),
+        ]),
+      )
   const hotwords = Array.from(new Set([...(params.hotwords ?? []), ...keywordHotwords])).slice(0, 12)
 
   const totalTurns = sessions.reduce((sum, session) => sum + session.turns.length, 0)
@@ -829,6 +883,16 @@ export function buildMemoryGrowthProfile(params: {
         frequentFocus,
         improvementDirection,
       )
+    : latestSessionCompaction
+      ? readString(latestSessionCompaction as Record<string, unknown>, 'next_step') ??
+        buildNextStep(
+          frequentInitialPairs,
+          frequentFinalPairs,
+          frequentTonePairs,
+          frequentSyllables,
+          frequentFocus,
+          improvementDirection,
+        )
     : buildNextStep(
         frequentInitialPairs,
         frequentFinalPairs,

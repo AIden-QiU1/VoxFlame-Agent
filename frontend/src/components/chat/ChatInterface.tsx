@@ -16,6 +16,7 @@ import { CommunicationStarterKit } from '@/components/chat/CommunicationStarterK
 import { QuickPhrasesPanel } from '@/components/phrases'
 import { UserNav } from '@/components/ui/user-nav'
 import { SessionReadinessPanel } from '@/components/runtime/SessionReadinessPanel'
+import { MicrophoneInputFeedback } from '@/components/runtime/MicrophoneInputFeedback'
 import {
   STARTER_KIT_SCENES,
   type StarterKitScene,
@@ -385,6 +386,11 @@ export default function ChatInterface({
                 <p>对方停下来后，再用语音、文字或短语继续补充。</p>
                 <p>如果被打断，就打开表达工具箱先补一句。</p>
               </div>
+              <MicrophoneInputFeedback
+                analyser={analyser}
+                active={isConnected || isRecording}
+                className="mt-4"
+              />
             </div>
           </section>
 

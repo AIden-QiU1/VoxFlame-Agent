@@ -1,5 +1,19 @@
 # VoxFlame 统一记忆系统报告（2026-03-05）
 
+> 状态说明：
+> - 这份文档保留为历史设计参考，不再代表当前代码现状
+> - 当前关于记忆系统的现役判断，应优先以：
+>   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](VOXFLAME_PRODUCT_PRD_2026-03-24.md)
+>   - [VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
+>   - [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+>   为准
+> - 本文中所有 `TEN memory_layer / LocalStore` 相关描述，都应视为 2026-03 的历史架构背景，而不是现役执行面
+> - 当前现役记忆边界已经是：
+>   - `livekit_agent session.userdata / participant attributes` = session-local state
+>   - `backend + workspace snapshot` = durable memory owner
+>   - `Qdrant` = 后续 recall 增强层
+>   - `Redis` = 仅在明确需要 ephemeral coordination/cache 时再引入
+
 > 目标：把三类 memory 体系整合为一个可落地、可迭代、可合规的统一方案，服务 VoxFlame 的“软硬件一体沟通系统”路线。
 
 > 补充：相关记忆机制研究已在 2026-03-26 收口为 [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)，进一步刷新了这份报告对 `本地事实源 / 结构化画像 / 上下文服务` 的分工理解。
@@ -30,14 +44,31 @@ VoxFlame 最合适的路线不是“单一记忆系统替代一切”，而是**
 
 ## 2. 现有代码与配置现实（仓库实测）
 
-### 2.1 已有基础能力（可复用）
+先补一个今天回看的判断：
 
-1. TEN 侧已有 `memory_layer_python` 扩展：
+1. 这份文档仍然有效的核心，不是 `TEN LocalStore` 方案本身，而是：
+   - 记忆不该是单一万能桶
+   - durable truth 和 runtime context assembly 必须分开
+   - 文本主干 + 结构化画像 + 可选 recall 增强，更适合当前阶段
+   - 训练结果、沟通结果、场景准备都应压成结构化记忆，而不是保留为流水
+2. 当前代码现状已经变成：
+   - durable owner = `backend + workspace snapshot`
+   - execution plane = `self-hosted livekit-server + livekit_agent`
+   - `training_result -> training_profile_summary -> workspace snapshot` 已成立
+3. 下一步重点不是恢复 TEN memory，而是补：
+   - `session.userdata`
+   - `PreparationContextPack`
+   - `pattern extraction / compaction`
+   - `Qdrant` 作为 recall 增强层的正确接回方式
+
+### 2.1 已有基础能力（历史背景）
+
+1. 当时 TEN 侧已有 `memory_layer_python` 扩展：
    - 本地目录与 SQLite 初始化、会话表/话语表/纠错表/热词表/混淆模式表。
    - 支持 `correction_event` 学习、自动热词、清晰度滚动分数。
    - 参考：`ten_agent/extension_src/memory_layer_python/*`
 
-2. 主流程已具备用户上下文注入与记忆事件触发：
+2. 当时主流程已具备用户上下文注入与记忆事件触发：
    - `system_init` 注入用户信息。
    - session start/end、correction event 已连接。
    - 参考：`ten_agent/property.json`, `voxflame_main_python/extension.py`
@@ -46,7 +77,7 @@ VoxFlame 最合适的路线不是“单一记忆系统替代一切”，而是**
    - `/api/memory/add|search|user/:id|stats` 等。
    - 参考：`backend/src/controllers/memory.controller.ts`, `backend/src/services/supabase.service.ts`
 
-### 2.2 当前缺口（2026-03-06）
+### 2.2 当时识别出的缺口（2026-03-06）
 
 1. **Memory 广播链路：已闭环，需回归门禁**
    - `_broadcast_voice_profile/_broadcast_clarity_score/_broadcast_memory_context` 已执行 `send_data`。

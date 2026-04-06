@@ -4,7 +4,12 @@ import {
   LiveKitConfigService,
   type LiveKitExecutionStatus,
 } from './livekit-config.service'
-import { LiveKitSessionService } from './livekit-session.service'
+import {
+  LiveKitPreparationContext,
+  LiveKitSessionService,
+} from './livekit-session.service'
+import { SupabaseService } from './supabase.service'
+import type { WorkspaceSceneId } from './expression-kit.service'
 
 export type RtcSessionMode = 'communication' | 'training' | 'quick_talk'
 export type RtcExecutionBackend = 'livekit'
@@ -125,6 +130,7 @@ export interface StartRtcSessionInput {
   mode?: RtcSessionMode
   intent?: RtcSessionIntentInput
   userUid?: number
+  authenticatedUserId?: string | null
   botUid?: number
   timeoutSeconds?: number
   properties?: RtcPropertyOverrides
@@ -207,6 +213,7 @@ export class RtcOrchestrationError extends Error {
 export class RtcOrchestrationService {
   private readonly liveKitConfig = new LiveKitConfigService()
   private readonly liveKitSessionService = new LiveKitSessionService()
+  private readonly supabaseService = createSupabaseService()
   private readonly defaultGraph =
     (process.env.RTC_DEFAULT_GRAPH || 'voxflame_livekit_agent').trim()
   private readonly defaultTimeoutSeconds = this.parseTimeout(
@@ -277,6 +284,10 @@ export class RtcOrchestrationService {
       normalizePositiveInt(input.timeoutSeconds) ?? this.defaultTimeoutSeconds
 
     const liveKitStatus = this.assertLiveKitCanStart()
+    const preparationContext = await this.loadPreparationContext(
+      input.authenticatedUserId,
+      intent,
+    )
     const liveKitSession = await this.liveKitSessionService.createSession({
       requestId,
       roomName: channelName,
@@ -288,6 +299,7 @@ export class RtcOrchestrationService {
       apiKey: process.env.LIVEKIT_API_KEY!.trim(),
       apiSecret: process.env.LIVEKIT_API_SECRET!.trim(),
       agentName: liveKitStatus.agentName,
+      preparationContext,
     })
 
     return {
@@ -346,6 +358,57 @@ export class RtcOrchestrationService {
       throw error
     }
   }
+
+  private async loadPreparationContext(
+    authenticatedUserId: string | null | undefined,
+    intent: RtcResolvedSessionIntent,
+  ): Promise<LiveKitPreparationContext | null> {
+    if (!authenticatedUserId) {
+      return null
+    }
+
+    if (!intent.grantedCapabilities.includes('workspace_snapshot_read')) {
+      return null
+    }
+
+    if (!this.supabaseService) {
+      return null
+    }
+
+    try {
+      const snapshot = await this.supabaseService.getWorkspaceMemorySnapshot(
+        authenticatedUserId,
+        {
+          sceneId: mapRtcSceneToWorkspaceSceneId(intent.scene),
+        },
+      )
+
+      const fallbackPhrases = [
+        ...snapshot.expression_kit.personalized_phrases.map((item) => item.text),
+        ...snapshot.expression_kit.quick_phrases.map((item) => item.text),
+      ]
+
+      return {
+        source: 'workspace_snapshot',
+        scene: snapshot.preparation.active_scene_id ?? intent.scene ?? null,
+        immediateGoal:
+          snapshot.preparation.immediate_goal ||
+          '当前优先先准备最关键的一句表达。',
+        profileSummary:
+          snapshot.preparation.profile_summary ||
+          '当前准备上下文已载入，请优先帮助用户把关键表达说清楚。',
+        listenerGuidance: snapshot.preparation.listener_guidance.slice(0, 4),
+        supportStrategies: snapshot.preparation.support_strategies.slice(0, 4),
+        hotwords: snapshot.preparation.hotwords.slice(0, 8),
+        riskyTerms: snapshot.preparation.risky_terms.slice(0, 6),
+        commonConfusions: snapshot.preparation.pronunciation_patterns.slice(0, 6),
+        fallbackPhrases: dedupeStrings(fallbackPhrases).slice(0, 6),
+      }
+    } catch (error) {
+      console.warn('[RTC] Failed to load workspace preparation context:', error)
+      return null
+    }
+  }
 }
 
 function mapLiveKitExecutionStatus(
@@ -394,6 +457,42 @@ function buildChannelName(mode: RtcSessionMode | undefined): string {
         ? 'voxquick'
         : 'voxrtc'
   return `${prefix}_${Date.now().toString(36)}_${uuidv4().slice(0, 8)}`
+}
+
+function mapRtcSceneToWorkspaceSceneId(
+  scene: RtcScene | null,
+): WorkspaceSceneId | undefined {
+  switch (scene) {
+    case 'interview':
+      return 'interview'
+    case 'work':
+      return 'workplace'
+    case 'stranger':
+      return 'stranger'
+    case 'medical':
+      return 'medical'
+    case 'family':
+    case 'home':
+      return 'caregiver'
+    case 'emergency':
+      return 'emergency'
+    default:
+      return undefined
+  }
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return Array.from(
+    new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)),
+  )
+}
+
+function createSupabaseService(): SupabaseService | null {
+  try {
+    return SupabaseService.getInstance()
+  } catch {
+    return null
+  }
 }
 
 function resolveSessionIntent(input: StartRtcSessionInput): RtcResolvedSessionIntent {

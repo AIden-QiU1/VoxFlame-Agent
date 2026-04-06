@@ -7,6 +7,11 @@
 > - 当前代码现状：`frontend -> backend -> self-hosted LiveKit + livekit_agent`
 > - 既有路线文档中的仍然有效部分
 
+> 文档边界：
+> - 这份 PRD 负责定义产品、页面职责、当前代码现状意味着什么，以及下一阶段产品该收成什么样
+> - [VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md) 负责 5 天窗口内的专项执行顺序、验收标准与取舍
+> - 两份都保留，但不再互相重复扮演对方角色
+
 ---
 
 ## 1. 重新定锚
@@ -49,7 +54,7 @@
 本 PRD 已吸收并统一了以下几类判断：
 
 1. 五层架构：`Control / Execution / Memory / Capability / Surface`
-2. `TEN + Agora` 只是现役执行面，不应被误写成长期不可替代底座
+2. 当前现役执行面已经是 `self-hosted LiveKit + livekit_agent`，但产品 contract 仍应保持 vendor-neutral
 3. memory 需要 `本地事实源 + typed memory + profile bundle` 三层组合，而不是一个“万能记忆桶”
 4. 语音 agent 的长期方向应该是 `runtime tools + skills + workflow + MCP` 分层，而不是把一切塞回 prompt 或页面按钮
 
@@ -167,6 +172,62 @@
 2. recorder queue、upload receipt、manifest 会不会只停留在 web 端心智
 3. `workspace / profile bundle / expression kit / agent tooling boundary` 会不会仍然只停留在研究稿里
 
+## 2.4 当前前端 / agent 代码现状一览
+
+### Frontend
+
+当前前端已经围绕 `workspace + live session` 在组织产品，而不是旧 transport demo：
+
+1. 沟通页已经显式固定 `LiveKit` 执行面
+2. 训练页已经能把 `training_feedback -> training_result -> training_profile_summary` 接进现有 memory 链
+3. 记忆页已经开始展示：
+   - `profile_summary`
+   - `listener_guidance`
+   - `workspaceSnapshot.preparation`
+4. 还没收好的地方也很明确：
+   - 沟通页还没有完全做到“只消费当前场景最小准备”
+   - 训练页还没有稳定产出更强的规律提取
+   - 记忆页还没有完全成为“用户画像 + 当前准备 owner”
+
+### livekit_agent
+
+当前 `livekit_agent` 已经不是迁移 stub，而是现役 execution runtime 的一部分。
+
+已具备：
+
+1. room connect + data contract
+2. DashScope realtime ASR
+3. correction-style transcript 输出
+4. DashScope realtime TTS
+5. basic interrupt / turn-taking
+6. `training_feedback_request -> training_feedback`
+
+但要更准确地说：
+
+1. 当前 interruption / turn-taking 仍主要是 `自定义 RMS VAD + silence window + 工程默认门槛`
+2. 当前 `QWEN_ASR_BARGE_IN_MIN_SPEECH_MS=220` 只是工程默认起始值，不是官方推荐定值
+3. 当前 audio processing 仍主要依赖浏览器侧 `echoCancellation / noiseSuppression / autoGainControl`
+4. 当前还没有把 LiveKit 官方更完整的：
+   - `turn_detection / min_interruption_duration / endpointing`
+   - `manual / hybrid turn control`
+   - `room_options.audio_input / APM`
+   - `session.userdata / participant attributes`
+   真正制度化进现役 agent
+
+还缺：
+
+1. 更强的 session-close compaction
+2. 多人场景下更稳的 interruption policy
+3. 会话内 speaker differentiation
+4. LiveKit 官方 `audio_input / APM` 接入下更保守、更可控的 audio processing strategy
+
+当前已经补齐的则是：
+
+1. `session.userdata` 第一片
+2. backend 注入 `PreparationContextPack`
+3. `session-close compaction` 第一片
+4. 输入电平与收音质量反馈第一片
+
 所以现在优先级应该是三件事一起收口：
 
 1. runtime / surface / control contract
@@ -192,25 +253,35 @@
 
 它是必要的，但已经靠近“第二控制面”的边界。
 
-### C. TEN 图已经足够承载当前 P0/P1
+### C. LiveKit 执行面已经足够承载当前 P0/P1
 
-TEN graph 内已经有：
+当前 `livekit_agent` 已经具备：
 
-1. VAD
-2. Qwen realtime ASR/TTS
-3. correction
-4. training feedback
-5. memory layer
+1. VAD / turn-taking
+2. DashScope realtime ASR/TTS
+3. correction-style transcript
+4. training feedback 最小 contract
+5. session review / memory 写回过渡链
 
-所以近期不应该把主精力放在“再换一套 runtime”，而应该把产品能力吃干榨尽。
+所以近期不应该把主精力放在“继续折腾执行面替换”，而应该把训练页、记忆页和现场准备能力补满。
+
+但这里也要补一条更严格的工程判断：
+
+1. 当前执行面已经够用，不代表它已经符合官方最佳实践的完整形态
+2. 下一阶段不是“再迁移一次”，而是沿 LiveKit 官方 primitives 做深：
+   - `session.userdata`
+   - `participant attributes`
+   - 更成熟的 `turn_detection / interruption`
+   - `room_options.audio_input` 与保守型 audio processing
+3. 也就是说，`LiveKit execution plane` 要继续保留，但 agent 能力需要从“已跑通”升级到“更完整、更官方、更适合构音障碍”
 
 ### D. 当前数据流已经开始收口成产品 contract，但 owner 还没完全制度化
 
-现在长期用户状态主要落在三处：
+现在长期用户状态主要落在两处主层、一处待补的 session-local 层：
 
 1. 前端 [memory-service.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/memory-service.ts)
 2. backend [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts)
-3. TEN [memory_layer_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/memory_layer_python/extension.py)
+3. `livekit_agent` 当前尚未显式制度化的 session-local typed state
 
 这已经不再是纯粹“混乱状态”，因为 backend 已经开始向 `workspace / profile bundle / session review / expression kit` 收口。
 
@@ -220,21 +291,21 @@ TEN graph 内已经有：
 
 1. frontend local store 负责本地缓存、离线兜底和最近会话草稿
 2. backend 负责共享的 `profile bundle / session review / hotword profile`
-3. TEN memory 负责低延迟运行时 working memory 和适配状态
+3. `livekit_agent` 应显式承接 typed session working memory 和适配状态
 
 在这些 ownership 没写清之前，继续长页面功能，只会让每一层都开始拼自己的“长期画像”。
 
-### E. TEN 主控已经过胖，近期不该继续长产品语义
+### E. `livekit_agent` 现在的真正缺口，不是 transport，而是 memory discipline
 
-从 [voxflame_main_python/extension.py](/home/ubuntu/VoxFlame-Agent/ten_agent/extension_src/voxflame_main_python/extension.py) 现状看，它已经同时处理：
+从当前 [livekit_agent/app.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/app.py) 现状看，执行面已经能跑，但还没有把：
 
-1. transport relay
-2. `system_init / user_input`
-3. training result 汇总
-4. voice profile 转发
-5. session history 和 transport state
+1. `session.userdata`
+2. `PreparationContextPack`
+3. 更完整的 `session-close compaction`
 
-这对当前阶段是可接受的，但下一步应该做的是“停长”，而不是继续把 `expression kit / session review / profile governance` 也放进去。
+这三层补到更完整、更符合官方实践。
+
+所以下一步应该是“补会话内记忆与压缩边界”，而不是再让 room data glue 和 callback 逻辑继续自然生长。
 
 ---
 
@@ -615,18 +686,18 @@ Home
 
 ## 8.1 保持不变的唯一事实源
 
-正式沟通与训练主链继续基于：
+正式沟通与训练主链当前已经基于：
 
-`Frontend RTC/RTM -> Backend /api/rtc/session/* -> TEN rtc graph`
+`Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`
 
-但这只是**当前现役执行面**，不是未来必须永久绑定的底座。
+这已经是当前现役执行面，不再是迁移中的备用路径。
 
 ### 8.1.1 长期执行面判断
 
 从现有替换研究和代码耦合看：
 
-1. `TEN + Agora` 应被视作过渡执行面
-2. 产品 contract 不能继续写死在 `channel_name / user_uid / rtcToken / rtmToken`
+1. 当前执行面已经切到 `LiveKit + livekit_agent`
+2. 产品 contract 仍然不能继续写死在任何单一 vendor 语义
 3. 未来应逐步切到 vendor-neutral 的 `session / transport / participant / capability` 语言
 
 这意味着：
@@ -693,10 +764,10 @@ type SessionIntent = {
 
 ### 当前判断
 
-1. 不继续在 `TEN + Agora` 上深度平台化
-2. 先把 `Agora` 降级成兼容层语义
-3. 先抽 `transport adapter + vendor-neutral session contract`
-4. 再评估新的 room/session runtime
+1. 不再继续维护旧执行面 compat
+2. 继续保持 `transport adapter + vendor-neutral session contract`
+3. 把主力转到 `session memory / preparation context / pattern compaction`
+4. 再在需要时引入 recall 增强层
 
 ### 当前最合理的中期方向
 
@@ -729,8 +800,9 @@ type SessionIntent = {
 
 ### Execution
 
-- TEN realtime graph
-- ASR / correction / TTS / training feedback
+- self-hosted livekit-server
+- livekit_agent
+- ASR / correction / TTS / training feedback / turn-taking
 
 ### Memory
 
@@ -922,52 +994,37 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 
 ## 10.1 按现状代码的最可行开发路径
 
-在当前仓库里，最可行的顺序已经调整为“先把 execution backend 迁移 seam 建立起来，再继续加深 memory”，但不是 big bang 重写：
+在当前仓库里，最可行的顺序已经调整为“在现有 LiveKit 执行面上把训练页、记忆页和现场准备做完整”，而不是继续围绕迁移 seam 打转：
 
-1. 先冻结上层 contract，不再让后续迁移打散产品语言
+1. 先冻结上层 contract，不再让后续功能打散产品语言
    - `workspace owner`
    - `dataset schema`
    - `session intent / readiness / capability gating`
-2. 建立 `execution backend` 过渡 seam
-   - backend `/api/rtc/session/start` 接受 `executionBackend`
-   - frontend runtime 不再直接只认 Agora transport
-   - 默认仍保持 `agora_ten`
-3. 再继续把 runtime / surface / control contract 写进真实 surface
-   - `session intent`
-   - `session strategy`
-   - `capability gating`
-   - `surface readiness`
-4. 在不影响现役主链的前提下，引入 LiveKit communication path 并行验证
-   - 默认流量继续走 `agora_ten`
-   - `livekit` 仅通过显式实验入口启用
-   - 先只覆盖 `communication workspace`
-   - 当前 `livekit_agent` 已经能跑通 communication 文字改写，但还没有达到 `TEN + Agora` 的全能力等价，不能误写成已替代现役执行面
-5. 只有 execution layer 稳定后，再继续加固 backend `workspace`
+2. 在 `livekit_agent` 内补齐 typed session memory
+   - `session.userdata`
+   - `PreparationContextPack`
+   - 当前场景 / 热词 / listener guidance / outline 锚点
+3. 在会话结束时做 `pattern extraction + compaction`
+   - `training_result`
+   - `training_profile_summary`
+   - `workspace preparation`
+   - `session_review`
+4. 再继续加固 backend `workspace`
    - `profile bundle`
-   - `session review`
+   - `preparation`
    - `expression kit merge`
-6. 再把前端 session hooks 继续变薄
-   - transport bootstrap
-   - transcript reducer
-   - memory sync
-   - training feedback sync
-7. 然后才评估轻入口与 future multi-surface 扩展
-   - `light voice`
-   - `mobile companion`
-   - `desktop companion`
+5. 再让沟通页只消费“当前场景最小必要准备”
+6. 再为训练页和记忆页补更强的 recall / hotword / prepared-expression 能力
+7. 然后才评估 `Qdrant` 作为 semantic recall layer 的正式接入
 
-补充约束（2026-04-02）：
+当前判断（2026-04-05）：
 
-1. LiveKit 迁移现在必须按三个节点判断，而不是按“是否已经有 worker 目录”判断：
-   - 节点 1：`LiveKit server` 部署与开发基座
-   - 节点 2：补齐现役 `TEN` 执行链功能并跑通全链路
-   - 节点 3：完全删除 `TEN + Agora`
-2. 当前最多算节点 1 已完成第一版开发基座，节点 2/3 都还未完成。
-3. 现役模型/语音执行面仍然以 `DashScope / Qwen-first` 为准，所以 `LiveKit + OpenAI stub` 只能算迁移骨架，不能算现役替代方案。
-
-详细对照见：
-
-- [VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md)
+1. LiveKit 迁移已经完成主执行面切换，不再是专项主任务
+2. 现役模型/语音执行面以 `DashScope / Qwen-first` 为准
+3. 当前最真实的缺口不是 transport，而是：
+   - 训练页 AI parity
+   - 记忆页作为“准备 owner”的完整度
+   - `session memory -> durable memory` 的压缩质量
 
 ---
 

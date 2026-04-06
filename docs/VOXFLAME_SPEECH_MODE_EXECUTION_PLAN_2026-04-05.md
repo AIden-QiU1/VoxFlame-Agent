@@ -2,6 +2,10 @@
 
 > 目标不是把产品做成“演讲 App”，而是在未来 5 天内把现有 VoxFlame 收成一套能真实帮助构音障碍用户完成高压、长时、结构化表达的产品闭环。现场 10 分钟演讲只是当前最严格的验证场景。
 
+> 文档边界：
+> - 这份文档只回答“这 5 天先做什么、为什么这样排、如何验收”
+> - 产品整体定义、页面职责和长期架构判断，以 [VOXFLAME_PRODUCT_PRD_2026-03-24.md](VOXFLAME_PRODUCT_PRD_2026-03-24.md) 为准
+
 ## 1. 北极星目标
 
 ### 5 天内必须达成
@@ -111,6 +115,110 @@
 所以当前最优策略不是重做 memory，而是：
 
 `继续沿 workspace snapshot / training_result / training_profile_summary 语义，加一层 speech-specific derived experience`
+
+### 当前 LiveKit 真相
+
+到今天为止，`LiveKit` 在仓库里的真实位置已经很清楚：
+
+1. 它已经是现役 execution plane
+   - `frontend -> backend -> self-hosted livekit-server -> livekit_agent`
+2. 它不再是迁移试验
+   - 沟通页主链、训练页最小反馈链都已经接上
+3. 它也还没有“万事大吉”
+   - 当前缺口不在 transport，而在：
+     - `session.userdata`
+     - `PreparationContextPack`
+     - `session-close compaction`
+     - 训练页 / 记忆页 AI parity
+
+结论：下一步不是继续围绕 LiveKit 迁移写计划，而是直接在现有 LiveKit 执行面上把训练页、记忆页和现场准备能力补完整。
+
+### 当前 agent 能力盘点
+
+#### 已经成立
+
+1. `ASR`
+   - 已接入 DashScope realtime ASR
+   - 能产出 interim / final transcript
+2. `TTS`
+   - 已接入 DashScope realtime TTS
+   - 已能在 LiveKit 房间发布 assistant audio track
+3. `interruption`
+   - 用户重新开口时，当前 TTS 可以被打断
+4. `turn detection`
+   - 已有基于 RMS 的 server-side VAD
+   - 已能产出 `speech_started / speech_stopped`
+5. `training feedback`
+   - `training_feedback_request -> training_feedback` 已跑通
+
+#### 还不够
+
+1. `turn detection` 还只是第一版
+   - 现在主要是 `RMS + silence window + 工程默认打断门槛`
+   - 当前 `QWEN_ASR_BARGE_IN_MIN_SPEECH_MS=220` 只是工程默认起始值，不是 LiveKit 官方推荐定值
+   - 还没有接上 LiveKit 官方更完整的 `turn_detection / min_interruption_duration / endpointing` 心智
+2. `speaker differentiation`
+   - 还没有会话内说话人区分
+   - 更没有持久化 voiceprint
+3. `typed session memory`
+   - `session.userdata` 第一片已经落地
+   - `PreparationContextPack` 第二片也已经落地：backend 现已把 `workspace snapshot.preparation` 注入 session metadata / dispatch metadata
+4. `session-close compaction`
+   - 第一片已经落地：
+     - session end 时会生成 `session_compaction`
+     - 当前会把 `fallback phrases / risky terms / pronunciation patterns / support strategies / hotwords / interruption telemetry`
+       压成结构化语义记忆
+     - 现有 `memory growth -> workspace snapshot` 已开始消费这层 compact memory
+   - 还没做完的，是让这层 compaction 继续长出更强的 pattern extraction 与 recall policy
+5. `构音障碍语音处理`
+   - 当前主要依赖浏览器 WebRTC 的 `echoCancellation / noiseSuppression / autoGainControl`
+   - 输入电平提示第一片已经落地：沟通页和训练页都会给出实时收音质量反馈
+   - 还没有接上 LiveKit 官方 `room_options.audio_input` 那层 noise cancellation / APM 能力
+   - 也还没有“保守型降噪 + 会话内 speaker differentiation”的成体系策略
+
+### 关于降噪 / interruption / 音纹的当前判断
+
+1. `降噪`
+   - 需要，但要保守
+   - 不能为了“更干净”把用户本来的发音特征一起抹掉
+   - 现阶段不做激进语音重建，优先做 `浏览器基础处理 + LiveKit audio_input/APM + 输入电平提示`
+2. `音量控制`
+   - 输入电平可视化第一片已经落地
+   - 现在系统会在沟通页和训练页提示：
+     - 声音偏小
+     - 收音稳定
+     - 声音过冲
+   - 后续还要继续补：
+     - 麦克风距离建议与更细的 telemetry
+     - LiveKit `audio_input / APM` 接入后的 server-side 策略
+3. `interruption`
+   - 当前已经有基本能力
+   - 下一步要补的是官方推荐的 policy，不是只会“检测到 speech_started 就停 TTS”
+   - 目标是逐步从“自定义 RMS VAD + 默认阈值”收口到 `turn detector + interruption policy + manual/hybrid turn control`
+4. `音纹 / speaker differentiation`
+   - 多人沟通里确实有价值
+   - 但短期应该先做“会话内说话人区分”，而不是直接上长期 voiceprint 库
+
+### 一个需要补准的 LiveKit 判断
+
+当前不该再把 `LiveKit` 和“记忆系统本体”混成一件事。
+
+更准确的分工应该是：
+
+1. `LiveKit`
+   - RTC / room / participant / data plane
+   - session-local typed state
+   - session report raw material
+2. `backend + workspace snapshot`
+   - durable user memory owner
+3. `Qdrant`
+   - 后续 semantic recall 增强层
+4. `Redis`
+   - 只有在真的需要 ephemeral coordination 时再引入
+
+详见：
+
+- [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
 
 ## 5. 外部参考真正值得借的长处
 
@@ -231,6 +339,44 @@
    - 稳定热词
    - 经 correction 后最可靠的表达版本
 2. correction 的最终目标不是“最像标准普通话”，而是“在这个人的习惯里最可信、最通顺、最不越权”
+
+### E. LiveKit 官方 best practices 的长处：session memory、room state、durable memory 三层分工很清楚
+
+详见：
+
+- [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+
+它对这 5 天目标最有帮助的地方在于：
+
+1. `userdata` 很适合承接一次 rehearsal / live session 的 typed working state
+2. `chat_ctx` 适合装“当前任务最小必要准备”，不适合装整个长期画像
+3. `participant attributes / metadata` 只适合低频共享状态，不适合高频 transcript
+4. `session report` 很适合拿来做 session-close compaction
+5. 这让我们可以把“实时稳定”和“长期记忆压缩”分开，不用继续把所有问题硬塞给一个 runtime loop
+
+### F. LiveKit 官方最值得直接借的技巧：不是换 provider，而是把 session / audio / turn primitives 用完整
+
+我们当前继续用 `DashScope / Qwen-first` 完全没问题，但要尽量把 LiveKit 官方已经做好的 voice agent 原语借全。
+
+最值得直接落地的 5 件事：
+
+1. `AgentSession turn handling`
+   - 官方明确把 `turn_detection / interruptions / min_interruption_duration / endpointing` 当成一等配置，而不是让每个项目都靠裸 VAD 自己拼。
+2. `manual / hybrid turn control`
+   - 官方给了 `start_turn / end_turn / cancel_turn` 的 RPC 范式。
+   - 这非常适合构音障碍场景下的“按住说 / 明确结束 / 说错就取消”心智。
+3. `room_options.audio_input`
+   - 官方建议把 noise cancellation 放在 `session.start(... room_options=...)` 层，而不是只依赖浏览器采集约束。
+4. `session.userdata`
+   - 官方把它视为 typed per-session state。
+   - 这正适合我们承接本轮 reheasal/live 的当前段落、热词命中、最近误听模式、当前场景。
+5. `participant attributes`
+   - 官方建议它承接低频共享状态，而不是高频 transcript。
+   - 这很适合我们后面做当前模式、语言偏好、会话角色之类的轻状态同步。
+
+结论：
+
+下一步不是“换掉 DashScope”，而是 `在继续使用 DashScope API 的前提下，把 LiveKit 官方推荐的 turn / audio / state primitives 接完整`。
 
 ## 6. 对 VoxFlame 的具体产品决策
 
@@ -513,6 +659,26 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
    - 关键点：
      - 适合发送低延迟控制事件
      - 当前可继续承接 `speech_activity / correction / training_feedback / speech control`
+4. Agent sessions / userdata
+   - https://docs.livekit.io/agents/logic/sessions
+   - https://docs.livekit.io/agents/logic/agents-handoffs
+   - 关键点：
+     - `userdata` 是官方支持的 typed per-session state
+     - 适合承接当前段落、当前场景、最近误听模式、热词命中等 session-local state
+5. Turns / interruptions
+   - https://docs.livekit.io/agents/logic/turns/
+   - https://livekit.io/field-guides/guide/vad-turn-detection-configuration
+   - 关键点：
+     - 官方推荐把 `turn detection + interruptions + endpointing` 作为一组能力看待
+     - `min_interruption_duration` 这类门槛是官方工程心智的一部分
+     - manual turn control (`start_turn / end_turn / cancel_turn`) 是正式支持范式
+6. Audio input / noise cancellation
+   - https://docs.livekit.io/agents/start/voice-ai
+   - https://docs.livekit.io/reference/python/livekit/rtc/apm.html
+   - 关键点：
+     - `room_options.audio_input` 可以配置 noise cancellation
+     - Python RTC 还有 APM 能力：echo cancellation / noise suppression / high-pass filter / gain control
+     - 对构音障碍用户要保守使用，优先减少误伤而不是追求“最干净”
 
 ### DashScope / Model Studio 官方
 
@@ -536,12 +702,57 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
 
 ## 10. 5 天综合执行计划
 
+### 在 Day 计划之前先固定一条技术原则
+
+`LiveKit 官方原语尽量接完整，DashScope provider 继续按需使用。`
+
+也就是：
+
+1. `turn / interruption`
+   - 尽量向官方 `turn_detection + interruption policy + manual control` 收口
+2. `audio input`
+   - 尽量把 noise cancellation / APM 放进官方 `room_options.audio_input` 思路
+3. `session state`
+   - 尽量把会话内 typed state 放进 `session.userdata`
+4. `shared lightweight state`
+   - 尽量把低频共享状态放进 `participant attributes`
+5. `provider`
+   - ASR / TTS / rewrite 继续用 DashScope，只要它们挂在这套更完整的 session/turn/audio 结构里就行
+
+### 官方最佳实践落地顺序
+
+这部分优先级高于继续拍脑袋调阈值。
+
+1. `Phase A: session.userdata + PreparationContextPack`
+   - 在 `livekit_agent` 里正式引入 typed session state
+   - session start 前组装最小准备包
+   - 让 correction / training feedback / scene prep 都读这层，而不是继续靠零散回调 glue
+   - 当前状态：`session.userdata + backend preparation injection` 已完成
+2. `Phase B: turn handling 收口到官方心智`
+   - 保留当前 RMS VAD 作为短期 fallback
+   - 但主目标切到：
+     - 更成熟的 turn detector
+     - `min_interruption_duration / endpointing` 组合
+     - 必要时引入 `manual / hybrid turn control`
+3. `Phase C: audio input / APM`
+   - 在继续保留浏览器采集约束的同时
+   - 研究并接入 LiveKit 官方 `room_options.audio_input` 或 Python RTC APM 路线
+   - 输入电平提示第一片已完成，下一步重点转到 `audio_input / APM`
+4. `Phase D: participant attributes + session-close compaction`
+   - 把低频共享状态和 session-local compaction 分开
+   - 让 session 结束时自动把规律压入 `workspace snapshot`
+   - 当前状态：`session-close compaction` 第一片已完成，下一步重点转到 `participant attributes + 更强 compaction`
+
 ### Day 1：把重要表达材料变成“可练、可记、可确认”的资产
 
 目标：让产品开始围绕一段重要表达形成专属记忆。
 
 开发重点：
 
+0. 先完成 `Phase A`
+   - `session.userdata`
+   - `PreparationContextPack`
+   - 最小 session-local typed state
 1. 新增 `prepared expression` 轻量数据层
    - 不重做 memory owner
    - 作为 `workspace snapshot` 上的派生视图或轻量扩展
@@ -584,6 +795,9 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
    - `training_result`
    - `training_profile_summary`
    - `workspace snapshot` 的 speech/important-expression 视图
+4. 开始做 `Phase B`
+   - 把当前 interruption 从“工程默认阈值”往官方 turn handling 收口
+   - 评估 manual / hybrid turn control 是否更适合构音障碍 rehearsal
 
 ### Day 3：把现场模式做成能支撑长时表达的实时界面
 
@@ -607,6 +821,10 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
 4. 做现场保底机制
    - 一键切到保底短句
    - 一键显示下一段关键句
+5. 完成 `Phase C`
+   - 输入电平提示
+   - 收音质量提示
+   - 保守型 noise cancellation / APM 接入验证
 
 验收：
 
@@ -635,6 +853,9 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
    - 卡壳修复句
    - 过渡句
    - 求助句
+4. 开始做 `Phase D`
+   - participant attributes 只承接低频共享状态
+   - session-close compaction 把本轮规律压回 durable memory
 
 验收：
 
@@ -662,6 +883,10 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
    - 看训练页是否能收规律
    - 看记忆页是否能表达规律
    - 看沟通页是否能实时纠正
+4. 复核 LiveKit 官方 best practices 对齐度
+   - turn handling 是否仍大量依赖自定义 heuristics
+   - audio input 是否仍只依赖浏览器约束
+   - userdata / attributes / compaction 是否真正落地
 
 ## 11. 下一步具体开发顺序
 
@@ -679,7 +904,12 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
    - 沟通页长时字幕 + 锚点 + 保底句
 6. `review mode`
    - 记忆页把结果收成下次准备页
-7. 再继续做数据录入和微调优化
+7. `human-interaction hardening`
+   - interruption / barge-in policy
+   - 输入电平提示
+   - 会话内 speaker differentiation
+8. 再继续做数据录入和微调优化
+9. 所有 `interruption / audio / session state` 相关实现，优先继续向 LiveKit 官方 primitives 对齐，而不是继续累加只属于 VoxFlame 的 ad-hoc 参数
 
 ## 12. 不该做的事
 

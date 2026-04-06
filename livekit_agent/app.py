@@ -19,6 +19,7 @@ from config import load_config, should_bypass_proxy_for_livekit
 from data_contract import (
     build_assistant_text_output,
     build_session_init_ack,
+    build_session_userdata_ack,
     build_speech_activity_output,
     build_voice_profile_updated_output,
     decode_data_packet,
@@ -27,6 +28,7 @@ from data_contract import (
     extract_user_text_input,
 )
 from session_context import build_session_context
+from session_userdata import build_session_userdata
 from tts_runtime import LiveKitAudioReplyRuntime
 
 load_dotenv()
@@ -113,7 +115,21 @@ async def entrypoint(ctx: JobContext) -> None:
         session_context.session_strategy,
         session_context.request_id,
     )
-    assistant_runtime = CommunicationAssistantRuntime(config=config, ctx=session_context)
+    session_userdata = build_session_userdata(session_context)
+    logger.info(
+        "LiveKit session userdata prepared room=%s participant=%s source=%s scene=%s hotwords=%s support_strategies=%s",
+        session_context.room_name,
+        session_context.participant_identity,
+        session_userdata.preparation.source,
+        session_userdata.preparation.scene,
+        len(session_userdata.preparation.hotwords),
+        len(session_userdata.preparation.support_strategies),
+    )
+    assistant_runtime = CommunicationAssistantRuntime(
+        config=config,
+        ctx=session_context,
+        userdata=session_userdata,
+    )
     audio_runtime = LiveKitAudioReplyRuntime(config=config, room=ctx.room)
 
     async def publish_payload(payload: dict[str, object]) -> None:
@@ -124,20 +140,27 @@ async def entrypoint(ctx: JobContext) -> None:
         )
 
     async def handle_speech_activity(state: str, auto_finalize: bool) -> None:
-        if state == "speech_started":
+        interruption_requested = False
+
+        if state == "barge_in_triggered":
             interrupted = await audio_runtime.interrupt()
+            interruption_requested = interrupted
             logger.info(
-                "LiveKit speech_started room=%s participant=%s interrupted_tts=%s",
+                "LiveKit barge-in room=%s participant=%s interrupted_tts=%s",
                 session_context.room_name,
                 session_context.participant_identity,
                 interrupted,
             )
+
+        session_userdata.note_speech_activity(state, interruption_requested)
 
         await publish_payload(
             build_speech_activity_output(
                 session_context,
                 state=state,
                 auto_finalize=auto_finalize,
+                interruption_requested=interruption_requested,
+                speech_duration_ms=0,
             ),
         )
 
@@ -179,6 +202,9 @@ async def entrypoint(ctx: JobContext) -> None:
         feedback_payload = build_training_feedback_payload(
             session_context,
             dict(request_payload),
+        )
+        session_userdata.note_training_feedback(
+            str(feedback_payload.get("summary", "") or "").strip() or None,
         )
         await publish_payload(feedback_payload)
         await publish_payload(
@@ -232,6 +258,9 @@ async def entrypoint(ctx: JobContext) -> None:
 
     async def publish_init_ack() -> None:
         await publish_payload(build_session_init_ack(session_context))
+        await publish_payload(
+            build_session_userdata_ack(session_context, session_userdata.preparation),
+        )
 
     @ctx.room.on("data_received")
     def _on_data_received(packet: rtc.DataPacket) -> None:

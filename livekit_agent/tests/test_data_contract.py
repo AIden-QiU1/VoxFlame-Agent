@@ -11,6 +11,7 @@ from data_contract import (
     build_assistant_text_output,
     build_error_output,
     build_session_init_ack,
+    build_session_userdata_ack,
     build_speech_activity_output,
     build_user_transcript_output,
     build_voice_profile_updated_output,
@@ -20,6 +21,7 @@ from data_contract import (
     extract_user_text_input,
 )
 from session_context import VoxFlameSessionContext
+from session_userdata import PreparationContextPack
 
 
 def create_context() -> VoxFlameSessionContext:
@@ -71,6 +73,24 @@ class DataContractTests(unittest.TestCase):
         self.assertEqual(payload["type"], "session_init_ack")
         self.assertEqual(payload["metadata"]["surface"], "communication_workspace")
         self.assertEqual(payload["metadata"]["request_id"], "req-123")
+
+    def test_build_session_userdata_ack_exposes_preparation_context(self) -> None:
+        payload = build_session_userdata_ack(
+            create_context(),
+            PreparationContextPack(
+                source="metadata",
+                scene="medical",
+                immediate_goal="先准备就医时最关键的一句表达。",
+                profile_summary="用户当前就医场景下需要优先保真和少扩写。",
+                listener_guidance=["如果没听清，请直接复述确认。"],
+                support_strategies=["优先突出症状和诉求。"],
+                hotwords=["挂号", "疼痛"],
+            ),
+        )
+
+        self.assertEqual(payload["type"], "session_userdata_ack")
+        self.assertEqual(payload["metadata"]["source"], "metadata")
+        self.assertEqual(payload["preparation"]["hotwords"], ["挂号", "疼痛"])
 
     def test_build_assistant_text_output_matches_frontend_reducer_shape(self) -> None:
         payload = build_assistant_text_output(create_context(), "我想挂号")
@@ -127,11 +147,15 @@ class DataContractTests(unittest.TestCase):
             create_context(),
             state="speech_started",
             auto_finalize=False,
+            interruption_requested=False,
+            speech_duration_ms=180,
         )
 
         self.assertEqual(payload["type"], "speech_activity")
         self.assertEqual(payload["state"], "speech_started")
         self.assertFalse(payload["auto_finalize"])
+        self.assertFalse(payload["interruption_requested"])
+        self.assertEqual(payload["speech_duration_ms"], 180)
         self.assertEqual(payload["metadata"]["scene"], "medical")
 
     def test_build_error_output_uses_error_envelope(self) -> None:

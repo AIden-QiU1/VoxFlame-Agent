@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { PWAStatusCenter } from '@/components/pwa/PWAStatusCenter'
 import { SessionReadinessPanel } from '@/components/runtime/SessionReadinessPanel'
+import { MicrophoneInputFeedback } from '@/components/runtime/MicrophoneInputFeedback'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/useAuth'
 import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
@@ -312,9 +313,11 @@ export default function ContributePage() {
     latestVoiceProfileSync,
     isRecording,
     isProcessing,
+    isConnected,
     sessionIntent,
     sessionReadiness,
     grantedCapabilities,
+    analyser,
     startRecording,
     stopRecording,
     requestTrainingFeedback,
@@ -998,6 +1001,13 @@ export default function ContributePage() {
                   <p className="mt-2 text-sm leading-6 text-gray-600">{recorderStatus.description}</p>
                 </div>
               </div>
+
+              <MicrophoneInputFeedback
+                analyser={analyser}
+                active={isConnected || isRecording}
+                title="录音输入质量"
+                className="mt-6"
+              />
 
               <div className="mt-6 rounded-3xl border border-stone-200 bg-stone-50 px-5 py-5">
                 <p className="text-sm font-medium text-gray-900">实时识别</p>

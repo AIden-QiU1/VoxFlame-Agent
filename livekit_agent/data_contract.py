@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from session_context import VoxFlameSessionContext
+from session_userdata import PreparationContextPack
 
 
 def decode_data_packet(payload: bytes | bytearray | memoryview | str) -> dict[str, Any] | None:
@@ -34,6 +35,32 @@ def build_session_init_ack(ctx: VoxFlameSessionContext) -> dict[str, Any]:
             "scene": ctx.scene,
             "session_strategy": ctx.session_strategy,
             "granted_capabilities": ctx.granted_capabilities,
+        },
+    }
+
+
+def build_session_userdata_ack(
+    ctx: VoxFlameSessionContext,
+    preparation: PreparationContextPack,
+) -> dict[str, Any]:
+    return {
+        "type": "session_userdata_ack",
+        "metadata": {
+            "request_id": ctx.request_id,
+            "surface": ctx.surface,
+            "mode": ctx.mode,
+            "scene": ctx.scene,
+            "source": preparation.source,
+        },
+        "preparation": {
+            "immediate_goal": preparation.immediate_goal,
+            "profile_summary": preparation.profile_summary,
+            "listener_guidance": preparation.listener_guidance,
+            "support_strategies": preparation.support_strategies,
+            "hotwords": preparation.hotwords,
+            "risky_terms": preparation.risky_terms,
+            "common_confusions": preparation.common_confusions,
+            "fallback_phrases": preparation.fallback_phrases,
         },
     }
 
@@ -121,12 +148,16 @@ def build_speech_activity_output(
     state: str,
     auto_finalize: bool,
     source: str = "server_vad",
+    interruption_requested: bool = False,
+    speech_duration_ms: int = 0,
 ) -> dict[str, Any]:
     return {
         "type": "speech_activity",
         "state": state,
         "source": source,
         "auto_finalize": auto_finalize,
+        "interruption_requested": interruption_requested,
+        "speech_duration_ms": max(0, speech_duration_ms),
         "metadata": {
             "request_id": ctx.request_id,
             "surface": ctx.surface,

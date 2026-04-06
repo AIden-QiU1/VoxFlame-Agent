@@ -10,7 +10,7 @@
 > 它不是新的 PRD，而是给 PRD 和工程决策提供 runtime / surface / 迁移边界的统一参考。
 >
 > 状态说明：
-> - 这份文档仍是现役主参考，主体已经稳定，已进入最后工程收尾
+> - 这份文档现在更适合作为 runtime / surface 的概念参考与历史架构复盘，不再单独代表当前代码现状
 > - `session intent / readiness / capability gating` 的基础 contract 已经进代码
 > - 当前还在继续收尾的是：把剩余运行时实现继续从 hook 下沉，并只在必要时同步文档状态；`workspace owner` 与 legacy compat 清理已基本完成
 > - `Agora/TEN -> LiveKit` 迁移已经完成主执行面切换；`ten_agent/` 目录已从仓库物理移除，文中出现的 TEN 路径仅用于历史复盘
@@ -27,10 +27,11 @@
 5. 中期所有新能力都要逐步改用供应商无关语言：`session / transport / capability / session_strategy`。
 6. `light voice surface` 要作为主执行面之外的轻入口策略存在，而不是第二套主产品。
 
-当前关于 `Agora/TEN -> LiveKit` 的正式迁移顺序，见：
+当前关于 LiveKit 的现役判断与下一步，以这些文档为准：
 
-- [VOXFLAME_LIVEKIT_TRANSITION_PLAN_2026-03-31.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_TRANSITION_PLAN_2026-03-31.md)
-- [VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md)
+- [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
+- [VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
+- [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
 
 ## 2. 五层架构怎么落到当前代码
 

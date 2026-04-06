@@ -20,6 +20,20 @@ export interface LiveKitSessionInput {
   apiKey: string
   apiSecret: string
   agentName?: string | null
+  preparationContext?: LiveKitPreparationContext | null
+}
+
+export interface LiveKitPreparationContext {
+  source: 'workspace_snapshot'
+  scene: string | null
+  immediateGoal: string
+  profileSummary: string
+  listenerGuidance: string[]
+  supportStrategies: string[]
+  hotwords: string[]
+  riskyTerms: string[]
+  commonConfusions: string[]
+  fallbackPhrases: string[]
 }
 
 export interface LiveKitSessionResult {
@@ -56,6 +70,21 @@ export class LiveKitSessionService {
         deviceContext: input.intent.deviceContext,
       },
       granted_capabilities: input.intent.grantedCapabilities,
+      ...(input.preparationContext
+        ? {
+            preparation_context: {
+              scene: input.preparationContext.scene,
+              immediate_goal: input.preparationContext.immediateGoal,
+              profile_summary: input.preparationContext.profileSummary,
+              listener_guidance: input.preparationContext.listenerGuidance,
+              support_strategies: input.preparationContext.supportStrategies,
+              hotwords: input.preparationContext.hotwords,
+              risky_terms: input.preparationContext.riskyTerms,
+              common_confusions: input.preparationContext.commonConfusions,
+              fallback_phrases: input.preparationContext.fallbackPhrases,
+            },
+          }
+        : {}),
       readiness: {
         requestedStrategy: input.readiness.requestedStrategy,
         resolvedStrategy: input.readiness.resolvedStrategy,
@@ -143,6 +172,21 @@ export class LiveKitSessionService {
           scene: input.intent.scene,
         },
         granted_capabilities: input.intent.grantedCapabilities,
+        ...(input.preparationContext
+          ? {
+              preparation_context: {
+                scene: input.preparationContext.scene,
+                immediate_goal: input.preparationContext.immediateGoal,
+                profile_summary: input.preparationContext.profileSummary,
+                listener_guidance: input.preparationContext.listenerGuidance,
+                support_strategies: input.preparationContext.supportStrategies,
+                hotwords: input.preparationContext.hotwords,
+                risky_terms: input.preparationContext.riskyTerms,
+                common_confusions: input.preparationContext.commonConfusions,
+                fallback_phrases: input.preparationContext.fallbackPhrases,
+              },
+            }
+          : {}),
       }),
     }
   }

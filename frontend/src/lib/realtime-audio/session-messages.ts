@@ -272,7 +272,7 @@ export function reduceRtcEnvelope(
   }
 
   if (message.type === 'speech_activity') {
-    if (message.state === 'speech_started') {
+    if (message.state === 'barge_in_triggered') {
       return {
         ...prev,
         isSpeaking: false,

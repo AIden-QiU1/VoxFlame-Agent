@@ -25,6 +25,7 @@ class LiveKitAgentConfig:
     dashscope_asr_vad_threshold: float
     dashscope_asr_vad_silence_duration_ms: int
     dashscope_asr_vad_hop_size_ms: int
+    dashscope_asr_barge_in_min_speech_ms: int
     dashscope_tts_url: str
     dashscope_tts_model: str
     dashscope_tts_voice: str
@@ -85,6 +86,9 @@ def load_config() -> LiveKitAgentConfig:
             os.getenv("QWEN_ASR_VAD_SILENCE_DURATION_MS", "720").strip() or "720"
         ),
         dashscope_asr_vad_hop_size_ms=int(os.getenv("QWEN_ASR_VAD_HOP_SIZE_MS", "16").strip() or "16"),
+        dashscope_asr_barge_in_min_speech_ms=int(
+            os.getenv("QWEN_ASR_BARGE_IN_MIN_SPEECH_MS", "220").strip() or "220"
+        ),
         dashscope_tts_url=(
             os.getenv("QWEN_TTS_REALTIME_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")
             .strip()

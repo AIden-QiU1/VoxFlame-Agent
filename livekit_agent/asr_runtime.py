@@ -260,6 +260,8 @@ class LiveKitASRRuntime:
     _logged_first_frame: bool = False
     _vad: RMSVoiceActivityDetector | None = None
     _received_voice_since_commit: bool = False
+    _speech_ms_since_commit: float = 0.0
+    _barge_in_triggered_since_commit: bool = False
 
     async def start(self) -> None:
         if self._stream_task is not None:
@@ -281,7 +283,7 @@ class LiveKitASRRuntime:
             )
 
         logger.info(
-            "LiveKit ASR runtime starting room=%s participant=%s model=%s sample_rate=%s interim=%s vad_threshold=%s vad_silence_ms=%s",
+            "LiveKit ASR runtime starting room=%s participant=%s model=%s sample_rate=%s interim=%s vad_threshold=%s vad_silence_ms=%s barge_in_min_speech_ms=%s",
             self.ctx.room_name,
             self.ctx.participant_identity,
             self.config.dashscope_asr_model,
@@ -289,6 +291,7 @@ class LiveKitASRRuntime:
             self.config.dashscope_asr_enable_interim,
             self.config.dashscope_asr_vad_threshold,
             self.config.dashscope_asr_vad_silence_duration_ms,
+            self.config.dashscope_asr_barge_in_min_speech_ms,
         )
         self._vad = RMSVoiceActivityDetector(
             threshold=self.config.dashscope_asr_vad_threshold,
@@ -312,6 +315,8 @@ class LiveKitASRRuntime:
         )
         await self.client.commit_audio()
         self._received_voice_since_commit = False
+        self._speech_ms_since_commit = 0.0
+        self._barge_in_triggered_since_commit = False
 
     async def stop(self) -> None:
         logger.info(
@@ -391,9 +396,12 @@ class LiveKitASRRuntime:
             return
 
         speech_started, speech_stopped, energy = self._vad.observe(pcm_bytes, sample_rate)
+        chunk_duration_ms = pcm_duration_ms(pcm_bytes, sample_rate)
 
         if speech_started:
             self._received_voice_since_commit = True
+            self._speech_ms_since_commit = chunk_duration_ms
+            self._barge_in_triggered_since_commit = False
             logger.info(
                 "LiveKit VAD speech_started room=%s participant=%s energy=%.4f threshold=%.4f",
                 self.ctx.room_name,
@@ -405,12 +413,31 @@ class LiveKitASRRuntime:
                 await self.on_speech_activity("speech_started", False)
             return
 
+        if self._vad.state is VADState.SPEAKING:
+            self._received_voice_since_commit = True
+            self._speech_ms_since_commit += chunk_duration_ms
+            if (
+                not self._barge_in_triggered_since_commit
+                and self._speech_ms_since_commit >= self.config.dashscope_asr_barge_in_min_speech_ms
+            ):
+                self._barge_in_triggered_since_commit = True
+                logger.info(
+                    "LiveKit barge-in triggered room=%s participant=%s speech_ms=%s threshold_ms=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    round(self._speech_ms_since_commit),
+                    self.config.dashscope_asr_barge_in_min_speech_ms,
+                )
+                if self.on_speech_activity is not None:
+                    await self.on_speech_activity("barge_in_triggered", False)
+
         if speech_stopped and self._received_voice_since_commit:
             logger.info(
-                "LiveKit VAD speech_stopped room=%s participant=%s silence_ms=%s -> auto_finalize",
+                "LiveKit VAD speech_stopped room=%s participant=%s silence_ms=%s speech_ms=%s -> auto_finalize",
                 self.ctx.room_name,
                 self.ctx.participant_identity,
                 self.config.dashscope_asr_vad_silence_duration_ms,
+                round(self._speech_ms_since_commit),
             )
             if self.on_speech_activity is not None:
                 await self.on_speech_activity("speech_stopped", True)

@@ -31,6 +31,7 @@ class ConfigTests(unittest.TestCase):
             "QWEN_ASR_VAD_THRESHOLD": "0.02",
             "QWEN_ASR_VAD_SILENCE_DURATION_MS": "650",
             "QWEN_ASR_VAD_HOP_SIZE_MS": "20",
+            "QWEN_ASR_BARGE_IN_MIN_SPEECH_MS": "240",
             "QWEN_TTS_REALTIME_URL": "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
             "QWEN_TTS_REALTIME_MODEL": "qwen3-tts-flash-realtime",
             "QWEN_TTS_REALTIME_VOICE": "Cherry",
@@ -71,6 +72,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.dashscope_asr_vad_threshold, 0.02)
         self.assertEqual(config.dashscope_asr_vad_silence_duration_ms, 650)
         self.assertEqual(config.dashscope_asr_vad_hop_size_ms, 20)
+        self.assertEqual(config.dashscope_asr_barge_in_min_speech_ms, 240)
         self.assertEqual(config.dashscope_tts_url, "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")
         self.assertEqual(config.dashscope_tts_model, "qwen3-tts-flash-realtime")
         self.assertEqual(config.dashscope_tts_voice, "Cherry")

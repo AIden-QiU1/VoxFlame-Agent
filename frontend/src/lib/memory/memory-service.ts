@@ -184,6 +184,126 @@ function mergeMetadata(
   }
 }
 
+function dedupeStrings(values: Array<string | null | undefined>, limit?: number): string[] {
+  const seen = new Set<string>()
+  const results: string[] = []
+
+  for (const value of values) {
+    if (typeof value !== 'string') {
+      continue
+    }
+
+    const normalized = value.trim()
+    if (!normalized || seen.has(normalized)) {
+      continue
+    }
+
+    seen.add(normalized)
+    results.push(normalized)
+
+    if (typeof limit === 'number' && results.length >= limit) {
+      break
+    }
+  }
+
+  return results
+}
+
+export interface SessionCompactionMemoryInput {
+  type: MemoryType
+  content: string
+  metadata: Record<string, unknown>
+  createdAt?: number
+}
+
+export function buildSessionCompactionMemoryInput(session: Session): SessionCompactionMemoryInput | null {
+  const metadata = isRecord(session.metadata) ? session.metadata : undefined
+  const latestCorrectionOriginal = readString(metadata, 'latestCorrectionOriginal')
+  const latestCorrectionText = readString(metadata, 'latestCorrectionText')
+  const trainingSummary = readString(metadata, 'lastTrainingFeedbackSummary')
+  const nextStep = readString(metadata, 'lastTrainingFeedbackNextStep')
+  const scene = readString(metadata, 'communicationScene') ?? readString(metadata, 'scene')
+  const clarityScore = readNumber(metadata, 'clarity_score')
+  const pronunciationTargets = Array.isArray(metadata?.lastTrainingPronunciationTargets)
+    ? metadata.lastTrainingPronunciationTargets.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : []
+  const focusSyllables = Array.isArray(metadata?.lastTrainingFocusSyllables)
+    ? metadata.lastTrainingFocusSyllables.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : []
+  const articulationTips = Array.isArray(metadata?.lastTrainingArticulationTips)
+    ? metadata.lastTrainingArticulationTips.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : []
+  const interruptionCount = readNumber(metadata, 'interruptionCount') ?? 0
+  const bargeInCount = readNumber(metadata, 'bargeInCount') ?? 0
+  const sessionTurnCount = session.turns.length
+
+  const fallbackPhrases = dedupeStrings([
+    latestCorrectionText,
+  ], 3)
+  const riskyTerms = dedupeStrings([
+    latestCorrectionOriginal,
+  ], 3)
+  const pronunciationPatterns = dedupeStrings([
+    ...focusSyllables,
+    ...articulationTips,
+  ], 6)
+  const supportStrategies = dedupeStrings([
+    ...articulationTips,
+    nextStep,
+    latestCorrectionText && latestCorrectionOriginal && latestCorrectionText !== latestCorrectionOriginal
+      ? '现场如果系统听偏，优先切回更稳的改写版本。'
+      : null,
+  ], 4)
+  const hotwords = dedupeStrings(pronunciationTargets, 6)
+
+  const content = (() => {
+    if (latestCorrectionOriginal && latestCorrectionText && latestCorrectionOriginal !== latestCorrectionText) {
+      return `这次会话里，系统更容易把“${latestCorrectionOriginal}”听偏。当前更稳的表达是“${latestCorrectionText}”。`
+    }
+
+    if (trainingSummary) {
+      return trainingSummary
+    }
+
+    if (supportStrategies[0]) {
+      return `这次会话暴露出的关键准备点是：${supportStrategies[0]}`
+    }
+
+    if (pronunciationPatterns[0]) {
+      return `这次会话里最值得继续盯住的是“${pronunciationPatterns[0]}”。`
+    }
+
+    return null
+  })()
+
+  if (!content) {
+    return null
+  }
+
+  return {
+    type: 'semantic',
+    content,
+    createdAt: session.endTime ?? Date.now(),
+    metadata: {
+      kind: 'session_compaction',
+      scene: scene ?? undefined,
+      clarity_score: clarityScore ?? undefined,
+      risky_terms: riskyTerms,
+      fallback_phrases: fallbackPhrases,
+      pronunciation_patterns: pronunciationPatterns,
+      support_strategies: supportStrategies,
+      hotwords,
+      latest_correction_original: latestCorrectionOriginal ?? undefined,
+      latest_correction_text: latestCorrectionText ?? undefined,
+      interruption_count: interruptionCount,
+      barge_in_count: bargeInCount,
+      next_step: nextStep ?? undefined,
+      session_turn_count: sessionTurnCount,
+      summary: content,
+    },
+  }
+}
+
 class MemoryService {
   private session: Session | null = null
   private userId: string | null = null
@@ -249,6 +369,7 @@ class MemoryService {
       this.enqueueSessionForSync(this.session)
     }
     await this.extractMemories(this.session)
+    this.extractSessionCompaction(this.session)
     await this.syncBackend()
     this.session = null
     localStorage.removeItem(userKey(this.userId!, KEYS.CURRENT))
@@ -546,6 +667,15 @@ class MemoryService {
       this.queue.push(...memories)
       this.saveQueue()
     }
+  }
+
+  private extractSessionCompaction(session: Session) {
+    const input = buildSessionCompactionMemoryInput(session)
+    if (!input) {
+      return
+    }
+
+    this.addMemoryEntry(input)
   }
 
   private async syncBackend() {

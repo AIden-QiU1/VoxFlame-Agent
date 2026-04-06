@@ -102,6 +102,10 @@ interface DisconnectRtcRuntimeOptions {
   setState: Dispatch<SetStateAction<RtcAgentState>>
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
 export async function pingRtcRuntimeSession(
   sessionRef: MutableRefObject<StartRtcSessionResponse | null>,
 ): Promise<void> {
@@ -348,6 +352,29 @@ export function createDecodedRtcMessageHandler({
               ? message.confusion_patterns_count
               : undefined,
         })
+      }
+
+      if (message.type === 'speech_activity') {
+        const sessionMetadata = memoryService.peekSession()?.metadata
+        const previousInterruptionCount =
+          isRecord(sessionMetadata) && typeof sessionMetadata.interruptionCount === 'number'
+            ? sessionMetadata.interruptionCount
+            : 0
+        const previousBargeInCount =
+          isRecord(sessionMetadata) && typeof sessionMetadata.bargeInCount === 'number'
+            ? sessionMetadata.bargeInCount
+            : 0
+
+        if (message.state === 'barge_in_triggered') {
+          memoryService.updateCurrentSessionMetadata({
+            interruptionCount: previousInterruptionCount + 1,
+            bargeInCount: previousBargeInCount + 1,
+            lastSpeechDurationMs:
+              typeof message.speech_duration_ms === 'number'
+                ? message.speech_duration_ms
+                : undefined,
+          })
+        }
       }
     }
 

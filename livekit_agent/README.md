@@ -16,7 +16,8 @@
 2. 记忆页 AI 功能完整等价
 3. 更深的 `voice profile / clarity score / memory context`
 4. 更完整的 `session review / memory tooling`
-5. 训练页、记忆页相关 AI 能力的最终等价补齐
+5. 更强的 session-close compaction
+6. 训练页、记忆页相关 AI 能力的最终等价补齐
 
 当前最重要的状态纠偏是：
 
@@ -30,17 +31,30 @@
    - 当前会在 correction reply 后发出 `clarity_score`
    - frontend 会把这些信号写回现有 session metadata，作为后续 `session_review / memory parity` 的过渡材料
 8. `livekit_agent` 已开始具备最小 turn-taking：
-   - server-side `speech_started / speech_stopped`
-   - `speech_started` 会打断当前 TTS 代播
+   - server-side `speech_started / speech_stopped / barge_in_triggered`
+   - 当前是“有门槛的 barge-in”：
+     - 先检测到用户开始说话
+     - 持续说够一小段时间后，才真正打断当前 TTS 代播
    - 对应 turn event 会通过 room data 回发给前端
-9. `livekit_agent` 已开始产出最小训练反馈：
+9. `session.userdata` 第一片已经落下去：
+   - `livekit_agent` 现在已正式有 typed session state owner
+   - session start 时会构建最小 `PreparationContextPack`
+   - backend 现在已经会把 `workspace snapshot.preparation` 注入 room metadata / dispatch metadata
+   - 如果当前会话还没有显式 preparation，才会回退到 derived minimal pack
+   - communication rewrite 也已开始读取这层准备上下文，而不再只依赖 `scene`
+10. `livekit_agent` 已开始产出最小训练反馈：
    - 现在会接收 `training_feedback_request`
    - 会回发前端现有 reducer 可直接消费的 `training_feedback`
    - 同时补发一条训练侧 `voice_profile_updated`
-10. LiveKit 训练反馈已开始进入现有 `session review / memory` 过渡链：
+11. LiveKit 训练反馈已开始进入现有 `session review / memory` 过渡链：
    - frontend 现在会把 `training_feedback` 写成现有 memory service 可识别的 `training_result`
    - 这让 workspace / session review / growth profile 开始真正吃到 LiveKit 训练结果
    - 记忆架构本身不需要重做，仍沿现有 `training_result -> training_profile_summary -> workspace snapshot` 语义继续长
+12. `session-close compaction` 第一片已落地：
+   - session 结束时现在会自动生成 `session_compaction`
+   - 当前会把 `fallback phrases / risky terms / pronunciation patterns / support strategies / hotwords / interruption telemetry`
+     压成结构化语义记忆
+   - backend `memory growth -> workspace snapshot` 已开始消费这层 compact memory
 
 ## Env 约定
 
@@ -203,6 +217,8 @@ LIVEKIT_SERVER_IMAGE=docker.m.daocloud.io/livekit/livekit-server:v1.10.1
   环境变量与运行模式配置
 - [session_context.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/session_context.py)
   把 participant metadata 解析成 VoxFlame session 语义
+- [session_userdata.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/session_userdata.py)
+  session-local typed state 与 `PreparationContextPack` 的当前 owner
 - [agent_factory.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/agent_factory.py)
   第一版 VoxFlame agent 构造逻辑
 
@@ -284,30 +300,48 @@ cd frontend && NEXT_PUBLIC_API_URL=http://127.0.0.1:3201 NEXT_PUBLIC_RTC_EXECUTI
 - worker 能通过 dispatch metadata 恢复 `session intent`
 - 文字控制消息和远端音频至少跑通最小沟通主链
 
-## 当前迁移边界
+## 当前现状
 
-这一阶段只回答 3 件事：
+`livekit_agent` 现在已经不是“迁移实验壳”，而是现役执行面的组成部分。
 
-1. 能不能启动一个 `livekit-agent` worker
-2. 能不能从房间参与者元数据中恢复 VoxFlame 的 `session intent`
-3. 能不能把沟通场景先跑成一条最小 communication loop
+当前已成立：
 
-更完整的差距盘点与迁移顺序，见：
+1. `self-hosted livekit-server + livekit_agent` 已是仓库现役 realtime execution plane
+2. 沟通页主链已跑通：
+   - room connect
+   - ASR
+   - correction-style transcript
+   - TTS
+   - interrupt / turn-taking
+3. 训练页最小反馈链已跑通：
+   - `training_feedback_request -> training_feedback`
+   - `voice_profile_updated`
+   - `training_result -> training_profile_summary -> workspace snapshot`
 
-- [VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md)
+当前还没做完的重点，不再是“迁移 seam”，而是：
 
-还不回答：
+1. 把 `session-local typed state` 制度化
+2. 把 `PreparationContextPack` 真正接进 runtime
+3. 把 `session-close compaction` 做成稳定的规律提取与记忆写回
+4. 把训练页、记忆页 AI 能力继续补齐，而不是继续折腾 transport
 
-1. `training feedback` 最终怎么完全迁移
-2. `memory layer` 最终怎么完全迁移
-3. `TEN` 什么时候彻底删除
+当前应以这些文档为准：
 
-这些要等 communication 主链先跑稳。
+- [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
+- [VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
+- [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+- [.tasks/current.md](/home/ubuntu/VoxFlame-Agent/.tasks/current.md)
 
-## 后续迁移顺序
+## 下一步重点
 
-1. 先把 communication loop 跑通
-2. 再迁移 `user_input / end_audio / session_init / speech_activity` 控制语义
-3. 再迁移 `training_feedback / voice_profile_update / clarity_score`
-4. 再迁移 `session_review / memory_context / tooling`
-5. 最后切默认流量并删除旧 TEN 路径
+1. 在不重做 durable memory owner 的前提下，为 `livekit_agent` 补齐：
+   - `session.userdata`
+   - `PreparationContextPack`
+   - `pattern extraction / compaction`
+2. 让训练页继续稳定产出：
+   - 发音规律
+   - 高频误听点
+   - 热词
+   - 最稳表达
+3. 让记忆页成为“用户画像 + 当前准备 owner”，而不是训练复盘页
+4. 让沟通页只消费当前场景最小必要准备

@@ -20,6 +20,8 @@ class VoxFlameSessionContext:
     raw_participant_metadata: str | None = None
     raw_job_metadata: str | None = None
     raw_attributes: dict[str, str] = field(default_factory=dict)
+    participant_payload: dict[str, Any] = field(default_factory=dict)
+    dispatch_payload: dict[str, Any] = field(default_factory=dict)
 
 
 def _safe_json_loads(raw: str | None) -> dict[str, Any]:
@@ -86,6 +88,8 @@ def build_session_context(
         raw_participant_metadata=metadata,
         raw_job_metadata=job_metadata,
         raw_attributes=attributes or {},
+        participant_payload=participant_payload,
+        dispatch_payload=dispatch_payload,
     )
 
 

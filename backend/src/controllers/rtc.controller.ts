@@ -200,6 +200,7 @@ router.post('/session/start', async (req: Request, res: Response) => {
       mode: parseMode(req.body?.mode),
       intent: parseSessionIntent(req.body?.intent),
       userUid: parseOptionalInteger(req.body?.userUid),
+      authenticatedUserId: req.user?.id ?? null,
       botUid: parseOptionalInteger(req.body?.botUid),
       timeoutSeconds: parseOptionalInteger(req.body?.timeoutSeconds),
       properties: parsePropertyOverrides(req.body?.properties),

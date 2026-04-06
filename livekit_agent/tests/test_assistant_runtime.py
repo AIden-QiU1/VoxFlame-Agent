@@ -10,12 +10,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from assistant_runtime import (
     CommunicationAssistantRuntime,
     build_fallback_text,
+    build_preparation_prompt,
     build_training_feedback_payload,
     estimate_clarity_score,
     extract_text_from_completion,
 )
 from config import LiveKitAgentConfig
 from session_context import VoxFlameSessionContext
+from session_userdata import build_session_userdata
 
 
 def create_config() -> LiveKitAgentConfig:
@@ -38,6 +40,7 @@ def create_config() -> LiveKitAgentConfig:
         dashscope_asr_vad_threshold=0.018,
         dashscope_asr_vad_silence_duration_ms=720,
         dashscope_asr_vad_hop_size_ms=16,
+        dashscope_asr_barge_in_min_speech_ms=220,
         dashscope_tts_url="wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
         dashscope_tts_model="qwen3-tts-flash-realtime",
         dashscope_tts_voice="Cherry",
@@ -109,7 +112,11 @@ class TestAssistantRuntime(unittest.TestCase):
         self.assertEqual(text, "第一句。第二句。")
 
     def test_generate_reply_uses_fallback_without_dashscope(self) -> None:
-        runtime = CommunicationAssistantRuntime(config=create_config(), ctx=create_context())
+        runtime = CommunicationAssistantRuntime(
+            config=create_config(),
+            ctx=create_context(),
+            userdata=build_session_userdata(create_context()),
+        )
         reply, source = asyncio.run(runtime.generate_reply("请帮我叫医生"))
         self.assertEqual(source, "livekit_agent_fallback")
         self.assertEqual(reply, build_fallback_text(create_context(), "请帮我叫医生"))
@@ -119,12 +126,23 @@ class TestAssistantRuntime(unittest.TestCase):
         runtime = CommunicationAssistantRuntime(
             config=create_config(),
             ctx=create_context(),
+            userdata=build_session_userdata(create_context()),
             client=fake_client,
         )
         reply, source = asyncio.run(runtime.generate_reply("请帮我叫医生"))
         self.assertEqual(source, "dashscope_chat_completion")
         self.assertEqual(reply, "请先帮我叫医生，我需要马上处理。")
         self.assertEqual(fake_client.requests[0][-1]["content"], "请帮我叫医生")
+        self.assertTrue(
+            any("当前准备目标" in message["content"] for message in fake_client.requests[0][:-1]),
+        )
+
+    def test_build_preparation_prompt_includes_hotwords(self) -> None:
+        userdata = build_session_userdata(create_context())
+        userdata.preparation.hotwords = ["挂号", "复诊"]
+        prompt = build_preparation_prompt(userdata)
+        self.assertIn("当前准备目标", prompt)
+        self.assertIn("挂号", prompt)
 
     def test_build_training_feedback_payload_matches_training_page_contract(self) -> None:
         payload = build_training_feedback_payload(

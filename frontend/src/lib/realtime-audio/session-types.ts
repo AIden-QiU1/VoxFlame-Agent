@@ -111,6 +111,8 @@ export interface RtcMessageEnvelope {
   clarity_score?: number
   state?: string
   auto_finalize?: boolean
+  interruption_requested?: boolean
+  speech_duration_ms?: number
   is_final?: boolean
   error?: string
   message?: string

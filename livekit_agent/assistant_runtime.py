@@ -10,6 +10,7 @@ from urllib import error, request
 
 from config import LiveKitAgentConfig
 from session_context import VoxFlameSessionContext
+from session_userdata import VoxFlameSessionUserData
 
 logger = logging.getLogger("voxflame-livekit-agent.assistant")
 
@@ -53,6 +54,25 @@ def build_scene_prompt(ctx: VoxFlameSessionContext) -> str:
         f"当前场景：{scene}\n"
         "请优先输出一句能让对方马上理解用户意图、可以直接代说的表达。"
     )
+
+
+def build_preparation_prompt(userdata: VoxFlameSessionUserData) -> str:
+    preparation = userdata.preparation
+    lines = [
+        f"当前准备目标：{preparation.immediate_goal}",
+        f"当前表达画像：{preparation.profile_summary}",
+    ]
+    if preparation.listener_guidance:
+        lines.append(f"听者引导：{'；'.join(preparation.listener_guidance[:2])}")
+    if preparation.support_strategies:
+        lines.append(f"支持策略：{'；'.join(preparation.support_strategies[:2])}")
+    if preparation.hotwords:
+        lines.append(f"热词：{'、'.join(preparation.hotwords[:6])}")
+    if preparation.common_confusions:
+        lines.append(f"常见误听：{'、'.join(preparation.common_confusions[:4])}")
+    if userdata.active_hotwords:
+        lines.append(f"本轮命中热词：{'、'.join(userdata.active_hotwords[:4])}")
+    return "\n".join(lines)
 
 
 def _normalize_training_status(value: Any) -> str:
@@ -301,6 +321,7 @@ class DashScopeChatClient:
 class CommunicationAssistantRuntime:
     config: LiveKitAgentConfig
     ctx: VoxFlameSessionContext
+    userdata: VoxFlameSessionUserData
     client: DashScopeChatClient | None = None
     history: list[dict[str, str]] = field(default_factory=list)
 
@@ -318,6 +339,7 @@ class CommunicationAssistantRuntime:
         if not normalized:
             return build_fallback_text(self.ctx, normalized), "livekit_agent_fallback"
 
+        self.userdata.note_user_transcript(normalized)
         self.history.append({"role": "user", "content": normalized})
         self.history = self.history[-8:]
 
@@ -330,6 +352,7 @@ class CommunicationAssistantRuntime:
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "system", "content": build_scene_prompt(self.ctx)},
+            {"role": "system", "content": build_preparation_prompt(self.userdata)},
             *self.history,
         ]
 
@@ -347,4 +370,5 @@ class CommunicationAssistantRuntime:
 
         self.history.append({"role": "assistant", "content": reply})
         self.history = self.history[-8:]
+        self.userdata.note_assistant_reply(reply)
         return reply, source

@@ -7,6 +7,9 @@
 - 主任务：把当前产品主线切到“5 天内验证长时重要表达能力”的专项体验，优先做 rehearsal / live / review 闭环。
 - 当前阶段：LiveKit 执行面已经足够支撑这条新主线，重点从“继续泛化替代”切到“long-form expression mode 落地”。
 - 当前最值得继续的切片：`prepared expression asset ingestion -> 结构化长表达练习 -> 记忆页顶部的当前重要表达准备模块`。
+- docs 目录继续收口：
+  - LiveKit 迁移三件套已删除
+  - 当前开发主入口收在：PRD / speech plan / LiveKit memory best practices / `.tasks/current.md`
 
 ## 最近 3 天有效结论
 
@@ -57,6 +60,101 @@
      - 记忆究竟该记什么、怎么压缩、怎么调出来
      这 3 件事的判断是否足够准
    - 所以下一步优先级不是“继续铺更多功能面”，而是把规律提取、场景准备、现场最小辅助这三层收准
+
+8. LiveKit 的“记忆边界”已经重新研究清楚
+   - `LiveKit != durable memory owner`
+   - 更准确的分工是：
+     - `LiveKit`: session-local state、room state、session report raw material
+     - `backend + workspace snapshot`: durable user memory owner
+     - `Qdrant`: 后续 semantic recall layer
+     - `Redis`: 只有在明确需要 ephemeral coordination/cache 时再引入
+   - 这意味着：
+     - 把 `qdrant / redis` 放进 `extras` profile 作为当前启动策略并没有破坏主链
+     - 但 `Qdrant` 仍然值得作为记忆增强层重新接回 backend，而不是长期闲置
+   - 对应专项文档已新增：
+     [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+
+9. docs 下的过时内容已经继续清理
+   - 已直接删除：
+     - `CORPUS_SOURCE_RESEARCH_2026-03-19.md`（无引用、且不再服务现役主线）
+   - 已继续删除三份已经和现役主线打架的旧迁移文档：
+     - `VOXFLAME_LIVEKIT_TRANSITION_PLAN_2026-03-31.md`
+     - `VOXFLAME_LIVEKIT_REPLACEMENT_ROADMAP_2026-04-02.md`
+     - `VOXFLAME_LIVEKIT_COMMUNICATION_MINIMAL_LOOP_PLAN_2026-04-02.md`
+   - 当前关于 LiveKit 现状与下一步，只以这些入口为准：
+     - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
+     - [VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
+     - [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+
+10. `PRD / speech plan / 历史深参考` 的边界已重新钉死
+   - `PRD`：产品定义、页面职责、当前代码现状和中期产品收口
+   - `speech plan`：未来 5 天专项执行顺序、验收和取舍
+   - `control-plane / unified memory`：只保留为历史与深参考，不再代表当前代码真相
+
+11. LiveKit 现役能力判断已写实
+   - 已成立：
+     - ASR
+     - correction-style transcript
+     - TTS
+     - basic interrupt / turn-taking
+     - training feedback 最小 contract
+   - 仍不足：
+     - 更完整的 session-close compaction
+     - 更稳的 interruption / barge-in policy
+     - 会话内 speaker differentiation
+     - LiveKit 官方 `audio_input / APM` 接入下更保守的 audio processing strategy
+   - 当前关于降噪 / interruption / 音纹的判断也已收清：
+     - 降噪需要，但要保守
+     - 输入电平提示现在比长期音纹库更值得优先做
+     - 多人场景先做会话内 speaker differentiation，再决定是否要持久化 voiceprint
+   - 一个更重要的工程判断也已收清：
+     - `220ms` 只是当前工程默认起始值，不是官方推荐定值
+     - 下一步要尽量把 `turn_detection / interruptions / audio_input / userdata / participant attributes` 向 LiveKit 官方 primitives 收口
+     - 即使继续使用 `DashScope / Qwen-first` 作为 provider，这条原则也不变
+
+13. `session.userdata + PreparationContextPack` 第一片已完成
+   - `livekit_agent` 现在已有 typed session state owner
+   - session start 时会构建最小 `PreparationContextPack`
+   - communication rewrite 已开始消费这层准备信息
+   - backend 也已经把 `workspace snapshot.preparation` 注入 session metadata / dispatch metadata
+
+14. `session-close compaction` 第一片已完成
+   - session end 时现在会自动生成 `session_compaction`
+   - 当前会把：
+     - `fallback phrases`
+     - `risky terms`
+     - `pronunciation patterns`
+     - `support strategies`
+     - `hotwords`
+     - `interruption telemetry`
+     压成结构化语义记忆
+   - frontend / backend 的 `memory growth` 已开始消费这层 compact memory
+   - 当前这项剩余工作是：
+     - 更强的 pattern extraction
+     - recall policy
+     - participant attributes 配合的低频共享状态
+
+15. 输入电平与收音质量反馈第一片已完成
+   - 沟通页与训练页现在都会基于浏览器 `AnalyserNode` 给出实时反馈
+   - 当前会提示：
+     - `声音偏小`
+     - `收音稳定`
+     - `声音过冲`
+   - 这一步的定位是高压场景下的即时辅助，不是官方 `audio_input / APM` 的替代
+   - 下一步仍然是：
+     - LiveKit 官方 `room_options.audio_input` / Python RTC APM
+     - 更细的输入 telemetry
+     - 会话内 speaker differentiation
+
+12. `interruption / barge-in` 第一刀已落代码
+   - `speech_started` 不再直接打断 TTS
+   - 现在改成“有门槛的 barge-in”：
+     - 先检测到用户开始说话
+     - 持续说够 `QWEN_ASR_BARGE_IN_MIN_SPEECH_MS` 后，才触发 `barge_in_triggered`
+     - 只有这时才真正中断当前 TTS
+   - 当前默认阈值为 `220ms`
+   - 这一步主要是减少短促噪声、咳嗽或误触带来的误打断，更贴近构音障碍场景
+   - 但这一步现在被重新定义为“工程起始默认值”，不是最终 best-practice 方案
 
 7. 旧执行面的辅助工具链也开始一起退役
    - `frontend/Dockerfile` 里的 `NEXT_PUBLIC_ENABLE_LIVEKIT_TRANSPORT` 旧 build arg/env 已删除
@@ -127,6 +225,15 @@
      - 高频误听规律
      - 热词
      - 最稳表达版本
+
+2.5. 为 `livekit_agent` 继续补官方风格的 turn/audio primitives
+   - 更成熟的 `turn_detection / min_interruption_duration / endpointing`
+   - 必要时引入 `manual / hybrid turn control`
+   - `room_options.audio_input` / APM 路线调研与接入
+   - 输入电平提示已经落地，下一步重点转到 `audio_input / APM`
+2.6. 继续做更强的 `session-close compaction`
+   - `pattern extraction -> workspace snapshot`
+   - 在保持现有 durable memory owner 不变的前提下，把 LiveKit memory best practices 真正落进代码
 
 3. 再做记忆页的“用户画像 + 当前重要表达准备”
    - 当前状态

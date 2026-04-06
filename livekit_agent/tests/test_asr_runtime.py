@@ -36,6 +36,7 @@ def create_config() -> LiveKitAgentConfig:
         dashscope_asr_vad_threshold=0.018,
         dashscope_asr_vad_silence_duration_ms=720,
         dashscope_asr_vad_hop_size_ms=16,
+        dashscope_asr_barge_in_min_speech_ms=220,
         dashscope_tts_url="wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
         dashscope_tts_model="qwen3-tts-flash-realtime",
         dashscope_tts_voice="Cherry",
