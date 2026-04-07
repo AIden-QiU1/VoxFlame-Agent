@@ -33,11 +33,33 @@ function normalizeOptionalValue(value: string | undefined): string | null {
   return trimmed ? trimmed : null
 }
 
+function deriveBrowserUrlFromPublicBaseUrl(
+  value: string | undefined,
+): string | null {
+  const publicBaseUrl = normalizeOptionalValue(value)
+  if (!publicBaseUrl) {
+    return null
+  }
+
+  try {
+    const url = new URL(publicBaseUrl)
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    url.pathname = ''
+    url.search = ''
+    url.hash = ''
+    return url.toString().replace(/\/$/, '')
+  } catch {
+    return null
+  }
+}
+
 export class LiveKitConfigService {
   public getStatus(): LiveKitExecutionStatus {
     const serverUrl = normalizeOptionalValue(process.env.LIVEKIT_URL)
     const browserUrl =
-      normalizeOptionalValue(process.env.LIVEKIT_BROWSER_URL) ?? serverUrl
+      normalizeOptionalValue(process.env.LIVEKIT_BROWSER_URL) ??
+      deriveBrowserUrlFromPublicBaseUrl(process.env.VOXFLAME_PUBLIC_BASE_URL) ??
+      serverUrl
     const apiKeyPresent = hasNonEmptyValue(process.env.LIVEKIT_API_KEY)
     const apiSecretPresent = hasNonEmptyValue(process.env.LIVEKIT_API_SECRET)
     const enabled = this.isExperimentEnabled()

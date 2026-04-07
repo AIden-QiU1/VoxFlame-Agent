@@ -82,6 +82,39 @@ export interface LiveKitTransportConnection {
   rtmClient: SessionControlClient
 }
 
+export function formatRtcConnectionError(error: unknown): string {
+  const name =
+    typeof error === 'object' && error !== null && 'name' in error
+      ? String((error as { name?: unknown }).name || '')
+      : ''
+  const message =
+    typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+  const normalized = `${name} ${message}`.toLowerCase()
+
+  if (
+    normalized.includes('could not establish pc connection') ||
+    normalized.includes('pc connection')
+  ) {
+    return '当前网络没能建立实时语音连接。请先关闭 VPN 或代理，换 Chrome / Safari，或者切到手机热点后再试。'
+  }
+
+  if (
+    normalized.includes('signal connection') ||
+    normalized.includes('server unreachable') ||
+    normalized.includes('websocket')
+  ) {
+    return '当前网络暂时连不上实时语音服务，请检查网络、代理设置后再试。'
+  }
+
+  if (normalized.includes('notallowed')) {
+    return '当前会话暂时没有连接权限，请刷新页面后重新连接。'
+  }
+
+  return message.trim() || '实时语音连接失败，请换一个网络或浏览器再试。'
+}
+
 function resolveBrowserLiveKitUrl(serverUrl: string): string {
   if (typeof window === 'undefined') {
     return serverUrl
@@ -194,7 +227,13 @@ export async function connectLiveKitTransport(
   const browserServerUrl = resolveBrowserLiveKitUrl(transport.serverUrl)
 
   room.prepareConnection(browserServerUrl, transport.participantToken)
-  await room.connect(browserServerUrl, transport.participantToken)
+
+  try {
+    await room.connect(browserServerUrl, transport.participantToken)
+  } catch (error) {
+    throw new Error(formatRtcConnectionError(error))
+  }
+
   options.onRtmStatus({ newState: 'CONNECTED' })
 
   return {

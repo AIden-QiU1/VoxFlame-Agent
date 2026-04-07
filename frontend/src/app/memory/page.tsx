@@ -641,6 +641,67 @@ export default function MemoryPage() {
                     ) : null}
                   </div>
 
+                  {workspaceSnapshot.prepared_expression ? (
+                    <div className="rounded-3xl border border-stone-200 bg-white p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium text-stone-700">本次重要表达结构</div>
+                          <div className="mt-1 text-lg font-semibold text-gray-900">
+                            {workspaceSnapshot.prepared_expression.title}
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+                          已练 {workspaceSnapshot.prepared_expression.rehearsal_count} 次
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm leading-7 text-gray-700 text-pretty">
+                        {workspaceSnapshot.prepared_expression.summary}
+                      </p>
+                      {workspaceSnapshot.prepared_expression.last_rehearsed_at ? (
+                        <div className="mt-3 text-sm text-gray-600">
+                          最近一次 rehearsal：{formatDate(new Date(workspaceSnapshot.prepared_expression.last_rehearsed_at).getTime())}
+                        </div>
+                      ) : null}
+                      {workspaceSnapshot.prepared_expression.next_focus.length > 0 ? (
+                        <div className="mt-4">
+                          {renderStringChips(
+                            workspaceSnapshot.prepared_expression.next_focus,
+                            '继续积累后，这里会自动浮出下一次上台前最该复习的内容。',
+                            'amber',
+                          )}
+                        </div>
+                      ) : null}
+                      <div className="mt-4 space-y-3">
+                        {workspaceSnapshot.prepared_expression.sections.slice(0, 4).map((section) => (
+                          <div key={section.id} className="rounded-2xl bg-stone-50 px-4 py-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="text-sm font-medium text-gray-900">{section.title}</div>
+                              <div className="flex flex-wrap gap-2">
+                                {section.is_priority ? (
+                                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                                    优先收口
+                                  </span>
+                                ) : null}
+                                <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
+                                  {section.rehearsal_count > 0 ? `已练 ${section.rehearsal_count} 次` : '待开始'}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="mt-2 text-sm leading-6 text-gray-600">{section.summary}</p>
+                            <p className="mt-3 text-sm leading-6 text-gray-800">锚点句：{section.anchor_line}</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {[...section.high_risk_phrases, ...section.fallback_phrases].slice(0, 4).map((item) => (
+                                <span key={`${section.id}-${item}`} className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="rounded-3xl border border-stone-200 bg-white p-5">
                     <div className="text-sm font-medium text-stone-700">
                       {workspaceSnapshot.session_review.headline}

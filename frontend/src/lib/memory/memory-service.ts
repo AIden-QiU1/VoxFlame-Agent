@@ -233,6 +233,10 @@ export function buildSessionCompactionMemoryInput(session: Session): SessionComp
   const articulationTips = Array.isArray(metadata?.lastTrainingArticulationTips)
     ? metadata.lastTrainingArticulationTips.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : []
+  const preparedExpressionId = readString(metadata, 'currentPreparedExpressionId')
+  const preparedExpressionTitle = readString(metadata, 'currentPreparedExpressionTitle')
+  const preparedExpressionSectionId = readString(metadata, 'currentPreparedExpressionSectionId')
+  const preparedExpressionSectionTitle = readString(metadata, 'currentPreparedExpressionSectionTitle')
   const interruptionCount = readNumber(metadata, 'interruptionCount') ?? 0
   const bargeInCount = readNumber(metadata, 'bargeInCount') ?? 0
   const lastInputTelemetryReason = readString(metadata, 'lastInputTelemetryReason')
@@ -255,6 +259,9 @@ export function buildSessionCompactionMemoryInput(session: Session): SessionComp
   ], 6)
   const supportStrategies = dedupeStrings([
     ...articulationTips,
+    preparedExpressionTitle
+      ? `这次重要表达聚焦在《${preparedExpressionTitle}》${preparedExpressionSectionTitle ? `的“${preparedExpressionSectionTitle}”` : ''}。`
+      : null,
     nextStep,
     lastInputClippingDetected
       ? '现场收音出现过削波，尽量把麦克风稍微拿远一点并保持音量稳定。'
@@ -274,6 +281,9 @@ export function buildSessionCompactionMemoryInput(session: Session): SessionComp
     }
 
     if (trainingSummary) {
+      if (preparedExpressionTitle) {
+        return `这次《${preparedExpressionTitle}》${preparedExpressionSectionTitle ? `的“${preparedExpressionSectionTitle}”` : ''}里，${trainingSummary}`
+      }
       return trainingSummary
     }
 
@@ -315,6 +325,10 @@ export function buildSessionCompactionMemoryInput(session: Session): SessionComp
       last_input_clipping_detected: lastInputClippingDetected,
       last_input_apm_enabled: lastInputApmEnabled,
       audio_clipping_event_count: audioClippingEventCount,
+      prepared_expression_id: preparedExpressionId ?? undefined,
+      prepared_expression_title: preparedExpressionTitle ?? undefined,
+      prepared_expression_section_id: preparedExpressionSectionId ?? undefined,
+      prepared_expression_section_title: preparedExpressionSectionTitle ?? undefined,
       next_step: nextStep ?? undefined,
       session_turn_count: sessionTurnCount,
       summary: content,

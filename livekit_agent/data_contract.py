@@ -142,6 +142,34 @@ def build_voice_profile_updated_output(
     }
 
 
+def build_training_coach_feedback_output(
+    ctx: VoxFlameSessionContext,
+    *,
+    exercise_id: str,
+    exercise_text: str,
+    recognized_text: str,
+    feedback_text: str,
+    source: str,
+    model: str,
+) -> dict[str, Any]:
+    return {
+        "type": "training_coach_feedback",
+        "feedback_request_id": exercise_id.strip() or ctx.request_id,
+        "exercise_id": exercise_id.strip(),
+        "exercise_text": exercise_text.strip(),
+        "recognized_text": recognized_text.strip(),
+        "feedback_text": feedback_text.strip(),
+        "source": source,
+        "model": model.strip(),
+        "metadata": {
+            "request_id": ctx.request_id,
+            "surface": ctx.surface,
+            "mode": ctx.mode,
+            "scene": ctx.scene,
+        },
+    }
+
+
 def build_speech_activity_output(
     ctx: VoxFlameSessionContext,
     *,
@@ -195,7 +223,14 @@ def build_audio_input_telemetry_output(
 
 
 def extract_training_feedback_request(message: dict[str, Any]) -> dict[str, Any] | None:
-    if message.get("type") != "training_feedback_request":
+    if message.get("type") not in {"training_feedback_request", "training_coach_request"}:
+        return None
+
+    return dict(message)
+
+
+def extract_training_coach_request(message: dict[str, Any]) -> dict[str, Any] | None:
+    if message.get("type") != "training_coach_request":
         return None
 
     return dict(message)

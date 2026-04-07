@@ -14,6 +14,7 @@ import { MicrophoneInputFeedback } from '@/components/runtime/MicrophoneInputFee
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/useAuth'
 import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
+import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
 import { type UploadReceipt, useVoiceUpload } from '@/hooks/useVoiceUpload'
 import {
   LEGAL_CONSENT_VERSION,
@@ -54,8 +55,14 @@ import {
   appendUploadedTrainingRecord,
   buildTrainingProfileMemorySummary,
   buildTrainingVoiceProfilePayload,
+  getUploadedTrainingExerciseIds,
   markTrainingProfileSummarySynced,
 } from '@/lib/training/training-profile'
+import {
+  buildPreparedExpressionPracticeExercises,
+  buildPreparedExpressionPracticeSummary,
+  type PreparedExpressionPracticeExercise,
+} from '@/lib/training/prepared-expression-practice'
 import {
   defaultCapabilitiesForMode,
   defaultStrategyForMode,
@@ -66,6 +73,7 @@ import {
   type TrainingSampleReviewDecision,
 } from '@/lib/training/training-sample-review'
 import { buildTrainingSampleLineage } from '@/lib/training/training-sample-lineage'
+import { selectTrainingExercises } from '@/lib/training/training-exercise-selection'
 
 type AttemptUploadStatus =
   | 'idle'
@@ -79,7 +87,7 @@ type AttemptSaveTrigger = 'auto' | 'manual'
 
 interface PracticeAttempt {
   createdAt: number
-  exercise: MandarinTrainingExercise
+  exercise: PracticeExercise
   transcript: string
   transcriptLatencyMs: number
   feedback: MandarinTrainingFeedback
@@ -95,15 +103,31 @@ interface NoticeState {
   message: string
 }
 
+type PracticeSourceMode = 'important_expression' | 'sentence_corpus'
+type PracticeExercise = MandarinTrainingExercise | PreparedExpressionPracticeExercise
+
+interface PracticeCollectionMeta {
+  label: string
+  shortLabel: string
+  description: string
+  examples: string[]
+  helper: string
+  trainingTips: string[]
+  corpusCount: number
+}
+
+function isPreparedExpressionExercise(
+  exercise: PracticeExercise | null | undefined,
+): exercise is PreparedExpressionPracticeExercise {
+  return Boolean(
+    exercise &&
+    'practiceSource' in exercise &&
+    exercise.practiceSource === 'prepared_expression',
+  )
+}
+
 const DEFAULT_VISIBLE_SENTENCES = 60
 const SEARCH_VISIBLE_SENTENCES = 80
-
-const FEEDBACK_STATUS_LABELS: Record<MandarinTrainingFeedback['status'], string> = {
-  excellent: '已经很接近了',
-  close: '差一点就稳了',
-  retry: '先拆开再练',
-  unclear: '这次没稳定听清',
-}
 
 const UPLOAD_STATUS_LABELS: Record<AttemptUploadStatus, string> = {
   idle: '这条录音还没进入保存流程',
@@ -112,19 +136,6 @@ const UPLOAD_STATUS_LABELS: Record<AttemptUploadStatus, string> = {
   retrying: '正在后台自动补登',
   auth_required: '需要重新登录恢复自动保存',
   failed: '云端登记暂时异常',
-}
-
-const SAMPLE_QUALITY_LABELS: Record<TrainingSampleQuality['tier'], string> = {
-  ready: '可直接训练',
-  usable: '可保留继续练',
-  review: '建议回看后补录',
-  retry: '建议马上重录',
-}
-
-const SAMPLE_REVIEW_LABELS: Record<TrainingSampleReviewDecision['evaluationStatus'], string> = {
-  ready: '自动纳入样本池',
-  sampled_for_review: '进入复核队列',
-  retry_recommended: '已上传，但建议后续补录',
 }
 
 function getClarityScore(status: MandarinTrainingFeedback['status']): number {
@@ -150,7 +161,7 @@ function formatRecordingTime(totalSeconds: number): string {
 }
 
 function buildUploadMetadata(
-  exercise: MandarinTrainingExercise,
+  exercise: PracticeExercise,
   recording: VoxFlameRecordingEnvelope,
   transcript: string,
   transcriptLatencyMs: number,
@@ -205,6 +216,17 @@ function buildUploadMetadata(
     auto_saved: saveTrigger === 'auto',
   }
 
+  if (isPreparedExpressionExercise(exercise)) {
+    metadata.prepared_expression_id = exercise.preparedExpressionId
+    metadata.prepared_expression_title = exercise.preparedExpressionTitle
+    metadata.prepared_expression_section_id = exercise.preparedExpressionSectionId
+    metadata.prepared_expression_section_title = exercise.preparedExpressionSectionTitle
+    metadata.high_risk_phrases = exercise.preparedExpressionHighRiskPhrases
+    metadata.fallback_phrases = exercise.preparedExpressionFallbackPhrases
+    metadata.keywords = exercise.preparedExpressionKeywords
+    metadata.practice_source = exercise.practiceSource
+  }
+
   for (const key of Object.keys(metadata)) {
     const value = metadata[key]
     if (Array.isArray(value) && value.length === 0) {
@@ -219,22 +241,35 @@ function buildUploadMetadata(
   return metadata
 }
 
-function buildTrainingFeedbackRequestPayload(
-  exercise: MandarinTrainingExercise,
+function buildTrainingCoachRequestPayload(
+  exercise: PracticeExercise,
   transcript: string,
-  feedback: MandarinTrainingFeedback,
   guidanceProfile: TrainingGuidanceProfile,
 ): Record<string, unknown> {
-  return {
+  const payload: Record<string, unknown> = {
     exercise_id: exercise.id,
     exercise_text: exercise.text,
     exercise_category: exercise.category,
     recognized_text: transcript,
-    feedback_status: feedback.status,
-    focus_tags: feedback.speechPatterns,
-    pronunciation_summary: feedback.pronunciationSummary,
     guidance_profile: buildTrainingGuidanceProfileMetadata(guidanceProfile),
   }
+
+  if (isPreparedExpressionExercise(exercise)) {
+    return {
+      ...payload,
+      prepared_expression_id: exercise.preparedExpressionId,
+      prepared_expression_title: exercise.preparedExpressionTitle,
+      prepared_expression_section_id: exercise.preparedExpressionSectionId,
+      prepared_expression_section_title: exercise.preparedExpressionSectionTitle,
+      high_risk_phrases: exercise.preparedExpressionHighRiskPhrases,
+      fallback_phrases: exercise.preparedExpressionFallbackPhrases,
+      keywords: exercise.preparedExpressionKeywords,
+      hotwords: exercise.preparedExpressionKeywords,
+      practice_source: exercise.practiceSource,
+    }
+  }
+
+  return payload
 }
 
 function buildUploadedTrainingRecord(attempt: PracticeAttempt) {
@@ -251,9 +286,14 @@ function buildUploadedTrainingRecord(attempt: PracticeAttempt) {
     status: attempt.feedback.status,
     clarityScore: getClarityScore(attempt.feedback.status),
     durationSeconds: attempt.recording.audio.durationSeconds,
-    focusTags: [attempt.exercise.category],
+    focusTags: isPreparedExpressionExercise(attempt.exercise)
+      ? [attempt.exercise.preparedExpressionSectionTitle, attempt.exercise.category]
+      : [attempt.exercise.category],
     speechPatterns: attempt.feedback.speechPatterns,
     articulationTips: attempt.feedback.articulationTips,
+    keywords: isPreparedExpressionExercise(attempt.exercise)
+      ? attempt.exercise.preparedExpressionKeywords
+      : undefined,
     pronunciationSummary: attempt.feedback.pronunciationSummary,
   }
 }
@@ -312,8 +352,7 @@ export default function ContributePage() {
     status,
     interimText,
     error: sessionError,
-    latestTrainingFeedback,
-    latestVoiceProfileSync,
+    latestTrainingCoachFeedback,
     isRecording,
     isProcessing,
     isConnected,
@@ -323,7 +362,7 @@ export default function ContributePage() {
     analyser,
     startRecording,
     stopRecording,
-    requestTrainingFeedback,
+    requestTrainingCoach,
     syncVoiceProfile,
     disconnect,
   } = useMandarinTrainingSession({
@@ -334,12 +373,20 @@ export default function ContributePage() {
     uploadRecording,
     refreshLocalQueueCount,
     isUploading,
+    localQueueItems,
     lastError,
   } = useVoiceUpload()
+  const {
+    snapshot: workspaceSnapshot,
+  } = useWorkspaceMemorySnapshot({
+    userId,
+    isAuthenticated,
+  })
 
   const [selectedCategory, setSelectedCategory] = useState<MandarinTrainingCategory>(
     MANDARIN_TRAINING_CATEGORIES[0],
   )
+  const [practiceMode, setPracticeMode] = useState<PracticeSourceMode>('sentence_corpus')
   const [selectedExerciseId, setSelectedExerciseId] = useState(
     getExercisesByCategory(MANDARIN_TRAINING_CATEGORIES[0])[0]?.id ?? '',
   )
@@ -348,10 +395,12 @@ export default function ContributePage() {
   const [guidanceProfile, setGuidanceProfile] = useState<TrainingGuidanceProfile>(
     DEFAULT_TRAINING_GUIDANCE_PROFILE,
   )
+  const [sessionPracticedExerciseIds, setSessionPracticedExerciseIds] = useState<string[]>([])
   const [attempt, setAttempt] = useState<PracticeAttempt | null>(null)
   const [notice, setNotice] = useState<NoticeState | null>(null)
 
   const disconnectRef = useRef(disconnect)
+  const hasAutoSwitchedPracticeModeRef = useRef(false)
   disconnectRef.current = disconnect
 
   const canSaveTrainingSample = hasRequiredLegalConsent(user)
@@ -360,35 +409,111 @@ export default function ContributePage() {
     () => buildTrainingGuidanceContext(guidanceProfile),
     [guidanceProfile],
   )
-  const categoryExercises = useMemo(
-    () => getExercisesByCategory(selectedCategory),
-    [selectedCategory],
+  const preparedExpression = workspaceSnapshot?.prepared_expression ?? null
+  const preparedExpressionExercises = useMemo(
+    () => buildPreparedExpressionPracticeExercises(preparedExpression),
+    [preparedExpression],
   )
+  const preparedExpressionSummary = useMemo(
+    () => buildPreparedExpressionPracticeSummary(preparedExpression),
+    [preparedExpression],
+  )
+  const hasPreparedExpression = preparedExpressionExercises.length > 0
+  const categoryExercises = useMemo(
+    () => (
+      practiceMode === 'important_expression'
+        ? preparedExpressionExercises
+        : getExercisesByCategory(selectedCategory)
+    ),
+    [practiceMode, preparedExpressionExercises, selectedCategory],
+  )
+  const recordedExerciseIds = useMemo(() => {
+    const persistedExerciseIds = userId ? getUploadedTrainingExerciseIds(userId) : []
+    const queuedExerciseIds = localQueueItems
+      .map((item) => (typeof item.sentenceId === 'string' ? item.sentenceId.trim() : ''))
+      .filter((item) => item.length > 0)
+
+    return [...persistedExerciseIds, ...queuedExerciseIds]
+  }, [localQueueItems, userId])
+  const selectableExerciseState = useMemo(
+    () => selectTrainingExercises({
+      exercises: categoryExercises,
+      recordedExerciseIds,
+      sessionExerciseIds: sessionPracticedExerciseIds,
+    }),
+    [categoryExercises, recordedExerciseIds, sessionPracticedExerciseIds],
+  )
+  const selectableExercises = selectableExerciseState.exercises
   const normalizedQuery = exerciseQuery.trim().toLowerCase()
   const matchingExercises = useMemo(() => {
     if (!normalizedQuery) {
-      return categoryExercises
+      return selectableExercises
     }
 
-    return categoryExercises.filter((exercise) => (
+    return selectableExercises.filter((exercise) => (
       exercise.text.includes(normalizedQuery)
     ))
-  }, [categoryExercises, normalizedQuery])
+  }, [normalizedQuery, selectableExercises])
   const visibleExercises = useMemo(
     () => matchingExercises.slice(0, normalizedQuery ? SEARCH_VISIBLE_SENTENCES : DEFAULT_VISIBLE_SENTENCES),
     [matchingExercises, normalizedQuery],
   )
   const currentExercise = useMemo(
     () => (
-      categoryExercises.find((exercise) => exercise.id === selectedExerciseId) ??
+      selectableExercises.find((exercise) => exercise.id === selectedExerciseId) ??
       visibleExercises[0] ??
+      selectableExercises[0] ??
+      categoryExercises.find((exercise) => exercise.id === selectedExerciseId) ??
       categoryExercises[0] ??
+      preparedExpressionExercises[0] ??
       getExercisesByCategory(MANDARIN_TRAINING_CATEGORIES[0])[0]
     ),
-    [categoryExercises, selectedExerciseId, visibleExercises],
+    [categoryExercises, preparedExpressionExercises, selectableExercises, selectedExerciseId, visibleExercises],
   )
+  const exerciseSelectionHint = useMemo(() => {
+    if (selectableExerciseState.stage === 'unrecorded') {
+      return `当前优先展示还没录过的句子，还剩 ${selectableExerciseState.unrecordedCount} 句。`
+    }
+
+    if (selectableExerciseState.stage === 'unrepeated') {
+      return '这一组句子之前都录过了，当前先避开这轮已经练过的句子。'
+    }
+
+    return '这一组这轮都练过了，现在允许回看前面的句子继续复练。'
+  }, [selectableExerciseState])
   const currentCategoryMeta = MANDARIN_TRAINING_CATEGORY_META[selectedCategory]
+  const currentPracticeMeta = useMemo<PracticeCollectionMeta>(() => {
+    if (practiceMode === 'important_expression' && preparedExpressionSummary && preparedExpression) {
+      return {
+        label: preparedExpressionSummary.title,
+        shortLabel: '重要表达',
+        description: preparedExpressionSummary.summary,
+        examples: preparedExpression.sections.slice(0, 2).map((section) => section.anchor_line),
+        helper: '先按结构段落练，不用一次扛整篇。先把开场、风险句和保底句各收稳一遍。',
+        trainingTips: [
+          '每次只盯当前段落的一个锚点句，不急着把整篇一次说完。',
+          '高风险词先慢一点、重一点，再把整段连回去。',
+          '卡住时优先切到保底句，不要在台上硬顶。',
+        ],
+        corpusCount: preparedExpression.sections.length,
+      }
+    }
+
+    return currentCategoryMeta
+  }, [currentCategoryMeta, practiceMode, preparedExpression, preparedExpressionSummary])
+  const currentPreparedSection = useMemo(
+    () => (
+      isPreparedExpressionExercise(currentExercise)
+        ? preparedExpression?.sections.find((section) => section.id === currentExercise.preparedExpressionSectionId) ?? null
+        : null
+    ),
+    [currentExercise, preparedExpression],
+  )
   const runtimeScene = useMemo<RtcScene | undefined>(() => {
+    if (practiceMode === 'important_expression') {
+      return undefined
+    }
+
     if (selectedCategory === '看病与求助') {
       return 'medical'
     }
@@ -402,7 +527,7 @@ export default function ContributePage() {
     }
 
     return undefined
-  }, [selectedCategory])
+  }, [practiceMode, selectedCategory])
   const plannedTrainingIntent = useMemo(() => ({
     surface: 'training_workspace' as const,
     mode: 'training' as const,
@@ -410,24 +535,15 @@ export default function ContributePage() {
     requestedCapabilities: defaultCapabilitiesForMode('training'),
     scene: runtimeScene,
   }), [runtimeScene])
-  const agentFeedback = useMemo(() => {
-    if (!attempt || !latestTrainingFeedback) {
+  const coachFeedback = useMemo(() => {
+    if (!attempt || !latestTrainingCoachFeedback) {
       return null
     }
 
-    return latestTrainingFeedback.exerciseId === attempt.exercise.id
-      ? latestTrainingFeedback
+    return latestTrainingCoachFeedback.exerciseId === attempt.exercise.id
+      ? latestTrainingCoachFeedback
       : null
-  }, [attempt, latestTrainingFeedback])
-  const profileSyncResult = useMemo(() => {
-    if (!attempt || !latestVoiceProfileSync) {
-      return null
-    }
-
-    return latestVoiceProfileSync.exerciseId === attempt.exercise.id
-      ? latestVoiceProfileSync
-      : null
-  }, [attempt, latestVoiceProfileSync])
+  }, [attempt, latestTrainingCoachFeedback])
 
   useEffect(() => {
     if (!userId) {
@@ -436,6 +552,7 @@ export default function ContributePage() {
 
     memoryService.init(userId)
     setGuidanceProfile(getTrainingGuidanceProfile(userId))
+    setSessionPracticedExerciseIds([])
     void refreshLocalQueueCount()
   }, [refreshLocalQueueCount, userId])
 
@@ -448,19 +565,34 @@ export default function ContributePage() {
   }, [guidanceProfile, isLoading, userId])
 
   useEffect(() => {
+    if (!hasPreparedExpression || hasAutoSwitchedPracticeModeRef.current) {
+      return
+    }
+
+    hasAutoSwitchedPracticeModeRef.current = true
+    setPracticeMode('important_expression')
+    if (preparedExpressionExercises[0]) {
+      setSelectedExerciseId(preparedExpressionExercises[0].id)
+    }
+  }, [hasPreparedExpression, preparedExpressionExercises])
+
+  useEffect(() => {
     return () => {
       disconnectRef.current()
     }
   }, [])
 
   useEffect(() => {
-    if (!categoryExercises.length) {
+    if (!selectableExercises.length) {
+      if (categoryExercises[0] && categoryExercises[0].id !== selectedExerciseId) {
+        setSelectedExerciseId(categoryExercises[0].id)
+      }
       return
     }
 
-    const stillInCategory = categoryExercises.some((exercise) => exercise.id === selectedExerciseId)
-    if (!stillInCategory) {
-      setSelectedExerciseId(categoryExercises[0].id)
+    const stillSelectable = selectableExercises.some((exercise) => exercise.id === selectedExerciseId)
+    if (!stillSelectable) {
+      setSelectedExerciseId(selectableExercises[0].id)
       return
     }
 
@@ -471,7 +603,7 @@ export default function ContributePage() {
     ) {
       setSelectedExerciseId(visibleExercises[0].id)
     }
-  }, [categoryExercises, normalizedQuery, selectedExerciseId, visibleExercises])
+  }, [categoryExercises, normalizedQuery, selectableExercises, selectedExerciseId, visibleExercises])
 
   useEffect(() => {
     if (!isRecording) {
@@ -503,6 +635,7 @@ export default function ContributePage() {
   }, [notice])
 
   const handleSelectCategory = useCallback((category: MandarinTrainingCategory) => {
+    setPracticeMode('sentence_corpus')
     setSelectedCategory(category)
     setExerciseQuery('')
     setAttempt(null)
@@ -511,6 +644,25 @@ export default function ContributePage() {
       setSelectedExerciseId(firstExercise.id)
     }
   }, [])
+
+  const handleSelectPracticeMode = useCallback((mode: PracticeSourceMode) => {
+    setPracticeMode(mode)
+    setExerciseQuery('')
+    setAttempt(null)
+    setNotice(null)
+
+    if (mode === 'important_expression') {
+      if (preparedExpressionExercises[0]) {
+        setSelectedExerciseId(preparedExpressionExercises[0].id)
+      }
+      return
+    }
+
+    const firstExercise = getExercisesByCategory(selectedCategory)[0]
+    if (firstExercise) {
+      setSelectedExerciseId(firstExercise.id)
+    }
+  }, [preparedExpressionExercises, selectedCategory])
 
   const handleSelectExercise = useCallback((exerciseId: string) => {
     setSelectedExerciseId(exerciseId)
@@ -726,28 +878,24 @@ export default function ContributePage() {
         uploadReceipt: null,
       }
 
+      setSessionPracticedExerciseIds((currentIds) => (
+        currentIds.includes(currentExercise.id)
+          ? currentIds
+          : [...currentIds, currentExercise.id]
+      ))
       setAttempt(nextAttempt)
-      requestTrainingFeedback(
-        buildTrainingFeedbackRequestPayload(
+      requestTrainingCoach(
+        buildTrainingCoachRequestPayload(
           currentExercise,
           transcript,
-          feedback,
           guidanceProfile,
         ),
       )
       setNotice({
-        tone: canSaveTrainingSample && result.recording
-          ? 'info'
-          : feedback.status === 'excellent'
-            ? 'success'
-            : 'info',
+        tone: canSaveTrainingSample && result.recording ? 'info' : 'success',
         message: canSaveTrainingSample && result.recording
-          ? sampleQuality.action === 'retry'
-            ? '反馈已经出来了，这条录音会自动保存，但更建议你马上补一条更稳的版本。'
-            : '反馈已经出来了，这条录音会自动保存成监督训练样本。'
-          : feedback.status === 'excellent'
-            ? '这句已经很接近了，可以继续换一句。'
-            : '反馈已经出来了，先盯一个点，不用一次全改。',
+          ? '录音已经收下，AI 教练点评会马上回来，这条音频也会自动进入训练样本链路。'
+          : '录音已经收下，AI 教练点评会马上回来。',
       })
 
       if (nextAttempt.recording && canSaveTrainingSample) {
@@ -760,7 +908,7 @@ export default function ContributePage() {
         message: error instanceof Error ? error.message : '录音结束失败，请重新尝试。',
       })
     }
-  }, [canSaveTrainingSample, currentExercise, guidanceProfile, persistTrainingAttempt, requestTrainingFeedback, stopRecording])
+  }, [canSaveTrainingSample, currentExercise, guidanceProfile, persistTrainingAttempt, requestTrainingCoach, stopRecording])
 
   if (isLoading) {
     return (
@@ -810,47 +958,102 @@ export default function ContributePage() {
           <section className="rounded-[32px] border border-stone-200 bg-white p-8 shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-amber-700">真实录音分类</p>
-                <h2 className="mt-1 text-2xl font-semibold text-gray-900">先选一句现在真会说出口的话</h2>
+                <p className="text-sm font-medium text-amber-700">
+                  {practiceMode === 'important_expression' ? '重要表达结构练习' : '真实录音分类'}
+                </p>
+                <h2 className="mt-1 text-2xl font-semibold text-gray-900">
+                  {practiceMode === 'important_expression'
+                    ? '先按段落和风险句，把这次重要表达收成习惯'
+                    : '先选一句现在真会说出口的话'}
+                </h2>
               </div>
               <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-                {currentCategoryMeta.corpusCount} 句真实语料
+                {practiceMode === 'important_expression'
+                  ? `${currentPracticeMeta.corpusCount} 个结构段`
+                  : `${currentPracticeMeta.corpusCount} 句真实语料`}
               </div>
             </div>
 
-            <div className="mt-6 grid gap-3 md:grid-cols-5">
-              {MANDARIN_TRAINING_CATEGORIES.map((category) => {
-                const meta = MANDARIN_TRAINING_CATEGORY_META[category]
-                const isActive = category === selectedCategory
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => handleSelectCategory(category)}
-                    className={`rounded-[28px] border px-4 py-4 text-left transition ${
-                      isActive
-                        ? 'border-amber-300 bg-amber-50 shadow-[0_12px_36px_rgba(245,158,11,0.10)]'
-                        : 'border-stone-200 bg-stone-50 hover:border-stone-300 hover:bg-stone-100'
-                    }`}
-                  >
-                    <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
-                    <p className="mt-1 text-xs text-gray-600">{meta.shortLabel}</p>
-                    <p className="mt-3 text-xs font-medium text-amber-800">{meta.corpusCount} 条</p>
-                  </button>
-                )
-              })}
-            </div>
+            {hasPreparedExpression ? (
+              <div className="mt-6 inline-flex rounded-full border border-stone-200 bg-stone-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => handleSelectPracticeMode('important_expression')}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    practiceMode === 'important_expression'
+                      ? 'bg-white text-amber-800 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  重要表达
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPracticeMode('sentence_corpus')}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    practiceMode === 'sentence_corpus'
+                      ? 'bg-white text-amber-800 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  普通句库
+                </button>
+              </div>
+            ) : null}
+
+            {practiceMode === 'sentence_corpus' ? (
+              <div className="mt-6 grid gap-3 md:grid-cols-5">
+                {MANDARIN_TRAINING_CATEGORIES.map((category) => {
+                  const meta = MANDARIN_TRAINING_CATEGORY_META[category]
+                  const isActive = category === selectedCategory
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => handleSelectCategory(category)}
+                      className={`rounded-[28px] border px-4 py-4 text-left transition ${
+                        isActive
+                          ? 'border-amber-300 bg-amber-50 shadow-[0_12px_36px_rgba(245,158,11,0.10)]'
+                          : 'border-stone-200 bg-stone-50 hover:border-stone-300 hover:bg-stone-100'
+                      }`}
+                    >
+                      <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
+                      <p className="mt-1 text-xs text-gray-600">{meta.shortLabel}</p>
+                      <p className="mt-3 text-xs font-medium text-amber-800">{meta.corpusCount} 条</p>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
 
             <div className="mt-6 rounded-[28px] border border-stone-200 bg-stone-50 px-5 py-5">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{currentCategoryMeta.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-gray-600">{currentCategoryMeta.description}</p>
+                  <p className="text-sm font-medium text-gray-900">{currentPracticeMeta.label}</p>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">{currentPracticeMeta.description}</p>
                 </div>
                 <div className="rounded-full bg-white px-4 py-2 text-sm text-gray-700">
-                  示例：{currentCategoryMeta.examples.slice(0, 2).join(' / ')}
+                  示例：{currentPracticeMeta.examples.slice(0, 2).join(' / ')}
                 </div>
               </div>
+              {practiceMode === 'important_expression' && preparedExpressionSummary ? (
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl bg-white px-4 py-4">
+                    <p className="text-xs uppercase text-stone-500">已练次数</p>
+                    <p className="mt-2 text-lg font-semibold text-gray-900">{preparedExpressionSummary.rehearsalCount}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white px-4 py-4">
+                    <p className="text-xs uppercase text-stone-500">待继续收口</p>
+                    <p className="mt-2 text-lg font-semibold text-gray-900">{preparedExpressionSummary.lowConfidenceSections} 段</p>
+                  </div>
+                  <div className="rounded-2xl bg-white px-4 py-4">
+                    <p className="text-xs uppercase text-stone-500">下一步</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-700">
+                      {preparedExpressionSummary.nextFocus[0] ?? '先把开场和产品定义段落收稳。'}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
@@ -859,7 +1062,7 @@ export default function ContributePage() {
                 <Input
                   value={exerciseQuery}
                   onChange={(event) => setExerciseQuery(event.target.value)}
-                  placeholder="在当前分类里搜索句子"
+                  placeholder={practiceMode === 'important_expression' ? '在这次重要表达里搜索段落或句子' : '在当前分类里搜索句子'}
                   className="h-11 rounded-2xl border-stone-200 bg-stone-50"
                 />
               </label>
@@ -869,6 +1072,7 @@ export default function ContributePage() {
                   : `当前可选 ${matchingExercises.length} 句`}
               </div>
             </div>
+            <p className="mt-3 text-sm text-gray-600">{exerciseSelectionHint}</p>
 
             <div className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
               <div className="max-h-[560px] overflow-y-auto rounded-[28px] border border-stone-200 bg-[#fffdfa] p-3">
@@ -888,7 +1092,9 @@ export default function ContributePage() {
                       >
                         <div className="flex items-center justify-between gap-3">
                           <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
-                            {exercise.category}
+                            {isPreparedExpressionExercise(exercise)
+                              ? exercise.preparedExpressionSectionTitle
+                              : exercise.category}
                           </span>
                           {isActive ? (
                             <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
@@ -897,6 +1103,20 @@ export default function ContributePage() {
                           ) : null}
                         </div>
                         <p className="mt-3 text-lg font-semibold leading-7 text-gray-900">{exercise.text}</p>
+                        {isPreparedExpressionExercise(exercise) ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {exercise.preparedExpressionPriority ? (
+                              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                                优先收口
+                              </span>
+                            ) : null}
+                            {exercise.preparedExpressionKeywords.slice(0, 3).map((item) => (
+                              <span key={`${exercise.id}-${item}`} className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </button>
                     )
                   })}
@@ -913,16 +1133,44 @@ export default function ContributePage() {
                 <p className="mt-3 text-2xl font-semibold leading-snug text-gray-900">{currentExercise.text}</p>
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
                   <p className="text-sm font-medium text-gray-900">先这样练</p>
-                  <p className="mt-2 text-sm leading-6 text-gray-700">{currentCategoryMeta.helper}</p>
+                  <p className="mt-2 text-sm leading-6 text-gray-700">{currentPracticeMeta.helper}</p>
                 </div>
+                {currentPreparedSection ? (
+                  <div className="mt-4 rounded-2xl bg-sky-50 px-4 py-4">
+                    <p className="text-sm font-medium text-gray-900">当前段落锚点</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-700">{currentPreparedSection.anchor_line}</p>
+                    {currentPreparedSection.fallback_phrases.length > 0 ? (
+                      <p className="mt-3 text-sm leading-6 text-sky-900">
+                        卡住时先切回：{currentPreparedSection.fallback_phrases[0]}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">分类提醒</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {currentPreparedSection ? '当前段落提醒' : '分类提醒'}
+                  </p>
                   <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                    {currentCategoryMeta.trainingTips.slice(0, 2).map((tip) => (
+                    {currentPracticeMeta.trainingTips.slice(0, 2).map((tip) => (
                       <li key={tip}>- {tip}</li>
                     ))}
                   </ul>
                 </div>
+                {currentPreparedSection ? (
+                  <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4">
+                    <p className="text-sm font-medium text-gray-900">高风险词和热词</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {[
+                        ...currentPreparedSection.high_risk_phrases,
+                        ...currentPreparedSection.hotwords,
+                      ].slice(0, 6).map((item) => (
+                        <span key={item} className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </section>
@@ -1038,11 +1286,11 @@ export default function ContributePage() {
                       <ListChecks className="mt-1 h-5 w-5 text-amber-700" />
                       <div>
                         <p className="text-sm font-medium text-amber-700">紧贴录音的反馈区</p>
-                        <h2 className="mt-1 text-2xl font-semibold text-gray-900">停录后先看这里，不用往下翻很远</h2>
+                        <h2 className="mt-1 text-2xl font-semibold text-gray-900">停录后先看 AI 教练怎么说</h2>
                       </div>
                     </div>
                     <span className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-gray-700">
-                      {FEEDBACK_STATUS_LABELS[attempt.feedback.status]}
+                      {coachFeedback?.model || '训练点评'}
                     </span>
                   </div>
 
@@ -1058,88 +1306,38 @@ export default function ContributePage() {
                       </p>
                     </div>
                     <div className="rounded-3xl bg-sky-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">先盯这一步</p>
-                      <p className="mt-3 text-lg leading-7 text-gray-900">
-                        {agentFeedback?.nextStep || attempt.feedback.suggestions[0]}
-                      </p>
-                      <p className="mt-3 text-sm leading-6 text-sky-900">
-                        {agentFeedback?.encouragement || '先把动作做慢、做实，再决定要不要继续录下一遍。'}
+                      <p className="text-sm font-medium text-gray-900">AI 教练点评</p>
+                      <p className="mt-3 text-sm leading-7 text-gray-900">
+                        {coachFeedback?.feedbackText || 'AI 教练正在生成这一句的自然语言点评。'}
                       </p>
                     </div>
                     <div className="rounded-3xl bg-emerald-50 px-5 py-5">
                       <p className="text-sm font-medium text-gray-900">上传状态</p>
                       <p className="mt-3 text-lg leading-7 text-gray-900">
-                        {SAMPLE_QUALITY_LABELS[attempt.sampleQuality.tier]}
+                        {UPLOAD_STATUS_LABELS[attempt.uploadStatus]}
                       </p>
                       <p className="mt-3 text-sm leading-6 text-emerald-900">
-                        这块只影响后台整理，不影响这条完整录音进入训练样本链路。
+                        这条录音会继续沿现有训练样本链路保存，AI 点评不会卡住上传。
                       </p>
                     </div>
                   </div>
 
                   <div className="mt-6 space-y-4">
                     <div className="rounded-3xl border border-stone-200 bg-stone-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">总结</p>
-                      <p className="mt-3 text-sm leading-6 text-gray-700">{attempt.feedback.summary}</p>
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl bg-white px-4 py-4">
-                          <p className="text-xs uppercase text-stone-500">漏掉的字</p>
-                          <p className="mt-2 text-sm text-gray-700">
-                            {attempt.feedback.missingChars.length > 0
-                              ? attempt.feedback.missingChars.join('、')
-                              : '无'}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl bg-white px-4 py-4">
-                          <p className="text-xs uppercase text-stone-500">多出来的字</p>
-                          <p className="mt-2 text-sm text-gray-700">
-                            {attempt.feedback.extraChars.length > 0
-                              ? attempt.feedback.extraChars.join('、')
-                              : '无'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-5">
-                        <p className="text-sm font-medium text-gray-900">先盯这几个字</p>
-                        <p className="mt-3 text-sm leading-6 text-gray-700">
-                          {agentFeedback?.primaryFocus || attempt.feedback.speechPatterns.join('、') || '先看整句节奏'}
-                        </p>
-                      </div>
-                      <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-5">
-                        <p className="text-sm font-medium text-gray-900">这次最容易混的点</p>
-                        <p className="mt-3 text-sm leading-6 text-gray-700">
-                          {attempt.feedback.pronunciationTargets.join('、') || '这次没有稳定发现固定混淆'}
-                        </p>
-                      </div>
-                      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-5">
-                        <p className="text-sm font-medium text-gray-900">嘴巴和气息怎么做</p>
-                        <p className="mt-3 text-sm leading-6 text-gray-700">
-                          {agentFeedback?.articulationTip || attempt.feedback.articulationTips[0] || guidanceContext.coachingPlan[1]}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">下一次怎么练</p>
-                      <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                        {(agentFeedback
-                          ? [agentFeedback.summary, agentFeedback.nextStep, guidanceContext.coachingPlan[2]]
-                          : attempt.feedback.suggestions
-                        ).filter(Boolean).map((item) => (
-                          <li key={item}>- {item}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="rounded-3xl border border-stone-200 bg-stone-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">系统为什么会这样听</p>
-                      <p className="mt-3 text-sm leading-6 text-gray-700">
-                        {attempt.feedback.pronunciationSummary}
+                      <p className="text-sm font-medium text-gray-900">这轮怎么继续</p>
+                      <p className="mt-3 text-sm leading-7 text-gray-700">
+                        {coachFeedback?.feedbackText || '如果这句还不顺，先把速度放慢一点，嘴巴动作做大一点，再马上补一条新的版本。'}
                       </p>
                     </div>
+
+                    {currentPreparedSection ? (
+                      <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-5">
+                        <p className="text-sm font-medium text-gray-900">卡住时先退回这一句</p>
+                        <p className="mt-3 text-sm leading-7 text-sky-900">
+                          {currentPreparedSection.fallback_phrases[0] || currentPreparedSection.anchor_line}
+                        </p>
+                      </div>
+                    ) : null}
 
                     {attempt.recording ? (
                       <div className="rounded-3xl border border-stone-200 bg-stone-50 px-5 py-5">
@@ -1169,42 +1367,20 @@ export default function ContributePage() {
                         </div>
 
                         <div className="mt-4 rounded-2xl border border-stone-200 bg-white px-4 py-4">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <p className="text-sm font-medium text-gray-900">数据侧备注，不影响这条录音上传</p>
-                            <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">
-                              {SAMPLE_QUALITY_LABELS[attempt.sampleQuality.tier]}
-                            </span>
-                          </div>
-                          <p className="mt-3 text-sm leading-6 text-gray-700">
-                            这些信息主要给系统做后续整理和复核参考，不是在判断你“值不值得上传”。只要这条录音完整，它就会进入训练样本链路。
-                          </p>
+                          <p className="text-sm font-medium text-gray-900">这条录音的基础信息</p>
                           <div className="mt-4 grid gap-3 sm:grid-cols-3">
                             <div className="rounded-2xl bg-stone-50 px-4 py-4">
                               <p className="text-xs uppercase text-stone-500">录音时长</p>
                               <p className="mt-2 text-sm text-gray-700">{formatRecordingTime(Math.round(attempt.recording.audio.durationSeconds))}</p>
                             </div>
                             <div className="rounded-2xl bg-stone-50 px-4 py-4">
-                              <p className="text-xs uppercase text-stone-500">识别覆盖</p>
-                              <p className="mt-2 text-sm text-gray-700">{Math.round(attempt.sampleQuality.coverageRatio * 100)}%</p>
-                            </div>
-                            <div className="rounded-2xl bg-stone-50 px-4 py-4">
                               <p className="text-xs uppercase text-stone-500">系统返回速度</p>
                               <p className="mt-2 text-sm text-gray-700">{(attempt.transcriptLatencyMs / 1000).toFixed(1)}s</p>
                             </div>
-                          </div>
-                          <ul className="mt-4 space-y-2 text-sm leading-6 text-gray-700">
-                            {attempt.sampleQuality.reasons.slice(0, 3).map((reason) => (
-                              <li key={reason}>- {reason}</li>
-                            ))}
-                          </ul>
-                          <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4">
-                            <p className="text-xs uppercase text-stone-500">后台备注</p>
-                            <p className="mt-2 text-sm font-medium text-gray-800">
-                              {SAMPLE_REVIEW_LABELS[attempt.sampleReview.evaluationStatus]}
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-gray-700">
-                              {attempt.sampleReview.summary} 要不要继续再录，交给你自己决定。
-                            </p>
+                            <div className="rounded-2xl bg-stone-50 px-4 py-4">
+                              <p className="text-xs uppercase text-stone-500">当前状态</p>
+                              <p className="mt-2 text-sm text-gray-700">{UPLOAD_STATUS_LABELS[attempt.uploadStatus]}</p>
+                            </div>
                           </div>
                           <p className="mt-4 text-sm leading-6 text-stone-600">
                             同一句可以反复练并保留多条样本；只有同一条录音重复上传时，系统才会按录音 ID 安全去重。
@@ -1220,19 +1396,6 @@ export default function ContributePage() {
                           </div>
                         ) : null}
 
-                        {profileSyncResult ? (
-                          <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-sm leading-6 text-sky-900">
-                            训练画像已收到这次更新结果：热词 {profileSyncResult.hotwordCount} 个，混淆模式 {profileSyncResult.confusionPatternsCount} 项。
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    {agentFeedback ? (
-                      <div className="rounded-3xl border border-amber-200 bg-[#fffaf0] px-5 py-5">
-                        <p className="text-sm font-medium text-gray-900">训练反馈</p>
-                        <p className="mt-3 text-sm leading-6 text-gray-700">{agentFeedback.summary}</p>
-                        <p className="mt-3 text-sm leading-6 text-gray-700">下一步：{agentFeedback.nextStep}</p>
                       </div>
                     ) : null}
                   </div>

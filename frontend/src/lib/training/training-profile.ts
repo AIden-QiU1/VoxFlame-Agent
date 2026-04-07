@@ -500,6 +500,23 @@ export function getTrainingProfileSnapshot(userId: string): TrainingProfileSnaps
   return buildSnapshot(safeParseState(userId).records)
 }
 
+export function getUploadedTrainingExerciseIds(userId: string): string[] {
+  const seen = new Set<string>()
+  const exerciseIds: string[] = []
+
+  for (const record of safeParseState(userId).records) {
+    const exerciseId = typeof record.exerciseId === 'string' ? record.exerciseId.trim() : ''
+    if (!exerciseId || seen.has(exerciseId)) {
+      continue
+    }
+
+    seen.add(exerciseId)
+    exerciseIds.push(exerciseId)
+  }
+
+  return exerciseIds
+}
+
 export function appendUploadedTrainingRecord(
   userId: string,
   record: Omit<UploadedTrainingRecord, 'id' | 'createdAt'> & Partial<Pick<UploadedTrainingRecord, 'id' | 'createdAt'>>,

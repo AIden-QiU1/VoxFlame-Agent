@@ -75,7 +75,7 @@ export function useMandarinTrainingSession(
     sessionId,
     currentASRText,
     latestUserTranscript,
-    lastTrainingFeedback,
+    lastTrainingCoachFeedback,
     lastVoiceProfileSync,
     isRecording: rtcIsRecording,
     isConnected,
@@ -370,8 +370,8 @@ export function useMandarinTrainingSession(
     })
   }, [sendControlEvent])
 
-  const requestTrainingFeedback = useCallback((payload: Record<string, unknown>) => {
-    void sendControlEvent('training_feedback_request', payload).catch((eventError: unknown) => {
+  const requestTrainingCoach = useCallback((payload: Record<string, unknown>) => {
+    void sendControlEvent('training_coach_request', payload).catch((eventError: unknown) => {
       const message =
         eventError instanceof Error ? eventError.message : '训练建议生成失败'
       setError(message)
@@ -395,7 +395,7 @@ export function useMandarinTrainingSession(
     status,
     interimText: currentASRText,
     finalText: latestUserTranscript,
-    latestTrainingFeedback: lastTrainingFeedback,
+    latestTrainingCoachFeedback: lastTrainingCoachFeedback,
     latestVoiceProfileSync: lastVoiceProfileSync,
     error: sessionError,
     isRecording: rtcIsRecording,
@@ -408,7 +408,7 @@ export function useMandarinTrainingSession(
     startRecording,
     stopRecording,
     syncVoiceProfile,
-    requestTrainingFeedback,
+    requestTrainingCoach,
     sendSpeechActivity,
     disconnect,
   }

@@ -6,18 +6,25 @@ services:
   livekit-server:
     image: ${LIVEKIT_SERVER_IMAGE:-docker.m.daocloud.io/livekit/livekit-server:v1.10.1}
     container_name: voxflame-livekit-server
-    command:
-      - --config
-      - /etc/livekit/livekit.yaml
-      - --bind
-      - 0.0.0.0
-      - --dev
+    environment:
+      - LIVEKIT_SERVER_DEV_MODE=${LIVEKIT_SERVER_DEV_MODE:-1}
+      - VOXFLAME_PUBLIC_HOST=${VOXFLAME_PUBLIC_HOST:-}
+      - LIVEKIT_TURN_UDP_PORT=${LIVEKIT_TURN_UDP_PORT:-3478}
+      - LIVEKIT_TURN_TLS_PORT=${LIVEKIT_TURN_TLS_PORT:-5349}
+    entrypoint:
+      - /bin/sh
+      - /etc/livekit/start-livekit.sh
     ports:
       - "7880:7880"
       - "7881:7881/tcp"
       - "7881:7881/udp"
+      - "7882:7882/udp"
+      - "${LIVEKIT_TURN_UDP_PORT:-3478}:${LIVEKIT_TURN_UDP_PORT:-3478}/udp"
+      - "${LIVEKIT_TURN_TLS_PORT:-5349}:${LIVEKIT_TURN_TLS_PORT:-5349}/tcp"
     volumes:
-      - ./infra/livekit/livekit.dev.yaml:/etc/livekit/livekit.yaml:ro
+      - ${LIVEKIT_CONFIG_FILE:-./infra/livekit/livekit.dev.yaml}:/etc/livekit/livekit.yaml:ro
+      - ./infra/livekit/start-livekit.sh:/etc/livekit/start-livekit.sh:ro
+      - caddy_data:/var/lib/caddy:ro
     restart: unless-stopped
     networks:
       - voxflame-network
@@ -78,6 +85,7 @@ services:
       - RTC_DEFAULT_TIMEOUT=120
       - LIVEKIT_URL=${LIVEKIT_URL:-ws://livekit-server:7880}
       - LIVEKIT_BROWSER_URL=${LIVEKIT_BROWSER_URL:-ws://localhost:3000}
+      - VOXFLAME_PUBLIC_BASE_URL=${VOXFLAME_PUBLIC_BASE_URL:-}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-voxflame_livekit_dev_secret_32chars}
       - LIVEKIT_AGENT_NAME=${LIVEKIT_AGENT_NAME:-voxflame-agent}
@@ -127,6 +135,22 @@ services:
     networks:
       - voxflame-network
 
+  caddy:
+    image: docker.m.daocloud.io/library/caddy:2.10.2-alpine
+    container_name: voxflame-caddy
+    profiles:
+      - https
+    network_mode: host
+    environment:
+      - VOXFLAME_PUBLIC_HOST=${VOXFLAME_PUBLIC_HOST:-}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
   # Qdrant (向量数据库 - 可选)
   qdrant:
     image: docker.m.daocloud.io/qdrant/qdrant:latest
@@ -160,6 +184,10 @@ services:
       - voxflame-network
 
 volumes:
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
   qdrant_data:
     driver: local
   redis_data:

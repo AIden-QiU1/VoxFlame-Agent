@@ -11,7 +11,7 @@ from livekit.agents import AgentServer, AutoSubscribe, JobContext, cli
 
 from assistant_runtime import (
     CommunicationAssistantRuntime,
-    build_training_feedback_payload,
+    TrainingCoachRuntime,
     estimate_clarity_score,
 )
 from asr_runtime import LiveKitASRRuntime
@@ -22,10 +22,11 @@ from data_contract import (
     build_session_init_ack,
     build_session_userdata_ack,
     build_speech_activity_output,
+    build_training_coach_feedback_output,
     build_voice_profile_updated_output,
     decode_data_packet,
     extract_end_audio_reason,
-    extract_training_feedback_request,
+    extract_training_coach_request,
     extract_user_text_input,
 )
 from session_context import build_session_context
@@ -131,6 +132,10 @@ async def entrypoint(ctx: JobContext) -> None:
         ctx=session_context,
         userdata=session_userdata,
     )
+    training_coach_runtime = TrainingCoachRuntime(
+        config=config,
+        ctx=session_context,
+    )
     audio_runtime = LiveKitAudioReplyRuntime(config=config, room=ctx.room)
 
     async def publish_payload(payload: dict[str, object]) -> None:
@@ -217,49 +222,29 @@ async def entrypoint(ctx: JobContext) -> None:
         )
         await audio_runtime.speak(reply_text)
 
-    async def respond_to_training_feedback(request_payload: dict[str, object]) -> None:
-        feedback_payload = build_training_feedback_payload(
-            session_context,
+    async def respond_to_training_coach(request_payload: dict[str, object]) -> None:
+        coach_text, source, model = await training_coach_runtime.generate_feedback(
             dict(request_payload),
         )
-        session_userdata.note_training_feedback(
-            str(feedback_payload.get("summary", "") or "").strip() or None,
-        )
-        await publish_payload(feedback_payload)
+        session_userdata.note_training_feedback(coach_text)
         await publish_payload(
-            build_voice_profile_updated_output(
+            build_training_coach_feedback_output(
                 session_context,
-                source="training_result",
-                clarity_score=float(feedback_payload.get("clarity_score", 0.0) or 0.0),
-                confusion_patterns_count=int(
-                    feedback_payload.get("confusion_patterns_count", 0) or 0,
-                ),
-                scene=str(
-                    feedback_payload.get("exercise_category")
-                    or session_context.scene
-                    or "中文训练",
-                ),
-                exercise_id=str(feedback_payload.get("exercise_id", "") or ""),
-                hotword_count=len(
-                    [
-                        item
-                        for item in feedback_payload.get("keywords", [])
-                        if isinstance(item, str) and item.strip()
-                    ][:3]
-                ),
-                last_training_category=str(
-                    feedback_payload.get("exercise_category")
-                    or session_context.scene
-                    or "中文训练",
-                ),
+                exercise_id=str(request_payload.get("exercise_id", "") or ""),
+                exercise_text=str(request_payload.get("exercise_text", "") or ""),
+                recognized_text=str(request_payload.get("recognized_text", "") or ""),
+                feedback_text=coach_text,
+                source=source,
+                model=model,
             ),
         )
         logger.info(
-            "LiveKit training feedback emitted room=%s participant=%s exercise_id=%s status=%s",
+            "LiveKit training coach feedback emitted room=%s participant=%s exercise_id=%s source=%s model=%s",
             session_context.room_name,
             session_context.participant_identity,
-            str(feedback_payload.get("exercise_id", "") or ""),
-            str(feedback_payload.get("feedback_status", "") or ""),
+            str(request_payload.get("exercise_id", "") or ""),
+            source,
+            model,
         )
 
     asr_runtime = LiveKitASRRuntime(
@@ -314,15 +299,15 @@ async def entrypoint(ctx: JobContext) -> None:
             asyncio.create_task(respond_to_user_text(user_text))
             return
 
-        training_feedback_request = extract_training_feedback_request(message)
-        if training_feedback_request:
+        training_coach_request = extract_training_coach_request(message)
+        if training_coach_request:
             logger.info(
-                "LiveKit training feedback request received room=%s participant=%s exercise_id=%s",
+                "LiveKit training coach request received room=%s participant=%s exercise_id=%s",
                 session_context.room_name,
                 session_context.participant_identity,
-                str(training_feedback_request.get("exercise_id", "") or ""),
+                str(training_coach_request.get("exercise_id", "") or ""),
             )
-            asyncio.create_task(respond_to_training_feedback(training_feedback_request))
+            asyncio.create_task(respond_to_training_coach(training_coach_request))
             return
 
         end_audio_reason = extract_end_audio_reason(message)

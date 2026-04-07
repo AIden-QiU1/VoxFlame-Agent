@@ -41,8 +41,7 @@ import type {
 } from '@/lib/realtime-audio/session-types'
 export type {
   ConversationMessage,
-  DualLineSubtitle,
-  TrainingFeedbackEvent,
+  TrainingCoachFeedbackEvent,
   VoiceProfileSyncEvent,
   RtcAgentState,
 } from '@/lib/realtime-audio/session-types'
@@ -158,11 +157,13 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
     const latestState = latestStateRef.current
 
     if (memoryOwnerId) {
+      const latestAssistantText = [...latestState.messages]
+        .reverse()
+        .find((message) => message.role === 'assistant')?.content
       memoryService.updateCurrentSessionMetadata({
         sessionEndedReason: 'rtc_disconnect',
         latestUserTranscript: latestUserTranscriptRef.current || undefined,
-        latestCorrectionOriginal: latestState.currentDualLine?.originalText,
-        latestCorrectionText: latestState.currentDualLine?.correctedText,
+        latestCorrectionText: latestAssistantText,
         lastVoiceProfileSource: latestState.lastVoiceProfileSync?.source,
         clarity_score:
           typeof latestState.lastVoiceProfileSync?.clarityScore === 'number'

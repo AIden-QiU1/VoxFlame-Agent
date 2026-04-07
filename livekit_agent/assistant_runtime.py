@@ -27,12 +27,41 @@ SYSTEM_PROMPT = """你是 VoxFlame 的沟通助手。
 6. 不要输出“现在先按当前沟通场景继续”“我先帮你把这句话往前推进”这类铺垫。
 """
 
+TRAINING_EXTENSION_SYSTEM_PROMPT = """你是 VoxFlame 的训练点评 extension。
+
+你的任务不是给用户打分、贴标签或输出结构化表格，而是在用户刚录完一句后，给出一小段自然语言训练点评。
+
+输出要求：
+1. 默认使用简体中文。
+2. 只输出 2 到 4 句自然语言，不要项目符号，不要 JSON，不要标题。
+3. 先点出这次最值得先改的一点，再给一个立刻能重录的具体动作。
+4. 不要输出“excellent / close / retry / unclear”这类状态词。
+5. 不要列“漏字 / 多字 / speech_patterns / articulation_tips”等结构化字段名。
+6. 语气温和、直接、像现场教练，不要写成长分析报告。
+"""
+
+
+def compute_reply_timeout_seconds(
+    configured_timeout_seconds: float,
+    user_text: str,
+) -> float:
+    normalized = user_text.strip()
+    if not normalized:
+        return max(0.8, configured_timeout_seconds)
+
+    text_length = len(normalized)
+    if text_length <= 8:
+        return max(0.8, min(configured_timeout_seconds, 1.2))
+    if text_length <= 20:
+        return max(1.2, min(configured_timeout_seconds, 2.2))
+    return max(1.5, configured_timeout_seconds)
+
 
 def estimate_clarity_score(original_text: str, corrected_text: str) -> float:
     original = original_text.strip()
     corrected = corrected_text.strip()
     if not original or not corrected:
-      return 0.0
+        return 0.0
     if original == corrected:
       return 1.0
     ratio = difflib.SequenceMatcher(a=original, b=corrected).ratio()
@@ -73,179 +102,75 @@ def build_preparation_prompt(userdata: VoxFlameSessionUserData) -> str:
     return "\n".join(lines)
 
 
-def _normalize_training_status(value: Any) -> str:
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"excellent", "close", "retry", "unclear"}:
-            return normalized
-    return "unclear"
-
-
 def _read_string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item.strip() for item in value if isinstance(item, str) and item.strip()]
 
 
-def _pick_primary_focus(payload: dict[str, Any]) -> str:
-    focus_tags = _read_string_list(payload.get("focus_tags"))
-    if focus_tags:
-        return focus_tags[0]
-
-    pronunciation_summary = payload.get("pronunciation_summary")
-    if isinstance(pronunciation_summary, str) and pronunciation_summary.strip():
-        return pronunciation_summary.strip().split("，")[0].split("。")[0].strip()
-
-    exercise_text = payload.get("exercise_text")
-    if isinstance(exercise_text, str) and exercise_text.strip():
-        return f"先把“{exercise_text.strip()[:6]}”说稳"
-
-    return "先把整句放慢一点"
-
-
-def _extract_speech_patterns(payload: dict[str, Any], primary_focus: str) -> list[str]:
-    focus_tags = _read_string_list(payload.get("focus_tags"))
-    candidates = focus_tags or ([primary_focus] if primary_focus else [])
-    patterns: list[str] = []
-    for item in candidates:
-        normalized = item.replace("先补", "").replace("先看", "").replace("“", "").replace("”", "").strip()
-        if normalized and normalized not in patterns:
-            patterns.append(normalized)
-    return patterns[:4]
+def build_training_extension_fallback_text(payload: dict[str, Any]) -> str:
+    exercise_text = str(payload.get("exercise_text", "") or "").strip()
+    recognized_text = str(payload.get("recognized_text", "") or "").strip()
+    if exercise_text and recognized_text and exercise_text != recognized_text:
+        return (
+            f"这次系统听到的是“{recognized_text}”，和目标句“{exercise_text}”还有一点偏差。"
+            "先别追求整句一次到位，先把最容易跑掉的那几个字慢一点、拉开一点，再重录一遍。"
+        )
+    if exercise_text:
+        return (
+            f"这次先继续对着目标句“{exercise_text}”练。"
+            "先把节奏放慢一点，嘴巴动作做大一点，再马上补一条新的版本。"
+        )
+    return "这次先把速度放慢一点，只盯一句里最关键的几个字，再补录一遍。"
 
 
-def _build_pronunciation_targets(primary_focus: str, speech_patterns: list[str]) -> list[str]:
-    targets = [item for item in [primary_focus, *speech_patterns] if item]
-    deduped: list[str] = []
-    for item in targets:
-        if item not in deduped:
-            deduped.append(item)
-    return deduped[:4]
-
-
-def _pick_keywords(payload: dict[str, Any]) -> list[str]:
-    explicit_keywords = _read_string_list(payload.get("keywords"))
-    if explicit_keywords:
-        return explicit_keywords[:3]
-
-    hotwords = _read_string_list(payload.get("hotwords"))
-    if hotwords:
-        return hotwords[:3]
-
-    return []
-
-
-def _pick_articulation_tip(
-    payload: dict[str, Any],
-    *,
-    status: str,
-) -> str:
+def _build_training_guidance_line(payload: dict[str, Any]) -> str | None:
     guidance_profile = payload.get("guidance_profile")
-    priority = ""
-    severity = ""
     if isinstance(guidance_profile, dict):
         priority = str(guidance_profile.get("priority", "") or "").strip()
         severity = str(guidance_profile.get("severity", "") or "").strip()
-
-    if priority == "clarity":
-        return "先把关键词拉开说，嘴巴动作做大一点，别急着整句连过去。"
-    if priority == "pace":
-        return "先把每个短词之间留一点空隙，让节奏慢下来。"
-    if priority == "breath":
-        return "先吸一口气再开口，整句只盯一个呼气节奏。"
-    if severity == "severe":
-        return "先只抓一句里最关键的两个词，把嘴形和节奏做稳。"
-    if status == "excellent":
-        return "保持刚才这个节奏，只放大关键词，不用整句都用力。"
-    if status == "close":
-        return "先把最容易糊掉的那一小段单独慢练两遍，再回整句。"
-    if status == "retry":
-        return "先拆成更短的两段，嘴巴先张开，再把重点词拖清楚。"
-    return "先把嘴巴张开一点，把第一个关键词慢慢送出来。"
+        if priority or severity:
+            return f"训练偏好：priority={priority or 'default'}；severity={severity or 'default'}"
+    return None
 
 
-def _status_to_clarity(status: str) -> float:
-    return {
-        "excellent": 0.92,
-        "close": 0.76,
-        "retry": 0.56,
-        "unclear": 0.32,
-    }.get(status, 0.32)
-
-
-def build_training_feedback_payload(
+def build_training_extension_prompt(
     ctx: VoxFlameSessionContext,
     payload: dict[str, Any],
-) -> dict[str, Any]:
-    status = _normalize_training_status(payload.get("feedback_status"))
-    recognized_text = str(payload.get("recognized_text", "") or "").strip()
+) -> str:
     exercise_text = str(payload.get("exercise_text", "") or "").strip()
-    exercise_id = str(payload.get("exercise_id", "") or ctx.request_id or "").strip()
+    recognized_text = str(payload.get("recognized_text", "") or "").strip()
     category = str(payload.get("exercise_category", "") or ctx.scene or "中文训练").strip()
-    focus_tags = _read_string_list(payload.get("focus_tags"))[:6]
-    primary_focus = _pick_primary_focus(payload)
-    pronunciation_summary = str(payload.get("pronunciation_summary", "") or "").strip()
-    clarity_score = _status_to_clarity(status)
-    confusion_patterns_count = max(1, len(focus_tags)) if status != "excellent" else 0
+    prepared_expression_title = str(payload.get("prepared_expression_title", "") or "").strip()
+    prepared_expression_section_title = str(payload.get("prepared_expression_section_title", "") or "").strip()
+    hotwords = _read_string_list(payload.get("hotwords"))[:5]
+    keywords = _read_string_list(payload.get("keywords"))[:5]
+    fallback_phrases = _read_string_list(payload.get("fallback_phrases"))[:2]
+    high_risk_phrases = _read_string_list(payload.get("high_risk_phrases"))[:3]
 
-    encouragement = {
-        "excellent": "这句已经很稳了，可以继续换下一句。",
-        "close": "这次已经很接近了，我们只盯一个点继续收口。",
-        "retry": "这次先不求整句完美，只改最关键的一处。",
-        "unclear": "系统这次没完全听清，但这条练习还是有价值。",
-    }[status]
-    next_step = {
-        "excellent": "保持这个节奏，再换一句高频表达继续练。",
-        "close": "先把这段最容易糊掉的内容单独慢练 2 到 3 次，再回整句。",
-        "retry": "先拆成短一点的两段，再把关键词连回整句。",
-        "unclear": "先把第一关键词单独说清，再补一条完整版本。",
-    }[status]
-    articulation_tip = _pick_articulation_tip(payload, status=status)
-    articulation_tips = [articulation_tip]
-    summary = (
-        f"这次先重点看“{primary_focus}”。"
-        if primary_focus
-        else "这次先盯一个关键词，把它说稳。"
-    )
-    speech_patterns = _extract_speech_patterns(payload, primary_focus)
-    pronunciation_targets = _build_pronunciation_targets(primary_focus, speech_patterns)
-    keywords = _pick_keywords(payload)
-
-    response = {
-        "feedback_request_id": exercise_id or ctx.request_id or "",
-        "exercise_id": exercise_id,
-        "exercise_text": exercise_text,
-        "recognized_text": recognized_text,
-        "feedback_status": status,
-        "exercise_category": category,
-        "clarity_score": clarity_score,
-        "summary": summary,
-        "focus_tags": focus_tags,
-        "pronunciation_summary": pronunciation_summary or summary,
-        "confusion_patterns_count": confusion_patterns_count,
-        "persisted": False,
-        "memory_enabled": True,
-        "voice_profile_update_requested": True,
-        "voice_profile_updated": True,
-        "encouragement": encouragement,
-        "primary_focus": primary_focus,
-        "articulation_tip": articulation_tip,
-        "articulation_tips": articulation_tips,
-        "speech_patterns": speech_patterns,
-        "pronunciation_targets": pronunciation_targets,
-        "next_step": next_step,
-        "source": "livekit_training_feedback",
-        "error": None,
-        "metadata": {
-            "request_id": ctx.request_id,
-            "surface": ctx.surface,
-            "mode": ctx.mode,
-            "scene": ctx.scene,
-        },
-    }
-    if keywords:
-        response["keywords"] = keywords
-    return response
+    lines = [
+        f"训练分类：{category}",
+        f"目标句：{exercise_text or '未提供'}",
+        f"系统听到：{recognized_text or '这次还没有稳定拿到最终结果'}",
+    ]
+    guidance_line = _build_training_guidance_line(payload)
+    if guidance_line:
+        lines.append(guidance_line)
+    if prepared_expression_title:
+        if prepared_expression_section_title:
+            lines.append(f"来源准备稿：{prepared_expression_title} / {prepared_expression_section_title}")
+        else:
+            lines.append(f"来源准备稿：{prepared_expression_title}")
+    if hotwords:
+        lines.append(f"热词：{'、'.join(hotwords)}")
+    elif keywords:
+        lines.append(f"关键词：{'、'.join(keywords)}")
+    if high_risk_phrases:
+        lines.append(f"高风险表达：{'、'.join(high_risk_phrases)}")
+    if fallback_phrases:
+        lines.append(f"卡住时可退回：{'；'.join(fallback_phrases)}")
+    lines.append("请直接给出自然语言训练点评。")
+    return "\n".join(lines)
 
 
 def extract_text_from_completion(payload: dict[str, Any]) -> str | None:
@@ -362,12 +287,16 @@ class CommunicationAssistantRuntime:
             {"role": "system", "content": build_preparation_prompt(self.userdata)},
             *self.history,
         ]
+        reply_timeout_seconds = compute_reply_timeout_seconds(
+            self.config.dashscope_reply_timeout_seconds,
+            normalized,
+        )
 
         try:
             if isinstance(self.client, DashScopeChatClient):
                 reply = await asyncio.wait_for(
                     asyncio.to_thread(self.client.complete, messages),
-                    timeout=self.config.dashscope_reply_timeout_seconds,
+                    timeout=reply_timeout_seconds,
                 )
             else:
                 reply = self.client.complete(messages)
@@ -382,3 +311,55 @@ class CommunicationAssistantRuntime:
         self.history = self.history[-8:]
         self.userdata.note_assistant_reply(reply)
         return reply, source
+
+
+@dataclass
+class TrainingCoachRuntime:
+    config: LiveKitAgentConfig
+    ctx: VoxFlameSessionContext
+    client: DashScopeChatClient | None = None
+
+    def __post_init__(self) -> None:
+        if self.client is None and self.config.dashscope_api_key:
+            self.client = DashScopeChatClient(
+                api_key=self.config.dashscope_api_key,
+                base_url=self.config.dashscope_base_url,
+                model=self.config.dashscope_training_extension_model,
+                timeout_seconds=self.config.dashscope_training_extension_timeout_seconds,
+            )
+
+    async def generate_feedback(
+        self,
+        payload: dict[str, Any],
+    ) -> tuple[str, str, str]:
+        fallback_text = build_training_extension_fallback_text(payload)
+        model = self.config.dashscope_training_extension_model
+
+        if self.client is None:
+            return fallback_text, "livekit_training_extension_fallback", model
+
+        messages = [
+            {"role": "system", "content": TRAINING_EXTENSION_SYSTEM_PROMPT},
+            {"role": "system", "content": build_scene_prompt(self.ctx)},
+            {"role": "user", "content": build_training_extension_prompt(self.ctx, payload)},
+        ]
+
+        try:
+            if isinstance(self.client, DashScopeChatClient):
+                feedback_text = await asyncio.wait_for(
+                    asyncio.to_thread(self.client.complete, messages),
+                    timeout=self.config.dashscope_training_extension_timeout_seconds,
+                )
+            else:
+                feedback_text = self.client.complete(messages)
+        except Exception as exc:
+            logger.warning(
+                "DashScope training extension failed, falling back to deterministic text: %s",
+                exc,
+            )
+            return fallback_text, "livekit_training_extension_fallback", model
+
+        normalized = feedback_text.strip()
+        if not normalized:
+            return fallback_text, "livekit_training_extension_fallback", model
+        return normalized, "livekit_training_extension", model

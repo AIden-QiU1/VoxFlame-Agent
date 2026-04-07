@@ -39,6 +39,7 @@ async function runLiveKitConfigTests(): Promise<void> {
     {
       LIVEKIT_URL: undefined,
       LIVEKIT_BROWSER_URL: undefined,
+      VOXFLAME_PUBLIC_BASE_URL: undefined,
       LIVEKIT_API_KEY: undefined,
       LIVEKIT_API_SECRET: undefined,
       LIVEKIT_AGENT_NAME: undefined,
@@ -63,6 +64,7 @@ async function runLiveKitConfigTests(): Promise<void> {
     {
       LIVEKIT_URL: 'wss://livekit.example.com',
       LIVEKIT_BROWSER_URL: 'wss://browser-livekit.example.com',
+      VOXFLAME_PUBLIC_BASE_URL: undefined,
       LIVEKIT_API_KEY: 'lk_api_key',
       LIVEKIT_API_SECRET: 'lk_api_secret',
       RTC_ENABLE_LIVEKIT_EXPERIMENT: '0',
@@ -84,6 +86,7 @@ async function runLiveKitConfigTests(): Promise<void> {
     {
       LIVEKIT_URL: 'wss://livekit.internal.example.com',
       LIVEKIT_BROWSER_URL: 'wss://livekit.example.com',
+      VOXFLAME_PUBLIC_BASE_URL: undefined,
       LIVEKIT_API_KEY: 'lk_api_key',
       LIVEKIT_API_SECRET: 'lk_api_secret',
       LIVEKIT_AGENT_NAME: 'voxflame-agent',
@@ -100,6 +103,24 @@ async function runLiveKitConfigTests(): Promise<void> {
       assert.equal(status.agentName, 'voxflame-agent')
       assert.deepEqual(status.missingEnv, [])
       assert.doesNotThrow(() => service.assertCanStart())
+    },
+  )
+
+  withEnv(
+    {
+      LIVEKIT_URL: 'ws://livekit-server:7880',
+      LIVEKIT_BROWSER_URL: undefined,
+      VOXFLAME_PUBLIC_BASE_URL: 'https://111.230.35.89.sslip.io',
+      LIVEKIT_API_KEY: 'lk_api_key',
+      LIVEKIT_API_SECRET: 'lk_api_secret',
+      RTC_ENABLE_LIVEKIT_EXPERIMENT: 'true',
+    },
+    () => {
+      const service = new LiveKitConfigService()
+      const status = service.getStatus()
+
+      assert.equal(status.serverUrl, 'ws://livekit-server:7880')
+      assert.equal(status.browserUrl, 'wss://111.230.35.89.sslip.io')
     },
   )
 

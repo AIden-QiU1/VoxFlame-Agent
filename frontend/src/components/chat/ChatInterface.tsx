@@ -69,7 +69,6 @@ export default function ChatInterface({
     sessionId,
     currentASRText,
     currentResponseText,
-    currentDualLine,
     messages,
     error,
     sessionIntent,
@@ -181,7 +180,7 @@ export default function ChatInterface({
   const latestAssistantText = [...messages]
     .reverse()
     .find((message) => message.role === 'assistant')?.content
-  const captionText = currentResponseText || currentDualLine?.correctedText || latestAssistantText || currentASRText
+  const captionText = currentResponseText || latestAssistantText || currentASRText
   const hasConversationStarted = messages.length > 0 || Boolean(currentResponseText) || Boolean(currentASRText)
   const statusText = isRecording
     ? '正在听你说话'

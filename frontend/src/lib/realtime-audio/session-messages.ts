@@ -1,12 +1,11 @@
 import {
+  applyTrainingCoachFeedback,
   applyAssistantResponseDelta,
   applyConnectedState,
-  applyCorrectedSubtitle,
   applyCurrentAsrText,
   applyFinalAssistantTranscript,
   applyFinalUserTranscript,
   applyRtcError,
-  applyTrainingFeedback,
   applyVoiceProfileSync,
 } from './session-state'
 import type {
@@ -16,7 +15,7 @@ import type {
   RtmMessageEvent,
   SessionControlClient,
   StartRtcSessionResponse,
-  TrainingFeedbackEvent,
+  TrainingCoachFeedbackEvent,
   VoiceProfileSyncEvent,
 } from './session-types'
 
@@ -111,17 +110,6 @@ function maybeAssembleChunkedMessage(
 
   chunks.delete(messageId)
   return decodeBase64Utf8(ordered.join(''))
-}
-
-function readStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value
-    .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean)
 }
 
 export function decodeInboundMessage(
@@ -219,39 +207,19 @@ export function reduceRtcEnvelope(
   prev: RtcAgentState,
   message: RtcMessageEnvelope,
 ): RtcAgentState {
-  if (message.type === 'training_feedback') {
-    const feedback: TrainingFeedbackEvent = {
+  if (message.type === 'training_coach_feedback') {
+    const feedback: TrainingCoachFeedbackEvent = {
       requestId: message.feedback_request_id || '',
       exerciseId: message.exercise_id || '',
       exerciseText: message.exercise_text || '',
       recognizedText: message.recognized_text || '',
-      status: message.feedback_status || 'unclear',
-      category: message.exercise_category || '',
-      clarityScore:
-        typeof message.clarity_score === 'number' ? Math.round(message.clarity_score * 100) : 0,
-      summary: message.summary || '',
-      focusTags: readStringList(message.focus_tags),
-      keywords: readStringList(message.keywords),
-      confusionPatternsCount:
-        typeof message.confusion_patterns_count === 'number' ? message.confusion_patterns_count : 0,
-      pronunciationSummary: message.pronunciation_summary || '',
-      persisted: message.persisted === true,
-      memoryEnabled: message.memory_enabled !== false,
-      voiceProfileUpdateRequested: message.voice_profile_update_requested === true,
-      voiceProfileUpdated: message.voice_profile_updated === true,
-      encouragement: message.encouragement || '',
-      primaryFocus: message.primary_focus || '',
-      articulationTip: message.articulation_tip || '',
-      nextStep: message.next_step || '',
+      feedbackText: message.feedback_text || '',
       source: typeof message.source === 'string' ? message.source : 'unknown',
+      model: typeof message.model === 'string' ? message.model : 'unknown',
       timestamp: new Date(),
       error: typeof message.error === 'string' ? message.error : null,
-      voiceProfileError:
-        typeof message.metadata?.voice_profile_error === 'string'
-          ? message.metadata.voice_profile_error
-          : null,
     }
-    return applyTrainingFeedback(prev, feedback)
+    return applyTrainingCoachFeedback(prev, feedback)
   }
 
   if (message.type === 'voice_profile_updated') {
@@ -287,27 +255,12 @@ export function reduceRtcEnvelope(
   }
 
   if (message.type === 'transcript' && message.text) {
-    const correctionOriginal =
-      (typeof message.metadata?.original === 'string' && message.metadata.original) || ''
-    const isCorrectionEvent = message.metadata?.type === 'correction'
-
     if (message.role === 'user' && message.is_final) {
       return applyFinalUserTranscript(prev, message.text)
     }
 
     if (message.role === 'assistant' && message.is_final) {
-      return applyFinalAssistantTranscript(
-        prev,
-        message.text,
-        isCorrectionEvent && correctionOriginal
-          ? {
-              originalText: correctionOriginal,
-              correctedText: message.text,
-              isCorrected: correctionOriginal !== message.text,
-              timestamp: new Date(),
-            }
-          : null,
-      )
+      return applyFinalAssistantTranscript(prev, message.text)
     }
 
     if (message.role === 'user') {
@@ -319,31 +272,6 @@ export function reduceRtcEnvelope(
     const text = message.data?.text
     if (typeof text === 'string') {
       return applyCurrentAsrText(prev, text)
-    }
-    return prev
-  }
-
-  if (message.name === 'corrected_text') {
-    const correctedText =
-      (typeof message.data?.corrected_text === 'string' && message.data.corrected_text) ||
-      message.corrected_text ||
-      ''
-    const originalText =
-      (typeof message.data?.original_text === 'string' && message.data.original_text) ||
-      message.original_text ||
-      ''
-    if (correctedText) {
-      return applyCorrectedSubtitle(
-        prev,
-        originalText && correctedText && originalText !== correctedText
-          ? {
-              originalText,
-              correctedText,
-              isCorrected: true,
-              timestamp: new Date(),
-            }
-          : null,
-      )
     }
     return prev
   }

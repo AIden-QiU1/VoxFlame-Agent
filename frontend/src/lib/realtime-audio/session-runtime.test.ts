@@ -168,74 +168,31 @@ test('session-runtime updates latest transcript, memory turns, and reduced state
   assert.equal(harness.getState().latestUserTranscript, '我想慢一点说')
 })
 
-test('session-runtime writes training feedback into current session metadata', () => {
+test('session-runtime stores training coach feedback in rtc state', () => {
   const harness = createStateHarness()
   const latestTranscriptRef = { current: '' }
-  const metadataUpdates: Array<Record<string, unknown>> = []
-  const memoryEntries: Array<Record<string, unknown>> = []
-  const originalUpdateCurrentSessionMetadata = memoryService.updateCurrentSessionMetadata
-  const originalAddMemoryEntry = memoryService.addMemoryEntry
-  memoryService.updateCurrentSessionMetadata = ((metadata: Record<string, unknown>) => {
-    metadataUpdates.push(metadata)
-  }) as typeof memoryService.updateCurrentSessionMetadata
-  memoryService.addMemoryEntry = ((input: Record<string, unknown>) => {
-    memoryEntries.push(input)
-    return null
-  }) as typeof memoryService.addMemoryEntry
 
-  try {
-    const handleMessage = createDecodedRtcMessageHandler({
-      memoryOwnerId: 'user-1',
-      latestUserTranscriptRef: latestTranscriptRef,
-      setState: harness.setState,
-    })
+  const handleMessage = createDecodedRtcMessageHandler({
+    memoryOwnerId: 'user-1',
+    latestUserTranscriptRef: latestTranscriptRef,
+    setState: harness.setState,
+  })
 
-    handleMessage({
-      type: 'training_feedback',
-      exercise_id: 'exercise-1',
-      feedback_status: 'close',
-      summary: '这次先重点看“请先听我说完”。',
-      next_step: '先单独慢练 2 次，再回整句。',
-      clarity_score: 0.76,
-      source: 'livekit_training_feedback',
-      focus_tags: ['请先听我说完'],
-      speech_patterns: ['请先', '说完'],
-      pronunciation_targets: ['请先听我说完'],
-      articulation_tip: '先把关键词慢慢送出来。',
-      articulation_tips: ['先把关键词慢慢送出来。'],
-    })
-  } finally {
-    memoryService.updateCurrentSessionMetadata = originalUpdateCurrentSessionMetadata
-    memoryService.addMemoryEntry = originalAddMemoryEntry
-  }
+  handleMessage({
+    type: 'training_coach_feedback',
+    exercise_id: 'exercise-1',
+    exercise_text: '请先听我说完',
+    recognized_text: '请先听我说话',
+    feedback_text: '这次最后两个字有点跑掉了，先把“说完”慢一点，再录一遍。',
+    source: 'livekit_training_extension',
+    model: 'qwen3.5-plus',
+  })
 
-  assert.equal(metadataUpdates.length, 1)
-  assert.equal(memoryEntries.length, 1)
-  assert.equal(memoryEntries[0].type, 'voice_profile')
-  assert.equal(memoryEntries[0].content, '这次先重点看“请先听我说完”。')
   assert.equal(
-    (memoryEntries[0].metadata as Record<string, unknown>).kind,
-    'training_result',
+    harness.getState().lastTrainingCoachFeedback?.feedbackText,
+    '这次最后两个字有点跑掉了，先把“说完”慢一点，再录一遍。',
   )
-  assert.equal(
-    (memoryEntries[0].sessionMetadata as Record<string, unknown>).kind,
-    'training',
-  )
-  assert.equal(
-    (memoryEntries[0].sessionMetadata as Record<string, unknown>).source,
-    'livekit_training_feedback',
-  )
-  assert.equal(metadataUpdates[0].lastTrainingFeedbackSource, 'livekit_training_feedback')
-  assert.equal(metadataUpdates[0].lastTrainingFeedbackStatus, 'close')
-  assert.equal(metadataUpdates[0].lastTrainingExerciseId, 'exercise-1')
-  assert.deepEqual(metadataUpdates[0].lastTrainingSpeechPatterns, ['请先', '说完'])
-  assert.deepEqual(metadataUpdates[0].lastTrainingArticulationTips, ['先把关键词慢慢送出来。'])
-  assert.deepEqual(metadataUpdates[0].lastTrainingPronunciationTargets, ['请先听我说完'])
-  assert.equal(metadataUpdates[0].clarity_score, 0.76)
-  assert.equal(
-    harness.getState().lastTrainingFeedback?.summary,
-    '这次先重点看“请先听我说完”。',
-  )
+  assert.equal(harness.getState().lastTrainingCoachFeedback?.model, 'qwen3.5-plus')
 })
 
 test('session-runtime writes audio input telemetry into current session metadata', () => {

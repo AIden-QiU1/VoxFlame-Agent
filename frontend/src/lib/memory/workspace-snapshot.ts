@@ -20,6 +20,45 @@ export interface ProfileBundleItem {
   updated_at: string
 }
 
+export type PreparedExpressionFeedbackStatus =
+  | 'excellent'
+  | 'close'
+  | 'retry'
+  | 'unclear'
+
+export interface PreparedExpressionSectionSnapshot {
+  id: string
+  title: string
+  summary: string
+  anchor_line: string
+  practice_lines: string[]
+  high_risk_phrases: string[]
+  fallback_phrases: string[]
+  hotwords: string[]
+  rehearsal_count: number
+  low_confidence_count: number
+  latest_feedback_status: PreparedExpressionFeedbackStatus | null
+  last_rehearsed_at: string | null
+  is_priority: boolean
+}
+
+export interface PreparedExpressionSnapshot {
+  id: string
+  title: string
+  summary: string
+  scene: string | null
+  source: string
+  last_rehearsed_at: string | null
+  rehearsal_count: number
+  low_confidence_sections: number
+  hotwords: string[]
+  high_risk_phrases: string[]
+  fallback_phrases: string[]
+  next_focus: string[]
+  sections: PreparedExpressionSectionSnapshot[]
+  updated_at: string
+}
+
 export interface WorkspaceMemorySnapshot {
   profile_bundle: {
     static: ProfileBundleItem[]
@@ -51,6 +90,7 @@ export interface WorkspaceMemorySnapshot {
     next_step: string | null
     updated_at: string
   }
+  prepared_expression: PreparedExpressionSnapshot | null
   expression_kit: {
     active_scene_id: StarterKitScene['id'] | null
     personalized_phrases: ExpressionKitSuggestion[]

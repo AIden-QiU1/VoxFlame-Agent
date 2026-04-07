@@ -17,38 +17,16 @@ export interface ConversationMessage {
   timestamp: Date
 }
 
-export interface DualLineSubtitle {
-  originalText: string
-  correctedText: string
-  isCorrected: boolean
-  timestamp: Date
-}
-
-export interface TrainingFeedbackEvent {
+export interface TrainingCoachFeedbackEvent {
   requestId: string
   exerciseId: string
   exerciseText: string
   recognizedText: string
-  status: string
-  category: string
-  clarityScore: number
-  summary: string
-  focusTags: string[]
-  keywords: string[]
-  confusionPatternsCount: number
-  pronunciationSummary: string
-  persisted: boolean
-  memoryEnabled: boolean
-  voiceProfileUpdateRequested: boolean
-  voiceProfileUpdated: boolean
-  encouragement: string
-  primaryFocus: string
-  articulationTip: string
-  nextStep: string
+  feedbackText: string
   source: string
+  model: string
   timestamp: Date
   error: string | null
-  voiceProfileError: string | null
 }
 
 export interface VoiceProfileSyncEvent {
@@ -126,26 +104,12 @@ export interface RtcMessageEnvelope {
   exercise_id?: string
   exercise_text?: string
   recognized_text?: string
-  feedback_status?: string
-  exercise_category?: string
-  summary?: string
-  focus_tags?: string[]
-  speech_patterns?: string[]
-  keywords?: string[]
-  pronunciation_summary?: string
-  pronunciation_targets?: string[]
-  encouragement?: string
-  primary_focus?: string
-  articulation_tip?: string
-  articulation_tips?: string[]
-  next_step?: string
-  confusion_patterns_count?: number
-  persisted?: boolean
-  memory_enabled?: boolean
-  voice_profile_update_requested?: boolean
-  voice_profile_updated?: boolean
+  feedback_text?: string
   source?: string
+  model?: string
+  exercise_category?: string
   hotword_count?: number
+  confusion_patterns_count?: number
   last_training_category?: string
 }
 
@@ -199,7 +163,6 @@ export interface RtcAgentState {
   sessionId: string | null
   currentASRText: string
   currentResponseText: string
-  currentDualLine: DualLineSubtitle | null
   latestUserTranscript: string
   messages: ConversationMessage[]
   error: string | null
@@ -207,6 +170,6 @@ export interface RtcAgentState {
   sessionIntent: RtcResolvedSessionIntent | null
   sessionReadiness: RtcSessionReadiness | null
   grantedCapabilities: RtcCapabilityId[]
-  lastTrainingFeedback: TrainingFeedbackEvent | null
+  lastTrainingCoachFeedback: TrainingCoachFeedbackEvent | null
   lastVoiceProfileSync: VoiceProfileSyncEvent | null
 }

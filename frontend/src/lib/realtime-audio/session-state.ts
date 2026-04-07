@@ -1,8 +1,7 @@
 import type {
   ConversationMessage,
-  DualLineSubtitle,
   RtcAgentState,
-  TrainingFeedbackEvent,
+  TrainingCoachFeedbackEvent,
   VoiceProfileSyncEvent,
 } from './session-types'
 import type { StartRtcSessionResponse } from './session-types'
@@ -28,7 +27,6 @@ export function createInitialRtcAgentState(): RtcAgentState {
     sessionId: null,
     currentASRText: '',
     currentResponseText: '',
-    currentDualLine: null,
     latestUserTranscript: '',
     messages: [],
     error: null,
@@ -36,18 +34,18 @@ export function createInitialRtcAgentState(): RtcAgentState {
     sessionIntent: null,
     sessionReadiness: null,
     grantedCapabilities: [],
-    lastTrainingFeedback: null,
+    lastTrainingCoachFeedback: null,
     lastVoiceProfileSync: null,
   }
 }
 
-export function applyTrainingFeedback(
+export function applyTrainingCoachFeedback(
   prev: RtcAgentState,
-  feedback: TrainingFeedbackEvent,
+  feedback: TrainingCoachFeedbackEvent,
 ): RtcAgentState {
   return {
     ...prev,
-    lastTrainingFeedback: feedback,
+    lastTrainingCoachFeedback: feedback,
   }
 }
 
@@ -86,13 +84,11 @@ export function applyFinalUserTranscript(
 export function applyFinalAssistantTranscript(
   prev: RtcAgentState,
   text: string,
-  currentDualLine: DualLineSubtitle | null,
 ): RtcAgentState {
   return {
     ...prev,
     currentResponseText: '',
     isThinking: false,
-    currentDualLine,
     messages: [...prev.messages, createMessage('assistant', text)],
   }
 }
@@ -104,16 +100,6 @@ export function applyCurrentAsrText(
   return {
     ...prev,
     currentASRText: text,
-  }
-}
-
-export function applyCorrectedSubtitle(
-  prev: RtcAgentState,
-  subtitle: DualLineSubtitle | null,
-): RtcAgentState {
-  return {
-    ...prev,
-    currentDualLine: subtitle,
   }
 }
 
@@ -152,7 +138,7 @@ export function applyDisconnectedState(prev: RtcAgentState): RtcAgentState {
     sessionIntent: null,
     sessionReadiness: null,
     grantedCapabilities: [],
-    lastTrainingFeedback: null,
+    lastTrainingCoachFeedback: null,
     lastVoiceProfileSync: null,
   }
 }
@@ -187,7 +173,6 @@ export function applyRecordingStarted(prev: RtcAgentState): RtcAgentState {
     error: null,
     currentASRText: '',
     currentResponseText: '',
-    currentDualLine: null,
     latestUserTranscript: '',
   }
 }
@@ -216,9 +201,8 @@ export function applyClearedMessages(prev: RtcAgentState): RtcAgentState {
     messages: [],
     currentASRText: '',
     currentResponseText: '',
-    currentDualLine: null,
     latestUserTranscript: '',
-    lastTrainingFeedback: null,
+    lastTrainingCoachFeedback: null,
     lastVoiceProfileSync: null,
   }
 }

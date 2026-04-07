@@ -82,7 +82,7 @@
 `livekit_agent` 的 env 现在按“LiveKit 基础设施 + DashScope provider”两层分组：
 
 1. 保留同样的“模型提供方 / 日志级别”分组
-2. `LOG_LEVEL` 与 `DASHSCOPE_*` 保持 provider 侧统一，但 `livekit_agent` 当前走的是 DashScope OpenAI-compatible `/chat/completions`，所以 `DASHSCOPE_LLM_MODEL` 要填这一接口可用的模型名，例如 `qwen3.5-flash` 或 `qwen3.6-plus`，而不是裸写 `qwen3.5`
+2. `LOG_LEVEL` 与 `DASHSCOPE_*` 保持 provider 侧统一，但 `livekit_agent` 当前走的是 DashScope OpenAI-compatible `/chat/completions`，所以 `DASHSCOPE_LLM_MODEL` 要填这一接口可用的模型名，例如 `qwen3.6-plus`，而不是裸写 `qwen3.5`
 3. `LIVEKIT_*` 继续由 compose environment 提供，`DASHSCOPE_*` 与 `LOG_LEVEL` 则优先从 [livekit_agent/.env](/home/ubuntu/VoxFlame-Agent/livekit_agent/.env) 读取
 4. 当前已经接通的是 `LIVEKIT_*` 驱动的 communication loop，并开始优先使用 `DASHSCOPE_*` 做 text rewrite / TTS / ASR；`training_feedback` 最小 contract 也已接上，但还没迁完更深的 `memory tooling`
 
@@ -91,7 +91,8 @@
 - `LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET / LIVEKIT_AGENT_NAME` 是当前必须的
 - `OPENAI_API_KEY` 现在不是最小 communication/data loop 的必需项，也不是当前主链依赖
 - `DASHSCOPE_API_KEY / DASHSCOPE_LLM_MODEL` 现在应写在 [livekit_agent/.env](/home/ubuntu/VoxFlame-Agent/livekit_agent/.env)
-- 当前 communication text rewrite 默认先收在 `qwen3.5-flash`，因为它比 `qwen3.5-plus` 更适合这条非流式最小闭环；后续如果迁到流式 voice loop，再评估是否切到 `qwen3.6-plus`
+- 当前 communication text rewrite 默认先收在 `qwen3.6-plus`
+- 当前实时 ASR 默认锁到 `qwen3-asr-flash-realtime-2026-02-10` snapshot；如果后续官方放出更高阶的非 `flash` realtime 线，再评估切换
 - `QWEN_ASR_REALTIME_*` 与 `QWEN_TTS_REALTIME_*` 现在也开始归 `livekit_agent` 自己管理，避免继续隐式借 TEN 的 provider 配置
 - `LIVEKIT_AUDIO_APM_*` 现在开始归 `livekit_agent` 自己管理，用于控制 agent 侧的 LiveKit Python RTC APM
 - 后续真正要达到的是 `DashScope-first parity`

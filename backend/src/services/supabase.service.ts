@@ -1,12 +1,16 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   buildMemoryGrowthProfileSnapshot,
+  FeedbackStatus,
   MemoryGrowthProfileSnapshot,
 } from './memory-growth.service';
 import {
   rankExpressionKitSuggestions,
   type WorkspaceSceneId,
 } from './expression-kit.service';
+import {
+  getDefaultPreparedExpressionTemplate,
+} from './prepared-expression.service';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -118,6 +122,36 @@ export interface WorkspaceMemorySnapshot {
     next_step: string | null;
     updated_at: string;
   };
+  prepared_expression: {
+    id: string;
+    title: string;
+    summary: string;
+    scene: string | null;
+    source: string;
+    last_rehearsed_at: string | null;
+    rehearsal_count: number;
+    low_confidence_sections: number;
+    hotwords: string[];
+    high_risk_phrases: string[];
+    fallback_phrases: string[];
+    next_focus: string[];
+    sections: Array<{
+      id: string;
+      title: string;
+      summary: string;
+      anchor_line: string;
+      practice_lines: string[];
+      high_risk_phrases: string[];
+      fallback_phrases: string[];
+      hotwords: string[];
+      rehearsal_count: number;
+      low_confidence_count: number;
+      latest_feedback_status: FeedbackStatus | null;
+      last_rehearsed_at: string | null;
+      is_priority: boolean;
+    }>;
+    updated_at: string;
+  } | null;
   expression_kit: {
     active_scene_id: WorkspaceSceneId | null;
     personalized_phrases: ExpressionKitSuggestion[];
@@ -315,7 +349,7 @@ export class SupabaseService {
   }
 
   // === User Profiles ===
-  async ensureUserProfile(userId: string): Promise<void> {
+  async ensureUserProfile(userId: string): Promise<boolean> {
     const { error } = await this.adminClient
       .from('user_profiles')
       .upsert(
@@ -327,7 +361,10 @@ export class SupabaseService {
 
     if (error) {
       console.error('Error ensuring user profile:', error);
+      return false;
     }
+
+    return true;
   }
 
   async getUserProfile(userId: string): Promise<UserProfile | null> {
@@ -335,7 +372,7 @@ export class SupabaseService {
       .from('user_profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error fetching user profile:', error);
@@ -666,11 +703,19 @@ export class SupabaseService {
     ]);
 
     const syncedAt = new Date().toISOString();
+    const preparedExpression = this.buildPreparedExpressionSnapshot(profileSnapshot, syncedAt);
 
     return {
       profile_bundle: this.buildProfileBundle(profileSnapshot, userProfile),
       session_review: this.buildSessionReview(profileSnapshot, syncedAt),
-      preparation: this.buildPreparationSnapshot(profileSnapshot, userProfile, options.sceneId, syncedAt),
+      preparation: this.buildPreparationSnapshot(
+        profileSnapshot,
+        userProfile,
+        options.sceneId,
+        syncedAt,
+        preparedExpression,
+      ),
+      prepared_expression: preparedExpression,
       expression_kit: this.buildExpressionKit(
         profileSnapshot,
         quickPhrases,
@@ -961,6 +1006,7 @@ export class SupabaseService {
     userProfile: UserProfile | null,
     sceneId: WorkspaceSceneId | undefined,
     syncedAt: string,
+    preparedExpression: WorkspaceMemorySnapshot['prepared_expression'],
   ): WorkspaceMemorySnapshot['preparation'] {
     const growthProfile = snapshot.growth_profile;
     const latestTrainingMemory = growthProfile.recentTraining[0];
@@ -982,12 +1028,16 @@ export class SupabaseService {
         } satisfies Record<WorkspaceSceneId, string>)[sceneId]
       : null;
     const immediateGoal =
+      preparedExpression?.next_focus[0] ||
       growthProfile.nextStep ||
       readString(latestTrainingMetadata, 'next_step') ||
       communicationPreferences.opening_phrase ||
       null;
     const supportStrategies = dedupeStrings(
       [
+        preparedExpression?.fallback_phrases[0]
+          ? `保底句先准备好：${preparedExpression.fallback_phrases[0]}`
+          : '',
         communicationPreferences.opening_phrase
           ? `先用固定开场白把节奏稳住：${communicationPreferences.opening_phrase}`
           : '',
@@ -1005,6 +1055,9 @@ export class SupabaseService {
     );
     const listenerGuidance = dedupeStrings(
       [
+        preparedExpression?.summary
+          ? `这次重要表达的结构已经压缩好，先按段落和锚点往前走。`
+          : '',
         communicationPreferences.pace_hint
           ? `希望对方这样配合：${communicationPreferences.pace_hint}`
           : '',
@@ -1019,6 +1072,7 @@ export class SupabaseService {
     );
     const strongPhrases = dedupeStrings(
       [
+        ...(preparedExpression?.fallback_phrases ?? []),
         ...growthProfile.frequentExpressions.slice(0, 4).map((item) => item.label),
         ...snapshot.memories
           .filter((memory) => {
@@ -1035,12 +1089,14 @@ export class SupabaseService {
         ...snapshot.hotword_profiles
           .map((profile) => profile.scenario)
           .filter((value) => value.trim().length > 0),
+        ...(preparedExpression?.scene ? [preparedExpression.scene] : []),
         ...(sceneId ? [sceneId] : []),
       ],
       6,
     );
     const riskyTerms = dedupeStrings(
       [
+        ...(preparedExpression?.high_risk_phrases ?? []),
         ...growthProfile.frequentConfusions.slice(0, 4).map((item) => item.label),
       ],
       6,
@@ -1055,6 +1111,7 @@ export class SupabaseService {
     );
     const hotwords = dedupeStrings(
       [
+        ...(preparedExpression?.hotwords ?? []),
         ...snapshot.hotword_profiles.slice(0, 6).map((profile) => profile.phrase),
         ...snapshot.hotwords.slice(0, 6),
       ],
@@ -1078,13 +1135,19 @@ export class SupabaseService {
         return '你已经开始形成自己的沟通方式：先用固定开场白稳住节奏，再告诉对方怎样配合你，这会比临场硬撑更有效。';
       }
 
+      if (preparedExpression) {
+        return `你已经为“${preparedExpression.title}”建立了一层结构化准备：重点段落、热词、风险句和保底句会继续从 rehearsal 中收紧。`;
+      }
+
       return '这里会逐步压缩出你的个人表达画像：你最常面对什么场景、系统最容易听偏什么、什么表达和补救方式最适合你。';
     })();
-    const overview = sceneBrief
-      ? `${sceneBrief}${immediateGoal ? ` 当前最该先准备的是：${immediateGoal}` : ''}`
-      : immediateGoal
-        ? `当前最该先准备的是：${immediateGoal}`
-        : '先固定一条开场白、一句补救句和 3 个最关键热词，现场会稳很多。';
+    const overview = preparedExpression
+      ? `当前已经围绕“${preparedExpression.title}”压出一层重要表达准备。${immediateGoal ? ` 现在最该先准备的是：${immediateGoal}` : ''}`
+      : sceneBrief
+        ? `${sceneBrief}${immediateGoal ? ` 当前最该先准备的是：${immediateGoal}` : ''}`
+        : immediateGoal
+          ? `当前最该先准备的是：${immediateGoal}`
+          : '先固定一条开场白、一句补救句和 3 个最关键热词，现场会稳很多。';
 
     return {
       active_scene_id: sceneId ?? null,
@@ -1102,6 +1165,141 @@ export class SupabaseService {
       next_step: growthProfile.nextStep ?? null,
       updated_at: syncedAt,
     };
+  }
+
+  private buildPreparedExpressionSnapshot(
+    snapshot: MemoryProfileSnapshot,
+    syncedAt: string,
+  ): WorkspaceMemorySnapshot['prepared_expression'] {
+    const template = getDefaultPreparedExpressionTemplate();
+    const preparedTrainingMemories = snapshot.memories
+      .filter((memory) => {
+        const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+        return (
+          readString(metadata, 'kind') === 'training_result' &&
+          readString(metadata, 'prepared_expression_id') === template.id
+        );
+      })
+      .sort((left, right) => {
+        const leftTime = new Date(left.created_at ?? 0).getTime();
+        const rightTime = new Date(right.created_at ?? 0).getTime();
+        return rightTime - leftTime;
+      });
+
+    const sectionStats = template.sections.map((section) => {
+      const sectionMemories = preparedTrainingMemories.filter((memory) => {
+        const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+        return readString(metadata, 'prepared_expression_section_id') === section.id;
+      });
+      const latestMemory = sectionMemories[0];
+      const latestMetadata = isRecord(latestMemory?.metadata) ? latestMemory.metadata : undefined;
+      const latestStatus = this.normalizePreparedExpressionStatus(
+        readString(latestMetadata, 'feedback_status'),
+      );
+      const lowConfidenceCount = sectionMemories.filter((memory) => {
+        const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+        return this.normalizePreparedExpressionStatus(
+          readString(metadata, 'feedback_status'),
+        ) !== 'excellent';
+      }).length;
+      const rehearsalCount = sectionMemories.length;
+      const lastRehearsedAt = latestMemory?.created_at ?? null;
+
+      return {
+        id: section.id,
+        title: section.title,
+        summary: section.summary,
+        anchor_line: section.anchorLine,
+        practice_lines: section.practiceLines,
+        high_risk_phrases: section.highRiskPhrases,
+        fallback_phrases: section.fallbackPhrases,
+        hotwords: section.hotwords,
+        rehearsal_count: rehearsalCount,
+        low_confidence_count: lowConfidenceCount,
+        latest_feedback_status: latestStatus,
+        last_rehearsed_at: lastRehearsedAt,
+        priority_score:
+          (rehearsalCount === 0 ? 80 : 0) +
+          lowConfidenceCount * 20 +
+          section.basePriority * 5 +
+          (latestStatus === 'retry' ? 15 : latestStatus === 'close' ? 8 : 0),
+      };
+    });
+
+    const prioritySectionIds = new Set(
+      [...sectionStats]
+        .sort((left, right) => right.priority_score - left.priority_score)
+        .slice(0, 3)
+        .map((section) => section.id),
+    );
+
+    const sections = sectionStats.map(({ priority_score: _priorityScore, ...section }) => ({
+      ...section,
+      is_priority: prioritySectionIds.has(section.id),
+    }));
+
+    const lastRehearsedAt = preparedTrainingMemories[0]?.created_at ?? null;
+    const rehearsedSectionCount = sections.filter((section) => section.rehearsal_count > 0).length;
+    const nextFocus = dedupeStrings(
+      sections
+        .filter((section) => section.is_priority)
+        .flatMap((section) => [
+          section.title,
+          section.high_risk_phrases[0] ?? '',
+          section.fallback_phrases[0] ?? '',
+        ]),
+      5,
+    );
+    const summary = lastRehearsedAt
+      ? `“${template.title}”已经练过 ${preparedTrainingMemories.length} 次，当前覆盖 ${rehearsedSectionCount}/${sections.length} 个结构段落。优先继续收口：${nextFocus[0] ?? sections[0]?.title ?? '开场段落'}。`
+      : template.summary;
+
+    return {
+      id: template.id,
+      title: template.title,
+      summary,
+      scene: template.scene,
+      source: template.source,
+      last_rehearsed_at: lastRehearsedAt,
+      rehearsal_count: preparedTrainingMemories.length,
+      low_confidence_sections: sections.filter((section) => section.low_confidence_count > 0).length,
+      hotwords: dedupeStrings(
+        [
+          ...template.hotwords,
+          ...sections.flatMap((section) => section.hotwords),
+        ],
+        10,
+      ),
+      high_risk_phrases: dedupeStrings(
+        [
+          ...template.highRiskPhrases,
+          ...sections
+            .filter((section) => section.is_priority)
+            .flatMap((section) => section.high_risk_phrases),
+        ],
+        8,
+      ),
+      fallback_phrases: dedupeStrings(
+        [
+          ...template.fallbackPhrases,
+          ...sections
+            .filter((section) => section.is_priority)
+            .flatMap((section) => section.fallback_phrases),
+        ],
+        6,
+      ),
+      next_focus: nextFocus,
+      sections,
+      updated_at: syncedAt,
+    };
+  }
+
+  private normalizePreparedExpressionStatus(value: string | null): FeedbackStatus | null {
+    if (value === 'excellent' || value === 'close' || value === 'retry' || value === 'unclear') {
+      return value;
+    }
+
+    return null;
   }
 
   private buildExpressionKit(

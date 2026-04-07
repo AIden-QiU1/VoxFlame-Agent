@@ -5,6 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
+import { SupabaseService } from '../services/supabase.service'
 
 // 扩展 Request 类型，添加 user 属性
 declare global {
@@ -28,6 +29,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null
+const ensuredUserProfileIds = new Set<string>()
 
 /**
  * 验证 Token 并提取用户信息
@@ -70,6 +72,13 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       id: user.id,
       email: user.email || '',
       role: user.user_metadata?.role,
+    }
+
+    if (!ensuredUserProfileIds.has(user.id)) {
+      const ensured = await SupabaseService.getInstance().ensureUserProfile(user.id)
+      if (ensured) {
+        ensuredUserProfileIds.add(user.id)
+      }
     }
 
     next()

@@ -29,11 +29,13 @@ def create_config() -> LiveKitAgentConfig:
         mode="communication_stub",
         dashscope_api_key="dashscope-test",
         dashscope_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        dashscope_llm_model="qwen3.5-flash",
+        dashscope_llm_model="qwen3.6-plus",
         dashscope_timeout_seconds=15.0,
         dashscope_reply_timeout_seconds=4.5,
+        dashscope_training_extension_model="qwen3.5-plus",
+        dashscope_training_extension_timeout_seconds=8.0,
         dashscope_asr_url="wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
-        dashscope_asr_model="qwen3-asr-flash-realtime",
+        dashscope_asr_model="qwen3-asr-flash-realtime-2026-02-10",
         dashscope_asr_sample_rate=16000,
         dashscope_asr_language="zh",
         dashscope_asr_enable_interim=True,
@@ -81,8 +83,11 @@ class FakeMonoFrame:
 
 class TestASRRuntime(unittest.TestCase):
     def test_with_model_query_appends_model_when_missing(self) -> None:
-        url = with_model_query("wss://dashscope.aliyuncs.com/api-ws/v1/realtime", "qwen3-asr-flash-realtime")
-        self.assertIn("model=qwen3-asr-flash-realtime", url)
+        url = with_model_query(
+            "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+            "qwen3-asr-flash-realtime-2026-02-10",
+        )
+        self.assertIn("model=qwen3-asr-flash-realtime-2026-02-10", url)
 
     def test_build_asr_session_payload_matches_dashscope_contract(self) -> None:
         payload = build_asr_session_payload(create_config())

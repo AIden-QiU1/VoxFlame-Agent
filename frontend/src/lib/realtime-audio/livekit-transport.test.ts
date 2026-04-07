@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { resolveBrowserLiveKitUrl } from './livekit-transport.ts'
+import {
+  formatRtcConnectionError,
+  resolveBrowserLiveKitUrl,
+} from './livekit-transport.ts'
 
 function withWindowOrigin(origin: string, fn: () => void): void {
   const previousWindow = globalThis.window
@@ -53,4 +56,13 @@ test('resolveBrowserLiveKitUrl upgrades to wss when page origin is https', () =>
       'wss://localhost',
     )
   })
+})
+
+test('formatRtcConnectionError rewrites pc connection failures into actionable guidance', () => {
+  const message = formatRtcConnectionError(
+    new Error('ConnectionError: could not establish pc connection'),
+  )
+
+  assert.match(message, /实时语音连接/)
+  assert.match(message, /手机热点/)
 })
