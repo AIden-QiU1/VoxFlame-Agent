@@ -167,6 +167,33 @@ def build_speech_activity_output(
     }
 
 
+def build_audio_input_telemetry_output(
+    ctx: VoxFlameSessionContext,
+    *,
+    normalized_level: float,
+    peak_level: float,
+    clipping_detected: bool,
+    apm_enabled: bool,
+    reason: str,
+    source: str = "server_audio_analysis",
+) -> dict[str, Any]:
+    return {
+        "type": "audio_input_telemetry",
+        "source": source,
+        "reason": reason.strip() or "unspecified",
+        "normalized_level": max(0.0, min(1.0, normalized_level)),
+        "peak_level": max(0.0, min(1.0, peak_level)),
+        "clipping_detected": clipping_detected,
+        "apm_enabled": apm_enabled,
+        "metadata": {
+            "request_id": ctx.request_id,
+            "surface": ctx.surface,
+            "mode": ctx.mode,
+            "scene": ctx.scene,
+        },
+    }
+
+
 def extract_training_feedback_request(message: dict[str, Any]) -> dict[str, Any] | None:
     if message.get("type") != "training_feedback_request":
         return None

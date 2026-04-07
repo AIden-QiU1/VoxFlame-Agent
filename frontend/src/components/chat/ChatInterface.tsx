@@ -9,7 +9,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { useRtcAgentSession, ConversationMessage, DualLineSubtitle } from '@/hooks/useRtcAgentSession'
+import { useRtcAgentSession, ConversationMessage } from '@/hooks/useRtcAgentSession'
 import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
 import WaveformVisualizer from '@/components/WaveformVisualizer'
 import { CommunicationStarterKit } from '@/components/chat/CommunicationStarterKit'
@@ -27,10 +27,11 @@ import {
   type RtcScene,
 } from '@/lib/realtime-audio/session-contract'
 import { cn } from '@/lib/utils'
-import { BrainIcon, EarIcon, XIcon } from 'lucide-react'
+import { XIcon } from 'lucide-react'
 
 interface ChatInterfaceProps {
   userId?: string
+  accessToken?: string
   isAuthenticated?: boolean
   initialStarterSceneId?: StarterKitScene['id']
   homeHref?: string
@@ -53,6 +54,7 @@ function mapStarterSceneToRuntimeScene(
 
 export default function ChatInterface({
   userId,
+  accessToken,
   isAuthenticated = false,
   initialStarterSceneId,
   homeHref,
@@ -81,6 +83,7 @@ export default function ChatInterface({
     sendText,
   } = useRtcAgentSession({
     userId,
+    accessToken,
     surface: 'communication_workspace',
     scene: requestedRuntimeScene,
     executionBackend: 'livekit',
@@ -544,13 +547,8 @@ export default function ChatInterface({
                   <MessageBubble key={message.id} message={message} />
                 ))}
 
-                {/* 双行字幕镜 - 显示用户说的 vs AI 理解的 */}
-                {currentDualLine && (
-                  <DualLineSubtitleDisplay subtitle={currentDualLine} />
-                )}
-
                 {/* Current ASR text (partial) */}
-                {currentASRText && !currentDualLine && (
+                {currentASRText && (
                   <div className="flex justify-end">
                     <div className="max-w-[80%] rounded-2xl rounded-br-md bg-amber-100 px-4 py-3 text-amber-900">
                       {currentASRText}
@@ -722,74 +720,6 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
         <div className={`mt-1 text-xs ${isUser ? 'text-amber-200' : 'text-stone-400'}`}>
           {new Date(message.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
         </div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * 双行字幕镜组件
- *
- * 只在“系统听到”和“AI 推测的意思”确实不同的时候显示，
- * 避免把相同内容硬拆成两行，造成误导。
- */
-function DualLineSubtitleDisplay({ subtitle }: { subtitle: DualLineSubtitle }) {
-  return (
-    <div className="flex justify-center mb-4">
-      <div className="w-full max-w-[90%] overflow-hidden rounded-xl border-2 border-amber-200 bg-amber-50 shadow-sm">
-        {/* 标题栏 */}
-        <div className="flex items-center justify-between border-b border-amber-200 bg-white px-4 py-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-stone-700">
-            <EarIcon className="w-4 h-4" />
-            <span>表达对照</span>
-          </div>
-          <div className="text-xs text-stone-500">仅在两者不同的时候显示</div>
-        </div>
-
-        {/* 内容区 */}
-        <div className="p-4 space-y-3">
-          {/* 第一行：机器听到的 */}
-          <div className="flex items-start gap-2">
-            <div className="flex size-6 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
-              <EarIcon className="w-3 h-3 text-red-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="mb-1 text-xs text-stone-500">机器听到的</div>
-              <div className="rounded-lg border border-stone-200 bg-white px-3 py-2 font-medium text-stone-900">
-                {subtitle.originalText || '(无法识别)'}
-              </div>
-            </div>
-          </div>
-
-          {/* 箭头 */}
-          {subtitle.isCorrected && (
-            <div className="flex justify-center">
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </svg>
-            </div>
-          )}
-
-          {/* 第二行：AI 理解的意图 */}
-          <div className="flex items-start gap-2">
-            <div className="flex size-6 flex-shrink-0 items-center justify-center rounded-full bg-green-100">
-              <BrainIcon className="w-3 h-3 text-green-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="mb-1 text-xs text-stone-500">AI 理解的意图</div>
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 font-medium text-stone-900">
-                {subtitle.correctedText}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 底部提示 */}
-        {subtitle.isCorrected && (
-          <div className="border-t border-amber-200 bg-amber-100 px-4 py-2 text-xs text-stone-600">
-            这表示系统第一次听到的内容和最终推测的意思不同。
-          </div>
-        )}
       </div>
     </div>
   )

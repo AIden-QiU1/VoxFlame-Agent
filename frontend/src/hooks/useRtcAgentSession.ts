@@ -49,6 +49,7 @@ export type {
 
 interface UseRtcAgentSessionOptions {
   userId?: string
+  accessToken?: string
   mode?: RtcSessionMode
   surface?: RtcSurface
   scene?: RtcScene
@@ -66,6 +67,7 @@ interface StartRecordingOptions extends ConnectRtcOptions {}
 export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
   const {
     userId,
+    accessToken,
     mode = 'communication',
     surface,
     scene,
@@ -78,6 +80,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
   const memoryOwnerId = userId ?? null
 
   const [state, setState] = useState<RtcAgentState>(createInitialRtcAgentState)
+  const latestStateRef = useRef<RtcAgentState>(state)
 
   const clientRef = useRef<SessionExecutionClient | null>(null)
   const rtmClientRef = useRef<SessionControlClient | null>(null)
@@ -93,6 +96,10 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
   const latestUserTranscriptRef = useRef('')
   const inboundRtmChunksRef = useRef<Map<string, ChunkAccumulator>>(new Map())
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null)
+
+  useEffect(() => {
+    latestStateRef.current = state
+  }, [state])
 
   useEffect(() => {
     if (!memoryOwnerId) {
@@ -148,18 +155,20 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
   }, [memoryOwnerId])
 
   const disconnect = useCallback(async () => {
+    const latestState = latestStateRef.current
+
     if (memoryOwnerId) {
       memoryService.updateCurrentSessionMetadata({
         sessionEndedReason: 'rtc_disconnect',
         latestUserTranscript: latestUserTranscriptRef.current || undefined,
-        latestCorrectionOriginal: state.currentDualLine?.originalText,
-        latestCorrectionText: state.currentDualLine?.correctedText,
-        lastVoiceProfileSource: state.lastVoiceProfileSync?.source,
+        latestCorrectionOriginal: latestState.currentDualLine?.originalText,
+        latestCorrectionText: latestState.currentDualLine?.correctedText,
+        lastVoiceProfileSource: latestState.lastVoiceProfileSync?.source,
         clarity_score:
-          typeof state.lastVoiceProfileSync?.clarityScore === 'number'
-            ? state.lastVoiceProfileSync.clarityScore / 100
+          typeof latestState.lastVoiceProfileSync?.clarityScore === 'number'
+            ? latestState.lastVoiceProfileSync.clarityScore / 100
             : undefined,
-        sessionTurnCount: state.messages.length,
+        sessionTurnCount: latestState.messages.length,
       })
       await memoryService.endSession()
     }
@@ -174,11 +183,12 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
         inboundRtmChunksRef,
         latestUserTranscriptRef,
       },
+      accessToken,
       clearPing,
       cleanupMicrophoneResources,
       setState,
     })
-  }, [cleanupMicrophoneResources, clearPing, memoryOwnerId, state.currentDualLine, state.lastVoiceProfileSync, state.messages.length])
+  }, [accessToken, cleanupMicrophoneResources, clearPing, memoryOwnerId])
 
   const ensureMicrophoneTrack = useCallback(async (): Promise<SessionMicrophoneTrack> => {
     return ensurePublishedMicrophoneTrack({
@@ -228,6 +238,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
           latestUserTranscriptRef,
         },
         userId,
+        accessToken,
         memoryOwnerId,
         mode,
         surface,
@@ -264,6 +275,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
     executionBackend,
     scene,
     surface,
+    accessToken,
     userId,
   ])
 

@@ -12,13 +12,8 @@ export interface TrainingMemoryMetadata {
   clarity_score?: number
   keywords?: string[]
   focus_tags?: string[]
-  focus_syllables?: string[]
+  speech_patterns?: string[]
   articulation_tips?: string[]
-  target_pinyin?: string
-  heard_pinyin?: string
-  pronunciation_initial_pairs?: string[]
-  pronunciation_final_pairs?: string[]
-  pronunciation_tone_pairs?: string[]
   pronunciation_targets?: string[]
   pronunciation_summary?: string
   sessionId?: string
@@ -42,10 +37,7 @@ export interface TrainingProfileSummaryMetadata {
   status_counts?: Partial<Record<FeedbackStatus, number>>
   dominant_categories?: MemoryLabelCount[]
   frequent_focus?: MemoryLabelCount[]
-  frequent_syllables?: MemoryLabelCount[]
-  frequent_initial_pairs?: MemoryLabelCount[]
-  frequent_final_pairs?: MemoryLabelCount[]
-  frequent_tone_pairs?: MemoryLabelCount[]
+  speech_patterns?: MemoryLabelCount[]
   frequent_confusions?: MemoryLabelCount[]
   articulation_tips?: MemoryLabelCount[]
   hotwords?: string[]
@@ -68,6 +60,12 @@ export interface SessionCompactionMetadata {
   latest_correction_text?: string
   interruption_count?: number
   barge_in_count?: number
+  last_input_telemetry_reason?: string
+  last_input_normalized_level?: number
+  last_input_peak_level?: number
+  last_input_clipping_detected?: boolean
+  last_input_apm_enabled?: boolean
+  audio_clipping_event_count?: number
   next_step?: string
   summary?: string
 }
@@ -89,10 +87,7 @@ export interface MemorySessionSummary {
   trainingAttempts: number
   avgClarityScore: number
   topFocusTags: string[]
-  topFocusSyllables: string[]
-  topInitialPairs: string[]
-  topFinalPairs: string[]
-  topTonePairs: string[]
+  topSpeechPatterns: string[]
 }
 
 export interface MemoryTrendPoint {
@@ -134,10 +129,7 @@ export interface MemoryGrowthProfile {
   recentSessions: MemorySessionSummary[]
   frequentExpressions: MemoryLabelCount[]
   frequentFocus: MemoryLabelCount[]
-  frequentSyllables: MemoryLabelCount[]
-  frequentInitialPairs: MemoryLabelCount[]
-  frequentFinalPairs: MemoryLabelCount[]
-  frequentTonePairs: MemoryLabelCount[]
+  frequentSpeechPatterns: MemoryLabelCount[]
   frequentConfusions: MemoryLabelCount[]
   articulationTips: MemoryLabelCount[]
   statusCounts: Record<FeedbackStatus, number>
@@ -451,31 +443,21 @@ export function mergeSessionCollections(localSessions: Session[], remoteSessions
 }
 
 function buildNextStep(
-  frequentInitialPairs: MemoryLabelCount[],
-  frequentFinalPairs: MemoryLabelCount[],
-  frequentTonePairs: MemoryLabelCount[],
-  frequentSyllables: MemoryLabelCount[],
+  frequentSpeechPatterns: MemoryLabelCount[],
   frequentFocus: MemoryLabelCount[],
+  articulationTips: MemoryLabelCount[],
   improvementDirection: ImprovementDirection,
 ): string {
-  if (frequentInitialPairs[0]) {
-    return `下一步先盯住声母 ${frequentInitialPairs[0].label}，拆到单音节慢练 2 到 3 次，再回到整句。`
-  }
-
-  if (frequentFinalPairs[0]) {
-    return `下一步先盯住韵母 ${frequentFinalPairs[0].label}，把口型和收尾做稳，再回到整句。`
-  }
-
-  if (frequentTonePairs[0]) {
-    return `下一步先把声调 ${frequentTonePairs[0].label} 单独拉开，避免一口气冲过去。`
-  }
-
-  if (frequentSyllables[0]) {
-    return `下一步先继续盯住 ${frequentSyllables[0].label}，把它单独慢练 2 到 3 次，再回到整句。`
+  if (frequentSpeechPatterns[0]) {
+    return `下一步先继续盯住“${frequentSpeechPatterns[0].label}”，先做短句重复，再回到整句。`
   }
 
   if (frequentFocus[0]) {
     return `下一步先围绕 ${frequentFocus[0].label} 做短句重复，不要同时改太多点。`
+  }
+
+  if (articulationTips[0]) {
+    return `下一步先抓住这条动作提醒：${articulationTips[0].label}`
   }
 
   if (improvementDirection === 'declining') {
@@ -540,21 +522,16 @@ function buildSessionSummaries(memories: Memory[], sessions: Session[]): MemoryS
         trainingInSession.flatMap((memory) => toTrainingMetadata(memory).focus_tags ?? []),
         3,
       ).map((item) => item.label),
-      topFocusSyllables: countValues(
-        trainingInSession.flatMap((memory) => toTrainingMetadata(memory).focus_syllables ?? []),
+      topSpeechPatterns: countValues(
+        trainingInSession.flatMap((memory) => {
+          const metadata = toTrainingMetadata(memory)
+          return [
+            ...(metadata.speech_patterns ?? []),
+            ...(metadata.articulation_tips ?? []),
+            ...(metadata.pronunciation_targets ?? []),
+          ]
+        }),
         4,
-      ).map((item) => item.label),
-      topInitialPairs: countValues(
-        trainingInSession.flatMap((memory) => toTrainingMetadata(memory).pronunciation_initial_pairs ?? []),
-        3,
-      ).map((item) => item.label),
-      topFinalPairs: countValues(
-        trainingInSession.flatMap((memory) => toTrainingMetadata(memory).pronunciation_final_pairs ?? []),
-        3,
-      ).map((item) => item.label),
-      topTonePairs: countValues(
-        trainingInSession.flatMap((memory) => toTrainingMetadata(memory).pronunciation_tone_pairs ?? []),
-        3,
       ).map((item) => item.label),
     })
   }
@@ -599,21 +576,16 @@ function buildSessionSummaries(memories: Memory[], sessions: Session[]): MemoryS
         trainingInSession.flatMap((memory: Memory) => toTrainingMetadata(memory).focus_tags ?? []),
         3,
       ).map((item) => item.label),
-      topFocusSyllables: countValues(
-        trainingInSession.flatMap((memory: Memory) => toTrainingMetadata(memory).focus_syllables ?? []),
+      topSpeechPatterns: countValues(
+        trainingInSession.flatMap((memory: Memory) => {
+          const metadata = toTrainingMetadata(memory)
+          return [
+            ...(metadata.speech_patterns ?? []),
+            ...(metadata.articulation_tips ?? []),
+            ...(metadata.pronunciation_targets ?? []),
+          ]
+        }),
         4,
-      ).map((item) => item.label),
-      topInitialPairs: countValues(
-        trainingInSession.flatMap((memory: Memory) => toTrainingMetadata(memory).pronunciation_initial_pairs ?? []),
-        3,
-      ).map((item) => item.label),
-      topFinalPairs: countValues(
-        trainingInSession.flatMap((memory: Memory) => toTrainingMetadata(memory).pronunciation_final_pairs ?? []),
-        3,
-      ).map((item) => item.label),
-      topTonePairs: countValues(
-        trainingInSession.flatMap((memory: Memory) => toTrainingMetadata(memory).pronunciation_tone_pairs ?? []),
-        3,
       ).map((item) => item.label),
     })
   }
@@ -741,29 +713,23 @@ export function buildMemoryGrowthProfile(params: {
         ],
         5,
       )
-  const frequentSyllables = latestTrainingSummary
-    ? readLabelCounts(latestTrainingSummary as Record<string, unknown>, 'frequent_syllables')
+  const frequentSpeechPatterns = latestTrainingSummary
+    ? readLabelCounts(latestTrainingSummary as Record<string, unknown>, 'speech_patterns')
     : countValues(
-        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).focus_syllables ?? []),
-        6,
-      )
-  const frequentInitialPairs = latestTrainingSummary
-    ? readLabelCounts(latestTrainingSummary as Record<string, unknown>, 'frequent_initial_pairs')
-    : countValues(
-        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).pronunciation_initial_pairs ?? []),
-        6,
-      )
-  const frequentFinalPairs = latestTrainingSummary
-    ? readLabelCounts(latestTrainingSummary as Record<string, unknown>, 'frequent_final_pairs')
-    : countValues(
-        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).pronunciation_final_pairs ?? []),
-        6,
-      )
-  const frequentTonePairs = latestTrainingSummary
-    ? readLabelCounts(latestTrainingSummary as Record<string, unknown>, 'frequent_tone_pairs')
-    : countValues(
-        granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).pronunciation_tone_pairs ?? []),
-        6,
+        [
+          ...granularTrainingMemories.flatMap((memory) => {
+            const metadata = toTrainingMetadata(memory)
+            return [
+              ...(metadata.speech_patterns ?? []),
+              ...(metadata.articulation_tips ?? []),
+              ...(metadata.pronunciation_targets ?? []),
+            ]
+          }),
+          ...sessionCompactionMemories.flatMap((memory) =>
+            readStringArray(toSessionCompactionMetadata(memory) as Record<string, unknown>, 'pronunciation_patterns'),
+          ),
+        ],
+        8,
       )
   const frequentConfusions = latestTrainingSummary
     ? readLabelCounts(latestTrainingSummary as Record<string, unknown>, 'frequent_confusions')
@@ -772,9 +738,8 @@ export function buildMemoryGrowthProfile(params: {
           ...granularTrainingMemories.flatMap((memory) => {
             const metadata = toTrainingMetadata(memory)
             return [
-              ...(metadata.pronunciation_initial_pairs ?? []).map((item) => `声母 ${item}`),
-              ...(metadata.pronunciation_final_pairs ?? []).map((item) => `韵母 ${item}`),
-              ...(metadata.pronunciation_tone_pairs ?? []).map((item) => `声调 ${item}`),
+              ...(metadata.speech_patterns ?? []),
+              ...(metadata.pronunciation_targets ?? []),
             ]
           }),
           ...sessionCompactionMemories.flatMap((memory) =>
@@ -876,29 +841,23 @@ export function buildMemoryGrowthProfile(params: {
   const nextStep = latestTrainingSummary
     ? readString(latestTrainingSummary as Record<string, unknown>, 'next_step') ??
       buildNextStep(
-        frequentInitialPairs,
-        frequentFinalPairs,
-        frequentTonePairs,
-        frequentSyllables,
+        frequentSpeechPatterns,
         frequentFocus,
+        articulationTips,
         improvementDirection,
       )
     : latestSessionCompaction
       ? readString(latestSessionCompaction as Record<string, unknown>, 'next_step') ??
         buildNextStep(
-          frequentInitialPairs,
-          frequentFinalPairs,
-          frequentTonePairs,
-          frequentSyllables,
+          frequentSpeechPatterns,
           frequentFocus,
+          articulationTips,
           improvementDirection,
         )
     : buildNextStep(
-        frequentInitialPairs,
-        frequentFinalPairs,
-        frequentTonePairs,
-        frequentSyllables,
+        frequentSpeechPatterns,
         frequentFocus,
+        articulationTips,
         improvementDirection,
       )
 
@@ -931,10 +890,7 @@ export function buildMemoryGrowthProfile(params: {
     recentSessions: sessionSummaries.slice(0, 6),
     frequentExpressions,
     frequentFocus,
-    frequentSyllables,
-    frequentInitialPairs,
-    frequentFinalPairs,
-    frequentTonePairs,
+    frequentSpeechPatterns,
     frequentConfusions,
     articulationTips,
     statusCounts,

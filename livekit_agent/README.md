@@ -55,6 +55,27 @@
    - 当前会把 `fallback phrases / risky terms / pronunciation patterns / support strategies / hotwords / interruption telemetry`
      压成结构化语义记忆
    - backend `memory growth -> workspace snapshot` 已开始消费这层 compact memory
+13. `LiveKit Python RTC AudioProcessingModule` 第一片已接上：
+   - 当前会在 agent 订阅到的房间麦克风帧上先走 LiveKit 官方 `AudioProcessingModule`
+   - 第一版默认是保守配置：
+     - `noise_suppression=true`
+     - `high_pass_filter=true`
+     - `echo_cancellation=false`
+     - `auto_gain_control=false`
+   - 这样做是因为：
+     - 现在处理的是远端订阅音频，不是本地全双工采集
+     - 对构音障碍用户，先避免过激增益和误伤发音特征
+   - 这一步是对官方 APM 的最小接入，不等于已经完成 `room_options.audio_input` 级别的完整音频链
+14. `server-side audio telemetry` 第一片已接上：
+   - `livekit_agent` 现在会把会话里的原始收音信号压成正式事件，而不只是写日志
+   - 当前会发：
+     - `normalized_level`
+     - `peak_level`
+     - `clipping_detected`
+     - `apm_enabled`
+     - `reason`
+   - 前端会把这些信号写回当前 session metadata
+   - `session-close compaction` 也已开始吸收这层信号，后续可以更可靠地区分“发音问题”和“收音问题”
 
 ## Env 约定
 
@@ -72,6 +93,7 @@
 - `DASHSCOPE_API_KEY / DASHSCOPE_LLM_MODEL` 现在应写在 [livekit_agent/.env](/home/ubuntu/VoxFlame-Agent/livekit_agent/.env)
 - 当前 communication text rewrite 默认先收在 `qwen3.5-flash`，因为它比 `qwen3.5-plus` 更适合这条非流式最小闭环；后续如果迁到流式 voice loop，再评估是否切到 `qwen3.6-plus`
 - `QWEN_ASR_REALTIME_*` 与 `QWEN_TTS_REALTIME_*` 现在也开始归 `livekit_agent` 自己管理，避免继续隐式借 TEN 的 provider 配置
+- `LIVEKIT_AUDIO_APM_*` 现在开始归 `livekit_agent` 自己管理，用于控制 agent 侧的 LiveKit Python RTC APM
 - 后续真正要达到的是 `DashScope-first parity`
 
 当前已经实际接上的 provider 能力：
@@ -84,6 +106,7 @@
    - 代码路径已经接进 worker，并开始监听房间里的麦克风音频
    - 当前已补首帧音频 / commit / final transcript 的诊断日志，并修复了 LiveKit 麦克风轨 `source` 未显式标注的问题
    - 第一版 server-side `VAD / 自动收句` 已接入，当前采用轻量 RMS 检测，并继续保留手动 `end_audio` 作为双保险
+   - 当前也已接入 LiveKit Python RTC `AudioProcessingModule` 第一片，对房间麦克风帧做保守型 APM 处理
 4. 最小 `voice_profile_updated`
    - 当前按 correction 前后文本估算 `clarity_score`
    - 先把 LiveKit communication loop 的 profile signal 跑起来

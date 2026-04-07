@@ -23,7 +23,7 @@ function buildCommunicatePath(sceneId?: StarterKitScene['id']) {
 
 export default function HomePage() {
   const router = useRouter()
-  const { userId, isLoading: authLoading, isAuthenticated } = useAuth({
+  const { userId, session, isLoading: authLoading, isAuthenticated } = useAuth({
     timeoutBehavior: 'guest',
   })
   const [showCommunicateView, setShowCommunicateView] = useState(false)
@@ -82,6 +82,7 @@ export default function HomePage() {
     return (
       <ChatInterface
         userId={userId || undefined}
+        accessToken={session?.access_token}
         isAuthenticated={isAuthenticated}
         initialStarterSceneId={starterSceneId}
         homeHref="/"

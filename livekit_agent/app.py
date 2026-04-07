@@ -17,6 +17,7 @@ from assistant_runtime import (
 from asr_runtime import LiveKitASRRuntime
 from config import load_config, should_bypass_proxy_for_livekit
 from data_contract import (
+    build_audio_input_telemetry_output,
     build_assistant_text_output,
     build_session_init_ack,
     build_session_userdata_ack,
@@ -164,6 +165,24 @@ async def entrypoint(ctx: JobContext) -> None:
             ),
         )
 
+    async def handle_audio_input_telemetry(
+        normalized_level: float,
+        peak_level: float,
+        clipping_detected: bool,
+        apm_enabled: bool,
+        reason: str,
+    ) -> None:
+        await publish_payload(
+            build_audio_input_telemetry_output(
+                session_context,
+                normalized_level=normalized_level,
+                peak_level=peak_level,
+                clipping_detected=clipping_detected,
+                apm_enabled=apm_enabled,
+                reason=reason,
+            ),
+        )
+
     async def respond_to_user_text(
         user_text: str,
         *,
@@ -253,6 +272,7 @@ async def entrypoint(ctx: JobContext) -> None:
             correction_original=transcript,
         ),
         on_speech_activity=handle_speech_activity,
+        on_audio_telemetry=handle_audio_input_telemetry,
     )
     await asr_runtime.start()
 

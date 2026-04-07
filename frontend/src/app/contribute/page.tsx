@@ -161,8 +161,7 @@ function buildUploadMetadata(
   saveTrigger: AttemptSaveTrigger,
 ): Record<string, unknown> {
   const lineage = buildTrainingSampleLineage(exercise, recording)
-
-  return {
+  const metadata: Record<string, unknown> = {
     exercise_id: exercise.id,
     exercise_text: exercise.text,
     exercise_category: exercise.category,
@@ -195,13 +194,8 @@ function buildUploadMetadata(
     transcript_coverage_ratio: sampleQuality.coverageRatio,
     missing_chars: feedback.missingChars,
     extra_chars: feedback.extraChars,
-    target_pinyin: feedback.targetPinyinDisplay,
-    heard_pinyin: feedback.heardPinyinDisplay,
-    focus_syllables: feedback.focusSyllables,
+    speech_patterns: feedback.speechPatterns,
     articulation_tips: feedback.articulationTips,
-    pronunciation_initial_pairs: feedback.pronunciationInitialPairs,
-    pronunciation_final_pairs: feedback.pronunciationFinalPairs,
-    pronunciation_tone_pairs: feedback.pronunciationTonePairs,
     pronunciation_targets: feedback.pronunciationTargets,
     pronunciation_summary: feedback.pronunciationSummary,
     guidance_profile: buildTrainingGuidanceProfileMetadata(guidanceProfile),
@@ -210,6 +204,19 @@ function buildUploadMetadata(
     save_trigger: saveTrigger,
     auto_saved: saveTrigger === 'auto',
   }
+
+  for (const key of Object.keys(metadata)) {
+    const value = metadata[key]
+    if (Array.isArray(value) && value.length === 0) {
+      delete metadata[key]
+      continue
+    }
+    if (typeof value === 'string' && value.trim().length === 0) {
+      delete metadata[key]
+    }
+  }
+
+  return metadata
 }
 
 function buildTrainingFeedbackRequestPayload(
@@ -224,7 +231,7 @@ function buildTrainingFeedbackRequestPayload(
     exercise_category: exercise.category,
     recognized_text: transcript,
     feedback_status: feedback.status,
-    focus_tags: feedback.focusSyllables,
+    focus_tags: feedback.speechPatterns,
     pronunciation_summary: feedback.pronunciationSummary,
     guidance_profile: buildTrainingGuidanceProfileMetadata(guidanceProfile),
   }
@@ -245,12 +252,8 @@ function buildUploadedTrainingRecord(attempt: PracticeAttempt) {
     clarityScore: getClarityScore(attempt.feedback.status),
     durationSeconds: attempt.recording.audio.durationSeconds,
     focusTags: [attempt.exercise.category],
-    focusSyllables: attempt.feedback.focusSyllables,
-    initialPairs: attempt.feedback.pronunciationInitialPairs,
-    finalPairs: attempt.feedback.pronunciationFinalPairs,
-    tonePairs: attempt.feedback.pronunciationTonePairs,
+    speechPatterns: attempt.feedback.speechPatterns,
     articulationTips: attempt.feedback.articulationTips,
-    keywords: [],
     pronunciationSummary: attempt.feedback.pronunciationSummary,
   }
 }
@@ -301,7 +304,7 @@ function getRecorderStatusCopy(
 }
 
 export default function ContributePage() {
-  const { user, userId, isLoading, isAuthenticated } = useAuth({
+  const { user, userId, session, isLoading, isAuthenticated } = useAuth({
     redirectToLogin: true,
     nextPath: '/contribute',
   })
@@ -325,6 +328,7 @@ export default function ContributePage() {
     disconnect,
   } = useMandarinTrainingSession({
     userId: userId ?? undefined,
+    accessToken: session?.access_token,
   })
   const {
     uploadRecording,
@@ -367,8 +371,7 @@ export default function ContributePage() {
     }
 
     return categoryExercises.filter((exercise) => (
-      exercise.text.includes(normalizedQuery) ||
-      exercise.pinyin.toLowerCase().includes(normalizedQuery)
+      exercise.text.includes(normalizedQuery)
     ))
   }, [categoryExercises, normalizedQuery])
   const visibleExercises = useMemo(
@@ -856,7 +859,7 @@ export default function ContributePage() {
                 <Input
                   value={exerciseQuery}
                   onChange={(event) => setExerciseQuery(event.target.value)}
-                  placeholder="在当前分类里搜索句子或拼音"
+                  placeholder="在当前分类里搜索句子"
                   className="h-11 rounded-2xl border-stone-200 bg-stone-50"
                 />
               </label>
@@ -894,7 +897,6 @@ export default function ContributePage() {
                           ) : null}
                         </div>
                         <p className="mt-3 text-lg font-semibold leading-7 text-gray-900">{exercise.text}</p>
-                        <p className="mt-2 text-sm leading-6 text-stone-600">{exercise.pinyin}</p>
                       </button>
                     )
                   })}
@@ -909,9 +911,6 @@ export default function ContributePage() {
               <div className="rounded-[28px] border border-stone-200 bg-white p-5">
                 <p className="text-sm font-medium text-gray-900">当前句子的训练重点</p>
                 <p className="mt-3 text-2xl font-semibold leading-snug text-gray-900">{currentExercise.text}</p>
-                <p className="mt-3 rounded-2xl bg-stone-50 px-4 py-4 text-sm leading-7 text-stone-700">
-                  {currentExercise.pinyin}
-                </p>
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
                   <p className="text-sm font-medium text-gray-900">先这样练</p>
                   <p className="mt-2 text-sm leading-6 text-gray-700">{currentCategoryMeta.helper}</p>
@@ -969,9 +968,6 @@ export default function ContributePage() {
                 </div>
 
                 <p className="mt-5 text-3xl font-semibold leading-snug text-gray-900">{currentExercise.text}</p>
-                <p className="mt-3 rounded-2xl bg-white px-4 py-4 text-sm leading-7 text-stone-700">
-                  {currentExercise.pinyin}
-                </p>
                 <div className="mt-4 rounded-2xl border border-stone-200 bg-white px-4 py-4">
                   <p className="text-sm font-medium text-gray-900">这轮训练重点</p>
                   <p className="mt-2 text-sm leading-6 text-gray-700">{guidanceContext.evidenceSummary}</p>
@@ -1054,14 +1050,12 @@ export default function ContributePage() {
                     <div className="rounded-3xl bg-stone-50 px-5 py-5">
                       <p className="text-sm font-medium text-gray-900">目标句</p>
                       <p className="mt-3 text-lg leading-7 text-gray-900">{attempt.exercise.text}</p>
-                      <p className="mt-3 text-sm leading-6 text-stone-600">{attempt.feedback.targetPinyinDisplay}</p>
                     </div>
                     <div className="rounded-3xl bg-amber-50 px-5 py-5">
                       <p className="text-sm font-medium text-gray-900">系统听到的内容</p>
                       <p className="mt-3 text-lg leading-7 text-gray-900">
                         {attempt.transcript || '这次还没有稳定拿到最终结果。'}
                       </p>
-                      <p className="mt-3 text-sm leading-6 text-stone-600">{attempt.feedback.heardPinyinDisplay}</p>
                     </div>
                     <div className="rounded-3xl bg-sky-50 px-5 py-5">
                       <p className="text-sm font-medium text-gray-900">先盯这一步</p>
@@ -1111,13 +1105,13 @@ export default function ContributePage() {
                       <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-5">
                         <p className="text-sm font-medium text-gray-900">先盯这几个字</p>
                         <p className="mt-3 text-sm leading-6 text-gray-700">
-                          {agentFeedback?.primaryFocus || attempt.feedback.focusSyllables.join('、') || '先看整句节奏'}
+                          {agentFeedback?.primaryFocus || attempt.feedback.speechPatterns.join('、') || '先看整句节奏'}
                         </p>
                       </div>
                       <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-5">
-                        <p className="text-sm font-medium text-gray-900">口型 / 舌位重点</p>
+                        <p className="text-sm font-medium text-gray-900">这次最容易混的点</p>
                         <p className="mt-3 text-sm leading-6 text-gray-700">
-                          {agentFeedback?.primaryPinyin || attempt.feedback.pronunciationTargets.join('、') || '这次没有稳定发现固定混淆'}
+                          {attempt.feedback.pronunciationTargets.join('、') || '这次没有稳定发现固定混淆'}
                         </p>
                       </div>
                       <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-5">

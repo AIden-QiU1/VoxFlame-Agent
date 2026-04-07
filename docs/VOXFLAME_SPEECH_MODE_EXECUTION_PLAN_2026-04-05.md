@@ -91,6 +91,21 @@
    - 用户在需要时立刻拿回控制权
 3. 演讲只是我们验证“这套能力是否真的够强”的测试场景。
 
+### 一个新增的前端/数据原则
+
+1. 一切从产品和用户出发，而不是从“字段是否齐全”出发。
+2. 前端展示优先来源于：
+   - 真实 corpus
+   - 结构化 feedback
+   - workspace snapshot
+   - 可解释的规则推导
+3. 不保留没有意义的空字段、空占位和宽泛关键词。
+4. `keywords` 只在高置信、对准备/检索/记忆真正有帮助时才写入，而且数量要少、语义要准。
+5. 训练页和记忆页不再围绕拼音、声母、韵母、声调做产品主语义；后续统一收口到三类真正面向用户的语义：
+   - 热词
+   - 用户发音规律
+   - 场景总结
+
 ## 4. 现有代码能接住什么
 
 结合当前代码现状，VoxFlame 已经有足够好的宿主，不需要另起一套系统：
@@ -169,11 +184,27 @@
      - 当前会把 `fallback phrases / risky terms / pronunciation patterns / support strategies / hotwords / interruption telemetry`
        压成结构化语义记忆
      - 现有 `memory growth -> workspace snapshot` 已开始消费这层 compact memory
+   - 这轮又往前收了一层：
+     - 记忆页和训练画像不再继续扩成“重点音节 / 易混声母 / 易混韵母 / 声调提醒”这类栏目
+     - 现役产品语义开始统一收口到：`热词 / 用户发音规律 / 场景总结`
    - 还没做完的，是让这层 compaction 继续长出更强的 pattern extraction 与 recall policy
 5. `构音障碍语音处理`
    - 当前主要依赖浏览器 WebRTC 的 `echoCancellation / noiseSuppression / autoGainControl`
    - 输入电平提示第一片已经落地：沟通页和训练页都会给出实时收音质量反馈
-   - 还没有接上 LiveKit 官方 `room_options.audio_input` 那层 noise cancellation / APM 能力
+   - LiveKit Python RTC `AudioProcessingModule` 第一片已经接上：
+     - 当前会在 agent 订阅到的房间麦克风帧上先做官方 APM 处理
+     - 第一版采用保守配置：
+       - `noise_suppression=true`
+       - `high_pass_filter=true`
+       - `echo_cancellation=false`
+       - `auto_gain_control=false`
+     - 这一步的边界很清楚：
+       - 现在处理的是远端订阅音频，不是本地全双工采集
+       - 对构音障碍用户也先避免过激增益和误伤发音特征
+   - 还没有收口到 LiveKit 官方 `room_options.audio_input` 那层更完整的 noise cancellation / audio input 管理
+   - server-side audio telemetry 第一片也已经接上：
+     - agent 现在会发 `normalized_level / peak_level / clipping_detected / apm_enabled`
+     - 这让我们后续能更可靠地区分“发音问题”和“收音问题”
    - 也还没有“保守型降噪 + 会话内 speaker differentiation”的成体系策略
 
 ### 关于降噪 / interruption / 音纹的当前判断
@@ -190,7 +221,7 @@
      - 声音过冲
    - 后续还要继续补：
      - 麦克风距离建议与更细的 telemetry
-     - LiveKit `audio_input / APM` 接入后的 server-side 策略
+     - `room_options.audio_input` 接入后的更完整 server-side 策略
 3. `interruption`
    - 当前已经有基本能力
    - 下一步要补的是官方推荐的 policy，不是只会“检测到 speech_started 就停 TTS”
@@ -614,6 +645,7 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
 
 1. `LiveKit self-hosted RTC`
    - 承接长时音频、房间数据和实时控制事件
+   - 本地开发验证继续统一走 `http://localhost:3000`
 2. `DashScope / Qwen-first`
    - 当前最现实的 ASR / rewrite / TTS provider
 3. `workspace memory`
@@ -637,6 +669,81 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
 换句话说：
 
 `短期靠产品控制权 + 记忆压缩 + 长时表达专项流程兜底，长期再靠数据和微调抬上限。`
+
+## 8. 4/6 新增吸收的工程判断
+
+基于 2026-04-06 的外部工程观察，这 5 天内最值得直接吸收的，不是再换一套“流行全栈”，而是把当前主线补成更稳的 contract 与上下文纪律。
+
+### A. 先补 shared contract，不急着换 backend / mobile 框架
+
+当前仓库最该优先共用的不是某个框架，而是跨页面、跨 runtime、跨未来 surface 的数据语言。
+
+这 5 天内最值得先抽出来的 shared contract：
+
+1. `session metadata`
+2. `dispatch metadata`
+3. `training_feedback`
+4. `session_compaction`
+5. `workspace snapshot.preparation`
+6. `important-expression / prepared-expression` 视图
+
+结论：
+
+1. 先把这些对象做稳，比“现在切 Nest / GraphQL / Prisma / RN 全家桶”更重要
+2. 当前 backend 继续以现有 `Express + TypeScript` 为主，不为框架迁移打断专项主线
+3. future mobile / PWA / desktop companion 都应该优先复用这套 contract，而不是各长一套会话启动协议
+
+### B. 这 5 天应补一层 `context assembly`
+
+当前 durable memory owner 已经明确是 `backend + workspace snapshot`，但 speech 模式还需要一层更明确的 runtime context assembly。
+
+这层的职责不是保存更多内容，而是为这次重要表达挑出“当前模型真正该看什么”。
+
+speech mode 里，优先装配的应是：
+
+1. 当前段落 / 当前表达目标
+2. 当前场景的 3 到 5 条关键准备
+3. 风险词 / 热词 / 专有名词
+4. 最近最相关的误听规律
+5. 保底句 / 卡住时补救句
+
+不应直接灌入：
+
+1. 原始 transcript 全量流水
+2. 全量训练历史
+3. 整份长期画像原文
+
+结论：
+
+1. `workspace snapshot` 继续做 durable owner
+2. `context assembly` 做当前 session 的最小准备装配
+3. correction / rewrite / live assist 默认吃装配后的最小上下文，而不是直接吃原始记忆流水
+
+### C. 这 5 天就可以补的离线压缩节奏
+
+当前已经有 `session-close compaction` 第一片，所以这 5 天可以进一步把“白天流水、结束后压缩”的节奏写成专项要求。
+
+最值得优先沉淀的不是整段 transcript，而是：
+
+1. 高频误听模式
+2. 稳定热词
+3. 当前重要表达的可靠说法
+4. 容易卡住的段落
+5. 打断 / 接管时机
+
+结论：
+
+1. 现场实时链路负责稳和可打断
+2. session close / review 链路负责重一点的 pattern extraction
+3. 记忆页展示压缩结果，不展示原始流水墙
+
+
+
+这次专项里明确要做：
+
+1. 让 `prepared expression -> context assembly -> live assist -> session compaction` 真正闭环
+2. 让记忆页和 correction 开始正式吃“规律 + 热词 + 风险句”
+3. 让未来 mobile / desktop companion 所需的 contract 先在 web 主链里稳定下来
 
 ## 9. 需要查和持续对齐的核心参考
 
@@ -737,7 +844,13 @@ CEO / 产品设计角度，最好的分工不是二选一，而是：
 3. `Phase C: audio input / APM`
    - 在继续保留浏览器采集约束的同时
    - 研究并接入 LiveKit 官方 `room_options.audio_input` 或 Python RTC APM 路线
-   - 输入电平提示第一片已完成，下一步重点转到 `audio_input / APM`
+   - 输入电平提示第一片已完成
+   - LiveKit Python RTC `AudioProcessingModule` 第一片已完成
+   - server-side audio telemetry 第一片已完成
+   - 下一步重点转到：
+     - `room_options.audio_input`
+     - 更细的 audio telemetry
+     - 会话内 speaker differentiation 前的保守音频策略
 4. `Phase D: participant attributes + session-close compaction`
    - 把低频共享状态和 session-local compaction 分开
    - 让 session 结束时自动把规律压入 `workspace snapshot`

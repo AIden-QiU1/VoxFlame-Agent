@@ -94,6 +94,21 @@ export async function getValidToken(): Promise<string | null> {
   }
 }
 
+export async function getFreshSession() {
+  const client = getSupabase()
+  if (!client) {
+    return null
+  }
+
+  const { data, error } = await client.auth.getSession()
+  if (error) {
+    console.error('[getFreshSession] 获取 session 失败:', error)
+    return null
+  }
+
+  return data.session ?? null
+}
+
 // 为了向后兼容，导出一个代理对象
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_, prop) {

@@ -855,11 +855,11 @@ export default function MemoryPage() {
                 {profile.recentTraining.map((memory) => {
                   const metadata = memory.metadata as Record<string, unknown> | undefined
                   const isTrainingProfileSummary = metadata?.kind === 'training_profile_summary'
-                  const focusSyllables = Array.isArray(metadata?.focus_syllables)
-                    ? metadata.focus_syllables.filter((item): item is string => typeof item === 'string')
+                  const focusPatterns = Array.isArray(metadata?.speech_patterns)
+                    ? metadata.speech_patterns.filter((item): item is string => typeof item === 'string')
                     : []
-                  const summarySyllables = Array.isArray(metadata?.frequent_syllables)
-                    ? metadata.frequent_syllables
+                  const summaryPatterns = Array.isArray(metadata?.speech_patterns)
+                    ? metadata.speech_patterns
                         .map((item) =>
                           item && typeof item === 'object' && 'label' in item && typeof item.label === 'string'
                             ? item.label
@@ -872,7 +872,7 @@ export default function MemoryPage() {
                       ? metadata.pronunciation_summary
                       : typeof metadata?.last_pronunciation_summary === 'string'
                         ? metadata.last_pronunciation_summary
-                      : '先看目标句、重点音节和动作提示。'
+                      : '先看目标句、用户发音规律和动作提示。'
                   const uploadedCount =
                     typeof metadata?.total_training_uploads === 'number' ? metadata.total_training_uploads : null
                   const nextStep =
@@ -889,9 +889,9 @@ export default function MemoryPage() {
                         </span>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
-                        {(isTrainingProfileSummary ? summarySyllables : focusSyllables).slice(0, 4).map((syllable) => (
-                          <span key={syllable} className="rounded-full bg-white px-3 py-1">
-                            {syllable}
+                        {(isTrainingProfileSummary ? summaryPatterns : focusPatterns).slice(0, 4).map((pattern) => (
+                          <span key={pattern} className="rounded-full bg-white px-3 py-1">
+                            {pattern}
                           </span>
                         ))}
                       </div>
@@ -934,9 +934,9 @@ export default function MemoryPage() {
                         会话清晰度均值 {formatClarity(session.avgClarityScore)}
                       </div>
                     ) : null}
-                    {session.topInitialPairs.length > 0 || session.topFocusSyllables.length > 0 ? (
+                    {session.topSpeechPatterns.length > 0 || session.topFocusTags.length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
-                        {[...session.topInitialPairs, ...session.topFocusSyllables].slice(0, 3).map((item) => (
+                        {[...session.topFocusTags, ...session.topSpeechPatterns].slice(0, 3).map((item) => (
                           <span key={item} className="rounded-full bg-white px-3 py-1">{item}</span>
                         ))}
                       </div>
@@ -972,72 +972,40 @@ export default function MemoryPage() {
           </article>
 
           <article className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
-            <div className="text-lg font-semibold text-gray-900">重点音节</div>
+            <div className="text-lg font-semibold text-gray-900">用户发音规律</div>
             <div className="mt-6">
               {renderLabelChips(
-                profile.frequentSyllables,
-                '训练积累后，这里会显示最常重复练的音节。',
+                profile.frequentSpeechPatterns,
+                '训练积累后，这里会显示最该优先记住的发音规律和高频卡点。',
                 'sky',
               )}
             </div>
           </article>
 
           <article className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
-            <div className="text-lg font-semibold text-gray-900">训练重点</div>
+            <div className="text-lg font-semibold text-gray-900">场景总结</div>
             <div className="mt-6">
-              {renderLabelChips(
-                profile.frequentFocus,
-                '这里会汇总你近期最常出现的训练标签。',
-                'amber',
-              )}
+              <div className="space-y-3 text-sm leading-7 text-gray-700">
+                <p>{workspaceSnapshot?.preparation.overview ?? '继续积累后，这里会压缩出你最近最需要准备的场景与目标。'}</p>
+                {renderStringChips(
+                  workspaceSnapshot?.preparation.common_scenarios ?? [],
+                  '继续积累后，这里会总结你最常面对的场景。',
+                  'amber',
+                )}
+              </div>
             </div>
           </article>
         </section>
 
         <section className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
-          <div className="text-lg font-semibold text-gray-900">累计混淆模式</div>
+          <div className="text-lg font-semibold text-gray-900">当前最该先记住的提醒</div>
           <div className="mt-6">
             {renderLabelChips(
               profile.frequentConfusions,
-              '继续积累后，这里会把声母 / 韵母 / 声调的混淆模式一起累计起来。',
+              '继续积累后，这里会把系统最容易听偏的内容和最常出现的风险点累计起来。',
               'amber',
             )}
           </div>
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-3">
-          <article className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
-            <div className="text-lg font-semibold text-gray-900">易混声母</div>
-            <div className="mt-6">
-              {renderLabelChips(
-                profile.frequentInitialPairs,
-                '继续积累后，这里会显示系统最常听混的声母对。',
-                'rose',
-              )}
-            </div>
-          </article>
-
-          <article className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
-            <div className="text-lg font-semibold text-gray-900">易混韵母</div>
-            <div className="mt-6">
-              {renderLabelChips(
-                profile.frequentFinalPairs,
-                '继续积累后，这里会显示系统最常听混的韵母对。',
-                'emerald',
-              )}
-            </div>
-          </article>
-
-          <article className="rounded-[32px] border border-amber-100 bg-white p-8 shadow-[0_20px_60px_rgba(120,53,15,0.08)]">
-            <div className="text-lg font-semibold text-gray-900">声调提醒</div>
-            <div className="mt-6">
-              {renderLabelChips(
-                profile.frequentTonePairs,
-                '继续积累后，这里会显示最值得先盯住的声调差异。',
-                'stone',
-              )}
-            </div>
-          </article>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">

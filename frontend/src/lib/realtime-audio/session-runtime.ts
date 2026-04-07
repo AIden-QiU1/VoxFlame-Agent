@@ -80,6 +80,7 @@ interface CreateRtmMessageHandlerOptions extends CreateDecodedRtcMessageHandlerO
 interface StartRtcRuntimeConnectionOptions {
   refs: SessionRuntimeRefs
   userId?: string
+  accessToken?: string
   memoryOwnerId: string | null
   mode: RtcSessionMode
   surface?: RtcSurface
@@ -97,6 +98,7 @@ interface StartRtcRuntimeConnectionOptions {
 
 interface DisconnectRtcRuntimeOptions {
   refs: SessionRuntimeRefs
+  accessToken?: string
   clearPing: () => void
   cleanupMicrophoneResources: () => void
   setState: Dispatch<SetStateAction<RtcAgentState>>
@@ -108,6 +110,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export async function pingRtcRuntimeSession(
   sessionRef: MutableRefObject<StartRtcSessionResponse | null>,
+  accessToken?: string,
 ): Promise<void> {
   const session = sessionRef.current
   if (!session) {
@@ -115,7 +118,7 @@ export async function pingRtcRuntimeSession(
   }
 
   try {
-    await pingRtcSession(session.channelName)
+    await pingRtcSession(session.channelName, accessToken)
   } catch (error) {
     console.error('[useRtcAgentSession] ping failed:', error)
   }
@@ -188,13 +191,9 @@ export function createDecodedRtcMessageHandler({
                 typeof message.clarity_score === 'number' ? message.clarity_score : undefined,
               keywords: Array.isArray(message.keywords) ? message.keywords : [],
               focus_tags: Array.isArray(message.focus_tags) ? message.focus_tags : [],
-              focus_syllables: Array.isArray(message.focus_syllables)
-                ? message.focus_syllables
-                : (
-                  typeof message.primary_pinyin === 'string' && message.primary_pinyin.trim()
-                    ? [message.primary_pinyin]
-                    : []
-                ),
+              speech_patterns: Array.isArray(message.speech_patterns)
+                ? message.speech_patterns
+                : [],
               pronunciation_summary:
                 typeof message.pronunciation_summary === 'string'
                   ? message.pronunciation_summary
@@ -207,15 +206,6 @@ export function createDecodedRtcMessageHandler({
                       ? [message.articulation_tip]
                       : []
                   ),
-              pronunciation_initial_pairs: Array.isArray(message.pronunciation_initial_pairs)
-                ? message.pronunciation_initial_pairs
-                : [],
-              pronunciation_final_pairs: Array.isArray(message.pronunciation_final_pairs)
-                ? message.pronunciation_final_pairs
-                : [],
-              pronunciation_tone_pairs: Array.isArray(message.pronunciation_tone_pairs)
-                ? message.pronunciation_tone_pairs
-                : [],
               pronunciation_targets: Array.isArray(message.pronunciation_targets)
                 ? message.pronunciation_targets
                 : [],
@@ -254,23 +244,10 @@ export function createDecodedRtcMessageHandler({
                 : 0,
             durationSeconds: 0,
             focusTags: Array.isArray(message.focus_tags) ? message.focus_tags : [],
-            focusSyllables:
-              Array.isArray(message.focus_syllables)
-                ? message.focus_syllables
-                : (
-                  typeof message.primary_pinyin === 'string' && message.primary_pinyin.trim()
-                    ? [message.primary_pinyin]
-                    : []
-                ),
-            initialPairs: Array.isArray(message.pronunciation_initial_pairs)
-              ? message.pronunciation_initial_pairs
-              : [],
-            finalPairs: Array.isArray(message.pronunciation_final_pairs)
-              ? message.pronunciation_final_pairs
-              : [],
-            tonePairs: Array.isArray(message.pronunciation_tone_pairs)
-              ? message.pronunciation_tone_pairs
-              : [],
+            speechPatterns:
+              Array.isArray(message.speech_patterns)
+                ? message.speech_patterns
+                : [],
             articulationTips:
               Array.isArray(message.articulation_tips)
                 ? message.articulation_tips
@@ -320,8 +297,8 @@ export function createDecodedRtcMessageHandler({
             typeof message.next_step === 'string' ? message.next_step : undefined,
           lastTrainingExerciseId:
             typeof message.exercise_id === 'string' ? message.exercise_id : undefined,
-          lastTrainingFocusSyllables: Array.isArray(message.focus_syllables)
-            ? message.focus_syllables
+          lastTrainingSpeechPatterns: Array.isArray(message.speech_patterns)
+            ? message.speech_patterns
             : undefined,
           lastTrainingArticulationTips: Array.isArray(message.articulation_tips)
             ? message.articulation_tips
@@ -376,6 +353,39 @@ export function createDecodedRtcMessageHandler({
           })
         }
       }
+
+      if (message.type === 'audio_input_telemetry') {
+        const sessionMetadata = memoryService.peekSession()?.metadata
+        const previousClippingCount =
+          isRecord(sessionMetadata) && typeof sessionMetadata.audioClippingEventCount === 'number'
+            ? sessionMetadata.audioClippingEventCount
+            : 0
+
+        const clippingDetected = message.clipping_detected === true
+        const telemetryReason =
+          typeof message.reason === 'string' && message.reason.trim()
+            ? message.reason
+            : undefined
+
+        memoryService.updateCurrentSessionMetadata({
+          lastAudioTelemetryAt: Date.now(),
+          lastInputTelemetryReason: telemetryReason,
+          lastInputNormalizedLevel:
+            typeof message.normalized_level === 'number'
+              ? message.normalized_level
+              : undefined,
+          lastInputPeakLevel:
+            typeof message.peak_level === 'number'
+              ? message.peak_level
+              : undefined,
+          lastInputClippingDetected: clippingDetected,
+          lastInputApmEnabled: message.apm_enabled === true,
+          audioClippingEventCount:
+            clippingDetected && telemetryReason === 'clipping_detected'
+              ? previousClippingCount + 1
+              : previousClippingCount,
+        })
+      }
     }
 
     setState((prev) => reduceRtcEnvelope(prev, message))
@@ -406,6 +416,7 @@ export function createRtmMessageHandler({
 
 export async function disconnectRtcRuntime({
   refs,
+  accessToken,
   clearPing,
   cleanupMicrophoneResources,
   setState,
@@ -436,7 +447,7 @@ export async function disconnectRtcRuntime({
 
   if (session) {
     try {
-      await stopRtcSession(session.channelName)
+      await stopRtcSession(session.channelName, accessToken)
     } catch (error) {
       console.warn('[useRtcAgentSession] stop session failed:', error)
     }
@@ -446,6 +457,7 @@ export async function disconnectRtcRuntime({
 export async function startRtcRuntimeConnection({
   refs,
   userId,
+  accessToken,
   memoryOwnerId,
   mode,
   surface,
@@ -464,6 +476,10 @@ export async function startRtcRuntimeConnection({
     throw new Error('请先登录后再使用这个功能。')
   }
 
+  if (!accessToken) {
+    throw new Error('当前登录态还没有准备好，请刷新页面后再试。')
+  }
+
   setState((prev) => applyRtcError(prev, ''))
 
   const sessionIntent: RtcSessionIntent = {
@@ -477,6 +493,7 @@ export async function startRtcRuntimeConnection({
 
   const session = await startRtcSession(mode, sessionIntent, {
     executionBackend: executionBackend ?? config.rtc.executionBackend,
+    accessToken,
   })
   let client: SessionExecutionClient | null = null
   let rtmClient: SessionControlClient | null = null
@@ -529,7 +546,7 @@ export async function startRtcRuntimeConnection({
 
     clearPing()
     pingTimerRef.current = window.setInterval(() => {
-      void pingRtcRuntimeSession(refs.sessionRef)
+      void pingRtcRuntimeSession(refs.sessionRef, accessToken)
     }, 30_000)
 
     setState((prev) => applyConnectedRtcSession(prev, session, connectionNotice))
@@ -551,7 +568,7 @@ export async function startRtcRuntimeConnection({
     cleanupMicrophoneResources()
 
     try {
-      await stopRtcSession(session.channelName)
+      await stopRtcSession(session.channelName, accessToken)
     } catch {
       // ignore cleanup error
     }

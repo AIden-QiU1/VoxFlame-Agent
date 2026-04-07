@@ -9,7 +9,7 @@ import {
     buildLegalConsentUserData,
     persistLocalLegalConsent,
 } from '@/lib/auth/legal-consent'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, getFreshSession } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -87,8 +87,7 @@ export default function LoginPage() {
         async function redirectIfLoggedIn() {
             const { data: { session } } = await supabase.auth.getSession()
             if (!cancelled && session?.user) {
-                router.replace(nextPath)
-                router.refresh()
+                window.location.replace(nextPath)
             }
         }
 
@@ -137,11 +136,13 @@ export default function LoginPage() {
                 description: "正在跳转...",
             })
             persistLocalLegalConsent(consentSnapshot)
-            await supabase.auth.updateUser({
+            void supabase.auth.updateUser({
                 data: buildLegalConsentUserData(consentSnapshot),
+            }).catch((updateError) => {
+                console.warn('[login] updateUser skipped after sign-in:', updateError)
             })
-            router.replace(nextPath)
-            router.refresh()
+            await getFreshSession()
+            window.location.replace(nextPath)
         }
 
         setIsLoading(false)
@@ -178,8 +179,8 @@ export default function LoginPage() {
                 description: "已自动登录，正在跳转...",
             })
             persistLocalLegalConsent(consentSnapshot)
-            router.replace(nextPath)
-            router.refresh()
+            await getFreshSession()
+            window.location.replace(nextPath)
         } else {
             toast({
                 title: "注册成功",

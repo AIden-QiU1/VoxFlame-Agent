@@ -863,8 +863,9 @@ export class SupabaseService {
         source: 'memory',
         emphasis: 'low',
         tags: dedupeStrings([
-          ...readStringList(metadata?.focus_syllables),
+          ...readStringList(metadata?.speech_patterns),
           ...readStringList(metadata?.pronunciation_targets),
+          ...readStringList(metadata?.articulation_tips),
         ], 4),
         updated_at: new Date(memory.updatedAt).toISOString(),
       });
@@ -888,9 +889,9 @@ export class SupabaseService {
       : undefined;
     const focusSpotlight =
       readFirstLabel(latestTrainingMetadata?.frequent_focus) ??
-      readFirstLabel(latestTrainingMetadata?.frequent_syllables) ??
+      readFirstLabel(latestTrainingMetadata?.speech_patterns) ??
       snapshot.growth_profile.frequentFocus[0]?.label ??
-      snapshot.growth_profile.frequentSyllables[0]?.label ??
+      snapshot.growth_profile.frequentSpeechPatterns[0]?.label ??
       null;
     const articulationSpotlight =
       readFirstLabel(latestTrainingMetadata?.articulation_tips) ??
@@ -921,7 +922,7 @@ export class SupabaseService {
         focus: dedupeStrings([
           ...(focusSpotlight ? [focusSpotlight] : []),
           ...snapshot.growth_profile.frequentFocus.slice(0, 3).map((item) => item.label),
-          ...snapshot.growth_profile.frequentSyllables.slice(0, 2).map((item) => item.label),
+          ...snapshot.growth_profile.frequentSpeechPatterns.slice(0, 2).map((item) => item.label),
         ], 4),
         recent_win: recentWin,
         next_step: snapshot.growth_profile.nextStep || null,
@@ -932,7 +933,7 @@ export class SupabaseService {
     const focus = dedupeStrings(
       [
         ...latestSession.topFocusTags,
-        ...latestSession.topFocusSyllables,
+        ...latestSession.topSpeechPatterns,
         ...snapshot.growth_profile.frequentFocus.slice(0, 2).map((item) => item.label),
       ],
       4,
@@ -1041,15 +1042,13 @@ export class SupabaseService {
     const riskyTerms = dedupeStrings(
       [
         ...growthProfile.frequentConfusions.slice(0, 4).map((item) => item.label),
-        ...growthProfile.frequentInitialPairs.slice(0, 2).map((item) => item.label),
-        ...growthProfile.frequentFinalPairs.slice(0, 2).map((item) => item.label),
       ],
       6,
     );
     const pronunciationPatterns = dedupeStrings(
       [
         ...growthProfile.frequentFocus.slice(0, 3).map((item) => item.label),
-        ...growthProfile.frequentSyllables.slice(0, 3).map((item) => item.label),
+        ...growthProfile.frequentSpeechPatterns.slice(0, 4).map((item) => item.label),
         ...growthProfile.articulationTips.slice(0, 2).map((item) => item.label),
       ],
       6,
@@ -1062,7 +1061,7 @@ export class SupabaseService {
       8,
     );
     const profileSummary = (() => {
-      const focus = growthProfile.frequentFocus[0]?.label ?? growthProfile.frequentSyllables[0]?.label;
+      const focus = growthProfile.frequentFocus[0]?.label ?? growthProfile.frequentSpeechPatterns[0]?.label;
       const confusion = growthProfile.frequentConfusions[0]?.label;
       const trainingVolume = growthProfile.stats.totalTrainingAttempts;
       const clarity = growthProfile.stats.rollingClarityAverage;

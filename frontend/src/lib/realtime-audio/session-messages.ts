@@ -241,7 +241,6 @@ export function reduceRtcEnvelope(
       voiceProfileUpdated: message.voice_profile_updated === true,
       encouragement: message.encouragement || '',
       primaryFocus: message.primary_focus || '',
-      primaryPinyin: message.primary_pinyin || '',
       articulationTip: message.articulation_tip || '',
       nextStep: message.next_step || '',
       source: typeof message.source === 'string' ? message.source : 'unknown',

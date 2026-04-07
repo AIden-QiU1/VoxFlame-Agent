@@ -188,6 +188,11 @@
    - 沟通页还没有完全做到“只消费当前场景最小准备”
    - 训练页还没有稳定产出更强的规律提取
    - 记忆页还没有完全成为“用户画像 + 当前准备 owner”
+5. 新的实现原则也已经固定：
+   - 不再为了“字段完整”保留空占位
+   - 不再默认写宽泛 `keywords`
+   - 前端展示优先来自真实 corpus、结构化 feedback、workspace snapshot 和可解释规则
+   - 训练页、记忆页后续继续淡出拼音/声母/韵母/声调这类产品语义，收口到用户真正需要的三类信息：`热词 / 用户发音规律 / 场景总结`
 
 ### livekit_agent
 
@@ -206,11 +211,17 @@
 
 1. 当前 interruption / turn-taking 仍主要是 `自定义 RMS VAD + silence window + 工程默认门槛`
 2. 当前 `QWEN_ASR_BARGE_IN_MIN_SPEECH_MS=220` 只是工程默认起始值，不是官方推荐定值
-3. 当前 audio processing 仍主要依赖浏览器侧 `echoCancellation / noiseSuppression / autoGainControl`
+3. 当前 audio processing 已经不只依赖浏览器侧 `echoCancellation / noiseSuppression / autoGainControl`
+   - agent 侧也已接入 LiveKit Python RTC `AudioProcessingModule` 第一片
+   - 当前采用保守配置：
+     - `noise_suppression=true`
+     - `high_pass_filter=true`
+     - `echo_cancellation=false`
+     - `auto_gain_control=false`
 4. 当前还没有把 LiveKit 官方更完整的：
    - `turn_detection / min_interruption_duration / endpointing`
    - `manual / hybrid turn control`
-   - `room_options.audio_input / APM`
+   - `room_options.audio_input`
    - `session.userdata / participant attributes`
    真正制度化进现役 agent
 
@@ -219,7 +230,7 @@
 1. 更强的 session-close compaction
 2. 多人场景下更稳的 interruption policy
 3. 会话内 speaker differentiation
-4. LiveKit 官方 `audio_input / APM` 接入下更保守、更可控的 audio processing strategy
+4. LiveKit 官方 `room_options.audio_input` 接入下更完整、更可控的 audio processing strategy
 
 当前已经补齐的则是：
 
@@ -227,6 +238,11 @@
 2. backend 注入 `PreparationContextPack`
 3. `session-close compaction` 第一片
 4. 输入电平与收音质量反馈第一片
+5. LiveKit Python RTC `AudioProcessingModule` 第一片
+6. server-side audio telemetry 第一片
+7. 记忆页和训练画像的现役用户语义第一片
+   - 当前产品面已经开始统一往：`热词 / 用户发音规律 / 场景总结`
+   - 不再继续把声母 / 韵母 / 声调 / 重点音节当成前端主栏目
 
 所以现在优先级应该是三件事一起收口：
 
@@ -760,6 +776,22 @@ type SessionIntent = {
 
 现在只做 contract 预留，不抢当前主线资源。
 
+### 对 future mobile 的当前判断
+
+从 2026-04-06 的新增外部工程观察看，future mobile 最值得吸收的不是“现在立刻开一条新 app 研发线”，而是先把多端共享 contract 收稳。
+
+当前更合理的顺序是：
+
+1. 先把 web / PWA 主链里的 `session intent / bootstrap / profile bundle / expression kit / preparation` 稳成共享语言
+2. 再让 future mobile companion 复用同一套 contract
+3. 最后才评估具体客户端形态
+
+当前 PRD 对 future mobile 的建议保持：
+
+1. 如果后续需要低摩擦 companion app，优先考虑 `React Native + Expo` 这一类更贴近现有 TypeScript 心智的路线
+2. 但这属于 surface 选择，不应倒逼当前 backend / runtime 主线临时重构
+3. 现在的优先级仍是先把 contract 稳住，而不是先把 app 壳做出来
+
 ## 8.4 执行面替换路线
 
 ### 当前判断
@@ -863,6 +895,33 @@ type SessionIntent = {
 
 沟通页、训练页、未来 app 都消费这同一份 bundle，而不是各自拼自己的 memory context。
 
+### L3.5 context assembly 层
+
+在 `durable memory owner` 与 runtime 之间，后续需要一层更明确的 `context assembly`。
+
+它的职责不是保存长期事实，而是为当前任务装配“这轮模型最该看到的最小必要上下文”。
+
+默认装配来源：
+
+1. `profile bundle`
+2. `workspace snapshot.preparation`
+3. `expression kit`
+4. `session intent`
+5. 最近一次相关 `session review / compaction`
+
+默认装配结果应至少区分：
+
+1. `static`
+   - 低频稳定画像
+2. `dynamic`
+   - 当前场景、当前段落、当前目标
+3. `relevant`
+   - 当前最相关热词、风险句、保底句、误听规律
+
+一句话：
+
+`memory source of truth` 和 `runtime context assembly` 不能再混成一个抽象。
+
 ### L4 选择性多模态索引
 
 只针对高价值音频片段做异步索引，不进入默认实时主链。
@@ -912,6 +971,26 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 一句话原则：
 
 `实时能力做 tool，长期方法做 skill，重任务编排做 workflow，跨系统接入做 MCP。`
+
+### 关于多 agent 的当前边界
+
+2026-04-06 新增判断：
+
+1. 多 agent / fork / swarm 更适合研发协作、离线分析和后台重任务
+2. 不适合直接进入构音障碍用户的现场主链
+3. 现场 runtime 的第一目标仍然是：
+   - 低延迟
+   - 可预测
+   - 可打断
+   - 不越权
+
+所以产品 runtime 继续优先：
+
+1. 单主链 realtime assistant
+2. 明确的 tool / skill / workflow 分层
+3. session close 后再做更重的 extraction / synthesis / review
+
+而不是把现场表达链路直接做成 agent swarm。
 
 ## 8.8 关键工程边界
 
@@ -975,6 +1054,7 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 1. 稳定 `recording envelope -> upload receipt -> manifest`
 2. 把样本质量、review queue、云端登记做成可信主链
 3. 让训练页继续服务用户练习，而不是暴露采集心智
+4. 开始抽离 future mobile / desktop companion 也要复用的 shared types / contract，而不是让多端各自复制 schema
 
 ## Phase 3：控制面与 surface contract 收口
 
@@ -983,6 +1063,7 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 1. 正式化 `session / transport / capability / session_strategy`
 2. 为 web / PWA / future mobile / future desktop 统一 surface 语言
 3. 把 `Runtime And Surface Reference` 升级成多端规划的主参考
+4. 补出 `context assembly` 这一层，禁止页面和 runtime 继续各自拼上下文
 
 ## Phase 4：沟通档案与 memory/tooling 深化
 
@@ -991,6 +1072,7 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 1. 让 `workspace` 真正成为 durable profile owner 入口
 2. 支持 expression kit 编辑与更清楚的 session review 治理
 3. 再继续深化 memory / tooling / future coach
+4. 逐步形成“日志追加 -> 异步蒸馏 -> 长期主题化记忆”的 compaction 节奏，而不是继续积累原始流水
 
 ## 10.1 按现状代码的最可行开发路径
 
@@ -1000,15 +1082,18 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
    - `workspace owner`
    - `dataset schema`
    - `session intent / readiness / capability gating`
+   - shared `session / review / preparation / feedback` objects
 2. 在 `livekit_agent` 内补齐 typed session memory
    - `session.userdata`
    - `PreparationContextPack`
    - 当前场景 / 热词 / listener guidance / outline 锚点
+   - `context assembly` 输出
 3. 在会话结束时做 `pattern extraction + compaction`
    - `training_result`
    - `training_profile_summary`
    - `workspace preparation`
    - `session_review`
+   - 主题化 important-expression synthesis
 4. 再继续加固 backend `workspace`
    - `profile bundle`
    - `preparation`

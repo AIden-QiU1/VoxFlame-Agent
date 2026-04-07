@@ -30,12 +30,9 @@ export interface UploadedTrainingRecord {
   clarityScore: number
   durationSeconds: number
   focusTags: string[]
-  focusSyllables: string[]
-  initialPairs: string[]
-  finalPairs: string[]
-  tonePairs: string[]
+  speechPatterns: string[]
   articulationTips: string[]
-  keywords: string[]
+  keywords?: string[]
   pronunciationSummary: string
   createdAt: number
 }
@@ -53,10 +50,7 @@ export interface TrainingProfileSnapshot {
   statusCounts: Record<TrainingFeedbackStatus, number>
   dominantCategories: LabelCount[]
   frequentFocus: LabelCount[]
-  frequentSyllables: LabelCount[]
-  frequentInitialPairs: LabelCount[]
-  frequentFinalPairs: LabelCount[]
-  frequentTonePairs: LabelCount[]
+  frequentSpeechPatterns: LabelCount[]
   frequentConfusions: LabelCount[]
   articulationTips: LabelCount[]
   hotwords: string[]
@@ -80,14 +74,6 @@ interface StoredTrainingProfileState {
 export interface TrainingProfileMemorySummary {
   content: string
   metadata: Record<string, unknown>
-}
-
-interface VoiceProfileConfusionPattern {
-  source_phonemes: string[]
-  target_phoneme: string
-  confidence: number
-  correction_count: number
-  examples: string[]
 }
 
 const STORAGE_PREFIX = 'voxflame_training_profile_'
@@ -318,31 +304,21 @@ function buildTrendPoints(records: UploadedTrainingRecord[]): TrainingProfileTre
 }
 
 function buildNextStep(
-  frequentInitialPairs: LabelCount[],
-  frequentFinalPairs: LabelCount[],
-  frequentTonePairs: LabelCount[],
-  frequentSyllables: LabelCount[],
+  frequentSpeechPatterns: LabelCount[],
   frequentFocus: LabelCount[],
+  articulationTips: LabelCount[],
   improvementDirection: ImprovementDirection,
 ): string {
-  if (frequentInitialPairs[0]) {
-    return `下一步先盯住声母 ${frequentInitialPairs[0].label}，拆到单音节慢练，再回到整句。`
-  }
-
-  if (frequentFinalPairs[0]) {
-    return `下一步先盯住韵母 ${frequentFinalPairs[0].label}，把口型和收尾做稳。`
-  }
-
-  if (frequentTonePairs[0]) {
-    return `下一步先把声调 ${frequentTonePairs[0].label} 单独拉开，避免一口气冲过去。`
-  }
-
-  if (frequentSyllables[0]) {
-    return `下一步先继续盯住 ${frequentSyllables[0].label}，把它单独慢练 2 到 3 次。`
+  if (frequentSpeechPatterns[0]) {
+    return `下一步先继续盯住“${frequentSpeechPatterns[0].label}”，先做短句重复，再回到整句。`
   }
 
   if (frequentFocus[0]) {
     return `下一步先围绕 ${frequentFocus[0].label} 做短句重复，不要同时改太多点。`
+  }
+
+  if (articulationTips[0]) {
+    return `下一步先抓住这条动作提醒：${articulationTips[0].label}`
   }
 
   if (improvementDirection === 'declining') {
@@ -382,17 +358,22 @@ function buildSnapshot(records: UploadedTrainingRecord[]): TrainingProfileSnapsh
 
   const dominantCategories = countValues(normalizedRecords.map((record) => record.exerciseCategory), 4)
   const frequentFocus = countValues(normalizedRecords.flatMap((record) => record.focusTags), 6)
-  const frequentSyllables = countValues(normalizedRecords.flatMap((record) => record.focusSyllables), 8)
-  const frequentInitialPairs = countValues(normalizedRecords.flatMap((record) => record.initialPairs), 6)
-  const frequentFinalPairs = countValues(normalizedRecords.flatMap((record) => record.finalPairs), 6)
-  const frequentTonePairs = countValues(normalizedRecords.flatMap((record) => record.tonePairs), 6)
+  const frequentSpeechPatterns = countValues(
+    normalizedRecords.flatMap((record) => [
+      ...record.speechPatterns,
+      ...record.articulationTips,
+    ]),
+    8,
+  )
   const articulationTips = countValues(normalizedRecords.flatMap((record) => record.articulationTips), 6)
-  const hotwords = countValues(normalizedRecords.flatMap((record) => record.keywords), 12).map((item) => item.label)
+  const hotwords = countValues(
+    normalizedRecords.flatMap((record) => record.keywords ?? []),
+    12,
+  ).map((item) => item.label)
   const frequentConfusions = countValues(
     normalizedRecords.flatMap((record) => [
-      ...record.initialPairs.map((item) => `声母 ${item}`),
-      ...record.finalPairs.map((item) => `韵母 ${item}`),
-      ...record.tonePairs.map((item) => `声调 ${item}`),
+      ...record.speechPatterns,
+      ...record.articulationTips,
     ]),
     10,
   )
@@ -406,11 +387,9 @@ function buildSnapshot(records: UploadedTrainingRecord[]): TrainingProfileSnapsh
   const improvementDirection = getImprovementDirection(improvementSlope)
   const { currentTrainingStreak, bestTrainingStreak } = buildTrainingStreaks(normalizedRecords)
   const nextStep = buildNextStep(
-    frequentInitialPairs,
-    frequentFinalPairs,
-    frequentTonePairs,
-    frequentSyllables,
+    frequentSpeechPatterns,
     frequentFocus,
+    articulationTips,
     improvementDirection,
   )
 
@@ -427,10 +406,7 @@ function buildSnapshot(records: UploadedTrainingRecord[]): TrainingProfileSnapsh
     statusCounts,
     dominantCategories,
     frequentFocus,
-    frequentSyllables,
-    frequentInitialPairs,
-    frequentFinalPairs,
-    frequentTonePairs,
+    frequentSpeechPatterns,
     frequentConfusions,
     articulationTips,
     hotwords,
@@ -469,10 +445,7 @@ function buildSummaryMetadata(snapshot: TrainingProfileSnapshot): Record<string,
     status_counts: snapshot.statusCounts,
     dominant_categories: toSerializableLabelCounts(snapshot.dominantCategories),
     frequent_focus: toSerializableLabelCounts(snapshot.frequentFocus),
-    frequent_syllables: toSerializableLabelCounts(snapshot.frequentSyllables),
-    frequent_initial_pairs: toSerializableLabelCounts(snapshot.frequentInitialPairs),
-    frequent_final_pairs: toSerializableLabelCounts(snapshot.frequentFinalPairs),
-    frequent_tone_pairs: toSerializableLabelCounts(snapshot.frequentTonePairs),
+    speech_patterns: toSerializableLabelCounts(snapshot.frequentSpeechPatterns),
     frequent_confusions: toSerializableLabelCounts(snapshot.frequentConfusions),
     articulation_tips: toSerializableLabelCounts(snapshot.articulationTips),
     hotwords: snapshot.hotwords,
@@ -481,19 +454,6 @@ function buildSummaryMetadata(snapshot: TrainingProfileSnapshot): Record<string,
     last_pronunciation_summary: snapshot.lastPronunciationSummary,
     generated_at: snapshot.generatedAt,
   }
-}
-
-function parsePairLabel(label: string): [string, string] | null {
-  const separators = ['/', '->', '→', ' vs ']
-
-  for (const separator of separators) {
-    const parts = label.split(separator).map((item) => item.trim()).filter(Boolean)
-    if (parts.length === 2) {
-      return [parts[0], parts[1]]
-    }
-  }
-
-  return null
 }
 
 export function buildTrainingProfileMemorySummary(
@@ -509,35 +469,15 @@ export function buildTrainingVoiceProfilePayload(
   snapshot: TrainingProfileSnapshot,
   guidanceProfile?: TrainingGuidanceProfile | null,
 ): Record<string, unknown> {
-  const confusionPatterns: VoiceProfileConfusionPattern[] = [
-    ...snapshot.frequentInitialPairs,
-    ...snapshot.frequentFinalPairs,
-    ...snapshot.frequentTonePairs,
-  ]
-    .slice(0, 6)
-    .map((item) => {
-      const pair = parsePairLabel(item.label)
-      if (!pair) {
-        return null
-      }
-
-      const [source, target] = pair
-      return {
-        source_phonemes: [source],
-        target_phoneme: target,
-        confidence: Math.min(0.95, 0.45 + item.count * 0.08),
-        correction_count: item.count,
-        examples: [`训练画像聚焦 ${item.label}`],
-      }
-    })
-    .filter((item): item is VoiceProfileConfusionPattern => item !== null)
-
   return {
     hotwords: snapshot.hotwords.slice(0, 8).map((word) => ({
       word,
       category: 'daily',
     })),
-    confusion_patterns: confusionPatterns,
+    speech_patterns: snapshot.frequentSpeechPatterns.slice(0, 8).map((item) => ({
+      label: item.label,
+      count: item.count,
+    })),
     clarity_score: snapshot.rollingClarityAverage,
     preferences: {
       training_profile_summary: buildSummaryMetadata(snapshot),

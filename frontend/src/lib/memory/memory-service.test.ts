@@ -27,12 +27,18 @@ function createSession(overrides: Partial<Session> = {}): Session {
       latestCorrectionOriginal: '请先听我说完',
       latestCorrectionText: '我说话会慢一点，请先听我说完。',
       lastTrainingFeedbackNextStep: '先把开场白和补救句练稳。',
-      lastTrainingFocusSyllables: ['请先', '说完'],
+      lastTrainingSpeechPatterns: ['请先', '说完'],
       lastTrainingArticulationTips: ['先把关键词慢慢送出来。'],
       lastTrainingPronunciationTargets: ['请先听我说完'],
       clarity_score: 0.72,
       interruptionCount: 2,
       bargeInCount: 1,
+      lastInputTelemetryReason: 'clipping_detected',
+      lastInputNormalizedLevel: 0.03,
+      lastInputPeakLevel: 0.99,
+      lastInputClippingDetected: true,
+      lastInputApmEnabled: true,
+      audioClippingEventCount: 2,
     },
     ...overrides,
   }
@@ -51,7 +57,17 @@ test('buildSessionCompactionMemoryInput compresses session signals into a semant
   assert.deepEqual(input?.metadata.pronunciation_patterns, ['请先', '说完', '先把关键词慢慢送出来。'])
   assert.equal(input?.metadata.interruption_count, 2)
   assert.equal(input?.metadata.barge_in_count, 1)
+  assert.equal(input?.metadata.last_input_telemetry_reason, 'clipping_detected')
+  assert.equal(input?.metadata.last_input_normalized_level, 0.03)
+  assert.equal(input?.metadata.last_input_peak_level, 0.99)
+  assert.equal(input?.metadata.last_input_clipping_detected, true)
+  assert.equal(input?.metadata.last_input_apm_enabled, true)
+  assert.equal(input?.metadata.audio_clipping_event_count, 2)
   assert.equal(input?.metadata.next_step, '先把开场白和补救句练稳。')
+  assert.match(input?.content ?? '', /更稳的表达是/)
+  assert.ok(
+    (input?.metadata.support_strategies as string[]).some((item) => item.includes('麦克风')),
+  )
 })
 
 test('buildSessionCompactionMemoryInput returns null when the session has no compressible signal', () => {

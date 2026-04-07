@@ -199,8 +199,7 @@ test('session-runtime writes training feedback into current session metadata', (
       clarity_score: 0.76,
       source: 'livekit_training_feedback',
       focus_tags: ['请先听我说完'],
-      focus_syllables: ['请先', '说完'],
-      pronunciation_initial_pairs: ['q/j'],
+      speech_patterns: ['请先', '说完'],
       pronunciation_targets: ['请先听我说完'],
       articulation_tip: '先把关键词慢慢送出来。',
       articulation_tips: ['先把关键词慢慢送出来。'],
@@ -229,7 +228,7 @@ test('session-runtime writes training feedback into current session metadata', (
   assert.equal(metadataUpdates[0].lastTrainingFeedbackSource, 'livekit_training_feedback')
   assert.equal(metadataUpdates[0].lastTrainingFeedbackStatus, 'close')
   assert.equal(metadataUpdates[0].lastTrainingExerciseId, 'exercise-1')
-  assert.deepEqual(metadataUpdates[0].lastTrainingFocusSyllables, ['请先', '说完'])
+  assert.deepEqual(metadataUpdates[0].lastTrainingSpeechPatterns, ['请先', '说完'])
   assert.deepEqual(metadataUpdates[0].lastTrainingArticulationTips, ['先把关键词慢慢送出来。'])
   assert.deepEqual(metadataUpdates[0].lastTrainingPronunciationTargets, ['请先听我说完'])
   assert.equal(metadataUpdates[0].clarity_score, 0.76)
@@ -237,4 +236,41 @@ test('session-runtime writes training feedback into current session metadata', (
     harness.getState().lastTrainingFeedback?.summary,
     '这次先重点看“请先听我说完”。',
   )
+})
+
+test('session-runtime writes audio input telemetry into current session metadata', () => {
+  const harness = createStateHarness()
+  const latestTranscriptRef = { current: '' }
+  const metadataUpdates: Array<Record<string, unknown>> = []
+  const originalUpdateCurrentSessionMetadata = memoryService.updateCurrentSessionMetadata
+  memoryService.updateCurrentSessionMetadata = ((metadata: Record<string, unknown>) => {
+    metadataUpdates.push(metadata)
+  }) as typeof memoryService.updateCurrentSessionMetadata
+
+  try {
+    const handleMessage = createDecodedRtcMessageHandler({
+      memoryOwnerId: 'user-1',
+      latestUserTranscriptRef: latestTranscriptRef,
+      setState: harness.setState,
+    })
+
+    handleMessage({
+      type: 'audio_input_telemetry',
+      reason: 'clipping_detected',
+      normalized_level: 0.11,
+      peak_level: 0.99,
+      clipping_detected: true,
+      apm_enabled: true,
+    })
+  } finally {
+    memoryService.updateCurrentSessionMetadata = originalUpdateCurrentSessionMetadata
+  }
+
+  assert.equal(metadataUpdates.length, 1)
+  assert.equal(metadataUpdates[0].lastInputTelemetryReason, 'clipping_detected')
+  assert.equal(metadataUpdates[0].lastInputNormalizedLevel, 0.11)
+  assert.equal(metadataUpdates[0].lastInputPeakLevel, 0.99)
+  assert.equal(metadataUpdates[0].lastInputClippingDetected, true)
+  assert.equal(metadataUpdates[0].lastInputApmEnabled, true)
+  assert.equal(metadataUpdates[0].audioClippingEventCount, 1)
 })

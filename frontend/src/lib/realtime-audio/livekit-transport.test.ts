@@ -47,10 +47,10 @@ test('resolveBrowserLiveKitUrl aligns localhost loopback url to current page ori
 })
 
 test('resolveBrowserLiveKitUrl upgrades to wss when page origin is https', () => {
-  withWindowOrigin('https://localhost:3443', () => {
+  withWindowOrigin('https://localhost', () => {
     assert.equal(
       resolveBrowserLiveKitUrl('ws://127.0.0.1:3000'),
-      'wss://localhost:3443',
+      'wss://localhost',
     )
   })
 })

@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from data_contract import (
+    build_audio_input_telemetry_output,
     build_assistant_text_output,
     build_error_output,
     build_session_init_ack,
@@ -157,6 +158,24 @@ class DataContractTests(unittest.TestCase):
         self.assertFalse(payload["interruption_requested"])
         self.assertEqual(payload["speech_duration_ms"], 180)
         self.assertEqual(payload["metadata"]["scene"], "medical")
+
+    def test_build_audio_input_telemetry_output_matches_runtime_shape(self) -> None:
+        payload = build_audio_input_telemetry_output(
+            create_context(),
+            normalized_level=0.12,
+            peak_level=0.91,
+            clipping_detected=False,
+            apm_enabled=True,
+            reason="speech_stopped",
+        )
+
+        self.assertEqual(payload["type"], "audio_input_telemetry")
+        self.assertEqual(payload["reason"], "speech_stopped")
+        self.assertEqual(payload["normalized_level"], 0.12)
+        self.assertEqual(payload["peak_level"], 0.91)
+        self.assertFalse(payload["clipping_detected"])
+        self.assertTrue(payload["apm_enabled"])
+        self.assertEqual(payload["metadata"]["request_id"], "req-123")
 
     def test_build_error_output_uses_error_envelope(self) -> None:
         payload = build_error_output("worker failed")

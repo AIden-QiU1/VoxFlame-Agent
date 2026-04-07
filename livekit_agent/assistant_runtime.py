@@ -24,6 +24,7 @@ SYSTEM_PROMPT = """你是 VoxFlame 的沟通助手。
 3. 只输出一到两句可直接说出去的话。
 4. 不要分析，不要解释，不要项目符号，不要自我介绍。
 5. 如果是就医、求助、购物等具体场景，优先把最关键的一句说清楚。
+6. 不要输出“现在先按当前沟通场景继续”“我先帮你把这句话往前推进”这类铺垫。
 """
 
 
@@ -40,12 +41,9 @@ def estimate_clarity_score(original_text: str, corrected_text: str) -> float:
 
 def build_fallback_text(ctx: VoxFlameSessionContext, user_text: str) -> str:
     normalized = user_text.strip()
-    scene_hint = f"现在先按“{ctx.scene}”场景继续。" if ctx.scene else "现在先按当前沟通场景继续。"
-    return (
-        f"{scene_hint}我先帮你把这句话往前推进：{normalized}"
-        if normalized
-        else "我已经接到你的输入，但还没有拿到可用文本。"
-    )
+    if normalized:
+        return normalized
+    return "请再说一遍。"
 
 
 def build_scene_prompt(ctx: VoxFlameSessionContext) -> str:
@@ -105,24 +103,36 @@ def _pick_primary_focus(payload: dict[str, Any]) -> str:
     return "先把整句放慢一点"
 
 
-def _extract_focus_syllables(payload: dict[str, Any], primary_focus: str) -> list[str]:
+def _extract_speech_patterns(payload: dict[str, Any], primary_focus: str) -> list[str]:
     focus_tags = _read_string_list(payload.get("focus_tags"))
     candidates = focus_tags or ([primary_focus] if primary_focus else [])
-    syllables: list[str] = []
+    patterns: list[str] = []
     for item in candidates:
         normalized = item.replace("先补", "").replace("先看", "").replace("“", "").replace("”", "").strip()
-        if normalized and normalized not in syllables:
-            syllables.append(normalized)
-    return syllables[:4]
+        if normalized and normalized not in patterns:
+            patterns.append(normalized)
+    return patterns[:4]
 
 
-def _build_pronunciation_targets(primary_focus: str, focus_syllables: list[str]) -> list[str]:
-    targets = [item for item in [primary_focus, *focus_syllables] if item]
+def _build_pronunciation_targets(primary_focus: str, speech_patterns: list[str]) -> list[str]:
+    targets = [item for item in [primary_focus, *speech_patterns] if item]
     deduped: list[str] = []
     for item in targets:
         if item not in deduped:
             deduped.append(item)
     return deduped[:4]
+
+
+def _pick_keywords(payload: dict[str, Any]) -> list[str]:
+    explicit_keywords = _read_string_list(payload.get("keywords"))
+    if explicit_keywords:
+        return explicit_keywords[:3]
+
+    hotwords = _read_string_list(payload.get("hotwords"))
+    if hotwords:
+        return hotwords[:3]
+
+    return []
 
 
 def _pick_articulation_tip(
@@ -148,7 +158,7 @@ def _pick_articulation_tip(
     if status == "excellent":
         return "保持刚才这个节奏，只放大关键词，不用整句都用力。"
     if status == "close":
-        return "先把最容易糊掉的那个音节单独慢练两遍，再回整句。"
+        return "先把最容易糊掉的那一小段单独慢练两遍，再回整句。"
     if status == "retry":
         return "先拆成更短的两段，嘴巴先张开，再把重点词拖清楚。"
     return "先把嘴巴张开一点，把第一个关键词慢慢送出来。"
@@ -186,7 +196,7 @@ def build_training_feedback_payload(
     }[status]
     next_step = {
         "excellent": "保持这个节奏，再换一句高频表达继续练。",
-        "close": "先把这个重点音节单独慢练 2 到 3 次，再回整句。",
+        "close": "先把这段最容易糊掉的内容单独慢练 2 到 3 次，再回整句。",
         "retry": "先拆成短一点的两段，再把关键词连回整句。",
         "unclear": "先把第一关键词单独说清，再补一条完整版本。",
     }[status]
@@ -197,12 +207,11 @@ def build_training_feedback_payload(
         if primary_focus
         else "这次先盯一个关键词，把它说稳。"
     )
-    primary_pinyin = focus_tags[0] if focus_tags else ""
-    focus_syllables = _extract_focus_syllables(payload, primary_focus)
-    pronunciation_targets = _build_pronunciation_targets(primary_focus, focus_syllables)
-    keywords = focus_tags[:3] if focus_tags else ([category] if category else [])
+    speech_patterns = _extract_speech_patterns(payload, primary_focus)
+    pronunciation_targets = _build_pronunciation_targets(primary_focus, speech_patterns)
+    keywords = _pick_keywords(payload)
 
-    return {
+    response = {
         "feedback_request_id": exercise_id or ctx.request_id or "",
         "exercise_id": exercise_id,
         "exercise_text": exercise_text,
@@ -212,7 +221,6 @@ def build_training_feedback_payload(
         "clarity_score": clarity_score,
         "summary": summary,
         "focus_tags": focus_tags,
-        "keywords": keywords,
         "pronunciation_summary": pronunciation_summary or summary,
         "confusion_patterns_count": confusion_patterns_count,
         "persisted": False,
@@ -221,14 +229,10 @@ def build_training_feedback_payload(
         "voice_profile_updated": True,
         "encouragement": encouragement,
         "primary_focus": primary_focus,
-        "primary_pinyin": primary_pinyin,
         "articulation_tip": articulation_tip,
         "articulation_tips": articulation_tips,
-        "focus_syllables": focus_syllables,
+        "speech_patterns": speech_patterns,
         "pronunciation_targets": pronunciation_targets,
-        "pronunciation_initial_pairs": [],
-        "pronunciation_final_pairs": [],
-        "pronunciation_tone_pairs": [],
         "next_step": next_step,
         "source": "livekit_training_feedback",
         "error": None,
@@ -239,6 +243,9 @@ def build_training_feedback_payload(
             "scene": ctx.scene,
         },
     }
+    if keywords:
+        response["keywords"] = keywords
+    return response
 
 
 def extract_text_from_completion(payload: dict[str, Any]) -> str | None:
@@ -331,7 +338,7 @@ class CommunicationAssistantRuntime:
                 api_key=self.config.dashscope_api_key,
                 base_url=self.config.dashscope_base_url,
                 model=self.config.dashscope_llm_model,
-                timeout_seconds=self.config.dashscope_timeout_seconds,
+                timeout_seconds=self.config.dashscope_reply_timeout_seconds,
             )
 
     async def generate_reply(self, user_text: str) -> tuple[str, str]:
@@ -358,7 +365,10 @@ class CommunicationAssistantRuntime:
 
         try:
             if isinstance(self.client, DashScopeChatClient):
-                reply = await asyncio.to_thread(self.client.complete, messages)
+                reply = await asyncio.wait_for(
+                    asyncio.to_thread(self.client.complete, messages),
+                    timeout=self.config.dashscope_reply_timeout_seconds,
+                )
             else:
                 reply = self.client.complete(messages)
         except Exception as exc:

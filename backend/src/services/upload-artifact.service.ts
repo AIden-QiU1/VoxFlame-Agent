@@ -126,7 +126,6 @@ function buildRecordingManifestEntry(
       id: readString(metadata, 'exercise_id'),
       text: readString(metadata, 'exercise_text') || targetText,
       category: readString(metadata, 'exercise_category'),
-      target_pinyin: readStringArray(metadata, 'target_pinyin'),
       target_focus: readStringArray(metadata, 'pronunciation_targets'),
       scenario_tag: [readString(metadata, 'exercise_category')].filter(Boolean),
     },
@@ -163,7 +162,7 @@ function buildRecordingManifestEntry(
         ...(readStringArray(metadata, 'missing_chars') || []).map((item) => `missing:${item}`),
         ...(readStringArray(metadata, 'extra_chars') || []).map((item) => `extra:${item}`),
       ],
-      focus_feedback: readStringArray(metadata, 'focus_syllables'),
+      focus_feedback: readStringArray(metadata, 'speech_patterns'),
       review: {
         queue: readString(metadata, 'review_queue'),
         priority: readString(metadata, 'review_priority'),

@@ -14,6 +14,7 @@ interface StopRecordingResult {
 
 interface UseMandarinTrainingSessionOptions {
   userId?: string
+  accessToken?: string
 }
 
 function pickRecorderMimeType(): string {
@@ -39,7 +40,7 @@ function transcriptLength(text: string): number {
 export function useMandarinTrainingSession(
   options: UseMandarinTrainingSessionOptions = {},
 ) {
-  const { userId } = options
+  const { userId, accessToken } = options
   const [error, setError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
@@ -57,6 +58,7 @@ export function useMandarinTrainingSession(
 
   const rtc = useRtcAgentSession({
     userId,
+    accessToken,
     mode: 'training',
     surface: 'training_workspace',
     executionBackend: 'livekit',

@@ -21,6 +21,7 @@ ServerEventHandler = Callable[[dict[str, Any]], Awaitable[None]]
 PublishPayload = Callable[[dict[str, Any]], Awaitable[None]]
 FinalTranscriptHandler = Callable[[str], Awaitable[None]]
 SpeechActivityHandler = Callable[[str, bool], Awaitable[None]]
+AudioTelemetryHandler = Callable[[float, float, bool, bool, str], Awaitable[None]]
 
 
 class VADState(Enum):
@@ -62,6 +63,25 @@ def frame_to_pcm_bytes(frame: Any) -> bytes:
     return data
 
 
+def pcm_bytes_to_audio_frame(
+    pcm_bytes: bytes,
+    *,
+    sample_rate: int,
+    num_channels: int = 1,
+) -> Any:
+    from livekit import rtc
+
+    samples_per_channel = len(pcm_bytes) // 2 // num_channels
+    if samples_per_channel <= 0:
+        raise ValueError("PCM payload is empty")
+    return rtc.AudioFrame(
+        pcm_bytes,
+        sample_rate=sample_rate,
+        num_channels=num_channels,
+        samples_per_channel=samples_per_channel,
+    )
+
+
 def normalized_rms_energy(pcm_bytes: bytes) -> float:
     if not pcm_bytes:
         return 0.0
@@ -73,6 +93,25 @@ def pcm_duration_ms(pcm_bytes: bytes, sample_rate: int) -> float:
         return 0.0
     samples = len(pcm_bytes) / 2
     return (samples * 1000.0) / sample_rate
+
+
+def normalized_peak_level(pcm_bytes: bytes) -> float:
+    if not pcm_bytes:
+        return 0.0
+    return audioop.max(pcm_bytes, 2) / 32768.0
+
+
+def build_livekit_audio_apm_options(config: LiveKitAgentConfig) -> dict[str, bool]:
+    return {
+        "echo_cancellation": config.livekit_audio_apm_echo_cancellation,
+        "noise_suppression": config.livekit_audio_apm_noise_suppression,
+        "high_pass_filter": config.livekit_audio_apm_high_pass_filter,
+        "auto_gain_control": config.livekit_audio_apm_auto_gain_control,
+    }
+
+
+def should_enable_livekit_audio_apm(config: LiveKitAgentConfig) -> bool:
+    return config.livekit_audio_apm_enabled and any(build_livekit_audio_apm_options(config).values())
 
 
 @dataclass
@@ -253,15 +292,23 @@ class LiveKitASRRuntime:
     publish_payload: PublishPayload
     on_final_transcript: FinalTranscriptHandler
     on_speech_activity: SpeechActivityHandler | None = None
+    on_audio_telemetry: AudioTelemetryHandler | None = None
     client: QwenRealtimeASRClient | None = None
     _stream_task: asyncio.Task[None] | None = None
     _started: bool = False
     _audio_frame_count: int = 0
     _logged_first_frame: bool = False
     _vad: RMSVoiceActivityDetector | None = None
+    _audio_apm: Any | None = None
     _received_voice_since_commit: bool = False
     _speech_ms_since_commit: float = 0.0
     _barge_in_triggered_since_commit: bool = False
+    _level_sum_since_commit: float = 0.0
+    _level_count_since_commit: int = 0
+    _peak_level_since_commit: float = 0.0
+    _clipping_detected_since_commit: bool = False
+    _clipping_reported_since_commit: bool = False
+    _apm_remainder: bytes = b""
 
     async def start(self) -> None:
         if self._stream_task is not None:
@@ -297,6 +344,7 @@ class LiveKitASRRuntime:
             threshold=self.config.dashscope_asr_vad_threshold,
             silence_duration_ms=self.config.dashscope_asr_vad_silence_duration_ms,
         )
+        self._audio_apm = self._create_audio_apm()
         stream = rtc.AudioStream.from_participant(
             participant=self.participant,
             track_source=rtc.TrackSource.SOURCE_MICROPHONE,
@@ -306,6 +354,8 @@ class LiveKitASRRuntime:
     async def commit_audio(self, reason: str | None = None) -> None:
         if self.client is None or not self._started:
             return
+
+        await self._emit_audio_telemetry(reason or "unknown")
 
         logger.info(
             "LiveKit ASR commit requested room=%s participant=%s reason=%s",
@@ -317,6 +367,12 @@ class LiveKitASRRuntime:
         self._received_voice_since_commit = False
         self._speech_ms_since_commit = 0.0
         self._barge_in_triggered_since_commit = False
+        self._level_sum_since_commit = 0.0
+        self._level_count_since_commit = 0
+        self._peak_level_since_commit = 0.0
+        self._clipping_detected_since_commit = False
+        self._clipping_reported_since_commit = False
+        self._apm_remainder = b""
 
     async def stop(self) -> None:
         logger.info(
@@ -336,6 +392,35 @@ class LiveKitASRRuntime:
 
         if self.client is not None:
             await self.client.stop()
+
+    def _create_audio_apm(self) -> Any | None:
+        if not should_enable_livekit_audio_apm(self.config):
+            logger.info(
+                "LiveKit audio APM disabled room=%s participant=%s",
+                self.ctx.room_name,
+                self.ctx.participant_identity,
+            )
+            return None
+
+        from livekit import rtc
+
+        options = build_livekit_audio_apm_options(self.config)
+        logger.info(
+            "LiveKit audio APM enabled room=%s participant=%s options=%s",
+            self.ctx.room_name,
+            self.ctx.participant_identity,
+            options,
+        )
+        try:
+            return rtc.AudioProcessingModule(**options)
+        except Exception as exc:
+            logger.warning(
+                "LiveKit audio APM unavailable room=%s participant=%s error=%s",
+                self.ctx.room_name,
+                self.ctx.participant_identity,
+                exc,
+            )
+            return None
 
     async def _consume_stream(self, stream: Any) -> None:
         from livekit import rtc
@@ -368,8 +453,51 @@ class LiveKitASRRuntime:
 
             for current in frames:
                 pcm_bytes = frame_to_pcm_bytes(current)
+                pcm_bytes = self._apply_audio_apm(pcm_bytes, current.sample_rate)
+                if not pcm_bytes:
+                    continue
                 await self.client.append_audio(pcm_bytes)
                 await self._observe_vad(pcm_bytes, current.sample_rate)
+
+    def _apply_audio_apm(self, pcm_bytes: bytes, sample_rate: int) -> bytes:
+        if self._audio_apm is None or not pcm_bytes:
+            return pcm_bytes
+
+        samples_per_10ms = sample_rate // 100
+        if samples_per_10ms <= 0:
+            return pcm_bytes
+
+        chunk_size = samples_per_10ms * 2
+        buffered = self._apm_remainder + pcm_bytes
+        processed_chunks: list[bytes] = []
+
+        while len(buffered) >= chunk_size:
+            chunk = buffered[:chunk_size]
+            buffered = buffered[chunk_size:]
+            try:
+                frame = pcm_bytes_to_audio_frame(
+                    chunk,
+                    sample_rate=sample_rate,
+                    num_channels=1,
+                )
+                processed = self._audio_apm.process_stream(frame)
+                processed_frame = processed if processed is not None else frame
+                processed_chunks.append(frame_to_pcm_bytes(processed_frame))
+            except Exception as exc:
+                logger.warning(
+                    "LiveKit audio APM process_stream failed room=%s participant=%s error=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    exc,
+                )
+                self._audio_apm = None
+                self._apm_remainder = b""
+                return pcm_bytes
+
+        self._apm_remainder = buffered
+        if not processed_chunks:
+            return b""
+        return b"".join(processed_chunks)
 
     async def _ensure_started(self) -> None:
         if self._started:
@@ -396,7 +524,13 @@ class LiveKitASRRuntime:
             return
 
         speech_started, speech_stopped, energy = self._vad.observe(pcm_bytes, sample_rate)
+        peak_level = normalized_peak_level(pcm_bytes)
         chunk_duration_ms = pcm_duration_ms(pcm_bytes, sample_rate)
+        self._level_sum_since_commit += energy
+        self._level_count_since_commit += 1
+        self._peak_level_since_commit = max(self._peak_level_since_commit, peak_level)
+        clipping_detected = peak_level >= 0.98
+        self._clipping_detected_since_commit = self._clipping_detected_since_commit or clipping_detected
 
         if speech_started:
             self._received_voice_since_commit = True
@@ -411,11 +545,15 @@ class LiveKitASRRuntime:
             )
             if self.on_speech_activity is not None:
                 await self.on_speech_activity("speech_started", False)
+            await self._emit_audio_telemetry("speech_started")
             return
 
         if self._vad.state is VADState.SPEAKING:
             self._received_voice_since_commit = True
             self._speech_ms_since_commit += chunk_duration_ms
+            if clipping_detected and not self._clipping_reported_since_commit:
+                self._clipping_reported_since_commit = True
+                await self._emit_audio_telemetry("clipping_detected")
             if (
                 not self._barge_in_triggered_since_commit
                 and self._speech_ms_since_commit >= self.config.dashscope_asr_barge_in_min_speech_ms
@@ -432,6 +570,7 @@ class LiveKitASRRuntime:
                     await self.on_speech_activity("barge_in_triggered", False)
 
         if speech_stopped and self._received_voice_since_commit:
+            await self._emit_audio_telemetry("speech_stopped")
             logger.info(
                 "LiveKit VAD speech_stopped room=%s participant=%s silence_ms=%s speech_ms=%s -> auto_finalize",
                 self.ctx.room_name,
@@ -442,6 +581,19 @@ class LiveKitASRRuntime:
             if self.on_speech_activity is not None:
                 await self.on_speech_activity("speech_stopped", True)
             await self.commit_audio("vad_auto_finalize")
+
+    async def _emit_audio_telemetry(self, reason: str) -> None:
+        if self.on_audio_telemetry is None or self._level_count_since_commit <= 0:
+            return
+
+        normalized_level = self._level_sum_since_commit / self._level_count_since_commit
+        await self.on_audio_telemetry(
+            normalized_level,
+            self._peak_level_since_commit,
+            self._clipping_detected_since_commit,
+            self._audio_apm is not None,
+            reason,
+        )
 
     async def _handle_server_event(self, payload: dict[str, Any]) -> None:
         from data_contract import build_error_output, build_user_transcript_output

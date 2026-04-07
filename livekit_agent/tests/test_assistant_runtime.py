@@ -4,11 +4,13 @@ import asyncio
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from assistant_runtime import (
     CommunicationAssistantRuntime,
+    DashScopeChatClient,
     build_fallback_text,
     build_preparation_prompt,
     build_training_feedback_payload,
@@ -31,12 +33,18 @@ def create_config() -> LiveKitAgentConfig:
         dashscope_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         dashscope_llm_model="qwen3.5-flash",
         dashscope_timeout_seconds=15.0,
+        dashscope_reply_timeout_seconds=4.5,
         dashscope_asr_url="wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
         dashscope_asr_model="qwen3-asr-flash-realtime",
         dashscope_asr_sample_rate=16000,
         dashscope_asr_language="zh",
         dashscope_asr_enable_interim=True,
         dashscope_asr_connect_timeout_seconds=15,
+        livekit_audio_apm_enabled=True,
+        livekit_audio_apm_echo_cancellation=False,
+        livekit_audio_apm_noise_suppression=True,
+        livekit_audio_apm_high_pass_filter=True,
+        livekit_audio_apm_auto_gain_control=False,
         dashscope_asr_vad_threshold=0.018,
         dashscope_asr_vad_silence_duration_ms=720,
         dashscope_asr_vad_hop_size_ms=16,
@@ -136,6 +144,31 @@ class TestAssistantRuntime(unittest.TestCase):
         self.assertTrue(
             any("当前准备目标" in message["content"] for message in fake_client.requests[0][:-1]),
         )
+
+    def test_generate_reply_falls_back_quickly_when_dashscope_reply_times_out(self) -> None:
+        config = create_config()
+        object.__setattr__(config, "dashscope_reply_timeout_seconds", 0.01)
+        runtime = CommunicationAssistantRuntime(
+            config=config,
+            ctx=create_context(),
+            userdata=build_session_userdata(create_context()),
+            client=DashScopeChatClient(
+                api_key="dashscope-test",
+                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                model="qwen3.5-flash",
+                timeout_seconds=0.01,
+            ),
+        )
+
+        async def slow_to_thread(*args, **kwargs):  # noqa: ANN002, ANN003
+            await asyncio.sleep(0.05)
+            return "这条不该返回"
+
+        with patch("assistant_runtime.asyncio.to_thread", slow_to_thread):
+            reply, source = asyncio.run(runtime.generate_reply("我渴了"))
+
+        self.assertEqual(source, "livekit_agent_fallback")
+        self.assertEqual(reply, "我渴了")
 
     def test_build_preparation_prompt_includes_hotwords(self) -> None:
         userdata = build_session_userdata(create_context())

@@ -43,7 +43,6 @@ export interface TrainingFeedbackEvent {
   voiceProfileUpdated: boolean
   encouragement: string
   primaryFocus: string
-  primaryPinyin: string
   articulationTip: string
   nextStep: string
   source: string
@@ -113,6 +112,11 @@ export interface RtcMessageEnvelope {
   auto_finalize?: boolean
   interruption_requested?: boolean
   speech_duration_ms?: number
+  reason?: string
+  normalized_level?: number
+  peak_level?: number
+  clipping_detected?: boolean
+  apm_enabled?: boolean
   is_final?: boolean
   error?: string
   message?: string
@@ -126,16 +130,12 @@ export interface RtcMessageEnvelope {
   exercise_category?: string
   summary?: string
   focus_tags?: string[]
-  focus_syllables?: string[]
+  speech_patterns?: string[]
   keywords?: string[]
   pronunciation_summary?: string
-  pronunciation_initial_pairs?: string[]
-  pronunciation_final_pairs?: string[]
-  pronunciation_tone_pairs?: string[]
   pronunciation_targets?: string[]
   encouragement?: string
   primary_focus?: string
-  primary_pinyin?: string
   articulation_tip?: string
   articulation_tips?: string[]
   next_step?: string

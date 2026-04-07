@@ -67,10 +67,9 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     (echo "deb https://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
      echo "deb https://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list)
 
-# Install curl and openssl for HTTPS support
+# Install runtime utilities
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create logs directory
@@ -86,7 +85,7 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Use startup script to support both HTTP and HTTPS
+# Use startup script to serve the public HTTP entrypoint
 COPY --chmod=755 docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --chown=nextjs:nodejs proxy-server.cjs /app/proxy-server.cjs
 

@@ -227,14 +227,20 @@ export function buildSessionCompactionMemoryInput(session: Session): SessionComp
   const pronunciationTargets = Array.isArray(metadata?.lastTrainingPronunciationTargets)
     ? metadata.lastTrainingPronunciationTargets.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : []
-  const focusSyllables = Array.isArray(metadata?.lastTrainingFocusSyllables)
-    ? metadata.lastTrainingFocusSyllables.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+  const speechPatterns = Array.isArray(metadata?.lastTrainingSpeechPatterns)
+    ? metadata.lastTrainingSpeechPatterns.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : []
   const articulationTips = Array.isArray(metadata?.lastTrainingArticulationTips)
     ? metadata.lastTrainingArticulationTips.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : []
   const interruptionCount = readNumber(metadata, 'interruptionCount') ?? 0
   const bargeInCount = readNumber(metadata, 'bargeInCount') ?? 0
+  const lastInputTelemetryReason = readString(metadata, 'lastInputTelemetryReason')
+  const lastInputNormalizedLevel = readNumber(metadata, 'lastInputNormalizedLevel')
+  const lastInputPeakLevel = readNumber(metadata, 'lastInputPeakLevel')
+  const lastInputClippingDetected = metadata?.lastInputClippingDetected === true
+  const lastInputApmEnabled = metadata?.lastInputApmEnabled === true
+  const audioClippingEventCount = readNumber(metadata, 'audioClippingEventCount') ?? 0
   const sessionTurnCount = session.turns.length
 
   const fallbackPhrases = dedupeStrings([
@@ -244,12 +250,18 @@ export function buildSessionCompactionMemoryInput(session: Session): SessionComp
     latestCorrectionOriginal,
   ], 3)
   const pronunciationPatterns = dedupeStrings([
-    ...focusSyllables,
+    ...speechPatterns,
     ...articulationTips,
   ], 6)
   const supportStrategies = dedupeStrings([
     ...articulationTips,
     nextStep,
+    lastInputClippingDetected
+      ? '现场收音出现过削波，尽量把麦克风稍微拿远一点并保持音量稳定。'
+      : null,
+    lastInputNormalizedLevel !== null && lastInputNormalizedLevel < 0.035
+      ? '现场收音偏小，尽量更靠近麦克风，再开始重要表达。'
+      : null,
     latestCorrectionText && latestCorrectionOriginal && latestCorrectionText !== latestCorrectionOriginal
       ? '现场如果系统听偏，优先切回更稳的改写版本。'
       : null,
@@ -297,6 +309,12 @@ export function buildSessionCompactionMemoryInput(session: Session): SessionComp
       latest_correction_text: latestCorrectionText ?? undefined,
       interruption_count: interruptionCount,
       barge_in_count: bargeInCount,
+      last_input_telemetry_reason: lastInputTelemetryReason ?? undefined,
+      last_input_normalized_level: lastInputNormalizedLevel ?? undefined,
+      last_input_peak_level: lastInputPeakLevel ?? undefined,
+      last_input_clipping_detected: lastInputClippingDetected,
+      last_input_apm_enabled: lastInputApmEnabled,
+      audio_clipping_event_count: audioClippingEventCount,
       next_step: nextStep ?? undefined,
       session_turn_count: sessionTurnCount,
       summary: content,

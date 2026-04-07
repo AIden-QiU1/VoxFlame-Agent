@@ -11,10 +11,12 @@ function buildApiUrl(path: string): string {
   return `${config.api.baseUrl}${path}`
 }
 
-export async function buildAuthorizedJsonHeaders(): Promise<Record<string, string>> {
-  const token = await getValidToken()
+export async function buildAuthorizedJsonHeaders(
+  accessToken?: string,
+): Promise<Record<string, string>> {
+  const token = await getValidToken() || accessToken
   if (!token) {
-    throw new Error('请先登录后再使用这个功能。')
+    throw new Error('当前登录态还没有准备好，请刷新页面后再试。')
   }
 
   return {
@@ -25,6 +27,7 @@ export async function buildAuthorizedJsonHeaders(): Promise<Record<string, strin
 
 interface StartRtcSessionOptions {
   executionBackend?: RtcExecutionBackend
+  accessToken?: string
 }
 
 export async function startRtcSession(
@@ -32,7 +35,7 @@ export async function startRtcSession(
   intent: RtcSessionIntent,
   options: StartRtcSessionOptions = {},
 ): Promise<StartRtcSessionResponse> {
-  const headers = await buildAuthorizedJsonHeaders()
+  const headers = await buildAuthorizedJsonHeaders(options.accessToken)
   const response = await fetch(buildApiUrl('/rtc/session/start'), {
     method: 'POST',
     headers,
@@ -53,8 +56,11 @@ export async function startRtcSession(
   return response.json() as Promise<StartRtcSessionResponse>
 }
 
-export async function pingRtcSession(channelName: string): Promise<void> {
-  const headers = await buildAuthorizedJsonHeaders()
+export async function pingRtcSession(
+  channelName: string,
+  accessToken?: string,
+): Promise<void> {
+  const headers = await buildAuthorizedJsonHeaders(accessToken)
   await fetch(buildApiUrl('/rtc/session/ping'), {
     method: 'POST',
     headers,
@@ -62,8 +68,11 @@ export async function pingRtcSession(channelName: string): Promise<void> {
   })
 }
 
-export async function stopRtcSession(channelName: string): Promise<void> {
-  const headers = await buildAuthorizedJsonHeaders()
+export async function stopRtcSession(
+  channelName: string,
+  accessToken?: string,
+): Promise<void> {
+  const headers = await buildAuthorizedJsonHeaders(accessToken)
   await fetch(buildApiUrl('/rtc/session/stop'), {
     method: 'POST',
     headers,

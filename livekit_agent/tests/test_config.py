@@ -22,12 +22,18 @@ class ConfigTests(unittest.TestCase):
             "DASHSCOPE_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "DASHSCOPE_LLM_MODEL": "qwen3.5-flash",
             "DASHSCOPE_TIMEOUT_SECONDS": "9.5",
+            "DASHSCOPE_REPLY_TIMEOUT_SECONDS": "3.2",
             "QWEN_ASR_REALTIME_URL": "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
             "QWEN_ASR_REALTIME_MODEL": "qwen3-asr-flash-realtime",
             "QWEN_ASR_REALTIME_SAMPLE_RATE": "16000",
             "QWEN_ASR_REALTIME_LANGUAGE": "zh",
             "QWEN_ASR_ENABLE_INTERIM": "1",
             "QWEN_ASR_CONNECT_TIMEOUT_SECONDS": "11",
+            "LIVEKIT_AUDIO_APM_ENABLED": "1",
+            "LIVEKIT_AUDIO_APM_ECHO_CANCELLATION": "0",
+            "LIVEKIT_AUDIO_APM_NOISE_SUPPRESSION": "1",
+            "LIVEKIT_AUDIO_APM_HIGH_PASS_FILTER": "1",
+            "LIVEKIT_AUDIO_APM_AUTO_GAIN_CONTROL": "0",
             "QWEN_ASR_VAD_THRESHOLD": "0.02",
             "QWEN_ASR_VAD_SILENCE_DURATION_MS": "650",
             "QWEN_ASR_VAD_HOP_SIZE_MS": "20",
@@ -63,12 +69,18 @@ class ConfigTests(unittest.TestCase):
         )
         self.assertEqual(config.dashscope_llm_model, "qwen3.5-flash")
         self.assertEqual(config.dashscope_timeout_seconds, 9.5)
+        self.assertEqual(config.dashscope_reply_timeout_seconds, 3.2)
         self.assertEqual(config.dashscope_asr_url, "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")
         self.assertEqual(config.dashscope_asr_model, "qwen3-asr-flash-realtime")
         self.assertEqual(config.dashscope_asr_sample_rate, 16000)
         self.assertEqual(config.dashscope_asr_language, "zh")
         self.assertTrue(config.dashscope_asr_enable_interim)
         self.assertEqual(config.dashscope_asr_connect_timeout_seconds, 11)
+        self.assertTrue(config.livekit_audio_apm_enabled)
+        self.assertFalse(config.livekit_audio_apm_echo_cancellation)
+        self.assertTrue(config.livekit_audio_apm_noise_suppression)
+        self.assertTrue(config.livekit_audio_apm_high_pass_filter)
+        self.assertFalse(config.livekit_audio_apm_auto_gain_control)
         self.assertEqual(config.dashscope_asr_vad_threshold, 0.02)
         self.assertEqual(config.dashscope_asr_vad_silence_duration_ms, 650)
         self.assertEqual(config.dashscope_asr_vad_hop_size_ms, 20)

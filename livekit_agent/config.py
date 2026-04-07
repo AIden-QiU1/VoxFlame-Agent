@@ -16,12 +16,18 @@ class LiveKitAgentConfig:
     dashscope_base_url: str
     dashscope_llm_model: str
     dashscope_timeout_seconds: float
+    dashscope_reply_timeout_seconds: float
     dashscope_asr_url: str
     dashscope_asr_model: str
     dashscope_asr_sample_rate: int
     dashscope_asr_language: str
     dashscope_asr_enable_interim: bool
     dashscope_asr_connect_timeout_seconds: int
+    livekit_audio_apm_enabled: bool
+    livekit_audio_apm_echo_cancellation: bool
+    livekit_audio_apm_noise_suppression: bool
+    livekit_audio_apm_high_pass_filter: bool
+    livekit_audio_apm_auto_gain_control: bool
     dashscope_asr_vad_threshold: float
     dashscope_asr_vad_silence_duration_ms: int
     dashscope_asr_vad_hop_size_ms: int
@@ -65,6 +71,9 @@ def load_config() -> LiveKitAgentConfig:
         dashscope_llm_model=os.getenv("DASHSCOPE_LLM_MODEL", "qwen3.5-flash").strip()
         or "qwen3.5-flash",
         dashscope_timeout_seconds=float(os.getenv("DASHSCOPE_TIMEOUT_SECONDS", "15").strip() or "15"),
+        dashscope_reply_timeout_seconds=float(
+            os.getenv("DASHSCOPE_REPLY_TIMEOUT_SECONDS", "4.5").strip() or "4.5"
+        ),
         dashscope_asr_url=(
             os.getenv("QWEN_ASR_REALTIME_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")
             .strip()
@@ -80,6 +89,25 @@ def load_config() -> LiveKitAgentConfig:
         ),
         dashscope_asr_connect_timeout_seconds=int(
             os.getenv("QWEN_ASR_CONNECT_TIMEOUT_SECONDS", "15").strip() or "15"
+        ),
+        livekit_audio_apm_enabled=(
+            os.getenv("LIVEKIT_AUDIO_APM_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
+        ),
+        livekit_audio_apm_echo_cancellation=(
+            os.getenv("LIVEKIT_AUDIO_APM_ECHO_CANCELLATION", "0").strip().lower()
+            not in {"0", "false", "no"}
+        ),
+        livekit_audio_apm_noise_suppression=(
+            os.getenv("LIVEKIT_AUDIO_APM_NOISE_SUPPRESSION", "1").strip().lower()
+            not in {"0", "false", "no"}
+        ),
+        livekit_audio_apm_high_pass_filter=(
+            os.getenv("LIVEKIT_AUDIO_APM_HIGH_PASS_FILTER", "1").strip().lower()
+            not in {"0", "false", "no"}
+        ),
+        livekit_audio_apm_auto_gain_control=(
+            os.getenv("LIVEKIT_AUDIO_APM_AUTO_GAIN_CONTROL", "0").strip().lower()
+            not in {"0", "false", "no"}
         ),
         dashscope_asr_vad_threshold=float(os.getenv("QWEN_ASR_VAD_THRESHOLD", "0.018").strip() or "0.018"),
         dashscope_asr_vad_silence_duration_ms=int(
