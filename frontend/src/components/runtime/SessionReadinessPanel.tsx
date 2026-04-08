@@ -25,7 +25,6 @@ const STRATEGY_LABELS: Record<RtcSessionStrategy, string> = {
 
 const CAPABILITY_LABELS: Record<RtcCapabilityId, string> = {
   transport_send_control: '实时发送',
-  training_feedback_request: '训练反馈',
   voice_profile_update: '训练画像同步',
   workspace_snapshot_read: '共享画像读取',
   upload_artifact_persist: '训练样本入链',

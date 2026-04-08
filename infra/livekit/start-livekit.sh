@@ -12,21 +12,32 @@ if [ -n "${VOXFLAME_PUBLIC_HOST:-}" ]; then
   CERT_BASE="/var/lib/caddy/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${VOXFLAME_PUBLIC_HOST}"
   CERT_FILE="${CERT_BASE}/${VOXFLAME_PUBLIC_HOST}.crt"
   KEY_FILE="${CERT_BASE}/${VOXFLAME_PUBLIC_HOST}.key"
+  TURN_UDP_PORT="${VOXFLAME_LIVEKIT_TURN_UDP_PORT:-443}"
+  TURN_TLS_ENABLED="${VOXFLAME_LIVEKIT_TURN_TLS_ENABLED:-0}"
+  TURN_TLS_PORT="${VOXFLAME_LIVEKIT_TURN_TLS_PORT:-5349}"
+  TURN_DOMAIN="${VOXFLAME_LIVEKIT_TURN_DOMAIN:-${VOXFLAME_PUBLIC_HOST:-}}"
 
-  if [ -f "$CERT_FILE" ] && [ -f "$KEY_FILE" ]; then
-    cat >> "$RUNTIME_CONFIG" <<EOF
+  cat >> "$RUNTIME_CONFIG" <<EOF
 
 turn:
   enabled: true
-  domain: ${VOXFLAME_PUBLIC_HOST}
+  udp_port: ${TURN_UDP_PORT}
+EOF
+
+  if [ "$TURN_TLS_ENABLED" = "1" ] || [ "$TURN_TLS_ENABLED" = "true" ] || [ "$TURN_TLS_ENABLED" = "yes" ]; then
+    if [ -f "$CERT_FILE" ] && [ -f "$KEY_FILE" ]; then
+      cat >> "$RUNTIME_CONFIG" <<EOF
+  domain: ${TURN_DOMAIN}
   cert_file: ${CERT_FILE}
   key_file: ${KEY_FILE}
-  udp_port: ${LIVEKIT_TURN_UDP_PORT:-3478}
-  tls_port: ${LIVEKIT_TURN_TLS_PORT:-5349}
+  tls_port: ${TURN_TLS_PORT}
 EOF
-    echo "[livekit] TURN enabled for ${VOXFLAME_PUBLIC_HOST} (udp:${LIVEKIT_TURN_UDP_PORT:-3478}, tls:${LIVEKIT_TURN_TLS_PORT:-5349})"
+      echo "[livekit] TURN enabled for ${TURN_DOMAIN} (udp:${TURN_UDP_PORT}, tls:${TURN_TLS_PORT})"
+    else
+      echo "[livekit] TURN TLS requested but certificate not found for ${TURN_DOMAIN}, continuing with TURN/UDP only on ${TURN_UDP_PORT}"
+    fi
   else
-    echo "[livekit] TURN certificate not found for ${VOXFLAME_PUBLIC_HOST}, starting without TURN"
+    echo "[livekit] TURN/UDP enabled for ${VOXFLAME_PUBLIC_HOST} on ${TURN_UDP_PORT} (TURN/TLS disabled)"
   fi
 fi
 

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  createRtmMessageHandler,
+  createSessionInitAckGate,
   createDecodedRtcMessageHandler,
   publishRtcRuntimeControlMessage,
 } from './session-runtime.ts'
@@ -168,33 +170,6 @@ test('session-runtime updates latest transcript, memory turns, and reduced state
   assert.equal(harness.getState().latestUserTranscript, '我想慢一点说')
 })
 
-test('session-runtime stores training coach feedback in rtc state', () => {
-  const harness = createStateHarness()
-  const latestTranscriptRef = { current: '' }
-
-  const handleMessage = createDecodedRtcMessageHandler({
-    memoryOwnerId: 'user-1',
-    latestUserTranscriptRef: latestTranscriptRef,
-    setState: harness.setState,
-  })
-
-  handleMessage({
-    type: 'training_coach_feedback',
-    exercise_id: 'exercise-1',
-    exercise_text: '请先听我说完',
-    recognized_text: '请先听我说话',
-    feedback_text: '这次最后两个字有点跑掉了，先把“说完”慢一点，再录一遍。',
-    source: 'livekit_training_extension',
-    model: 'qwen3.5-plus',
-  })
-
-  assert.equal(
-    harness.getState().lastTrainingCoachFeedback?.feedbackText,
-    '这次最后两个字有点跑掉了，先把“说完”慢一点，再录一遍。',
-  )
-  assert.equal(harness.getState().lastTrainingCoachFeedback?.model, 'qwen3.5-plus')
-})
-
 test('session-runtime writes audio input telemetry into current session metadata', () => {
   const harness = createStateHarness()
   const latestTranscriptRef = { current: '' }
@@ -230,4 +205,56 @@ test('session-runtime writes audio input telemetry into current session metadata
   assert.equal(metadataUpdates[0].lastInputClippingDetected, true)
   assert.equal(metadataUpdates[0].lastInputApmEnabled, true)
   assert.equal(metadataUpdates[0].audioClippingEventCount, 1)
+})
+
+test('session-runtime resolves the bootstrap gate after the matching session_init_ack arrives', async () => {
+  const gate = createSessionInitAckGate('req_1', 100)
+  gate.handleDecodedMessage({
+    type: 'session_init_ack',
+    metadata: {
+      request_id: 'req_1',
+    },
+  })
+
+  await assert.doesNotReject(gate.waitForReady())
+  gate.cleanup()
+})
+
+test('session-runtime rejects the bootstrap gate when no session_init_ack arrives in time', async () => {
+  const gate = createSessionInitAckGate('req_missing', 20)
+
+  await assert.rejects(
+    gate.waitForReady(),
+    /系统已阻止这次“假连接”/,
+  )
+  gate.cleanup()
+})
+
+test('session-runtime forwards decoded envelopes to the optional onDecodedEnvelope callback', () => {
+  const seenTypes: string[] = []
+  const latestTranscriptRef = { current: '' }
+  const harness = createStateHarness()
+
+  const handleMessage = createRtmMessageHandler({
+    inboundRtmChunksRef: { current: new Map() },
+    memoryOwnerId: null,
+    latestUserTranscriptRef: latestTranscriptRef,
+    setState: harness.setState,
+    onDecodedEnvelope: (message) => {
+      seenTypes.push(String(message.type || 'unknown'))
+    },
+  })
+
+  handleMessage({
+    message: JSON.stringify({
+      type: 'session_init_ack',
+      metadata: {
+        request_id: 'req_1',
+      },
+    }),
+    publisher: 'livekit-room',
+    channelName: 'voxrtc_channel',
+  })
+
+  assert.deepEqual(seenTypes, ['session_init_ack'])
 })

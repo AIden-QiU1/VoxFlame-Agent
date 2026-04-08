@@ -35,13 +35,13 @@ import {
 import type { SessionExecutionClient } from '@/lib/realtime-audio/session-execution'
 import type {
   RtcAgentState,
+  RtcMessageEnvelope,
   SessionControlClient,
   SessionMicrophoneTrack,
   StartRtcSessionResponse,
 } from '@/lib/realtime-audio/session-types'
 export type {
   ConversationMessage,
-  TrainingCoachFeedbackEvent,
   VoiceProfileSyncEvent,
   RtcAgentState,
 } from '@/lib/realtime-audio/session-types'
@@ -55,6 +55,7 @@ interface UseRtcAgentSessionOptions {
   requestedCapabilities?: RtcCapabilityId[]
   executionBackend?: RtcExecutionBackend
   connectionNotice?: string | null
+  timeoutSeconds?: number
 }
 
 interface ConnectRtcOptions {
@@ -75,6 +76,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
     connectionNotice = mode === 'training'
       ? null
       : '已连接，请点击下方麦克风开始说话，也可以先用文字或短语沟通。',
+    timeoutSeconds,
   } = options
   const memoryOwnerId = userId ?? null
 
@@ -94,6 +96,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
   const pingTimerRef = useRef<number | null>(null)
   const latestUserTranscriptRef = useRef('')
   const inboundRtmChunksRef = useRef<Map<string, ChunkAccumulator>>(new Map())
+  const onDecodedEnvelopeRef = useRef<((message: RtcMessageEnvelope) => void) | null>(null)
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null)
 
   useEffect(() => {
@@ -150,6 +153,9 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
       memoryOwnerId,
       latestUserTranscriptRef,
       setState,
+      onDecodedEnvelope: (message) => {
+        onDecodedEnvelopeRef.current?.(message)
+      },
     })
   }, [memoryOwnerId])
 
@@ -183,6 +189,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
         connectPromiseRef,
         inboundRtmChunksRef,
         latestUserTranscriptRef,
+        onDecodedEnvelopeRef,
       },
       accessToken,
       clearPing,
@@ -237,6 +244,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
           connectPromiseRef,
           inboundRtmChunksRef,
           latestUserTranscriptRef,
+          onDecodedEnvelopeRef,
         },
         userId,
         accessToken,
@@ -247,6 +255,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
         requestedCapabilities,
         executionBackend,
         connectionNotice,
+        timeoutSeconds,
         suppressGreeting: connectOptions.suppressGreeting,
         setState,
         clearPing,
@@ -276,6 +285,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
     executionBackend,
     scene,
     surface,
+    timeoutSeconds,
     accessToken,
     userId,
   ])

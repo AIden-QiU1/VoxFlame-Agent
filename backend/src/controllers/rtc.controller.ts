@@ -16,6 +16,62 @@ import {
 const router = Router()
 const rtcService = new RtcOrchestrationService()
 
+function getSingleHeaderValue(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0]?.trim() || null
+  }
+
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function deriveBrowserOrigin(req: Request): string | null {
+  const originHeader = getSingleHeaderValue(req.headers.origin)
+  if (originHeader) {
+    try {
+      const originUrl = new URL(originHeader)
+      if (originUrl.protocol === 'http:' || originUrl.protocol === 'https:') {
+        originUrl.pathname = ''
+        originUrl.search = ''
+        originUrl.hash = ''
+        return originUrl.toString().replace(/\/$/, '')
+      }
+    } catch {
+      // Ignore malformed origin and continue with fallback headers.
+    }
+  }
+
+  const refererHeader = getSingleHeaderValue(req.headers.referer)
+  if (refererHeader) {
+    try {
+      const refererUrl = new URL(refererHeader)
+      if (refererUrl.protocol === 'http:' || refererUrl.protocol === 'https:') {
+        refererUrl.pathname = ''
+        refererUrl.search = ''
+        refererUrl.hash = ''
+        return refererUrl.toString().replace(/\/$/, '')
+      }
+    } catch {
+      // Ignore malformed referer and continue with forwarded headers.
+    }
+  }
+
+  const forwardedProto =
+    getSingleHeaderValue(req.headers['x-forwarded-proto']) ?? req.protocol
+  const forwardedHost =
+    getSingleHeaderValue(req.headers['x-forwarded-host']) ??
+    getSingleHeaderValue(req.headers.host)
+
+  if (!forwardedProto || !forwardedHost) {
+    return null
+  }
+
+  if (forwardedProto !== 'http' && forwardedProto !== 'https') {
+    return null
+  }
+
+  return `${forwardedProto}://${forwardedHost}`
+}
+
 function parseExecutionBackend(value: unknown): RtcExecutionBackend | undefined {
   return value === 'livekit' ? value : undefined
 }
@@ -68,7 +124,6 @@ function parseRequestedCapabilities(value: unknown): RtcCapabilityId[] | undefin
 
   const supportedCapabilities: RtcCapabilityId[] = [
     'transport_send_control',
-    'training_feedback_request',
     'voice_profile_update',
     'workspace_snapshot_read',
     'upload_artifact_persist',
@@ -204,6 +259,7 @@ router.post('/session/start', async (req: Request, res: Response) => {
       botUid: parseOptionalInteger(req.body?.botUid),
       timeoutSeconds: parseOptionalInteger(req.body?.timeoutSeconds),
       properties: parsePropertyOverrides(req.body?.properties),
+      browserOrigin: deriveBrowserOrigin(req),
     })
 
     res.json(result)

@@ -25,20 +25,29 @@ SYSTEM_PROMPT = """你是 VoxFlame 的沟通助手。
 4. 不要分析，不要解释，不要项目符号，不要自我介绍。
 5. 如果是就医、求助、购物等具体场景，优先把最关键的一句说清楚。
 6. 不要输出“现在先按当前沟通场景继续”“我先帮你把这句话往前推进”这类铺垫。
+7. 把输入视为 ASR 最终文本，默认先做最小必要纠错，而不是大幅改写。
+8. 优先保留用户已经表达出的事实、专有名词、数字、时间、地点、疾病名和产品名。
+9. 如果某个词和热词/风险词明显接近，优先按准备上下文修正到这些词。
+10. 如果信息仍不确定，选择更短、更保守、不新增事实的表达。
+11. 把输入视为“多数高置信片段 + 少量误听片段”，优先保留高置信片段原样，只做局部替换。
+12. 只允许做同音/近音纠错、漏字补齐、标点整理和热词纠偏，不要整句改写。
 """
 
-TRAINING_EXTENSION_SYSTEM_PROMPT = """你是 VoxFlame 的训练点评 extension。
+CAPTION_SYSTEM_PROMPT = """你是 VoxFlame 的实时字幕纠错助手。
 
-你的任务不是给用户打分、贴标签或输出结构化表格，而是在用户刚录完一句后，给出一小段自然语言训练点评。
+你的任务不是替用户发挥，而是把用户刚刚说出的这一句整理成最终展示字幕。
 
-输出要求：
+回复要求：
 1. 默认使用简体中文。
-2. 只输出 2 到 4 句自然语言，不要项目符号，不要 JSON，不要标题。
-3. 先点出这次最值得先改的一点，再给一个立刻能重录的具体动作。
-4. 不要输出“excellent / close / retry / unclear”这类状态词。
-5. 不要列“漏字 / 多字 / speech_patterns / articulation_tips”等结构化字段名。
-6. 语气温和、直接、像现场教练，不要写成长分析报告。
+2. 只输出当前这句话的最终字幕，不要解释，不要补充，不要续写。
+3. 先保留用户原意、专有名词、数字、时间、地点和疾病名。
+4. 只做最小必要纠错，不要为了更顺而新增事实。
+5. 如果信息仍不确定，优先保守保留，不要猜测。
+6. 把这句话视为“多数高置信片段 + 少量误听片段”，优先复制正确片段，只修局部错误。
 """
+
+REPLY_HISTORY_WINDOW_MESSAGES = 6
+REPLY_HISTORY_STORAGE_LIMIT = 12
 
 
 def compute_reply_timeout_seconds(
@@ -63,7 +72,7 @@ def estimate_clarity_score(original_text: str, corrected_text: str) -> float:
     if not original or not corrected:
         return 0.0
     if original == corrected:
-      return 1.0
+        return 1.0
     ratio = difflib.SequenceMatcher(a=original, b=corrected).ratio()
     return max(0.0, min(1.0, round(ratio, 4)))
 
@@ -75,102 +84,133 @@ def build_fallback_text(ctx: VoxFlameSessionContext, user_text: str) -> str:
     return "请再说一遍。"
 
 
-def build_scene_prompt(ctx: VoxFlameSessionContext) -> str:
+def build_scene_prompt(
+    ctx: VoxFlameSessionContext,
+    *,
+    caption_mode_enabled: bool = False,
+) -> str:
     scene = ctx.scene or "general"
     return (
         f"当前场景：{scene}\n"
-        "请优先输出一句能让对方马上理解用户意图、可以直接代说的表达。"
+        + (
+            "请优先输出当前这句话的最终展示字幕。"
+            if caption_mode_enabled
+            else "请优先输出一句能让对方马上理解用户意图、可以直接代说的表达。"
+        )
+    )
+
+
+def _dedupe_strings(values: list[str], limit: int) -> list[str]:
+    results: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        if normalized and normalized not in results:
+            results.append(normalized)
+        if len(results) >= limit:
+            break
+    return results
+
+
+def _truncate_text(value: str, limit: int) -> str:
+    normalized = " ".join(value.strip().split())
+    if len(normalized) <= limit:
+        return normalized
+    return f"{normalized[: limit - 1]}…"
+
+
+def build_priority_hotwords(userdata: VoxFlameSessionUserData) -> list[str]:
+    weighted_entries = sorted(
+        userdata.preparation.asr_hotword_entries,
+        key=lambda item: int(item.get("weight", 4))
+        if isinstance(item.get("weight"), int)
+        else 4,
+        reverse=True,
+    )
+    weighted_hotwords = [
+        item["text"].strip()
+        for item in weighted_entries
+        if isinstance(item.get("text"), str) and item["text"].strip()
+    ]
+    return _dedupe_strings(
+        [
+            *userdata.active_hotwords,
+            *weighted_hotwords,
+            *userdata.preparation.hotwords,
+        ],
+        8,
     )
 
 
 def build_preparation_prompt(userdata: VoxFlameSessionUserData) -> str:
     preparation = userdata.preparation
+    priority_hotwords = build_priority_hotwords(userdata)
     lines = [
-        f"当前准备目标：{preparation.immediate_goal}",
-        f"当前表达画像：{preparation.profile_summary}",
+        "稳定准备上下文：",
+        f"- 当前目标：{_truncate_text(preparation.immediate_goal, 120)}",
+        f"- 表达画像：{_truncate_text(preparation.profile_summary, 180)}",
     ]
     if preparation.listener_guidance:
-        lines.append(f"听者引导：{'；'.join(preparation.listener_guidance[:2])}")
+        lines.append(
+            f"- 听者引导：{'；'.join(_truncate_text(item, 48) for item in preparation.listener_guidance[:2])}"
+        )
     if preparation.support_strategies:
-        lines.append(f"支持策略：{'；'.join(preparation.support_strategies[:2])}")
-    if preparation.hotwords:
-        lines.append(f"热词：{'、'.join(preparation.hotwords[:6])}")
+        lines.append(
+            f"- 支持策略：{'；'.join(_truncate_text(item, 48) for item in preparation.support_strategies[:2])}"
+        )
+    if priority_hotwords:
+        lines.append(f"- 优先热词：{'、'.join(priority_hotwords)}")
+    if preparation.risky_terms:
+        lines.append(
+            f"- 高风险词句：{'；'.join(_truncate_text(item, 32) for item in preparation.risky_terms[:4])}"
+        )
     if preparation.common_confusions:
-        lines.append(f"常见误听：{'、'.join(preparation.common_confusions[:4])}")
+        lines.append(
+            f"- 常见误听：{'；'.join(_truncate_text(item, 32) for item in preparation.common_confusions[:4])}"
+        )
+    if preparation.fallback_phrases:
+        lines.append(
+            f"- 保底句：{'；'.join(_truncate_text(item, 40) for item in preparation.fallback_phrases[:2])}"
+        )
     if userdata.active_hotwords:
-        lines.append(f"本轮命中热词：{'、'.join(userdata.active_hotwords[:4])}")
+        lines.append(f"- 本轮命中热词：{'、'.join(userdata.active_hotwords[:4])}")
     return "\n".join(lines)
 
 
-def _read_string_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
-
-
-def build_training_extension_fallback_text(payload: dict[str, Any]) -> str:
-    exercise_text = str(payload.get("exercise_text", "") or "").strip()
-    recognized_text = str(payload.get("recognized_text", "") or "").strip()
-    if exercise_text and recognized_text and exercise_text != recognized_text:
-        return (
-            f"这次系统听到的是“{recognized_text}”，和目标句“{exercise_text}”还有一点偏差。"
-            "先别追求整句一次到位，先把最容易跑掉的那几个字慢一点、拉开一点，再重录一遍。"
-        )
-    if exercise_text:
-        return (
-            f"这次先继续对着目标句“{exercise_text}”练。"
-            "先把节奏放慢一点，嘴巴动作做大一点，再马上补一条新的版本。"
-        )
-    return "这次先把速度放慢一点，只盯一句里最关键的几个字，再补录一遍。"
-
-
-def _build_training_guidance_line(payload: dict[str, Any]) -> str | None:
-    guidance_profile = payload.get("guidance_profile")
-    if isinstance(guidance_profile, dict):
-        priority = str(guidance_profile.get("priority", "") or "").strip()
-        severity = str(guidance_profile.get("severity", "") or "").strip()
-        if priority or severity:
-            return f"训练偏好：priority={priority or 'default'}；severity={severity or 'default'}"
-    return None
-
-
-def build_training_extension_prompt(
-    ctx: VoxFlameSessionContext,
-    payload: dict[str, Any],
+def build_current_turn_prompt(
+    user_text: str,
+    userdata: VoxFlameSessionUserData,
+    *,
+    caption_mode_enabled: bool = False,
 ) -> str:
-    exercise_text = str(payload.get("exercise_text", "") or "").strip()
-    recognized_text = str(payload.get("recognized_text", "") or "").strip()
-    category = str(payload.get("exercise_category", "") or ctx.scene or "中文训练").strip()
-    prepared_expression_title = str(payload.get("prepared_expression_title", "") or "").strip()
-    prepared_expression_section_title = str(payload.get("prepared_expression_section_title", "") or "").strip()
-    hotwords = _read_string_list(payload.get("hotwords"))[:5]
-    keywords = _read_string_list(payload.get("keywords"))[:5]
-    fallback_phrases = _read_string_list(payload.get("fallback_phrases"))[:2]
-    high_risk_phrases = _read_string_list(payload.get("high_risk_phrases"))[:3]
-
     lines = [
-        f"训练分类：{category}",
-        f"目标句：{exercise_text or '未提供'}",
-        f"系统听到：{recognized_text or '这次还没有稳定拿到最终结果'}",
+        "以下是用户本轮 ASR 最终文本，可能仍有误听、漏字或同音词偏差。",
+        f"本轮 ASR 最终文本：{user_text.strip() or '未提供'}",
     ]
-    guidance_line = _build_training_guidance_line(payload)
-    if guidance_line:
-        lines.append(guidance_line)
-    if prepared_expression_title:
-        if prepared_expression_section_title:
-            lines.append(f"来源准备稿：{prepared_expression_title} / {prepared_expression_section_title}")
-        else:
-            lines.append(f"来源准备稿：{prepared_expression_title}")
-    if hotwords:
-        lines.append(f"热词：{'、'.join(hotwords)}")
-    elif keywords:
-        lines.append(f"关键词：{'、'.join(keywords)}")
-    if high_risk_phrases:
-        lines.append(f"高风险表达：{'、'.join(high_risk_phrases)}")
-    if fallback_phrases:
-        lines.append(f"卡住时可退回：{'；'.join(fallback_phrases)}")
-    lines.append("请直接给出自然语言训练点评。")
+    if userdata.active_hotwords:
+        lines.append(f"优先核对热词：{'、'.join(userdata.active_hotwords[:4])}")
+    elif userdata.preparation.hotwords:
+        lines.append(f"优先参考热词：{'、'.join(build_priority_hotwords(userdata)[:6])}")
+    if userdata.preparation.risky_terms:
+        lines.append(
+            f"优先核对风险词句：{'；'.join(_truncate_text(item, 32) for item in userdata.preparation.risky_terms[:3])}"
+        )
+    if userdata.preparation.fallback_phrases:
+        lines.append(
+            f"如果原句不完整，可优先参考这些保底句的表达方式，但不要凭空补事实：{'；'.join(_truncate_text(item, 40) for item in userdata.preparation.fallback_phrases[:2])}"
+        )
+    lines.append("只允许做局部纠错：同音/近音替换、漏字补齐、标点整理、热词纠偏。")
+    lines.append(
+        "请只输出当前这句话的最终展示字幕。"
+        if caption_mode_enabled
+        else "请只输出最终可直接说出去的话。"
+    )
     return "\n".join(lines)
+
+
+def build_recent_history_window(
+    history: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    return history[-REPLY_HISTORY_WINDOW_MESSAGES:]
 
 
 def extract_text_from_completion(payload: dict[str, Any]) -> str | None:
@@ -266,26 +306,45 @@ class CommunicationAssistantRuntime:
                 timeout_seconds=self.config.dashscope_reply_timeout_seconds,
             )
 
+    def _build_system_prompt(self) -> str:
+        return CAPTION_SYSTEM_PROMPT if self.userdata.caption_mode_enabled else SYSTEM_PROMPT
+
     async def generate_reply(self, user_text: str) -> tuple[str, str]:
         normalized = user_text.strip()
         if not normalized:
             return build_fallback_text(self.ctx, normalized), "livekit_agent_fallback"
 
         self.userdata.note_user_transcript(normalized)
-        self.history.append({"role": "user", "content": normalized})
-        self.history = self.history[-8:]
 
         if self.client is None:
             reply = build_fallback_text(self.ctx, normalized)
-            self.history.append({"role": "assistant", "content": reply})
-            self.history = self.history[-8:]
+            self._remember_turn(normalized, reply)
             return reply, "livekit_agent_fallback"
 
+        history_window = (
+            []
+            if self.userdata.caption_mode_enabled
+            else build_recent_history_window(self.history)
+        )
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "system", "content": build_scene_prompt(self.ctx)},
+            {"role": "system", "content": self._build_system_prompt()},
+            {
+                "role": "system",
+                "content": build_scene_prompt(
+                    self.ctx,
+                    caption_mode_enabled=self.userdata.caption_mode_enabled,
+                ),
+            },
             {"role": "system", "content": build_preparation_prompt(self.userdata)},
-            *self.history,
+            *history_window,
+            {
+                "role": "user",
+                "content": build_current_turn_prompt(
+                    normalized,
+                    self.userdata,
+                    caption_mode_enabled=self.userdata.caption_mode_enabled,
+                ),
+            },
         ]
         reply_timeout_seconds = compute_reply_timeout_seconds(
             self.config.dashscope_reply_timeout_seconds,
@@ -307,59 +366,15 @@ class CommunicationAssistantRuntime:
         else:
             source = "dashscope_chat_completion"
 
-        self.history.append({"role": "assistant", "content": reply})
-        self.history = self.history[-8:]
+        self._remember_turn(normalized, reply)
         self.userdata.note_assistant_reply(reply)
         return reply, source
 
-
-@dataclass
-class TrainingCoachRuntime:
-    config: LiveKitAgentConfig
-    ctx: VoxFlameSessionContext
-    client: DashScopeChatClient | None = None
-
-    def __post_init__(self) -> None:
-        if self.client is None and self.config.dashscope_api_key:
-            self.client = DashScopeChatClient(
-                api_key=self.config.dashscope_api_key,
-                base_url=self.config.dashscope_base_url,
-                model=self.config.dashscope_training_extension_model,
-                timeout_seconds=self.config.dashscope_training_extension_timeout_seconds,
-            )
-
-    async def generate_feedback(
-        self,
-        payload: dict[str, Any],
-    ) -> tuple[str, str, str]:
-        fallback_text = build_training_extension_fallback_text(payload)
-        model = self.config.dashscope_training_extension_model
-
-        if self.client is None:
-            return fallback_text, "livekit_training_extension_fallback", model
-
-        messages = [
-            {"role": "system", "content": TRAINING_EXTENSION_SYSTEM_PROMPT},
-            {"role": "system", "content": build_scene_prompt(self.ctx)},
-            {"role": "user", "content": build_training_extension_prompt(self.ctx, payload)},
-        ]
-
-        try:
-            if isinstance(self.client, DashScopeChatClient):
-                feedback_text = await asyncio.wait_for(
-                    asyncio.to_thread(self.client.complete, messages),
-                    timeout=self.config.dashscope_training_extension_timeout_seconds,
-                )
-            else:
-                feedback_text = self.client.complete(messages)
-        except Exception as exc:
-            logger.warning(
-                "DashScope training extension failed, falling back to deterministic text: %s",
-                exc,
-            )
-            return fallback_text, "livekit_training_extension_fallback", model
-
-        normalized = feedback_text.strip()
-        if not normalized:
-            return fallback_text, "livekit_training_extension_fallback", model
-        return normalized, "livekit_training_extension", model
+    def _remember_turn(self, user_text: str, reply: str) -> None:
+        self.history.extend(
+            [
+                {"role": "user", "content": user_text},
+                {"role": "assistant", "content": reply},
+            ]
+        )
+        self.history = self.history[-REPLY_HISTORY_STORAGE_LIMIT:]

@@ -179,7 +179,7 @@
 当前前端已经围绕 `workspace + live session` 在组织产品，而不是旧 transport demo：
 
 1. 沟通页已经显式固定 `LiveKit` 执行面
-2. 训练页已经能把 `training_feedback -> training_result -> training_profile_summary` 接进现有 memory 链
+2. 训练页已经能把每次录音结果直接写成 `training_result -> training_profile_summary` 接进现有 memory 链
 3. 记忆页已经开始展示：
    - `profile_summary`
    - `listener_guidance`
@@ -205,7 +205,7 @@
 3. correction-style transcript 输出
 4. DashScope realtime TTS
 5. basic interrupt / turn-taking
-6. `training_feedback_request -> training_feedback`
+6. `training_result -> training_profile_summary`
 
 但要更准确地说：
 
@@ -812,7 +812,7 @@ type SessionIntent = {
 
 1. `session_start / session_stop / session_ping`
 2. `transport_send_control`
-3. `training_feedback_request`
+3. `voice_profile_update`
 4. `voice_profile_update`
 5. `memory_profile_read / write`
 6. `session_review_build`
@@ -956,7 +956,7 @@ VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
 
 ### Training & Dataset Tools
 
-- `training_feedback_request`
+- `upload_artifact_persist`
 - `recorder_enqueue`
 - `dataset_manifest_append`
 - `sample_quality_score`

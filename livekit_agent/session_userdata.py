@@ -15,6 +15,7 @@ class PreparationContextPack:
     listener_guidance: list[str] = field(default_factory=list)
     support_strategies: list[str] = field(default_factory=list)
     hotwords: list[str] = field(default_factory=list)
+    asr_hotword_entries: list[dict[str, Any]] = field(default_factory=list)
     risky_terms: list[str] = field(default_factory=list)
     common_confusions: list[str] = field(default_factory=list)
     fallback_phrases: list[str] = field(default_factory=list)
@@ -26,9 +27,9 @@ class VoxFlameSessionUserData:
     current_turn_state: str = "idle"
     last_user_transcript: str | None = None
     last_assistant_reply: str | None = None
-    last_training_feedback_summary: str | None = None
     interruption_count: int = 0
     barge_in_count: int = 0
+    caption_mode_enabled: bool = False
     active_hotwords: list[str] = field(default_factory=list)
 
     def note_user_transcript(self, transcript: str) -> None:
@@ -37,7 +38,7 @@ class VoxFlameSessionUserData:
             return
         self.last_user_transcript = normalized
         matched_hotwords: list[str] = []
-        for hotword in self.preparation.hotwords:
+        for hotword in _build_matchable_hotwords(self.preparation):
             if hotword and hotword in normalized and hotword not in matched_hotwords:
                 matched_hotwords.append(hotword)
         self.active_hotwords = matched_hotwords[:6]
@@ -47,17 +48,15 @@ class VoxFlameSessionUserData:
         if normalized:
             self.last_assistant_reply = normalized
 
-    def note_training_feedback(self, summary: str | None) -> None:
-        normalized = (summary or "").strip()
-        if normalized:
-            self.last_training_feedback_summary = normalized
-
     def note_speech_activity(self, state: str, interruption_requested: bool) -> None:
         self.current_turn_state = state.strip() or self.current_turn_state
         if interruption_requested:
             self.interruption_count += 1
         if state == "barge_in_triggered":
             self.barge_in_count += 1
+
+    def set_caption_mode(self, enabled: bool) -> None:
+        self.caption_mode_enabled = enabled
 
 
 def build_session_userdata(ctx: VoxFlameSessionContext) -> VoxFlameSessionUserData:
@@ -125,6 +124,7 @@ def _read_preparation_payload(ctx: VoxFlameSessionContext) -> PreparationContext
             listener_guidance=_read_string_list(payload.get("listener_guidance")),
             support_strategies=_read_string_list(payload.get("support_strategies")),
             hotwords=_read_string_list(payload.get("hotwords")),
+            asr_hotword_entries=_read_hotword_entries(payload.get("asr_hotword_entries")),
             risky_terms=_read_string_list(payload.get("risky_terms")),
             common_confusions=_read_string_list(payload.get("common_confusions")),
             fallback_phrases=_read_string_list(payload.get("fallback_phrases")),
@@ -154,3 +154,49 @@ def _read_string_list(value: Any) -> list[str]:
         if normalized and normalized not in deduped:
             deduped.append(normalized)
     return deduped[:8]
+
+
+def _read_hotword_entries(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+
+    entries: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        text = item.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        lang = item.get("lang")
+        weight = item.get("weight")
+        normalized_weight = (
+            int(weight)
+            if isinstance(weight, (int, float)) and int(weight) > 0
+            else 4
+        )
+        entries.append(
+            {
+                "text": text.strip(),
+                "lang": lang if lang in {"zh", "en"} else "zh",
+                "weight": normalized_weight,
+            }
+        )
+    return entries[:12]
+
+
+def _build_matchable_hotwords(preparation: PreparationContextPack) -> list[str]:
+    combined: list[str] = []
+
+    for value in preparation.hotwords:
+        normalized = value.strip()
+        if normalized and normalized not in combined:
+            combined.append(normalized)
+
+    for entry in preparation.asr_hotword_entries:
+        text = entry.get("text")
+        if isinstance(text, str):
+            normalized = text.strip()
+            if normalized and normalized not in combined:
+                combined.append(normalized)
+
+    return combined

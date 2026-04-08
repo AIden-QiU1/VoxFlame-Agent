@@ -79,7 +79,7 @@ export interface TrainingProfileMemorySummary {
 const STORAGE_PREFIX = 'voxflame_training_profile_'
 const MAX_RECORDS = 400
 export const MIN_TRAINING_UPLOADS_FOR_PROFILE = 12
-export const TRAINING_PROFILE_SYNC_INTERVAL = 5
+export const TRAINING_PROFILE_SYNC_INTERVAL = 50
 
 function createEmptyStatusCounts(): Record<TrainingFeedbackStatus, number> {
   return {
@@ -537,7 +537,6 @@ export function appendUploadedTrainingRecord(
   saveState(userId, nextState)
   const snapshot = buildSnapshot(records)
   const shouldSyncSummary =
-    snapshot.profileReady &&
     snapshot.totalUploadedRecordings - current.lastSyncedUploadCount >= TRAINING_PROFILE_SYNC_INTERVAL
 
   return {

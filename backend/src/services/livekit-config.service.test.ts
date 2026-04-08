@@ -5,6 +5,7 @@ import {
   LiveKitConfigService,
 } from './livekit-config.service'
 import { LiveKitSessionService } from './livekit-session.service'
+import { deriveRtcBrowserWebSocketUrl } from './rtc-orchestration.service'
 
 function withEnv(
   values: Record<string, string | undefined>,
@@ -35,6 +36,20 @@ function withEnv(
 }
 
 async function runLiveKitConfigTests(): Promise<void> {
+  assert.equal(
+    deriveRtcBrowserWebSocketUrl('http://localhost:3000'),
+    'ws://localhost:3000',
+  )
+  assert.equal(
+    deriveRtcBrowserWebSocketUrl('https://111.230.35.89'),
+    'wss://111.230.35.89',
+  )
+  assert.equal(
+    deriveRtcBrowserWebSocketUrl('https://111.230.35.89/?mode=communicate'),
+    'wss://111.230.35.89',
+  )
+  assert.equal(deriveRtcBrowserWebSocketUrl('ws://localhost:3000'), null)
+
   withEnv(
     {
       LIVEKIT_URL: undefined,

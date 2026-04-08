@@ -35,6 +35,7 @@ import {
 } from './session-bootstrap'
 import {
   applyDisconnectedState,
+  applyConnectingState,
   applyRtcError,
 } from './session-state'
 import {
@@ -60,6 +61,7 @@ export interface SessionRuntimeRefs {
   connectPromiseRef: MutableRefObject<Promise<void> | null>
   inboundRtmChunksRef: MutableRefObject<Map<string, ChunkAccumulator>>
   latestUserTranscriptRef: MutableRefObject<string>
+  onDecodedEnvelopeRef: MutableRefObject<((message: RtcMessageEnvelope) => void) | null>
 }
 
 interface CreateDecodedRtcMessageHandlerOptions {
@@ -70,6 +72,7 @@ interface CreateDecodedRtcMessageHandlerOptions {
 
 interface CreateRtmMessageHandlerOptions extends CreateDecodedRtcMessageHandlerOptions {
   inboundRtmChunksRef: MutableRefObject<Map<string, ChunkAccumulator>>
+  onDecodedEnvelope?: (message: RtcMessageEnvelope) => void
 }
 
 interface StartRtcRuntimeConnectionOptions {
@@ -83,6 +86,7 @@ interface StartRtcRuntimeConnectionOptions {
   requestedCapabilities?: RtcCapabilityId[]
   executionBackend?: RtcExecutionBackend
   connectionNotice: string | null
+  timeoutSeconds?: number
   suppressGreeting?: boolean
   setState: Dispatch<SetStateAction<RtcAgentState>>
   clearPing: () => void
@@ -99,8 +103,114 @@ interface DisconnectRtcRuntimeOptions {
   setState: Dispatch<SetStateAction<RtcAgentState>>
 }
 
+const SESSION_INIT_ACK_TIMEOUT_MS = 6_000
+const SESSION_INIT_ACK_RETRY_DELAY_MS = 900
+const SESSION_INIT_ACK_MAX_ATTEMPTS = 2
+
+export class SessionBootstrapTimeoutError extends Error {
+  constructor(message = '助手没有及时进入房间，当前这次连接不会有转录结果。') {
+    super(message)
+    this.name = 'SessionBootstrapTimeoutError'
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isSessionInitAckMessage(
+  message: RtcMessageEnvelope,
+  requestId: string,
+): boolean {
+  if (message.type !== 'session_init_ack') {
+    return false
+  }
+
+  if (!isRecord(message.metadata)) {
+    return true
+  }
+
+  const metadataRequestId = message.metadata.request_id
+  return typeof metadataRequestId !== 'string' || metadataRequestId === requestId
+}
+
+export function createSessionInitAckGate(
+  requestId: string,
+  timeoutMs: number = SESSION_INIT_ACK_TIMEOUT_MS,
+) {
+  let settled = false
+  let timeoutHandle: ReturnType<typeof globalThis.setTimeout> | null = null
+  let resolveReady: () => void = () => {}
+  let rejectReady: (error: Error) => void = () => {}
+
+  const ready = new Promise<void>((resolve, reject) => {
+    resolveReady = () => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      if (timeoutHandle) {
+        globalThis.clearTimeout(timeoutHandle)
+        timeoutHandle = null
+      }
+      resolve()
+    }
+
+    rejectReady = (error) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      if (timeoutHandle) {
+        globalThis.clearTimeout(timeoutHandle)
+        timeoutHandle = null
+      }
+      reject(error)
+    }
+
+    timeoutHandle = globalThis.setTimeout(() => {
+      rejectReady(
+        new SessionBootstrapTimeoutError(
+          '助手还没有成功进入当前房间，系统已阻止这次“假连接”。请稍后重试。',
+        ),
+      )
+    }, timeoutMs)
+  })
+
+  return {
+    handleDecodedMessage: (message: RtcMessageEnvelope) => {
+      if (!isSessionInitAckMessage(message, requestId)) {
+        return
+      }
+
+      resolveReady()
+    },
+    waitForReady: () => ready,
+    cleanup: () => {
+      if (timeoutHandle) {
+        globalThis.clearTimeout(timeoutHandle)
+        timeoutHandle = null
+      }
+    },
+  }
+}
+
+function waitForDelay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms)
+  })
+}
+
+function resetRuntimeRefs(refs: SessionRuntimeRefs): void {
+  refs.clientRef.current = null
+  refs.rtmClientRef.current = null
+  refs.micTrackRef.current = null
+  refs.sessionRef.current = null
+  refs.inboundRtmChunksRef.current.clear()
+  refs.latestUserTranscriptRef.current = ''
+  refs.onDecodedEnvelopeRef.current = null
 }
 
 export async function pingRtcRuntimeSession(
@@ -236,6 +346,7 @@ export function createRtmMessageHandler({
   memoryOwnerId,
   latestUserTranscriptRef,
   setState,
+  onDecodedEnvelope,
 }: CreateRtmMessageHandlerOptions): (event: RtmMessageEvent) => void {
   const handleDecodedMessage = createDecodedRtcMessageHandler({
     memoryOwnerId,
@@ -250,6 +361,7 @@ export function createRtmMessageHandler({
     }
 
     handleDecodedMessage(envelope)
+    onDecodedEnvelope?.(envelope)
   }
 }
 
@@ -267,12 +379,8 @@ export async function disconnectRtcRuntime({
   const micTrack = refs.micTrackRef.current
   const session = refs.sessionRef.current
 
-  refs.clientRef.current = null
-  refs.rtmClientRef.current = null
-  refs.micTrackRef.current = null
-  refs.sessionRef.current = null
+  resetRuntimeRefs(refs)
   refs.connectPromiseRef.current = null
-  refs.inboundRtmChunksRef.current.clear()
 
   setState((prev) => applyDisconnectedState(prev))
 
@@ -304,6 +412,7 @@ export async function startRtcRuntimeConnection({
   requestedCapabilities,
   executionBackend,
   connectionNotice,
+  timeoutSeconds,
   suppressGreeting,
   setState,
   clearPing,
@@ -319,7 +428,7 @@ export async function startRtcRuntimeConnection({
     throw new Error('当前登录态还没有准备好，请刷新页面后再试。')
   }
 
-  setState((prev) => applyRtcError(prev, ''))
+  setState((prev) => applyConnectingState(prev))
 
   const sessionIntent: RtcSessionIntent = {
     surface: surface ?? (mode === 'training' ? 'training_workspace' : 'communication_workspace'),
@@ -330,91 +439,124 @@ export async function startRtcRuntimeConnection({
     deviceContext: buildClientDeviceContext(mode),
   }
 
-  const session = await startRtcSession(mode, sessionIntent, {
-    executionBackend: executionBackend ?? config.rtc.executionBackend,
-    accessToken,
-  })
-  let client: SessionExecutionClient | null = null
-  let rtmClient: SessionControlClient | null = null
-  let connectionError: Error | null = null
+  let lastError: Error | null = null
 
-  try {
-    const transportEventHandlers = createSessionTransportEventHandlers(setState)
-    const transport = await connectSessionExecution({
-      session,
-      onRtmMessage: handleRtmMessage,
-      ...transportEventHandlers,
+  for (let attempt = 1; attempt <= SESSION_INIT_ACK_MAX_ATTEMPTS; attempt += 1) {
+    const session = await startRtcSession(mode, sessionIntent, {
+      executionBackend: executionBackend ?? config.rtc.executionBackend,
+      accessToken,
+      timeoutSeconds,
     })
-    client = transport.clientHandle
-    rtmClient = transport.rtmClient
+    let client: SessionExecutionClient | null = null
+    let rtmClient: SessionControlClient | null = null
+    const initAckGate = createSessionInitAckGate(session.requestId)
+    refs.onDecodedEnvelopeRef.current = initAckGate.handleDecodedMessage
 
-    refs.clientRef.current = client
-    refs.rtmClientRef.current = rtmClient
-    refs.sessionRef.current = session
-
-    if (memoryOwnerId) {
-      memoryService.updateCurrentSessionMetadata({
-        kind: session.intent.mode === 'training' ? 'training' : 'communication',
-        source: 'rtc_agent',
-        surface: session.intent.surface,
-        scene: session.intent.scene,
-        sessionStrategy: session.intent.sessionStrategy,
-        executionBackend: session.executionBackend,
-        transportProvider: session.transport.provider,
-      })
-    }
-
-    const bootstrapSendControlMessage = async (
-      type: string,
-      payload: Record<string, unknown> = {},
-    ) => {
-      await publishSessionControlMessage({
-        rtmClient: rtmClient!,
+    try {
+      const transportEventHandlers = createSessionTransportEventHandlers(setState)
+      const transport = await connectSessionExecution({
         session,
-        type,
-        payload,
+        onRtmMessage: handleRtmMessage,
+        ...transportEventHandlers,
       })
-    }
+      client = transport.clientHandle
+      rtmClient = transport.rtmClient
 
-    await syncRtcSessionProfile({
-      session,
-      userId,
-      suppressGreeting,
-      sendControl: bootstrapSendControlMessage,
-    })
+      refs.clientRef.current = client
+      refs.rtmClientRef.current = rtmClient
+      refs.sessionRef.current = session
 
-    clearPing()
-    pingTimerRef.current = window.setInterval(() => {
-      void pingRtcRuntimeSession(refs.sessionRef, accessToken)
-    }, 30_000)
+      await initAckGate.waitForReady()
 
-    setState((prev) => applyConnectedRtcSession(prev, session, connectionNotice))
-  } catch (error) {
-    connectionError = error instanceof Error ? error : new Error(String(error))
+      if (memoryOwnerId) {
+        memoryService.updateCurrentSessionMetadata({
+          kind: session.intent.mode === 'training' ? 'training' : 'communication',
+          source: 'rtc_agent',
+          surface: session.intent.surface,
+          scene: session.intent.scene,
+          sessionStrategy: session.intent.sessionStrategy,
+          executionBackend: session.executionBackend,
+          transportProvider: session.transport.provider,
+        })
+      }
 
-    try {
-      refs.micTrackRef.current?.stop()
-    } catch {
-      // ignore cleanup error
-    }
+      const bootstrapSendControlMessage = async (
+        type: string,
+        payload: Record<string, unknown> = {},
+      ) => {
+        await publishSessionControlMessage({
+          rtmClient: rtmClient!,
+          session,
+          type,
+          payload,
+        })
+      }
 
-    await disconnectSessionExecution({
-      clientHandle: client,
-      rtmClient,
-      micTrack: refs.micTrackRef.current,
-      session,
-    })
-    cleanupMicrophoneResources()
+      await syncRtcSessionProfile({
+        session,
+        userId,
+        suppressGreeting,
+        sendControl: bootstrapSendControlMessage,
+      })
 
-    try {
-      await stopRtcSession(session.channelName, accessToken)
-    } catch {
-      // ignore cleanup error
+      clearPing()
+      pingTimerRef.current = window.setInterval(() => {
+        void pingRtcRuntimeSession(refs.sessionRef, accessToken)
+      }, 30_000)
+
+      refs.onDecodedEnvelopeRef.current = null
+      initAckGate.cleanup()
+      setState((prev) => applyConnectedRtcSession(prev, session, connectionNotice))
+      return
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      refs.onDecodedEnvelopeRef.current = null
+      initAckGate.cleanup()
+
+      try {
+        refs.micTrackRef.current?.stop()
+      } catch {
+        // ignore cleanup error
+      }
+
+      await disconnectSessionExecution({
+        clientHandle: client,
+        rtmClient,
+        micTrack: refs.micTrackRef.current,
+        session,
+      })
+      cleanupMicrophoneResources()
+      resetRuntimeRefs(refs)
+
+      try {
+        await stopRtcSession(session.channelName, accessToken)
+      } catch {
+        // ignore cleanup error
+      }
+
+      if (
+        lastError instanceof SessionBootstrapTimeoutError &&
+        attempt < SESSION_INIT_ACK_MAX_ATTEMPTS
+      ) {
+        console.warn(
+          '[useRtcAgentSession] agent bootstrap timed out, retrying session connect once',
+        )
+        setState((prev) => applyConnectingState(prev))
+        await waitForDelay(SESSION_INIT_ACK_RETRY_DELAY_MS)
+        continue
+      }
+
+      break
     }
   }
 
-  if (connectionError) {
-    setState((prev) => applyRtcError(prev, connectionError.message))
-    throw connectionError
-  }
+  const connectionError =
+    lastError instanceof SessionBootstrapTimeoutError
+      ? new Error(
+          '助手没有真正进入房间，所以这次录音不会有转录结果。系统已自动重试一次，请再点连接；如果持续出现，请检查 livekit-agent 日志。',
+        )
+      : lastError ?? new Error('RTC 会话启动失败')
+
+  setState((prev) => applyRtcError(prev, connectionError.message))
+  throw connectionError
 }

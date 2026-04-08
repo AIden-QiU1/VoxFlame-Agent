@@ -11,7 +11,6 @@ from livekit.agents import AgentServer, AutoSubscribe, JobContext, cli
 
 from assistant_runtime import (
     CommunicationAssistantRuntime,
-    TrainingCoachRuntime,
     estimate_clarity_score,
 )
 from asr_runtime import LiveKitASRRuntime
@@ -22,11 +21,10 @@ from data_contract import (
     build_session_init_ack,
     build_session_userdata_ack,
     build_speech_activity_output,
-    build_training_coach_feedback_output,
     build_voice_profile_updated_output,
+    extract_caption_mode_update,
     decode_data_packet,
     extract_end_audio_reason,
-    extract_training_coach_request,
     extract_user_text_input,
 )
 from session_context import build_session_context
@@ -38,6 +36,7 @@ load_dotenv()
 logger = logging.getLogger("voxflame-livekit-agent")
 config = load_config()
 logging.basicConfig(level=getattr(logging, config.log_level.upper(), logging.INFO))
+REPLY_QUEUE_MAXSIZE = 8
 
 
 def _sanitize_proxy_env_for_local_livekit() -> None:
@@ -119,12 +118,13 @@ async def entrypoint(ctx: JobContext) -> None:
     )
     session_userdata = build_session_userdata(session_context)
     logger.info(
-        "LiveKit session userdata prepared room=%s participant=%s source=%s scene=%s hotwords=%s support_strategies=%s",
+        "LiveKit session userdata prepared room=%s participant=%s source=%s scene=%s hotwords=%s asr_hotword_entries=%s support_strategies=%s",
         session_context.room_name,
         session_context.participant_identity,
         session_userdata.preparation.source,
         session_userdata.preparation.scene,
         len(session_userdata.preparation.hotwords),
+        len(session_userdata.preparation.asr_hotword_entries),
         len(session_userdata.preparation.support_strategies),
     )
     assistant_runtime = CommunicationAssistantRuntime(
@@ -132,11 +132,10 @@ async def entrypoint(ctx: JobContext) -> None:
         ctx=session_context,
         userdata=session_userdata,
     )
-    training_coach_runtime = TrainingCoachRuntime(
-        config=config,
-        ctx=session_context,
-    )
     audio_runtime = LiveKitAudioReplyRuntime(config=config, room=ctx.room)
+    reply_queue: asyncio.Queue[tuple[str, str | None]] = asyncio.Queue(
+        maxsize=REPLY_QUEUE_MAXSIZE,
+    )
 
     async def publish_payload(payload: dict[str, object]) -> None:
         await ctx.room.local_participant.publish_data(
@@ -188,7 +187,7 @@ async def entrypoint(ctx: JobContext) -> None:
             ),
         )
 
-    async def respond_to_user_text(
+    async def process_user_text(
         user_text: str,
         *,
         correction_original: str | None = None,
@@ -219,32 +218,84 @@ async def entrypoint(ctx: JobContext) -> None:
                     clarity_score=clarity_score,
                     confusion_patterns_count=1 if correction_original != reply_text else 0,
                 ),
-        )
+            )
+        if session_userdata.caption_mode_enabled:
+            logger.info(
+                "LiveKit caption mode active, skipping TTS room=%s participant=%s",
+                session_context.room_name,
+                session_context.participant_identity,
+            )
+            return
+
         await audio_runtime.speak(reply_text)
 
-    async def respond_to_training_coach(request_payload: dict[str, object]) -> None:
-        coach_text, source, model = await training_coach_runtime.generate_feedback(
-            dict(request_payload),
-        )
-        session_userdata.note_training_feedback(coach_text)
-        await publish_payload(
-            build_training_coach_feedback_output(
-                session_context,
-                exercise_id=str(request_payload.get("exercise_id", "") or ""),
-                exercise_text=str(request_payload.get("exercise_text", "") or ""),
-                recognized_text=str(request_payload.get("recognized_text", "") or ""),
-                feedback_text=coach_text,
-                source=source,
-                model=model,
-            ),
-        )
+    async def reply_worker() -> None:
+        while True:
+            user_text, correction_original = await reply_queue.get()
+            try:
+                await process_user_text(
+                    user_text,
+                    correction_original=correction_original,
+                )
+            except Exception:
+                logger.exception(
+                    "LiveKit reply worker failed room=%s participant=%s",
+                    session_context.room_name,
+                    session_context.participant_identity,
+                )
+            finally:
+                reply_queue.task_done()
+
+    def enqueue_user_text(
+        user_text: str,
+        *,
+        correction_original: str | None = None,
+    ) -> None:
+        normalized = user_text.strip()
+        if not normalized:
+            return
+
+        if reply_queue.full():
+            try:
+                dropped_text, _ = reply_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                dropped_text = ""
+            else:
+                reply_queue.task_done()
+                logger.warning(
+                    "LiveKit reply queue full, dropped oldest pending transcript room=%s participant=%s chars=%s",
+                    session_context.room_name,
+                    session_context.participant_identity,
+                    len(dropped_text),
+                )
+
+        try:
+            reply_queue.put_nowait((normalized, correction_original))
+        except asyncio.QueueFull:
+            logger.warning(
+                "LiveKit reply queue still full, dropped latest transcript room=%s participant=%s chars=%s",
+                session_context.room_name,
+                session_context.participant_identity,
+                len(normalized),
+            )
+            return
+
         logger.info(
-            "LiveKit training coach feedback emitted room=%s participant=%s exercise_id=%s source=%s model=%s",
+            "LiveKit transcript enqueued room=%s participant=%s queue_size=%s chars=%s",
             session_context.room_name,
             session_context.participant_identity,
-            str(request_payload.get("exercise_id", "") or ""),
-            source,
-            model,
+            reply_queue.qsize(),
+            len(normalized),
+        )
+
+    async def enqueue_user_text_async(
+        user_text: str,
+        *,
+        correction_original: str | None = None,
+    ) -> None:
+        enqueue_user_text(
+            user_text,
+            correction_original=correction_original,
         )
 
     asr_runtime = LiveKitASRRuntime(
@@ -252,7 +303,7 @@ async def entrypoint(ctx: JobContext) -> None:
         ctx=session_context,
         participant=participant,
         publish_payload=publish_payload,
-        on_final_transcript=lambda transcript: respond_to_user_text(
+        on_final_transcript=lambda transcript: enqueue_user_text_async(
             transcript,
             correction_original=transcript,
         ),
@@ -260,6 +311,7 @@ async def entrypoint(ctx: JobContext) -> None:
         on_audio_telemetry=handle_audio_input_telemetry,
     )
     await asr_runtime.start()
+    asyncio.create_task(reply_worker())
 
     async def publish_init_ack() -> None:
         await publish_payload(build_session_init_ack(session_context))
@@ -296,18 +348,20 @@ async def entrypoint(ctx: JobContext) -> None:
                 len(user_text),
                 user_text[:80],
             )
-            asyncio.create_task(respond_to_user_text(user_text))
+            enqueue_user_text(user_text)
             return
 
-        training_coach_request = extract_training_coach_request(message)
-        if training_coach_request:
+        caption_mode_enabled = extract_caption_mode_update(message)
+        if caption_mode_enabled is not None:
+            session_userdata.set_caption_mode(caption_mode_enabled)
             logger.info(
-                "LiveKit training coach request received room=%s participant=%s exercise_id=%s",
+                "LiveKit caption mode updated room=%s participant=%s enabled=%s",
                 session_context.room_name,
                 session_context.participant_identity,
-                str(training_coach_request.get("exercise_id", "") or ""),
+                caption_mode_enabled,
             )
-            asyncio.create_task(respond_to_training_coach(training_coach_request))
+            if caption_mode_enabled:
+                asyncio.create_task(audio_runtime.interrupt())
             return
 
         end_audio_reason = extract_end_audio_reason(message)

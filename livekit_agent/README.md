@@ -42,20 +42,16 @@
    - backend 现在已经会把 `workspace snapshot.preparation` 注入 room metadata / dispatch metadata
    - 如果当前会话还没有显式 preparation，才会回退到 derived minimal pack
    - communication rewrite 也已开始读取这层准备上下文，而不再只依赖 `scene`
-10. `livekit_agent` 已开始产出最小训练反馈：
-   - 现在会接收 `training_feedback_request`
-   - 会回发前端现有 reducer 可直接消费的 `training_feedback`
-   - 同时补发一条训练侧 `voice_profile_updated`
-11. LiveKit 训练反馈已开始进入现有 `session review / memory` 过渡链：
-   - frontend 现在会把 `training_feedback` 写成现有 memory service 可识别的 `training_result`
+10. 训练页最小训练结果链已经并入现役主线：
+   - frontend 现在会把每次录音的 `标签 / 目标句 / 系统听到 / 保存状态` 写成现有 memory service 可识别的 `training_result`
    - 这让 workspace / session review / growth profile 开始真正吃到 LiveKit 训练结果
    - 记忆架构本身不需要重做，仍沿现有 `training_result -> training_profile_summary -> workspace snapshot` 语义继续长
-12. `session-close compaction` 第一片已落地：
+11. `session-close compaction` 第一片已落地：
    - session 结束时现在会自动生成 `session_compaction`
    - 当前会把 `fallback phrases / risky terms / pronunciation patterns / support strategies / hotwords / interruption telemetry`
      压成结构化语义记忆
    - backend `memory growth -> workspace snapshot` 已开始消费这层 compact memory
-13. `LiveKit Python RTC AudioProcessingModule` 第一片已接上：
+12. `LiveKit Python RTC AudioProcessingModule` 第一片已接上：
    - 当前会在 agent 订阅到的房间麦克风帧上先走 LiveKit 官方 `AudioProcessingModule`
    - 第一版默认是保守配置：
      - `noise_suppression=true`
@@ -66,7 +62,7 @@
      - 现在处理的是远端订阅音频，不是本地全双工采集
      - 对构音障碍用户，先避免过激增益和误伤发音特征
    - 这一步是对官方 APM 的最小接入，不等于已经完成 `room_options.audio_input` 级别的完整音频链
-14. `server-side audio telemetry` 第一片已接上：
+13. `server-side audio telemetry` 第一片已接上：
    - `livekit_agent` 现在会把会话里的原始收音信号压成正式事件，而不只是写日志
    - 当前会发：
      - `normalized_level`
@@ -84,7 +80,7 @@
 1. 保留同样的“模型提供方 / 日志级别”分组
 2. `LOG_LEVEL` 与 `DASHSCOPE_*` 保持 provider 侧统一，但 `livekit_agent` 当前走的是 DashScope OpenAI-compatible `/chat/completions`，所以 `DASHSCOPE_LLM_MODEL` 要填这一接口可用的模型名，例如 `qwen3.6-plus`，而不是裸写 `qwen3.5`
 3. `LIVEKIT_*` 继续由 compose environment 提供，`DASHSCOPE_*` 与 `LOG_LEVEL` 则优先从 [livekit_agent/.env](/home/ubuntu/VoxFlame-Agent/livekit_agent/.env) 读取
-4. 当前已经接通的是 `LIVEKIT_*` 驱动的 communication loop，并开始优先使用 `DASHSCOPE_*` 做 text rewrite / TTS / ASR；`training_feedback` 最小 contract 也已接上，但还没迁完更深的 `memory tooling`
+4. 当前已经接通的是 `LIVEKIT_*` 驱动的 communication loop，并开始优先使用 `DASHSCOPE_*` 做 text rewrite / TTS / ASR；训练结果与记忆沉淀继续走现有 `training_result -> workspace snapshot` 语义，不再并行维护逐句 feedback contract
 
 也就是说：
 
@@ -111,20 +107,15 @@
 4. 最小 `voice_profile_updated`
    - 当前按 correction 前后文本估算 `clarity_score`
    - 先把 LiveKit communication loop 的 profile signal 跑起来
-   - 训练反馈路径现在也会补发一条训练侧 `voice_profile_updated`
    - 后续再继续补真正的 `memory tooling`
 5. 最小 `interrupt / turn detection`
    - 当前由 server-side VAD 驱动
    - 用户再次开口时，worker 会中断当前 TTS
    - 这一步先让沟通页更接近现役 TEN 的可打断体验
-6. 最小 `training_feedback`
-   - 当前会消费 `training_feedback_request`
-   - 生成训练页当前可显示的 `summary / articulation_tip / next_step / clarity_score`
-   - 先对齐页面 contract，再继续迁更深的训练画像和记忆写入
-7. 最小 `training_result memory`
-   - frontend 会把 LiveKit `training_feedback` 记成现有 `training_result`
+6. 最小 `training_result memory`
+   - frontend 会把训练页每次录音结果记成现有 `training_result`
    - 后续 `session_review_build / growth profile` 可以继续沿同一条 memory 链演进
-8. 训练页执行面已显式优先 LiveKit
+7. 训练页执行面已显式优先 LiveKit
    - [frontend/src/hooks/useMandarinTrainingSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useMandarinTrainingSession.ts) 现在直接指定 `executionBackend: 'livekit'`
    - 训练 AI 功能后续可以继续补齐等价能力，而不会再隐式吃到旧默认执行面
 
@@ -337,9 +328,7 @@ cd frontend && NEXT_PUBLIC_API_URL=http://127.0.0.1:3201 NEXT_PUBLIC_RTC_EXECUTI
    - correction-style transcript
    - TTS
    - interrupt / turn-taking
-3. 训练页最小反馈链已跑通：
-   - `training_feedback_request -> training_feedback`
-   - `voice_profile_updated`
+3. 训练页最小结果链已跑通：
    - `training_result -> training_profile_summary -> workspace snapshot`
 
 当前还没做完的重点，不再是“迁移 seam”，而是：

@@ -28,6 +28,7 @@ export async function buildAuthorizedJsonHeaders(
 interface StartRtcSessionOptions {
   executionBackend?: RtcExecutionBackend
   accessToken?: string
+  timeoutSeconds?: number
 }
 
 export async function startRtcSession(
@@ -44,6 +45,9 @@ export async function startRtcSession(
       intent,
       ...(options.executionBackend
         ? { executionBackend: options.executionBackend }
+        : {}),
+      ...(typeof options.timeoutSeconds === 'number' && options.timeoutSeconds > 0
+        ? { timeoutSeconds: options.timeoutSeconds }
         : {}),
     }),
   })

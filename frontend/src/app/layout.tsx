@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster"
 import './globals.css'
 
 const pwaEnabled = process.env.NEXT_PUBLIC_PWA_ENABLED === '1'
+const allowLocalhostPwa = process.env.NEXT_PUBLIC_PWA_ALLOW_LOCALHOST === '1'
+const shouldResetLocalRuntime = !pwaEnabled || !allowLocalhostPwa
 const LOCAL_RUNTIME_RESET_SESSION_KEY = 'voxflame-local-runtime-reset-session-v1'
 const LOCAL_RUNTIME_RESET_BOOTSTRAP = `
 (() => {
@@ -137,7 +139,9 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#F59E0B" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
         {pwaEnabled ? <meta name="mobile-web-app-capable" content="yes" /> : null}
-        <script dangerouslySetInnerHTML={{ __html: LOCAL_RUNTIME_RESET_BOOTSTRAP }} />
+        {shouldResetLocalRuntime ? (
+          <script dangerouslySetInnerHTML={{ __html: LOCAL_RUNTIME_RESET_BOOTSTRAP }} />
+        ) : null}
       </head>
       <body className="antialiased">
         {/* Skip to main content link for accessibility */}
@@ -148,7 +152,7 @@ export default function RootLayout({
           跳转到主要内容
         </a>
         {children}
-        <LocalRuntimeReset />
+        {shouldResetLocalRuntime ? <LocalRuntimeReset /> : null}
         {pwaEnabled ? <PWAStatusCenter /> : null}
         <Toaster />
       </body>

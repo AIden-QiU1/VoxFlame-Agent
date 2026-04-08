@@ -11,10 +11,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from assistant_runtime import (
     CommunicationAssistantRuntime,
     DashScopeChatClient,
-    TrainingCoachRuntime,
+    build_current_turn_prompt,
     build_fallback_text,
     build_preparation_prompt,
-    build_training_extension_fallback_text,
     compute_reply_timeout_seconds,
     estimate_clarity_score,
     extract_text_from_completion,
@@ -36,8 +35,6 @@ def create_config() -> LiveKitAgentConfig:
         dashscope_llm_model="qwen3.6-plus",
         dashscope_timeout_seconds=15.0,
         dashscope_reply_timeout_seconds=4.5,
-        dashscope_training_extension_model="qwen3.5-plus",
-        dashscope_training_extension_timeout_seconds=8.0,
         dashscope_asr_url="wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
         dashscope_asr_model="qwen3-asr-flash-realtime-2026-02-10",
         dashscope_asr_sample_rate=16000,
@@ -153,10 +150,28 @@ class TestAssistantRuntime(unittest.TestCase):
         reply, source = asyncio.run(runtime.generate_reply("请帮我叫医生"))
         self.assertEqual(source, "dashscope_chat_completion")
         self.assertEqual(reply, "请先帮我叫医生，我需要马上处理。")
-        self.assertEqual(fake_client.requests[0][-1]["content"], "请帮我叫医生")
+        self.assertIn("本轮 ASR 最终文本：请帮我叫医生", fake_client.requests[0][-1]["content"])
         self.assertTrue(
-            any("当前准备目标" in message["content"] for message in fake_client.requests[0][:-1]),
+            any("稳定准备上下文" in message["content"] for message in fake_client.requests[0][:-1]),
         )
+
+    def test_generate_reply_uses_caption_prompt_without_history_when_caption_mode_enabled(self) -> None:
+        fake_client = FakeDashScopeClient("请先帮我叫医生。")
+        userdata = build_session_userdata(create_context())
+        userdata.set_caption_mode(True)
+        runtime = CommunicationAssistantRuntime(
+            config=create_config(),
+            ctx=create_context(),
+            userdata=userdata,
+            client=fake_client,
+        )
+
+        asyncio.run(runtime.generate_reply("请帮我叫医生"))
+        asyncio.run(runtime.generate_reply("我现在很难受"))
+
+        self.assertIn("实时字幕纠错助手", fake_client.requests[0][0]["content"])
+        self.assertIn("最终展示字幕", fake_client.requests[0][-1]["content"])
+        self.assertEqual(len(fake_client.requests[1]), 4)
 
     def test_generate_reply_falls_back_quickly_when_dashscope_reply_times_out(self) -> None:
         config = create_config()
@@ -190,106 +205,21 @@ class TestAssistantRuntime(unittest.TestCase):
         userdata = build_session_userdata(create_context())
         userdata.preparation.hotwords = ["挂号", "复诊"]
         prompt = build_preparation_prompt(userdata)
-        self.assertIn("当前准备目标", prompt)
+        self.assertIn("稳定准备上下文", prompt)
         self.assertIn("挂号", prompt)
 
-    def test_training_extension_uses_fallback_without_dashscope(self) -> None:
-        runtime = TrainingCoachRuntime(
-            config=create_config(),
-            ctx=create_context(),
-        )
-        feedback_text, source, model = asyncio.run(
-            runtime.generate_feedback(
-                {
-                    "exercise_text": "请先听我说完",
-                    "recognized_text": "请先听我说话",
-                },
-            ),
-        )
-        self.assertEqual(source, "livekit_training_extension_fallback")
-        self.assertEqual(model, "qwen3.5-plus")
-        self.assertEqual(
-            feedback_text,
-            build_training_extension_fallback_text(
-                {
-                    "exercise_text": "请先听我说完",
-                    "recognized_text": "请先听我说话",
-                },
-            ),
-        )
+    def test_build_current_turn_prompt_prefers_active_hotwords(self) -> None:
+        userdata = build_session_userdata(create_context())
+        userdata.preparation.hotwords = ["挂号", "复诊"]
+        userdata.preparation.risky_terms = ["甲状腺结节"]
+        userdata.preparation.fallback_phrases = ["医生您好，我想先挂号。"]
+        userdata.note_user_transcript("我想先挂号")
 
-    def test_training_extension_uses_client_when_available(self) -> None:
-        fake_client = FakeDashScopeClient("这次最后两个字有点跑掉了，先把“说完”慢一点，再录一遍。")
-        runtime = TrainingCoachRuntime(
-            config=create_config(),
-            ctx=create_context(),
-            client=fake_client,
-        )
-        feedback_text, source, model = asyncio.run(
-            runtime.generate_feedback(
-                {
-                    "exercise_text": "请先听我说完",
-                    "recognized_text": "请先听我说话",
-                    "exercise_category": "outing",
-                },
-            ),
-        )
-        self.assertEqual(source, "livekit_training_extension")
-        self.assertEqual(model, "qwen3.5-plus")
-        self.assertEqual(
-            feedback_text,
-            "这次最后两个字有点跑掉了，先把“说完”慢一点，再录一遍。",
-        )
-        self.assertIn("目标句", fake_client.requests[0][-1]["content"])
-        self.assertIn("系统听到", fake_client.requests[0][-1]["content"])
+        prompt = build_current_turn_prompt("我想先挂号", userdata)
 
-    def test_training_extension_falls_back_when_dashscope_times_out(self) -> None:
-        config = create_config()
-        object.__setattr__(config, "dashscope_training_extension_timeout_seconds", 0.01)
-        runtime = TrainingCoachRuntime(
-            config=config,
-            ctx=create_context(),
-            client=DashScopeChatClient(
-                api_key="dashscope-test",
-                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                model="qwen3.5-plus",
-                timeout_seconds=0.01,
-            ),
-        )
-
-        async def slow_to_thread(*args, **kwargs):  # noqa: ANN002, ANN003
-            await asyncio.sleep(0.05)
-            return "这条不该返回"
-
-        with patch("assistant_runtime.asyncio.to_thread", slow_to_thread):
-            feedback_text, source, model = asyncio.run(
-                runtime.generate_feedback(
-                    {
-                        "exercise_text": "请先听我说完",
-                        "recognized_text": "请先听我说话",
-                    },
-                ),
-            )
-
-        self.assertEqual(source, "livekit_training_extension_fallback")
-        self.assertEqual(model, "qwen3.5-plus")
-        self.assertEqual(
-            feedback_text,
-            build_training_extension_fallback_text(
-                {
-                    "exercise_text": "请先听我说完",
-                    "recognized_text": "请先听我说话",
-                },
-            ),
-        )
-
-    def test_build_training_extension_fallback_prefers_target_when_no_transcript(self) -> None:
-        text = build_training_extension_fallback_text(
-            {
-                "exercise_text": "请先听我说完",
-            },
-        )
-        self.assertIn("先对着目标句", text)
+        self.assertIn("本轮 ASR 最终文本：我想先挂号", prompt)
+        self.assertIn("优先核对热词：挂号", prompt)
+        self.assertIn("甲状腺结节", prompt)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
-const pwaEnabled = process.env.VOXFLAME_ENABLE_PWA === "1";
+const normalizedPwaFlag = (process.env.VOXFLAME_ENABLE_PWA || "").trim().toLowerCase();
+const normalizedPwaDevFlag = (process.env.VOXFLAME_ENABLE_PWA_DEV || "").trim().toLowerCase();
+const pwaEnabled = !["0", "false", "no"].includes(normalizedPwaFlag);
+const pwaEnabledInDevelopment = ["1", "true", "yes"].includes(normalizedPwaDevFlag);
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
   register: false,
@@ -7,7 +10,9 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swcMinify: true,
-  disable: process.env.NODE_ENV === "development" || !pwaEnabled,
+  disable:
+    !pwaEnabled ||
+    (process.env.NODE_ENV === "development" && !pwaEnabledInDevelopment),
   fallbacks: {
     document: "/~offline",
   },
@@ -28,6 +33,7 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_PWA_ENABLED: pwaEnabled ? "1" : "0",
+    NEXT_PUBLIC_PWA_ALLOW_LOCALHOST: pwaEnabledInDevelopment ? "1" : "0",
   },
   async rewrites() {
     const backendUrl =

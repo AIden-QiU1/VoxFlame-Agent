@@ -17,18 +17,6 @@ export interface ConversationMessage {
   timestamp: Date
 }
 
-export interface TrainingCoachFeedbackEvent {
-  requestId: string
-  exerciseId: string
-  exerciseText: string
-  recognizedText: string
-  feedbackText: string
-  source: string
-  model: string
-  timestamp: Date
-  error: string | null
-}
-
 export interface VoiceProfileSyncEvent {
   source: string
   exerciseId: string
@@ -156,6 +144,7 @@ export interface SessionMicrophoneTrack {
 }
 
 export interface RtcAgentState {
+  isConnecting: boolean
   isConnected: boolean
   isRecording: boolean
   isThinking: boolean
@@ -170,6 +159,5 @@ export interface RtcAgentState {
   sessionIntent: RtcResolvedSessionIntent | null
   sessionReadiness: RtcSessionReadiness | null
   grantedCapabilities: RtcCapabilityId[]
-  lastTrainingCoachFeedback: TrainingCoachFeedbackEvent | null
   lastVoiceProfileSync: VoiceProfileSyncEvent | null
 }

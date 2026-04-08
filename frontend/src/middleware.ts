@@ -1,7 +1,7 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { buildLoginPath } from '@/lib/auth/navigation'
+import { buildLoginPath, resolveExternalOrigin } from '@/lib/auth/navigation'
 
 const PROTECTED_PATH_PREFIXES = ['/contribute', '/memory', '/chat']
 
@@ -50,11 +50,12 @@ export async function middleware(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (requiresAuth(request) && !user) {
-        const loginUrl = request.nextUrl.clone()
         const nextValue = `${request.nextUrl.pathname}${request.nextUrl.search}`
         const loginPath = buildLoginPath(nextValue)
-        loginUrl.pathname = '/login'
-        loginUrl.search = loginPath.includes('?') ? loginPath.slice(loginPath.indexOf('?')) : ''
+        const loginUrl = new URL(
+            loginPath,
+            resolveExternalOrigin(request.url, request.headers),
+        )
         return NextResponse.redirect(loginUrl)
     }
 

@@ -65,7 +65,6 @@ export function useMandarinTrainingSession(
     requestedCapabilities: [
       'transport_send_control',
       'workspace_snapshot_read',
-      'training_feedback_request',
       'voice_profile_update',
       'upload_artifact_persist',
     ],
@@ -75,7 +74,6 @@ export function useMandarinTrainingSession(
     sessionId,
     currentASRText,
     latestUserTranscript,
-    lastTrainingCoachFeedback,
     lastVoiceProfileSync,
     isRecording: rtcIsRecording,
     isConnected,
@@ -370,14 +368,6 @@ export function useMandarinTrainingSession(
     })
   }, [sendControlEvent])
 
-  const requestTrainingCoach = useCallback((payload: Record<string, unknown>) => {
-    void sendControlEvent('training_coach_request', payload).catch((eventError: unknown) => {
-      const message =
-        eventError instanceof Error ? eventError.message : '训练建议生成失败'
-      setError(message)
-    })
-  }, [sendControlEvent])
-
   const sessionError = error || rtcError
   const status: SessionStatus = sessionError
     ? 'error'
@@ -395,7 +385,6 @@ export function useMandarinTrainingSession(
     status,
     interimText: currentASRText,
     finalText: latestUserTranscript,
-    latestTrainingCoachFeedback: lastTrainingCoachFeedback,
     latestVoiceProfileSync: lastVoiceProfileSync,
     error: sessionError,
     isRecording: rtcIsRecording,
@@ -408,7 +397,6 @@ export function useMandarinTrainingSession(
     startRecording,
     stopRecording,
     syncVoiceProfile,
-    requestTrainingCoach,
     sendSpeechActivity,
     disconnect,
   }

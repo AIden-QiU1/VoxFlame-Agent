@@ -23,8 +23,6 @@ class ConfigTests(unittest.TestCase):
             "DASHSCOPE_LLM_MODEL": "qwen3.6-plus",
             "DASHSCOPE_TIMEOUT_SECONDS": "9.5",
             "DASHSCOPE_REPLY_TIMEOUT_SECONDS": "3.2",
-            "DASHSCOPE_TRAINING_EXTENSION_MODEL": "qwen3.5-plus",
-            "DASHSCOPE_TRAINING_EXTENSION_TIMEOUT_SECONDS": "7.5",
             "QWEN_ASR_REALTIME_URL": "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
             "QWEN_ASR_REALTIME_MODEL": "qwen3-asr-flash-realtime-2026-02-10",
             "QWEN_ASR_REALTIME_SAMPLE_RATE": "16000",
@@ -72,8 +70,6 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.dashscope_llm_model, "qwen3.6-plus")
         self.assertEqual(config.dashscope_timeout_seconds, 9.5)
         self.assertEqual(config.dashscope_reply_timeout_seconds, 3.2)
-        self.assertEqual(config.dashscope_training_extension_model, "qwen3.5-plus")
-        self.assertEqual(config.dashscope_training_extension_timeout_seconds, 7.5)
         self.assertEqual(config.dashscope_asr_url, "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")
         self.assertEqual(config.dashscope_asr_model, "qwen3-asr-flash-realtime-2026-02-10")
         self.assertEqual(config.dashscope_asr_sample_rate, 16000)

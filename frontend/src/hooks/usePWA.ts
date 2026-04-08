@@ -3,9 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 
 let swRegistrationPromise: Promise<ServiceWorkerRegistration | null> | null = null
+const allowLocalhostPwa = process.env.NEXT_PUBLIC_PWA_ALLOW_LOCALHOST === '1'
 
 function isLocalRuntimeOriginHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1'
+}
+
+function shouldBypassLocalRuntimeOrigin(hostname: string): boolean {
+  return isLocalRuntimeOriginHost(hostname) && !allowLocalhostPwa
 }
 
 interface BeforeInstallPromptEvent extends Event {
@@ -53,7 +58,7 @@ export function usePWA(): UsePWAReturn {
     if (
       typeof window === 'undefined' ||
       !('serviceWorker' in navigator) ||
-      isLocalRuntimeOriginHost(window.location.hostname)
+      shouldBypassLocalRuntimeOrigin(window.location.hostname)
     ) {
       return null
     }
@@ -123,7 +128,7 @@ export function usePWA(): UsePWAReturn {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    if (isLocalRuntimeOriginHost(window.location.hostname)) {
+    if (shouldBypassLocalRuntimeOrigin(window.location.hostname)) {
       return
     }
 
@@ -152,7 +157,7 @@ export function usePWA(): UsePWAReturn {
     if (
       typeof window === 'undefined' ||
       !('serviceWorker' in navigator) ||
-      isLocalRuntimeOriginHost(window.location.hostname)
+      shouldBypassLocalRuntimeOrigin(window.location.hostname)
     ) {
       return
     }
@@ -235,7 +240,7 @@ export function usePWA(): UsePWAReturn {
   }, [])
 
   return {
-    canInstall: !isLocalOrigin && !!deferredPrompt && !isInstalled,
+    canInstall: (!!deferredPrompt && !isInstalled && (!isLocalOrigin || allowLocalhostPwa)),
     isInstalled,
     isStandalone,
     isOnline,
@@ -243,7 +248,7 @@ export function usePWA(): UsePWAReturn {
     hasUpdate,
     installPlatform,
     isIOS,
-    needsManualInstall: !isLocalOrigin && isIOS && !isInstalled && !deferredPrompt,
+    needsManualInstall: (!isLocalOrigin || allowLocalhostPwa) && isIOS && !isInstalled && !deferredPrompt,
     promptInstall,
     updateServiceWorker,
     clearCacheAndReload,

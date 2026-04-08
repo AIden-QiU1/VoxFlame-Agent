@@ -30,7 +30,7 @@ class SessionContextTests(unittest.TestCase):
                 "participant_identity": "vox-user-42-dispatch",
                 "session_intent": {
                     "scene": "medical",
-                    "requestedCapabilities": ["training_feedback_request"],
+                    "requestedCapabilities": ["voice_profile_update"],
                 },
                 "granted_capabilities": ["transport_send_control"],
             }
@@ -51,7 +51,7 @@ class SessionContextTests(unittest.TestCase):
         self.assertEqual(ctx.scene, "medical")
         self.assertEqual(
             ctx.requested_capabilities,
-            ["transport_send_control", "training_feedback_request"],
+            ["transport_send_control", "voice_profile_update"],
         )
         self.assertEqual(
             ctx.granted_capabilities,

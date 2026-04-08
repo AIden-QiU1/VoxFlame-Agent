@@ -14,7 +14,6 @@ export type RtcSessionStrategy = 'heavy_realtime' | 'light_voice'
 
 export type RtcCapabilityId =
   | 'transport_send_control'
-  | 'training_feedback_request'
   | 'voice_profile_update'
   | 'workspace_snapshot_read'
   | 'upload_artifact_persist'
@@ -78,7 +77,6 @@ export function defaultCapabilitiesForMode(
     return [
       'transport_send_control',
       'workspace_snapshot_read',
-      'training_feedback_request',
       'voice_profile_update',
       'upload_artifact_persist',
     ]

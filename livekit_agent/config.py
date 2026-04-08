@@ -17,8 +17,6 @@ class LiveKitAgentConfig:
     dashscope_llm_model: str
     dashscope_timeout_seconds: float
     dashscope_reply_timeout_seconds: float
-    dashscope_training_extension_model: str
-    dashscope_training_extension_timeout_seconds: float
     dashscope_asr_url: str
     dashscope_asr_model: str
     dashscope_asr_sample_rate: int
@@ -75,13 +73,6 @@ def load_config() -> LiveKitAgentConfig:
         dashscope_timeout_seconds=float(os.getenv("DASHSCOPE_TIMEOUT_SECONDS", "15").strip() or "15"),
         dashscope_reply_timeout_seconds=float(
             os.getenv("DASHSCOPE_REPLY_TIMEOUT_SECONDS", "4.5").strip() or "4.5"
-        ),
-        dashscope_training_extension_model=(
-            os.getenv("DASHSCOPE_TRAINING_EXTENSION_MODEL", "qwen3.5-plus").strip()
-            or "qwen3.5-plus"
-        ),
-        dashscope_training_extension_timeout_seconds=float(
-            os.getenv("DASHSCOPE_TRAINING_EXTENSION_TIMEOUT_SECONDS", "8").strip() or "8"
         ),
         dashscope_asr_url=(
             os.getenv("QWEN_ASR_REALTIME_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")

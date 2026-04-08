@@ -18,7 +18,6 @@ from data_contract import (
     build_voice_profile_updated_output,
     decode_data_packet,
     extract_end_audio_reason,
-    extract_training_feedback_request,
     extract_user_text_input,
 )
 from session_context import VoxFlameSessionContext
@@ -59,15 +58,6 @@ class DataContractTests(unittest.TestCase):
         self.assertIsNone(extract_user_text_input({"type": "end_audio"}))
         self.assertEqual(extract_end_audio_reason({"type": "end_audio", "reason": "manual_stop"}), "manual_stop")
 
-    def test_extract_training_feedback_request_reads_training_message(self) -> None:
-        message = {
-            "type": "training_feedback_request",
-            "exercise_id": "exercise-1",
-        }
-        payload = extract_training_feedback_request(message)
-        self.assertIsNotNone(payload)
-        self.assertEqual(payload["exercise_id"], "exercise-1")
-
     def test_build_session_init_ack_exposes_runtime_metadata(self) -> None:
         payload = build_session_init_ack(create_context())
 
@@ -86,12 +76,17 @@ class DataContractTests(unittest.TestCase):
                 listener_guidance=["如果没听清，请直接复述确认。"],
                 support_strategies=["优先突出症状和诉求。"],
                 hotwords=["挂号", "疼痛"],
+                asr_hotword_entries=[{"text": "甲状腺结节", "weight": 6, "lang": "zh"}],
             ),
         )
 
         self.assertEqual(payload["type"], "session_userdata_ack")
         self.assertEqual(payload["metadata"]["source"], "metadata")
         self.assertEqual(payload["preparation"]["hotwords"], ["挂号", "疼痛"])
+        self.assertEqual(
+            payload["preparation"]["asr_hotword_entries"],
+            [{"text": "甲状腺结节", "weight": 6, "lang": "zh"}],
+        )
 
     def test_build_assistant_text_output_matches_frontend_reducer_shape(self) -> None:
         payload = build_assistant_text_output(create_context(), "我想挂号")

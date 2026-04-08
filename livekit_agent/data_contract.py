@@ -58,6 +58,7 @@ def build_session_userdata_ack(
             "listener_guidance": preparation.listener_guidance,
             "support_strategies": preparation.support_strategies,
             "hotwords": preparation.hotwords,
+            "asr_hotword_entries": preparation.asr_hotword_entries,
             "risky_terms": preparation.risky_terms,
             "common_confusions": preparation.common_confusions,
             "fallback_phrases": preparation.fallback_phrases,
@@ -142,34 +143,6 @@ def build_voice_profile_updated_output(
     }
 
 
-def build_training_coach_feedback_output(
-    ctx: VoxFlameSessionContext,
-    *,
-    exercise_id: str,
-    exercise_text: str,
-    recognized_text: str,
-    feedback_text: str,
-    source: str,
-    model: str,
-) -> dict[str, Any]:
-    return {
-        "type": "training_coach_feedback",
-        "feedback_request_id": exercise_id.strip() or ctx.request_id,
-        "exercise_id": exercise_id.strip(),
-        "exercise_text": exercise_text.strip(),
-        "recognized_text": recognized_text.strip(),
-        "feedback_text": feedback_text.strip(),
-        "source": source,
-        "model": model.strip(),
-        "metadata": {
-            "request_id": ctx.request_id,
-            "surface": ctx.surface,
-            "mode": ctx.mode,
-            "scene": ctx.scene,
-        },
-    }
-
-
 def build_speech_activity_output(
     ctx: VoxFlameSessionContext,
     *,
@@ -222,20 +195,6 @@ def build_audio_input_telemetry_output(
     }
 
 
-def extract_training_feedback_request(message: dict[str, Any]) -> dict[str, Any] | None:
-    if message.get("type") not in {"training_feedback_request", "training_coach_request"}:
-        return None
-
-    return dict(message)
-
-
-def extract_training_coach_request(message: dict[str, Any]) -> dict[str, Any] | None:
-    if message.get("type") != "training_coach_request":
-        return None
-
-    return dict(message)
-
-
 def extract_user_text_input(message: dict[str, Any]) -> str | None:
     if message.get("type") != "user_input":
         return None
@@ -252,3 +211,11 @@ def extract_end_audio_reason(message: dict[str, Any]) -> str | None:
 
     reason = message.get("reason")
     return reason.strip() if isinstance(reason, str) and reason.strip() else "unknown"
+
+
+def extract_caption_mode_update(message: dict[str, Any]) -> bool | None:
+    if message.get("type") != "caption_mode_update":
+        return None
+
+    enabled = message.get("enabled")
+    return enabled if isinstance(enabled, bool) else None

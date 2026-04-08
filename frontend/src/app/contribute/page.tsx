@@ -1,17 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ListChecks,
-  Mic,
-  SlidersHorizontal,
-  UploadCloud,
-} from 'lucide-react'
-import { PWAStatusCenter } from '@/components/pwa/PWAStatusCenter'
-import { SessionReadinessPanel } from '@/components/runtime/SessionReadinessPanel'
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from 'react'
+import { FileText, Loader2, Mic, Sparkles, UploadCloud } from 'lucide-react'
 import { MicrophoneInputFeedback } from '@/components/runtime/MicrophoneInputFeedback'
-import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/useAuth'
 import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
 import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
@@ -27,7 +26,12 @@ import {
   type MandarinTrainingExercise,
   getExercisesByCategory,
 } from '@/lib/corpus/mandarin-training'
-import { memoryService } from '@/lib/memory/memory-service'
+import {
+  fetchPreparedExpressionAsset,
+  savePreparedExpressionAsset,
+  summarizePreparedExpressionAsset,
+  type PreparedExpressionAsset,
+} from '@/lib/memory/workspace-client'
 import type {
   VoxFlameConsentScope,
   VoxFlameRecordingEnvelope,
@@ -37,41 +41,20 @@ import {
   analyzeMandarinAttempt,
 } from '@/lib/training/mandarin-feedback'
 import {
-  assessTrainingSampleQuality,
-  type TrainingSampleQuality,
-} from '@/lib/training/training-sample-quality'
-import {
-  DEFAULT_TRAINING_GUIDANCE_PROFILE,
-  TRAINING_ETIOLOGY_OPTIONS,
-  TRAINING_PRIORITY_OPTIONS,
-  TRAINING_SEVERITY_OPTIONS,
-  buildTrainingGuidanceContext,
-  buildTrainingGuidanceProfileMetadata,
-  getTrainingGuidanceProfile,
-  saveTrainingGuidanceProfile,
-  type TrainingGuidanceProfile,
-} from '@/lib/training/training-guidance-profile'
-import {
   appendUploadedTrainingRecord,
-  buildTrainingProfileMemorySummary,
-  buildTrainingVoiceProfilePayload,
   getUploadedTrainingExerciseIds,
   markTrainingProfileSummarySynced,
+  TRAINING_PROFILE_SYNC_INTERVAL,
 } from '@/lib/training/training-profile'
 import {
   buildPreparedExpressionPracticeExercises,
-  buildPreparedExpressionPracticeSummary,
   type PreparedExpressionPracticeExercise,
 } from '@/lib/training/prepared-expression-practice'
 import {
-  defaultCapabilitiesForMode,
-  defaultStrategyForMode,
-  type RtcScene,
-} from '@/lib/realtime-audio/session-contract'
-import {
-  deriveTrainingSampleReviewDecision,
-  type TrainingSampleReviewDecision,
-} from '@/lib/training/training-sample-review'
+  assessTrainingSampleQuality,
+  type TrainingSampleQuality,
+} from '@/lib/training/training-sample-quality'
+import { deriveTrainingSampleReviewDecision, type TrainingSampleReviewDecision } from '@/lib/training/training-sample-review'
 import { buildTrainingSampleLineage } from '@/lib/training/training-sample-lineage'
 import { selectTrainingExercises } from '@/lib/training/training-exercise-selection'
 
@@ -84,6 +67,9 @@ type AttemptUploadStatus =
   | 'failed'
 
 type AttemptSaveTrigger = 'auto' | 'manual'
+
+type PracticeSourceMode = 'prepared_content' | 'sentence_corpus'
+type PracticeExercise = MandarinTrainingExercise | PreparedExpressionPracticeExercise
 
 interface PracticeAttempt {
   createdAt: number
@@ -103,27 +89,13 @@ interface NoticeState {
   message: string
 }
 
-type PracticeSourceMode = 'important_expression' | 'sentence_corpus'
-type PracticeExercise = MandarinTrainingExercise | PreparedExpressionPracticeExercise
-
-interface PracticeCollectionMeta {
-  label: string
-  shortLabel: string
-  description: string
-  examples: string[]
-  helper: string
-  trainingTips: string[]
-  corpusCount: number
-}
-
-function isPreparedExpressionExercise(
-  exercise: PracticeExercise | null | undefined,
-): exercise is PreparedExpressionPracticeExercise {
-  return Boolean(
-    exercise &&
-    'practiceSource' in exercise &&
-    exercise.practiceSource === 'prepared_expression',
-  )
+interface PreparedCorrectionSummaryView {
+  summary: string
+  hotwords: string[]
+  recurringErrors: string[]
+  nextFocus: string[]
+  model: string
+  basedOnTrainingCount: number
 }
 
 const DEFAULT_VISIBLE_SENTENCES = 60
@@ -136,6 +108,41 @@ const UPLOAD_STATUS_LABELS: Record<AttemptUploadStatus, string> = {
   retrying: '正在后台自动补登',
   auth_required: '需要重新登录恢复自动保存',
   failed: '云端登记暂时异常',
+}
+
+function stripFileExtension(filename: string): string {
+  return filename.replace(/\.[^/.]+$/, '')
+}
+
+function dedupeStrings(values: Array<string | null | undefined>, limit?: number): string[] {
+  const seen = new Set<string>()
+  const results: string[] = []
+
+  values.forEach((value) => {
+    if (typeof value !== 'string') {
+      return
+    }
+
+    const normalized = value.trim()
+    if (!normalized || seen.has(normalized)) {
+      return
+    }
+
+    seen.add(normalized)
+    results.push(normalized)
+  })
+
+  return typeof limit === 'number' ? results.slice(0, limit) : results
+}
+
+function isPreparedExpressionExercise(
+  exercise: PracticeExercise | null | undefined,
+): exercise is PreparedExpressionPracticeExercise {
+  return Boolean(
+    exercise &&
+    'practiceSource' in exercise &&
+    exercise.practiceSource === 'prepared_expression',
+  )
 }
 
 function getClarityScore(status: MandarinTrainingFeedback['status']): number {
@@ -168,11 +175,11 @@ function buildUploadMetadata(
   feedback: MandarinTrainingFeedback,
   sampleQuality: TrainingSampleQuality,
   sampleReview: TrainingSampleReviewDecision,
-  guidanceProfile: TrainingGuidanceProfile,
   saveTrigger: AttemptSaveTrigger,
 ): Record<string, unknown> {
   const lineage = buildTrainingSampleLineage(exercise, recording)
   const metadata: Record<string, unknown> = {
+    kind: 'training_result',
     exercise_id: exercise.id,
     exercise_text: exercise.text,
     exercise_category: exercise.category,
@@ -209,9 +216,8 @@ function buildUploadMetadata(
     articulation_tips: feedback.articulationTips,
     pronunciation_targets: feedback.pronunciationTargets,
     pronunciation_summary: feedback.pronunciationSummary,
-    guidance_profile: buildTrainingGuidanceProfileMetadata(guidanceProfile),
     consent_version: LEGAL_CONSENT_VERSION,
-    source_label: 'training_workspace_v2',
+    source_label: 'training_workspace_v3',
     save_trigger: saveTrigger,
     auto_saved: saveTrigger === 'auto',
   }
@@ -224,6 +230,7 @@ function buildUploadMetadata(
     metadata.high_risk_phrases = exercise.preparedExpressionHighRiskPhrases
     metadata.fallback_phrases = exercise.preparedExpressionFallbackPhrases
     metadata.keywords = exercise.preparedExpressionKeywords
+    metadata.hotwords = exercise.preparedExpressionKeywords
     metadata.practice_source = exercise.practiceSource
   }
 
@@ -239,37 +246,6 @@ function buildUploadMetadata(
   }
 
   return metadata
-}
-
-function buildTrainingCoachRequestPayload(
-  exercise: PracticeExercise,
-  transcript: string,
-  guidanceProfile: TrainingGuidanceProfile,
-): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
-    exercise_id: exercise.id,
-    exercise_text: exercise.text,
-    exercise_category: exercise.category,
-    recognized_text: transcript,
-    guidance_profile: buildTrainingGuidanceProfileMetadata(guidanceProfile),
-  }
-
-  if (isPreparedExpressionExercise(exercise)) {
-    return {
-      ...payload,
-      prepared_expression_id: exercise.preparedExpressionId,
-      prepared_expression_title: exercise.preparedExpressionTitle,
-      prepared_expression_section_id: exercise.preparedExpressionSectionId,
-      prepared_expression_section_title: exercise.preparedExpressionSectionTitle,
-      high_risk_phrases: exercise.preparedExpressionHighRiskPhrases,
-      fallback_phrases: exercise.preparedExpressionFallbackPhrases,
-      keywords: exercise.preparedExpressionKeywords,
-      hotwords: exercise.preparedExpressionKeywords,
-      practice_source: exercise.practiceSource,
-    }
-  }
-
-  return payload
 }
 
 function buildUploadedTrainingRecord(attempt: PracticeAttempt) {
@@ -305,21 +281,21 @@ function getRecorderStatusCopy(
   if (status === 'recording') {
     return {
       label: '正在录音',
-      description: '按正常节奏读完这句，然后点击停止看反馈。',
+      description: '按正常节奏读完这句，然后点击停止。',
     }
   }
 
   if (status === 'processing') {
     return {
       label: '正在收结果',
-      description: '正在等待最终 transcript 和录音 envelope 收齐。',
+      description: '正在等最终 transcript 和录音 envelope 收齐。',
     }
   }
 
   if (status === 'ready') {
     return {
       label: '可以开始',
-      description: '句子和录音按钮都已就绪，直接点一次就能开练。',
+      description: '选中一句后，点一次录音就行。',
     }
   }
 
@@ -333,14 +309,39 @@ function getRecorderStatusCopy(
   if (status === 'error') {
     return {
       label: '需要处理',
-      description: sessionError || '当前训练链路有异常，请先看下面的提示。',
+      description: sessionError || '当前训练链路有异常，请先处理下面的提示。',
     }
   }
 
   return {
-    label: '等待你开始',
-    description: '先选一句，再点录音。训练页不会先让你读很多说明。',
+    label: '等待开始',
+    description: '先保存准备内容，再选一句开始练。',
   }
+}
+
+function renderChips(
+  items: string[],
+  tone: 'stone' | 'amber' | 'sky' | 'emerald' = 'stone',
+) {
+  const toneClasses: Record<typeof tone, string> = {
+    stone: 'bg-stone-100 text-stone-700',
+    amber: 'bg-amber-100 text-amber-800',
+    sky: 'bg-sky-100 text-sky-800',
+    emerald: 'bg-emerald-100 text-emerald-800',
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => (
+        <span
+          key={item}
+          className={`rounded-full px-3 py-1 text-xs font-medium ${toneClasses[tone]}`}
+        >
+          {item}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 export default function ContributePage() {
@@ -352,18 +353,11 @@ export default function ContributePage() {
     status,
     interimText,
     error: sessionError,
-    latestTrainingCoachFeedback,
     isRecording,
     isProcessing,
-    isConnected,
-    sessionIntent,
-    sessionReadiness,
-    grantedCapabilities,
     analyser,
     startRecording,
     stopRecording,
-    requestTrainingCoach,
-    syncVoiceProfile,
     disconnect,
   } = useMandarinTrainingSession({
     userId: userId ?? undefined,
@@ -374,10 +368,10 @@ export default function ContributePage() {
     refreshLocalQueueCount,
     isUploading,
     localQueueItems,
-    lastError,
   } = useVoiceUpload()
   const {
     snapshot: workspaceSnapshot,
+    refresh: refreshWorkspaceSnapshot,
   } = useWorkspaceMemorySnapshot({
     userId,
     isAuthenticated,
@@ -392,41 +386,43 @@ export default function ContributePage() {
   )
   const [exerciseQuery, setExerciseQuery] = useState('')
   const [recordingSeconds, setRecordingSeconds] = useState(0)
-  const [guidanceProfile, setGuidanceProfile] = useState<TrainingGuidanceProfile>(
-    DEFAULT_TRAINING_GUIDANCE_PROFILE,
-  )
   const [sessionPracticedExerciseIds, setSessionPracticedExerciseIds] = useState<string[]>([])
   const [attempt, setAttempt] = useState<PracticeAttempt | null>(null)
   const [notice, setNotice] = useState<NoticeState | null>(null)
+  const [preparedContentAsset, setPreparedContentAsset] = useState<PreparedExpressionAsset | null>(null)
+  const [preparedContentTitle, setPreparedContentTitle] = useState('')
+  const [preparedContentScene, setPreparedContentScene] = useState('')
+  const [preparedContentSource, setPreparedContentSource] = useState('manual_input')
+  const [preparedContentText, setPreparedContentText] = useState('')
+  const [preparedContentStatus, setPreparedContentStatus] = useState<string | null>(null)
+  const [isPreparedContentLoading, setIsPreparedContentLoading] = useState(false)
+  const [isSavingPreparedContent, setIsSavingPreparedContent] = useState(false)
+  const [isSummarizingPreparedContent, setIsSummarizingPreparedContent] = useState(false)
 
   const disconnectRef = useRef(disconnect)
-  const hasAutoSwitchedPracticeModeRef = useRef(false)
+  const preparedContentFileInputRef = useRef<HTMLInputElement | null>(null)
   disconnectRef.current = disconnect
 
   const canSaveTrainingSample = hasRequiredLegalConsent(user)
   const recorderStatus = getRecorderStatusCopy(status, sessionError)
-  const guidanceContext = useMemo(
-    () => buildTrainingGuidanceContext(guidanceProfile),
-    [guidanceProfile],
-  )
   const preparedExpression = workspaceSnapshot?.prepared_expression ?? null
   const preparedExpressionExercises = useMemo(
     () => buildPreparedExpressionPracticeExercises(preparedExpression),
     [preparedExpression],
   )
-  const preparedExpressionSummary = useMemo(
-    () => buildPreparedExpressionPracticeSummary(preparedExpression),
-    [preparedExpression],
-  )
-  const hasPreparedExpression = preparedExpressionExercises.length > 0
+  const hasPreparedContent = preparedExpressionExercises.length > 0
+  const preparedExpressionTrainingCount = preparedExpression?.rehearsal_count ?? 0
+  const canRefreshCorrectionSummary = preparedExpressionTrainingCount > 0
+
   const categoryExercises = useMemo(
     () => (
-      practiceMode === 'important_expression'
+      practiceMode === 'prepared_content'
         ? preparedExpressionExercises
         : getExercisesByCategory(selectedCategory)
     ),
     [practiceMode, preparedExpressionExercises, selectedCategory],
   )
+
   const recordedExerciseIds = useMemo(() => {
     const persistedExerciseIds = userId ? getUploadedTrainingExerciseIds(userId) : []
     const queuedExerciseIds = localQueueItems
@@ -435,6 +431,7 @@ export default function ContributePage() {
 
     return [...persistedExerciseIds, ...queuedExerciseIds]
   }, [localQueueItems, userId])
+
   const selectableExerciseState = useMemo(
     () => selectTrainingExercises({
       exercises: categoryExercises,
@@ -443,64 +440,36 @@ export default function ContributePage() {
     }),
     [categoryExercises, recordedExerciseIds, sessionPracticedExerciseIds],
   )
-  const selectableExercises = selectableExerciseState.exercises
+
   const normalizedQuery = exerciseQuery.trim().toLowerCase()
   const matchingExercises = useMemo(() => {
     if (!normalizedQuery) {
-      return selectableExercises
+      return selectableExerciseState.exercises
     }
 
-    return selectableExercises.filter((exercise) => (
-      exercise.text.includes(normalizedQuery)
+    return selectableExerciseState.exercises.filter((exercise) => (
+      exercise.text.toLowerCase().includes(normalizedQuery)
     ))
-  }, [normalizedQuery, selectableExercises])
+  }, [normalizedQuery, selectableExerciseState.exercises])
+
   const visibleExercises = useMemo(
     () => matchingExercises.slice(0, normalizedQuery ? SEARCH_VISIBLE_SENTENCES : DEFAULT_VISIBLE_SENTENCES),
     [matchingExercises, normalizedQuery],
   )
+
   const currentExercise = useMemo(
     () => (
-      selectableExercises.find((exercise) => exercise.id === selectedExerciseId) ??
+      selectableExerciseState.exercises.find((exercise) => exercise.id === selectedExerciseId) ??
       visibleExercises[0] ??
-      selectableExercises[0] ??
+      selectableExerciseState.exercises[0] ??
       categoryExercises.find((exercise) => exercise.id === selectedExerciseId) ??
       categoryExercises[0] ??
       preparedExpressionExercises[0] ??
       getExercisesByCategory(MANDARIN_TRAINING_CATEGORIES[0])[0]
     ),
-    [categoryExercises, preparedExpressionExercises, selectableExercises, selectedExerciseId, visibleExercises],
+    [categoryExercises, preparedExpressionExercises, selectableExerciseState.exercises, selectedExerciseId, visibleExercises],
   )
-  const exerciseSelectionHint = useMemo(() => {
-    if (selectableExerciseState.stage === 'unrecorded') {
-      return `当前优先展示还没录过的句子，还剩 ${selectableExerciseState.unrecordedCount} 句。`
-    }
 
-    if (selectableExerciseState.stage === 'unrepeated') {
-      return '这一组句子之前都录过了，当前先避开这轮已经练过的句子。'
-    }
-
-    return '这一组这轮都练过了，现在允许回看前面的句子继续复练。'
-  }, [selectableExerciseState])
-  const currentCategoryMeta = MANDARIN_TRAINING_CATEGORY_META[selectedCategory]
-  const currentPracticeMeta = useMemo<PracticeCollectionMeta>(() => {
-    if (practiceMode === 'important_expression' && preparedExpressionSummary && preparedExpression) {
-      return {
-        label: preparedExpressionSummary.title,
-        shortLabel: '重要表达',
-        description: preparedExpressionSummary.summary,
-        examples: preparedExpression.sections.slice(0, 2).map((section) => section.anchor_line),
-        helper: '先按结构段落练，不用一次扛整篇。先把开场、风险句和保底句各收稳一遍。',
-        trainingTips: [
-          '每次只盯当前段落的一个锚点句，不急着把整篇一次说完。',
-          '高风险词先慢一点、重一点，再把整段连回去。',
-          '卡住时优先切到保底句，不要在台上硬顶。',
-        ],
-        corpusCount: preparedExpression.sections.length,
-      }
-    }
-
-    return currentCategoryMeta
-  }, [currentCategoryMeta, practiceMode, preparedExpression, preparedExpressionSummary])
   const currentPreparedSection = useMemo(
     () => (
       isPreparedExpressionExercise(currentExercise)
@@ -509,72 +478,86 @@ export default function ContributePage() {
     ),
     [currentExercise, preparedExpression],
   )
-  const runtimeScene = useMemo<RtcScene | undefined>(() => {
-    if (practiceMode === 'important_expression') {
-      return undefined
+
+  const currentExerciseTags = useMemo(
+    () => dedupeStrings(
+      isPreparedExpressionExercise(currentExercise)
+        ? [
+            currentExercise.preparedExpressionSectionTitle,
+            ...currentExercise.preparedExpressionKeywords,
+            ...currentExercise.preparedExpressionHighRiskPhrases,
+          ]
+        : [currentExercise?.category ?? null],
+      8,
+    ),
+    [currentExercise],
+  )
+
+  const correctionSummary = useMemo<PreparedCorrectionSummaryView | null>(() => {
+    const assetSummary = preparedContentAsset?.rehearsal_summary
+    if (assetSummary) {
+      return {
+        summary: assetSummary.summary,
+        hotwords: assetSummary.hotwords,
+        recurringErrors: assetSummary.recurringErrors,
+        nextFocus: assetSummary.nextFocus,
+        model: assetSummary.model,
+        basedOnTrainingCount: assetSummary.basedOnTrainingCount,
+      }
     }
 
-    if (selectedCategory === '看病与求助') {
-      return 'medical'
-    }
-
-    if (selectedCategory === '日常与出行') {
-      return 'outing'
-    }
-
-    if (selectedCategory === '人群与角色') {
-      return 'home'
-    }
-
-    return undefined
-  }, [practiceMode, selectedCategory])
-  const plannedTrainingIntent = useMemo(() => ({
-    surface: 'training_workspace' as const,
-    mode: 'training' as const,
-    sessionStrategy: defaultStrategyForMode('training'),
-    requestedCapabilities: defaultCapabilitiesForMode('training'),
-    scene: runtimeScene,
-  }), [runtimeScene])
-  const coachFeedback = useMemo(() => {
-    if (!attempt || !latestTrainingCoachFeedback) {
+    const snapshotSummary = workspaceSnapshot?.prepared_expression?.rehearsal_summary
+    if (!snapshotSummary) {
       return null
     }
 
-    return latestTrainingCoachFeedback.exerciseId === attempt.exercise.id
-      ? latestTrainingCoachFeedback
-      : null
-  }, [attempt, latestTrainingCoachFeedback])
+    return {
+      summary: snapshotSummary.summary,
+      hotwords: snapshotSummary.hotwords,
+      recurringErrors: snapshotSummary.recurring_errors,
+      nextFocus: snapshotSummary.next_focus,
+      model: snapshotSummary.model,
+      basedOnTrainingCount: snapshotSummary.based_on_training_count,
+    }
+  }, [preparedContentAsset, workspaceSnapshot?.prepared_expression])
+
+  const exerciseSelectionHint = useMemo(() => {
+    if (selectableExerciseState.stage === 'unrecorded') {
+      return `当前优先展示还没录过的句子，还剩 ${selectableExerciseState.unrecordedCount} 句。`
+    }
+
+    if (selectableExerciseState.stage === 'unrepeated') {
+      return '这一组之前都录过了，当前先避开这轮已经练过的句子。'
+    }
+
+    return '这一组这轮都练过了，现在允许回看前面的句子继续复练。'
+  }, [selectableExerciseState])
+
+  const applyPreparedContentAsset = useCallback((asset: PreparedExpressionAsset | null) => {
+    setPreparedContentAsset(asset)
+    setPreparedContentTitle(asset?.draft.title ?? '')
+    setPreparedContentScene(asset?.draft.scene ?? '')
+    setPreparedContentSource(asset?.draft.source ?? 'manual_input')
+    setPreparedContentText(asset?.draft.content ?? '')
+  }, [])
 
   useEffect(() => {
     if (!userId) {
       return
     }
 
-    memoryService.init(userId)
-    setGuidanceProfile(getTrainingGuidanceProfile(userId))
     setSessionPracticedExerciseIds([])
     void refreshLocalQueueCount()
   }, [refreshLocalQueueCount, userId])
 
   useEffect(() => {
-    if (!userId || isLoading) {
-      return
+    if (hasPreparedContent && practiceMode !== 'prepared_content') {
+      setPracticeMode('prepared_content')
+      if (preparedExpressionExercises[0]) {
+        setSelectedExerciseId(preparedExpressionExercises[0].id)
+      }
     }
-
-    saveTrainingGuidanceProfile(userId, guidanceProfile)
-  }, [guidanceProfile, isLoading, userId])
-
-  useEffect(() => {
-    if (!hasPreparedExpression || hasAutoSwitchedPracticeModeRef.current) {
-      return
-    }
-
-    hasAutoSwitchedPracticeModeRef.current = true
-    setPracticeMode('important_expression')
-    if (preparedExpressionExercises[0]) {
-      setSelectedExerciseId(preparedExpressionExercises[0].id)
-    }
-  }, [hasPreparedExpression, preparedExpressionExercises])
+  }, [hasPreparedContent, practiceMode, preparedExpressionExercises])
 
   useEffect(() => {
     return () => {
@@ -583,27 +566,15 @@ export default function ContributePage() {
   }, [])
 
   useEffect(() => {
-    if (!selectableExercises.length) {
-      if (categoryExercises[0] && categoryExercises[0].id !== selectedExerciseId) {
-        setSelectedExerciseId(categoryExercises[0].id)
-      }
+    if (!visibleExercises.length) {
       return
     }
 
-    const stillSelectable = selectableExercises.some((exercise) => exercise.id === selectedExerciseId)
-    if (!stillSelectable) {
-      setSelectedExerciseId(selectableExercises[0].id)
-      return
-    }
-
-    if (
-      normalizedQuery &&
-      visibleExercises.length > 0 &&
-      !visibleExercises.some((exercise) => exercise.id === selectedExerciseId)
-    ) {
+    const stillVisible = visibleExercises.some((exercise) => exercise.id === selectedExerciseId)
+    if (!stillVisible) {
       setSelectedExerciseId(visibleExercises[0].id)
     }
-  }, [categoryExercises, normalizedQuery, selectableExercises, selectedExerciseId, visibleExercises])
+  }, [selectedExerciseId, visibleExercises])
 
   useEffect(() => {
     if (!isRecording) {
@@ -634,41 +605,172 @@ export default function ContributePage() {
     }
   }, [notice])
 
-  const handleSelectCategory = useCallback((category: MandarinTrainingCategory) => {
-    setPracticeMode('sentence_corpus')
-    setSelectedCategory(category)
-    setExerciseQuery('')
-    setAttempt(null)
-    const firstExercise = getExercisesByCategory(category)[0]
-    if (firstExercise) {
-      setSelectedExerciseId(firstExercise.id)
-    }
-  }, [])
-
-  const handleSelectPracticeMode = useCallback((mode: PracticeSourceMode) => {
-    setPracticeMode(mode)
-    setExerciseQuery('')
-    setAttempt(null)
-    setNotice(null)
-
-    if (mode === 'important_expression') {
-      if (preparedExpressionExercises[0]) {
-        setSelectedExerciseId(preparedExpressionExercises[0].id)
-      }
+  useEffect(() => {
+    if (!preparedContentStatus) {
       return
     }
 
-    const firstExercise = getExercisesByCategory(selectedCategory)[0]
-    if (firstExercise) {
-      setSelectedExerciseId(firstExercise.id)
-    }
-  }, [preparedExpressionExercises, selectedCategory])
+    const timer = window.setTimeout(() => {
+      setPreparedContentStatus(null)
+    }, 3600)
 
-  const handleSelectExercise = useCallback((exerciseId: string) => {
-    setSelectedExerciseId(exerciseId)
-    setAttempt(null)
-    setNotice(null)
-  }, [])
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [preparedContentStatus])
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId) {
+      applyPreparedContentAsset(null)
+      return
+    }
+
+    const activeUserId = userId
+    let cancelled = false
+
+    async function loadPreparedContent() {
+      setIsPreparedContentLoading(true)
+
+      try {
+        const asset = await fetchPreparedExpressionAsset(activeUserId)
+        if (!cancelled) {
+          applyPreparedContentAsset(asset)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('[contribute] failed to load prepared content asset:', error)
+          setPreparedContentStatus('准备内容读取失败了，稍后再试一次。')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsPreparedContentLoading(false)
+        }
+      }
+    }
+
+    void loadPreparedContent()
+
+    return () => {
+      cancelled = true
+    }
+  }, [applyPreparedContentAsset, isAuthenticated, userId])
+
+  const handlePreparedContentFileChange = useCallback(async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    try {
+      const content = await file.text()
+      setPreparedContentText(content)
+      setPreparedContentSource(file.name)
+      if (!preparedContentTitle.trim()) {
+        setPreparedContentTitle(stripFileExtension(file.name))
+      }
+      setPreparedContentStatus('准备内容已经读进来了，确认后保存就行。')
+    } catch (error) {
+      console.error('[contribute] failed to read prepared content file:', error)
+      setPreparedContentStatus('文件读取失败了，换一个 `.md` 或 `.txt` 再试一下。')
+    } finally {
+      event.target.value = ''
+    }
+  }, [preparedContentTitle])
+
+  const handleSavePreparedContent = useCallback(async () => {
+    if (!userId || !isAuthenticated) {
+      setPreparedContentStatus('先登录后才能保存准备内容。')
+      return
+    }
+
+    const content = preparedContentText.trim()
+    if (!content) {
+      setPreparedContentStatus('先贴入一份准备内容，再保存。')
+      return
+    }
+
+    setIsSavingPreparedContent(true)
+    try {
+      const asset = await savePreparedExpressionAsset(userId, {
+        title: preparedContentTitle.trim() || null,
+        scene: preparedContentScene.trim() || null,
+        source: preparedContentSource.trim() || 'manual_input',
+        content,
+      })
+
+      applyPreparedContentAsset(asset)
+      await refreshWorkspaceSnapshot()
+      setPreparedContentStatus('准备内容已经保存，下面会直接按标点和拆句结果训练。')
+    } catch (error) {
+      console.error('[contribute] failed to save prepared content:', error)
+      setPreparedContentStatus('准备内容保存失败了，请稍后再试。')
+    } finally {
+      setIsSavingPreparedContent(false)
+    }
+  }, [
+    applyPreparedContentAsset,
+    isAuthenticated,
+    preparedContentScene,
+    preparedContentSource,
+    preparedContentText,
+    preparedContentTitle,
+    refreshWorkspaceSnapshot,
+    userId,
+  ])
+
+  const handleSummarizePreparedContent = useCallback(async () => {
+    if (!userId || !isAuthenticated) {
+      setPreparedContentStatus('先登录后才能更新总结。')
+      return
+    }
+
+    if (!canRefreshCorrectionSummary) {
+      setPreparedContentStatus('现在还没有训练录音，先至少录 1 句再刷新训练总结。')
+      return
+    }
+
+    const content = preparedContentText.trim()
+    if (!content) {
+      setPreparedContentStatus('先保存一份准备内容，再更新总结。')
+      return
+    }
+
+    setIsSummarizingPreparedContent(true)
+    try {
+      if (!preparedContentAsset || preparedContentAsset.draft.content.trim() !== content) {
+        const saved = await savePreparedExpressionAsset(userId, {
+          title: preparedContentTitle.trim() || null,
+          scene: preparedContentScene.trim() || null,
+          source: preparedContentSource.trim() || 'manual_input',
+          content,
+        })
+        applyPreparedContentAsset(saved)
+      }
+
+      const summarized = await summarizePreparedExpressionAsset(userId, 'manual')
+      applyPreparedContentAsset(summarized)
+      await refreshWorkspaceSnapshot()
+      setPreparedContentStatus('最新训练总结已经写回记忆和纠错上下文。')
+    } catch (error) {
+      console.error('[contribute] failed to summarize prepared content:', error)
+      setPreparedContentStatus('总结失败了，请稍后再试。')
+    } finally {
+      setIsSummarizingPreparedContent(false)
+    }
+  }, [
+    applyPreparedContentAsset,
+    isAuthenticated,
+    preparedContentAsset,
+    preparedContentScene,
+    preparedContentSource,
+    preparedContentText,
+    preparedContentTitle,
+    refreshWorkspaceSnapshot,
+    userId,
+    canRefreshCorrectionSummary,
+  ])
 
   const moveExercise = useCallback((offset: number) => {
     if (!visibleExercises.length || !currentExercise) {
@@ -711,7 +813,7 @@ export default function ContributePage() {
     if (!attemptToPersist.recording) {
       setNotice({
         tone: 'error',
-        message: '这次录音还没有完整的音频文件，暂时无法保存。',
+        message: '这次录音还没有完整音频文件，暂时无法保存。',
       })
       return
     }
@@ -761,7 +863,6 @@ export default function ContributePage() {
         attemptToPersist.feedback,
         attemptToPersist.sampleQuality,
         attemptToPersist.sampleReview,
-        guidanceProfile,
         saveTrigger,
       ),
     })
@@ -782,34 +883,30 @@ export default function ContributePage() {
       const uploadedRecord = buildUploadedTrainingRecord(attemptToPersist)
       if (uploadedRecord) {
         const syncCandidate = appendUploadedTrainingRecord(userId, uploadedRecord)
-        syncVoiceProfile(
-          buildTrainingVoiceProfilePayload(syncCandidate.snapshot, guidanceProfile),
-        )
 
-        if (syncCandidate.shouldSyncSummary) {
-          const summary = buildTrainingProfileMemorySummary(syncCandidate.snapshot)
-          memoryService.addMemoryEntry({
-            type: 'semantic',
-            content: summary.content,
-            metadata: summary.metadata,
-            sessionMetadata: {
-              kind: 'training',
-              source: 'training_profile_summary',
-              category: attemptToPersist.exercise.category,
-            },
-          })
-          markTrainingProfileSummarySynced(
-            userId,
-            syncCandidate.snapshot.totalUploadedRecordings,
-          )
+        if (isPreparedExpressionExercise(attemptToPersist.exercise) && syncCandidate.shouldSyncSummary) {
+          void summarizePreparedExpressionAsset(userId, 'periodic_auto')
+            .then(async (asset) => {
+              applyPreparedContentAsset(asset)
+              markTrainingProfileSummarySynced(
+                userId,
+                syncCandidate.snapshot.totalUploadedRecordings,
+              )
+              await refreshWorkspaceSnapshot()
+              setNotice({
+                tone: 'success',
+                message: `已累计满 ${TRAINING_PROFILE_SYNC_INTERVAL} 条，训练总结已自动更新。`,
+              })
+            })
+            .catch((error) => {
+              console.error('[contribute] auto summarize prepared content failed:', error)
+            })
         }
       }
 
       setNotice({
         tone: 'success',
-        message: saveTrigger === 'auto'
-          ? `${attemptToPersist.sampleQuality.summary} 已按目标句 + 录音音频写入训练语料。`
-          : '这条录音已经写入训练语料，后面的画像和 manifest 可以继续沿这条资产往下走。',
+        message: '这条录音已经进入训练语料，只保留标签和系统听到的结果。',
       })
       return
     }
@@ -817,7 +914,7 @@ export default function ContributePage() {
     if (result.status === 'retrying') {
       setNotice({
         tone: 'info',
-        message: '音频已经收下了，云端登记会在后台自动补齐，不需要手动同步。',
+        message: '音频已经收下了，云端登记会在后台自动补齐。',
       })
       return
     }
@@ -835,9 +932,9 @@ export default function ContributePage() {
       message: result.errorMessage || '保存训练样本失败，请稍后重试。',
     })
   }, [
+    applyPreparedContentAsset,
     canSaveTrainingSample,
-    guidanceProfile,
-    syncVoiceProfile,
+    refreshWorkspaceSnapshot,
     uploadRecording,
     userId,
   ])
@@ -884,18 +981,11 @@ export default function ContributePage() {
           : [...currentIds, currentExercise.id]
       ))
       setAttempt(nextAttempt)
-      requestTrainingCoach(
-        buildTrainingCoachRequestPayload(
-          currentExercise,
-          transcript,
-          guidanceProfile,
-        ),
-      )
       setNotice({
         tone: canSaveTrainingSample && result.recording ? 'info' : 'success',
         message: canSaveTrainingSample && result.recording
-          ? '录音已经收下，AI 教练点评会马上回来，这条音频也会自动进入训练样本链路。'
-          : '录音已经收下，AI 教练点评会马上回来。',
+          ? '录音已经收下，正在自动保存这条样本。'
+          : '录音已经收下，可以直接看系统听到的结果。',
       })
 
       if (nextAttempt.recording && canSaveTrainingSample) {
@@ -908,18 +998,12 @@ export default function ContributePage() {
         message: error instanceof Error ? error.message : '录音结束失败，请重新尝试。',
       })
     }
-  }, [canSaveTrainingSample, currentExercise, guidanceProfile, persistTrainingAttempt, requestTrainingCoach, stopRecording])
+  }, [canSaveTrainingSample, currentExercise, persistTrainingAttempt, stopRecording])
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_54%,_#f6f4ee_100%)] px-4 py-10">
-        <div className="mx-auto max-w-6xl space-y-6">
-          <div className="h-20 rounded-[32px] bg-white shadow-[0_20px_60px_rgba(120,53,15,0.06)]" />
-          <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-            <div className="h-[620px] rounded-[32px] bg-white shadow-[0_20px_60px_rgba(120,53,15,0.06)]" />
-            <div className="h-[620px] rounded-[32px] bg-white shadow-[0_20px_60px_rgba(120,53,15,0.06)]" />
-          </div>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-stone-50">
+        <div className="text-center text-sm text-gray-600">正在准备训练页...</div>
       </div>
     )
   }
@@ -929,275 +1013,304 @@ export default function ContributePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.10),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.10),_transparent_22%),linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_50%,_#f5f3ed_100%)]">
-      <nav className="border-b border-amber-100 bg-white">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-6 py-4">
-          <Link href="/" className="flex items-center gap-3 text-gray-900">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-lg font-semibold text-amber-700">
-              燃
-            </div>
-            <div>
-              <p className="text-sm font-medium text-amber-700">VoxFlame</p>
-              <p className="text-lg font-semibold">训练工作台</p>
-            </div>
-          </Link>
+    <div className="min-h-screen bg-[linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_54%,_#f6f4ee_100%)]">
+      <header className="border-b border-stone-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
+          <div>
+            <Link href="/" className="text-sm font-medium text-amber-700 hover:text-amber-800">
+              返回首页
+            </Link>
+            <h1 className="mt-1 text-2xl font-semibold text-gray-900">训练页</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              只做三件事：保存准备内容、拆句录音、累计 50 句后自动更新纠错总结。
+            </p>
+          </div>
           <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700">
             当前账号：{user?.email || '已登录用户'}
           </div>
         </div>
-      </nav>
+      </header>
 
       {notice ? (
-        <div className="fixed left-1/2 top-24 z-50 -translate-x-1/2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white shadow-xl">
+        <div className="fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white shadow-xl">
           {notice.message}
         </div>
       ) : null}
 
-      <main className="mx-auto flex max-w-[1440px] flex-col gap-6 px-6 py-8">
-        <section className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-          <section className="rounded-[32px] border border-stone-200 bg-white p-8 shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+        <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-sm font-medium text-amber-800">
+                <Sparkles className="h-4 w-4" />
+                准备内容
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold text-gray-900">用户自己管理准备内容，不做任何场景硬编码</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
+                把你后面要说的全文、提纲或说明贴进来。保存后，系统会按标点和拆句结果生成可练内容，训练满 50 句后自动总结热词和高频误听。
+              </p>
+            </div>
+            <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
+              {correctionSummary
+                ? `最近一次总结基于 ${correctionSummary.basedOnTrainingCount} 条训练样本`
+                : `每满 ${TRAINING_PROFILE_SYNC_INTERVAL} 句自动更新一次`}
+            </div>
+          </div>
+
+          {preparedContentStatus ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              {preparedContentStatus}
+            </div>
+          ) : null}
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-gray-900">标题</span>
+              <input
+                value={preparedContentTitle}
+                onChange={(event) => setPreparedContentTitle(event.target.value)}
+                placeholder="例如：公开分享 / 面试自我介绍 / 就医说明"
+                className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-gray-900">场景标签</span>
+              <input
+                value={preparedContentScene}
+                onChange={(event) => setPreparedContentScene(event.target.value)}
+                placeholder="例如：interview / work / medical"
+                className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => preparedContentFileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-gray-800 transition hover:border-amber-300 hover:bg-amber-50"
+            >
+              <UploadCloud className="h-4 w-4" />
+              上传 `.md` / `.txt`
+            </button>
+            <input
+              ref={preparedContentFileInputRef}
+              type="file"
+              accept=".md,.txt,.text"
+              onChange={handlePreparedContentFileChange}
+              className="hidden"
+            />
+            <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
+              来源：{preparedContentSource || 'manual_input'}
+            </span>
+            {isPreparedContentLoading ? (
+              <span className="inline-flex items-center gap-2 text-sm text-gray-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                正在读取已有内容
+              </span>
+            ) : null}
+          </div>
+
+          <label className="mt-4 block space-y-2">
+            <span className="text-sm font-medium text-gray-900">全文内容</span>
+            <textarea
+              value={preparedContentText}
+              onChange={(event) => setPreparedContentText(event.target.value)}
+              placeholder="把你后面要说的全文、提纲或说明贴在这里。"
+              className="min-h-[220px] w-full rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-4 text-sm leading-7 text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
+            />
+          </label>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void handleSavePreparedContent()}
+              disabled={isSavingPreparedContent || isSummarizingPreparedContent}
+              className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSavingPreparedContent ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              保存内容
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSummarizePreparedContent()}
+              disabled={isSavingPreparedContent || isSummarizingPreparedContent || !canRefreshCorrectionSummary}
+              className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-900 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSummarizingPreparedContent ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              用训练记录刷新总结
+            </button>
+            {!canRefreshCorrectionSummary ? (
+              <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
+                先录至少 1 句，训练总结才会生成
+              </span>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+          <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-amber-700">
-                  {practiceMode === 'important_expression' ? '重要表达结构练习' : '真实录音分类'}
+                <h2 className="text-xl font-semibold text-gray-900">拆句训练</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  优先展示还没录过的句子，同一轮里也不会重复。
                 </p>
-                <h2 className="mt-1 text-2xl font-semibold text-gray-900">
-                  {practiceMode === 'important_expression'
-                    ? '先按段落和风险句，把这次重要表达收成习惯'
-                    : '先选一句现在真会说出口的话'}
-                </h2>
               </div>
-              <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-                {practiceMode === 'important_expression'
-                  ? `${currentPracticeMeta.corpusCount} 个结构段`
-                  : `${currentPracticeMeta.corpusCount} 句真实语料`}
-              </div>
+              {hasPreparedContent ? (
+                <div className="inline-flex rounded-full border border-stone-200 bg-stone-50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPracticeMode('prepared_content')
+                      setAttempt(null)
+                      if (preparedExpressionExercises[0]) {
+                        setSelectedExerciseId(preparedExpressionExercises[0].id)
+                      }
+                    }}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                      practiceMode === 'prepared_content'
+                        ? 'bg-white text-amber-800 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    准备内容
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPracticeMode('sentence_corpus')
+                      setAttempt(null)
+                      const firstExercise = getExercisesByCategory(selectedCategory)[0]
+                      if (firstExercise) {
+                        setSelectedExerciseId(firstExercise.id)
+                      }
+                    }}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                      practiceMode === 'sentence_corpus'
+                        ? 'bg-white text-amber-800 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    通用句库
+                  </button>
+                </div>
+              ) : null}
             </div>
 
-            {hasPreparedExpression ? (
-              <div className="mt-6 inline-flex rounded-full border border-stone-200 bg-stone-50 p-1">
-                <button
-                  type="button"
-                  onClick={() => handleSelectPracticeMode('important_expression')}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                    practiceMode === 'important_expression'
-                      ? 'bg-white text-amber-800 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  重要表达
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectPracticeMode('sentence_corpus')}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                    practiceMode === 'sentence_corpus'
-                      ? 'bg-white text-amber-800 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  普通句库
-                </button>
-              </div>
-            ) : null}
-
             {practiceMode === 'sentence_corpus' ? (
-              <div className="mt-6 grid gap-3 md:grid-cols-5">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {MANDARIN_TRAINING_CATEGORIES.map((category) => {
                   const meta = MANDARIN_TRAINING_CATEGORY_META[category]
                   const isActive = category === selectedCategory
+
                   return (
                     <button
                       key={category}
                       type="button"
-                      onClick={() => handleSelectCategory(category)}
-                      className={`rounded-[28px] border px-4 py-4 text-left transition ${
+                      onClick={() => {
+                        setSelectedCategory(category)
+                        setExerciseQuery('')
+                        setAttempt(null)
+                        const firstExercise = getExercisesByCategory(category)[0]
+                        if (firstExercise) {
+                          setSelectedExerciseId(firstExercise.id)
+                        }
+                      }}
+                      className={`rounded-[20px] border px-4 py-4 text-left transition ${
                         isActive
-                          ? 'border-amber-300 bg-amber-50 shadow-[0_12px_36px_rgba(245,158,11,0.10)]'
+                          ? 'border-amber-300 bg-amber-50'
                           : 'border-stone-200 bg-stone-50 hover:border-stone-300 hover:bg-stone-100'
                       }`}
                     >
                       <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
-                      <p className="mt-1 text-xs text-gray-600">{meta.shortLabel}</p>
-                      <p className="mt-3 text-xs font-medium text-amber-800">{meta.corpusCount} 条</p>
+                      <p className="mt-2 text-xs text-gray-600">{meta.corpusCount} 条</p>
                     </button>
                   )
                 })}
               </div>
             ) : null}
 
-            <div className="mt-6 rounded-[28px] border border-stone-200 bg-stone-50 px-5 py-5">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{currentPracticeMeta.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-gray-600">{currentPracticeMeta.description}</p>
-                </div>
-                <div className="rounded-full bg-white px-4 py-2 text-sm text-gray-700">
-                  示例：{currentPracticeMeta.examples.slice(0, 2).join(' / ')}
-                </div>
-              </div>
-              {practiceMode === 'important_expression' && preparedExpressionSummary ? (
-                <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-2xl bg-white px-4 py-4">
-                    <p className="text-xs uppercase text-stone-500">已练次数</p>
-                    <p className="mt-2 text-lg font-semibold text-gray-900">{preparedExpressionSummary.rehearsalCount}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white px-4 py-4">
-                    <p className="text-xs uppercase text-stone-500">待继续收口</p>
-                    <p className="mt-2 text-lg font-semibold text-gray-900">{preparedExpressionSummary.lowConfidenceSections} 段</p>
-                  </div>
-                  <div className="rounded-2xl bg-white px-4 py-4">
-                    <p className="text-xs uppercase text-stone-500">下一步</p>
-                    <p className="mt-2 text-sm leading-6 text-gray-700">
-                      {preparedExpressionSummary.nextFocus[0] ?? '先把开场和产品定义段落收稳。'}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <input
+                value={exerciseQuery}
+                onChange={(event) => setExerciseQuery(event.target.value)}
+                placeholder={practiceMode === 'prepared_content' ? '搜索准备内容中的句子' : '搜索当前句库'}
+                className="h-11 flex-1 rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
+              />
+              <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
+                {matchingExercises.length} 句
+              </span>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <label className="flex-1">
-                <span className="sr-only">搜索句子</span>
-                <Input
-                  value={exerciseQuery}
-                  onChange={(event) => setExerciseQuery(event.target.value)}
-                  placeholder={practiceMode === 'important_expression' ? '在这次重要表达里搜索段落或句子' : '在当前分类里搜索句子'}
-                  className="h-11 rounded-2xl border-stone-200 bg-stone-50"
-                />
-              </label>
-              <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-                {matchingExercises.length > visibleExercises.length
-                  ? `共 ${matchingExercises.length} 句，当前显示前 ${visibleExercises.length} 句`
-                  : `当前可选 ${matchingExercises.length} 句`}
-              </div>
-            </div>
             <p className="mt-3 text-sm text-gray-600">{exerciseSelectionHint}</p>
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="max-h-[560px] overflow-y-auto rounded-[28px] border border-stone-200 bg-[#fffdfa] p-3">
-                <div className="space-y-3">
-                  {visibleExercises.map((exercise) => {
-                    const isActive = currentExercise.id === exercise.id
-                    return (
-                      <button
-                        key={exercise.id}
-                        type="button"
-                        onClick={() => handleSelectExercise(exercise.id)}
-                        className={`w-full rounded-3xl border px-4 py-4 text-left transition ${
-                          isActive
-                            ? 'border-amber-300 bg-amber-50 shadow-[0_12px_30px_rgba(245,158,11,0.10)]'
-                            : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
-                            {isPreparedExpressionExercise(exercise)
-                              ? exercise.preparedExpressionSectionTitle
-                              : exercise.category}
-                          </span>
-                          {isActive ? (
-                            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-                              当前句
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-3 text-lg font-semibold leading-7 text-gray-900">{exercise.text}</p>
-                        {isPreparedExpressionExercise(exercise) ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {exercise.preparedExpressionPriority ? (
-                              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-                                优先收口
-                              </span>
-                            ) : null}
-                            {exercise.preparedExpressionKeywords.slice(0, 3).map((item) => (
-                              <span key={`${exercise.id}-${item}`} className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
-                                {item}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </button>
-                    )
-                  })}
-                  {visibleExercises.length === 0 ? (
-                    <div className="rounded-3xl border border-dashed border-stone-300 bg-white px-5 py-10 text-center text-sm text-gray-600">
-                      当前筛选下没有匹配句子，换个关键词试试。
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-stone-200 bg-white p-5">
-                <p className="text-sm font-medium text-gray-900">当前句子的训练重点</p>
-                <p className="mt-3 text-2xl font-semibold leading-snug text-gray-900">{currentExercise.text}</p>
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">先这样练</p>
-                  <p className="mt-2 text-sm leading-6 text-gray-700">{currentPracticeMeta.helper}</p>
-                </div>
-                {currentPreparedSection ? (
-                  <div className="mt-4 rounded-2xl bg-sky-50 px-4 py-4">
-                    <p className="text-sm font-medium text-gray-900">当前段落锚点</p>
-                    <p className="mt-2 text-sm leading-6 text-gray-700">{currentPreparedSection.anchor_line}</p>
-                    {currentPreparedSection.fallback_phrases.length > 0 ? (
-                      <p className="mt-3 text-sm leading-6 text-sky-900">
-                        卡住时先切回：{currentPreparedSection.fallback_phrases[0]}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">
-                    {currentPreparedSection ? '当前段落提醒' : '分类提醒'}
-                  </p>
-                  <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                    {currentPracticeMeta.trainingTips.slice(0, 2).map((tip) => (
-                      <li key={tip}>- {tip}</li>
-                    ))}
-                  </ul>
-                </div>
-                {currentPreparedSection ? (
-                  <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4">
-                    <p className="text-sm font-medium text-gray-900">高风险词和热词</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {[
-                        ...currentPreparedSection.high_risk_phrases,
-                        ...currentPreparedSection.hotwords,
-                      ].slice(0, 6).map((item) => (
-                        <span key={item} className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
-                          {item}
+            <div className="mt-4 max-h-[620px] overflow-y-auto rounded-[24px] border border-stone-200 bg-stone-50 p-3">
+              <div className="space-y-3">
+                {visibleExercises.map((exercise) => {
+                  const isActive = currentExercise.id === exercise.id
+                  return (
+                    <button
+                      key={exercise.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedExerciseId(exercise.id)
+                        setAttempt(null)
+                      }}
+                      className={`w-full rounded-[20px] border px-4 py-4 text-left transition ${
+                        isActive
+                          ? 'border-amber-300 bg-white shadow-sm'
+                          : 'border-stone-200 bg-white hover:border-stone-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
+                          {isPreparedExpressionExercise(exercise)
+                            ? exercise.preparedExpressionSectionTitle
+                            : exercise.category}
                         </span>
-                      ))}
-                    </div>
+                        {isActive ? (
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                            当前句
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-3 text-base font-semibold leading-7 text-gray-900">{exercise.text}</p>
+                    </button>
+                  )
+                })}
+
+                {visibleExercises.length === 0 ? (
+                  <div className="rounded-[20px] border border-dashed border-stone-300 bg-white px-5 py-10 text-center text-sm text-gray-600">
+                    当前筛选下没有句子，换个关键词试试。
                   </div>
                 ) : null}
               </div>
             </div>
           </section>
 
-          <aside className="space-y-6 xl:sticky xl:top-24 xl:h-fit">
-            <section className="rounded-[32px] border border-stone-200 bg-white p-8 shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
-              <div className="flex items-center justify-between gap-4">
+          <section className="space-y-6">
+            <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-amber-700">大录音区</p>
-                  <h2 className="mt-1 text-2xl font-semibold text-gray-900">录音、训练、反馈都围着这一句转</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">当前句</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    训练页每次只保留标签、目标句和系统听到的结果。
+                  </p>
                 </div>
-                <div className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-gray-700">
+                <span className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-gray-700">
                   {isRecording ? formatRecordingTime(recordingSeconds) : recorderStatus.label}
-                </div>
+                </span>
               </div>
 
-              <div className="mt-6 rounded-[28px] border border-amber-200 bg-[#fff9ef] px-5 py-5">
+              <div className="mt-4 rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <span className="rounded-full bg-amber-100 px-3 py-1 font-medium text-amber-800">
-                      {currentExercise.category}
-                    </span>
-                    <span className="rounded-full bg-stone-100 px-3 py-1 text-stone-700">
-                      当前目标句
-                    </span>
-                  </div>
-                  <div className="flex gap-3">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-800">
+                    {isPreparedExpressionExercise(currentExercise)
+                      ? currentExercise.preparedExpressionSectionTitle
+                      : currentExercise.category}
+                  </span>
+                  <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => moveExercise(-1)}
@@ -1210,16 +1323,25 @@ export default function ContributePage() {
                       onClick={() => moveExercise(1)}
                       className="rounded-full border border-stone-300 px-4 py-2 text-sm text-gray-700 transition hover:border-stone-400 hover:bg-white"
                     >
-                      换一句
+                      下一句
                     </button>
                   </div>
                 </div>
 
-                <p className="mt-5 text-3xl font-semibold leading-snug text-gray-900">{currentExercise.text}</p>
-                <div className="mt-4 rounded-2xl border border-stone-200 bg-white px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">这轮训练重点</p>
-                  <p className="mt-2 text-sm leading-6 text-gray-700">{guidanceContext.evidenceSummary}</p>
-                </div>
+                <p className="mt-4 text-2xl font-semibold leading-snug text-gray-900">{currentExercise.text}</p>
+
+                {currentExerciseTags.length > 0 ? (
+                  <div className="mt-4">
+                    {renderChips(currentExerciseTags, 'amber')}
+                  </div>
+                ) : null}
+
+                {currentPreparedSection ? (
+                  <div className="mt-4 rounded-2xl bg-white px-4 py-4">
+                    <p className="text-sm font-medium text-gray-900">当前段落锚点</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-700">{currentPreparedSection.anchor_line}</p>
+                  </div>
+                ) : null}
               </div>
 
               <div className="mt-6 flex flex-col items-center gap-4 text-center">
@@ -1227,7 +1349,7 @@ export default function ContributePage() {
                   type="button"
                   onClick={isRecording ? () => void handleStopRecording() : () => void handleStartRecording()}
                   disabled={isUploading || isProcessing || status === 'connecting'}
-                  className={`flex h-28 w-28 items-center justify-center rounded-full text-white shadow-[0_16px_40px_rgba(120,53,15,0.20)] transition ${
+                  className={`flex h-28 w-28 items-center justify-center rounded-full text-white shadow-lg transition ${
                     isRecording
                       ? 'bg-rose-500 hover:bg-rose-600'
                       : 'bg-amber-500 hover:bg-amber-600'
@@ -1240,7 +1362,7 @@ export default function ContributePage() {
                 </button>
                 <div>
                   <p className="text-lg font-semibold text-gray-900">
-                    {isRecording ? '正在收这一句的声音' : '点一下，直接开始练这一句'}
+                    {isRecording ? '正在录这一句' : '点一次，直接开始练'}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-gray-600">{recorderStatus.description}</p>
                 </div>
@@ -1248,338 +1370,157 @@ export default function ContributePage() {
 
               <MicrophoneInputFeedback
                 analyser={analyser}
-                active={isConnected || isRecording}
+                active={isRecording}
                 title="录音输入质量"
                 className="mt-6"
               />
 
-              <div className="mt-6 rounded-3xl border border-stone-200 bg-stone-50 px-5 py-5">
+              <div className="mt-6 rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-5">
                 <p className="text-sm font-medium text-gray-900">实时识别</p>
-                <p className="mt-2 text-sm leading-6 text-gray-500">
-                  这里先显示系统当前听到的内容。你点停止后，下面的反馈区会切到最终结果。
-                </p>
-                <p className="mt-4 min-h-20 text-base leading-7 text-gray-700">
-                  {interimText || '开始录音后，这里会出现实时 transcript。'}
+                <p className="mt-3 min-h-16 text-base leading-7 text-gray-700">
+                  {interimText || '开始录音后，这里会出现系统当前听到的内容。'}
                 </p>
               </div>
 
               {sessionError ? (
-                <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm leading-6 text-rose-800">
+                <div className="mt-4 rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
                   {sessionError}
                 </div>
               ) : null}
-
-              <SessionReadinessPanel
-                intent={sessionIntent}
-                readiness={sessionReadiness}
-                grantedCapabilities={grantedCapabilities}
-                plannedIntent={plannedTrainingIntent}
-                title="训练前准备"
-                className="mt-4"
-              />
             </section>
-            <section className="rounded-[32px] border border-stone-200 bg-white p-8 shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
-              {attempt ? (
-                <>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <ListChecks className="mt-1 h-5 w-5 text-amber-700" />
-                      <div>
-                        <p className="text-sm font-medium text-amber-700">紧贴录音的反馈区</p>
-                        <h2 className="mt-1 text-2xl font-semibold text-gray-900">停录后先看 AI 教练怎么说</h2>
-                      </div>
-                    </div>
-                    <span className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-gray-700">
-                      {coachFeedback?.model || '训练点评'}
-                    </span>
-                  </div>
 
-                  <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-3xl bg-stone-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">目标句</p>
-                      <p className="mt-3 text-lg leading-7 text-gray-900">{attempt.exercise.text}</p>
-                    </div>
-                    <div className="rounded-3xl bg-amber-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">系统听到的内容</p>
-                      <p className="mt-3 text-lg leading-7 text-gray-900">
-                        {attempt.transcript || '这次还没有稳定拿到最终结果。'}
-                      </p>
-                    </div>
-                    <div className="rounded-3xl bg-sky-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">AI 教练点评</p>
-                      <p className="mt-3 text-sm leading-7 text-gray-900">
-                        {coachFeedback?.feedbackText || 'AI 教练正在生成这一句的自然语言点评。'}
-                      </p>
-                    </div>
-                    <div className="rounded-3xl bg-emerald-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">上传状态</p>
-                      <p className="mt-3 text-lg leading-7 text-gray-900">
-                        {UPLOAD_STATUS_LABELS[attempt.uploadStatus]}
-                      </p>
-                      <p className="mt-3 text-sm leading-6 text-emerald-900">
-                        这条录音会继续沿现有训练样本链路保存，AI 点评不会卡住上传。
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 space-y-4">
-                    <div className="rounded-3xl border border-stone-200 bg-stone-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">这轮怎么继续</p>
-                      <p className="mt-3 text-sm leading-7 text-gray-700">
-                        {coachFeedback?.feedbackText || '如果这句还不顺，先把速度放慢一点，嘴巴动作做大一点，再马上补一条新的版本。'}
-                      </p>
-                    </div>
-
-                    {currentPreparedSection ? (
-                      <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-5">
-                        <p className="text-sm font-medium text-gray-900">卡住时先退回这一句</p>
-                        <p className="mt-3 text-sm leading-7 text-sky-900">
-                          {currentPreparedSection.fallback_phrases[0] || currentPreparedSection.anchor_line}
-                        </p>
-                      </div>
-                    ) : null}
-
-                    {attempt.recording ? (
-                      <div className="rounded-3xl border border-stone-200 bg-stone-50 px-5 py-5">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <p className="text-sm font-medium text-gray-900">训练资产状态</p>
-                          <span className="rounded-full bg-white px-3 py-1 text-sm text-gray-700">
-                            {UPLOAD_STATUS_LABELS[attempt.uploadStatus]}
-                          </span>
-                        </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-2xl bg-white px-4 py-4">
-                            <p className="text-xs uppercase text-stone-500">录音 ID</p>
-                            <p className="mt-2 break-all font-mono text-sm text-gray-700">{attempt.recording.recordingId}</p>
-                          </div>
-                          <div className="rounded-2xl bg-white px-4 py-4">
-                            <p className="text-xs uppercase text-stone-500">会话 ID</p>
-                            <p className="mt-2 break-all font-mono text-sm text-gray-700">{attempt.recording.sessionId}</p>
-                          </div>
-                          <div className="rounded-2xl bg-white px-4 py-4">
-                            <p className="text-xs uppercase text-stone-500">采样率</p>
-                            <p className="mt-2 text-sm text-gray-700">{attempt.recording.audio.sampleRate} Hz</p>
-                          </div>
-                          <div className="rounded-2xl bg-white px-4 py-4">
-                            <p className="text-xs uppercase text-stone-500">授权范围</p>
-                            <p className="mt-2 text-sm text-gray-700">training_only</p>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 rounded-2xl border border-stone-200 bg-white px-4 py-4">
-                          <p className="text-sm font-medium text-gray-900">这条录音的基础信息</p>
-                          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                            <div className="rounded-2xl bg-stone-50 px-4 py-4">
-                              <p className="text-xs uppercase text-stone-500">录音时长</p>
-                              <p className="mt-2 text-sm text-gray-700">{formatRecordingTime(Math.round(attempt.recording.audio.durationSeconds))}</p>
-                            </div>
-                            <div className="rounded-2xl bg-stone-50 px-4 py-4">
-                              <p className="text-xs uppercase text-stone-500">系统返回速度</p>
-                              <p className="mt-2 text-sm text-gray-700">{(attempt.transcriptLatencyMs / 1000).toFixed(1)}s</p>
-                            </div>
-                            <div className="rounded-2xl bg-stone-50 px-4 py-4">
-                              <p className="text-xs uppercase text-stone-500">当前状态</p>
-                              <p className="mt-2 text-sm text-gray-700">{UPLOAD_STATUS_LABELS[attempt.uploadStatus]}</p>
-                            </div>
-                          </div>
-                          <p className="mt-4 text-sm leading-6 text-stone-600">
-                            同一句可以反复练并保留多条样本；只有同一条录音重复上传时，系统才会按录音 ID 安全去重。
-                          </p>
-                        </div>
-
-                        {attempt.uploadReceipt?.manifestPath ? (
-                          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-                            <p className="text-xs uppercase text-emerald-700">Manifest</p>
-                            <p className="mt-2 break-all font-mono text-sm text-emerald-900">
-                              {attempt.uploadReceipt.manifestPath}
-                            </p>
-                          </div>
-                        ) : null}
-
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleStartRecording()}
-                      disabled={isRecording || isUploading || isProcessing}
-                      className="rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      再录一次这句
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveExercise(1)}
-                      className="rounded-full border border-stone-300 px-5 py-3 text-sm font-medium text-gray-700 transition hover:border-stone-400 hover:bg-stone-50"
-                    >
-                      换一句继续练
-                    </button>
-                    {attempt.uploadStatus === 'saving' ? (
-                      <span className="rounded-full bg-amber-100 px-5 py-3 text-sm font-medium text-amber-900">
-                        正在自动保存这条录音
-                      </span>
-                    ) : attempt.uploadStatus === 'retrying' || attempt.uploadStatus === 'failed' ? (
-                      <span className="rounded-full bg-amber-100 px-5 py-3 text-sm font-medium text-amber-900">
-                        正在后台自动补齐云端登记
-                      </span>
-                    ) : attempt.uploadStatus === 'auth_required' ? (
-                      <span className="rounded-full bg-stone-100 px-5 py-3 text-sm font-medium text-stone-700">
-                        重新登录后会恢复自动保存
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-emerald-100 px-5 py-3 text-sm font-medium text-emerald-800">
-                        这条录音已经进入训练语料
-                      </span>
-                    )}
-                  </div>
-                </>
-              ) : (
+            <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="flex items-start gap-3">
-                    <ListChecks className="mt-1 h-5 w-5 text-amber-700" />
-                    <div>
-                      <p className="text-sm font-medium text-amber-700">反馈区预留在录音旁边</p>
-                      <h2 className="mt-1 text-2xl font-semibold text-gray-900">录完这一句后，反馈就在下面出现</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">本次结果</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    不做逐句 AI 点评，只看标签和系统听到的结果。
+                  </p>
+                </div>
+                {attempt ? (
+                  <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
+                    {UPLOAD_STATUS_LABELS[attempt.uploadStatus]}
+                  </span>
+                ) : null}
+              </div>
+
+              {attempt ? (
+                <div className="mt-4 space-y-4">
+                  <div className="rounded-[20px] bg-stone-50 px-4 py-4">
+                    <p className="text-sm font-medium text-gray-900">标签</p>
+                    <div className="mt-3">
+                      {renderChips(
+                        dedupeStrings(
+                          isPreparedExpressionExercise(attempt.exercise)
+                            ? [
+                                attempt.exercise.preparedExpressionSectionTitle,
+                                ...attempt.exercise.preparedExpressionKeywords,
+                              ]
+                            : [attempt.exercise.category],
+                          8,
+                        ),
+                        'stone',
+                      )}
                     </div>
                   </div>
-                  <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-3xl bg-stone-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">系统听到的内容</p>
-                      <p className="mt-3 text-sm leading-6 text-gray-600">停录后直接看到 transcript，不需要切到别的地方。</p>
-                    </div>
-                    <div className="rounded-3xl bg-sky-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">最该先改的地方</p>
-                      <p className="mt-3 text-sm leading-6 text-gray-600">会先告诉你应该盯哪几个字、哪组声母或韵母，不会先给一堆旧历史。</p>
-                    </div>
-                    <div className="rounded-3xl bg-amber-50 px-5 py-5">
-                      <p className="text-sm font-medium text-gray-900">样本质量与资产状态</p>
-                      <p className="mt-3 text-sm leading-6 text-gray-600">录完后这里会同时告诉你它是否已自动落盘，若云端登记短暂波动也会在后台自动补齐，不再让你手动同步。</p>
-                    </div>
+
+                  <div className="rounded-[20px] bg-amber-50 px-4 py-4">
+                    <p className="text-sm font-medium text-gray-900">目标句</p>
+                    <p className="mt-3 text-base leading-7 text-gray-900">{attempt.exercise.text}</p>
                   </div>
+
+                  <div className="rounded-[20px] bg-sky-50 px-4 py-4">
+                    <p className="text-sm font-medium text-gray-900">系统听到</p>
+                    <p className="mt-3 text-base leading-7 text-gray-900">
+                      {attempt.transcript || '这次还没有稳定拿到最终结果。'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[20px] bg-emerald-50 px-4 py-4">
+                    <p className="text-sm font-medium text-gray-900">保存状态</p>
+                    <p className="mt-3 text-base leading-7 text-gray-900">
+                      {UPLOAD_STATUS_LABELS[attempt.uploadStatus]}
+                    </p>
+                    {attempt.uploadReceipt?.manifestPath ? (
+                      <p className="mt-3 break-all font-mono text-xs text-emerald-900">
+                        {attempt.uploadReceipt.manifestPath}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
+                  录完这一句后，这里只会出现标签、目标句、系统听到和保存状态。
                 </div>
               )}
             </section>
-          </aside>
+          </section>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <section className="rounded-[32px] border border-stone-200 bg-white p-8 shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
-            <div className="flex items-center gap-3">
-              <UploadCloud className="h-5 w-5 text-amber-700" />
-              <div>
-                <p className="text-sm font-medium text-amber-700">训练资产状态</p>
-                <h2 className="mt-1 text-xl font-semibold text-gray-900">录完就直接走自动上传，不再让你手动处理</h2>
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-3xl bg-stone-50 px-5 py-5">
-              <p className="text-sm font-medium text-gray-900">当前策略</p>
-              <p className="mt-3 text-lg font-semibold text-gray-900">录音结束后立即上传音频，并自动补齐 manifest / receipt。</p>
-              <p className="mt-2 text-sm leading-6 text-gray-600">
-                训练页不再把“留在本地、手动同步、再点一次上传”放进主路径。只要音频完整，就会继续走上传链路；识别差异只用于训练反馈和后续整理，不会拿来挡数据入链。即使云端登记短暂波动，也会优先转成后台自动补登。
+        <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">纠错总结</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                这里只展示每 50 句更新一次的规律、重点词和高频误听，用来服务 correction。
               </p>
             </div>
+            <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
+              {correctionSummary
+                ? `${correctionSummary.model} · ${correctionSummary.basedOnTrainingCount} 条`
+                : preparedExpressionTrainingCount > 0
+                  ? `已有 ${preparedExpressionTrainingCount} 条训练样本`
+                  : `满 ${TRAINING_PROFILE_SYNC_INTERVAL} 句后自动更新`}
+            </span>
+          </div>
 
-            {!canSaveTrainingSample ? (
-              <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-900">
-                当前账号还没有新的授权确认记录。重新登录一次后，训练页就不会再重复问，自动保存也会直接恢复。
+          {correctionSummary ? (
+            <div className="mt-5 grid gap-4 lg:grid-cols-3">
+              <div className="rounded-[20px] bg-stone-50 px-4 py-4 lg:col-span-3">
+                <p className="text-sm font-medium text-gray-900">总结</p>
+                <p className="mt-3 text-sm leading-7 text-gray-700">{correctionSummary.summary}</p>
               </div>
-            ) : null}
 
-            {lastError ? (
-              <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-900">
-                {lastError}
+              <div className="rounded-[20px] bg-amber-50 px-4 py-4">
+                <p className="text-sm font-medium text-gray-900">热词</p>
+                <div className="mt-3">
+                  {correctionSummary.hotwords.length > 0
+                    ? renderChips(correctionSummary.hotwords, 'amber')
+                    : <p className="text-sm text-gray-600">当前还没有热词。</p>}
+                </div>
               </div>
-            ) : null}
-          </section>
 
-          <section className="rounded-[32px] border border-stone-200 bg-white p-8 shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
-            <div className="flex items-center gap-3">
-              <SlidersHorizontal className="h-5 w-5 text-amber-700" />
-              <div>
-                <p className="text-sm font-medium text-amber-700">训练设置</p>
-                <h2 className="mt-1 text-xl font-semibold text-gray-900">只保留会直接影响反馈的设置</h2>
+              <div className="rounded-[20px] bg-sky-50 px-4 py-4">
+                <p className="text-sm font-medium text-gray-900">高频误听</p>
+                {correctionSummary.recurringErrors.length > 0 ? (
+                  <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+                    {correctionSummary.recurringErrors.map((item) => (
+                      <p key={item}>{item}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-gray-600">当前还没有累计出稳定误听。</p>
+                )}
+              </div>
+
+              <div className="rounded-[20px] bg-emerald-50 px-4 py-4">
+                <p className="text-sm font-medium text-gray-900">下一轮重点</p>
+                <div className="mt-3">
+                  {correctionSummary.nextFocus.length > 0
+                    ? renderChips(correctionSummary.nextFocus, 'emerald')
+                    : <p className="text-sm text-gray-600">继续训练后会自动浮出下一轮重点。</p>}
+                </div>
               </div>
             </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              <label className="block">
-                <span className="text-sm font-medium text-gray-900">病因背景</span>
-                <select
-                  value={guidanceProfile.etiology}
-                  onChange={(event) => {
-                    setGuidanceProfile((current) => ({
-                      ...current,
-                      etiology: event.target.value as TrainingGuidanceProfile['etiology'],
-                    }))
-                  }}
-                  className="mt-2 h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-800"
-                >
-                  {TRAINING_ETIOLOGY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium text-gray-900">当前严重程度</span>
-                <select
-                  value={guidanceProfile.severity}
-                  onChange={(event) => {
-                    setGuidanceProfile((current) => ({
-                      ...current,
-                      severity: event.target.value as TrainingGuidanceProfile['severity'],
-                    }))
-                  }}
-                  className="mt-2 h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-800"
-                >
-                  {TRAINING_SEVERITY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium text-gray-900">这轮最先改哪类</span>
-                <select
-                  value={guidanceProfile.priority}
-                  onChange={(event) => {
-                    setGuidanceProfile((current) => ({
-                      ...current,
-                      priority: event.target.value as TrainingGuidanceProfile['priority'],
-                    }))
-                  }}
-                  className="mt-2 h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-800"
-                >
-                  {TRAINING_PRIORITY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          ) : (
+            <div className="mt-5 rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
+              {preparedExpressionTrainingCount > 0
+                ? '现在还没有 50 句级别的训练总结。可以继续练，或者点“用训练记录刷新总结”先手动整理一版。'
+                : '现在还没有训练总结。先开始录音，系统会只根据真实训练结果回流规律、重点词和高频误听。'}
             </div>
-
-            <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-5">
-              <p className="text-sm font-medium text-gray-900">这轮我会先按这个方向提醒你</p>
-              <p className="mt-3 text-sm leading-6 text-gray-700">{guidanceContext.evidenceSummary}</p>
-              <ul className="mt-4 space-y-2 text-sm leading-6 text-gray-700">
-                {guidanceContext.coachingPlan.map((item) => (
-                  <li key={item}>- {item}</li>
-                ))}
-              </ul>
-            </div>
-          </section>
+          )}
         </section>
       </main>
-
-      <PWAStatusCenter />
     </div>
   )
 }

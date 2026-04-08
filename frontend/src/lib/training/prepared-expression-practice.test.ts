@@ -58,17 +58,17 @@ const PREPARED_EXPRESSION_FIXTURE: PreparedExpressionSnapshot = {
 test('buildPreparedExpressionPracticeExercises maps sections into practice exercises', () => {
   const exercises = buildPreparedExpressionPracticeExercises(PREPARED_EXPRESSION_FIXTURE)
 
-  assert.equal(exercises.length, 4)
+  assert.equal(exercises.length, 2)
   assert.equal(exercises[0].practiceSource, 'prepared_expression')
   assert.equal(exercises[0].preparedExpressionId, 'speech-1')
   assert.equal(exercises[0].preparedExpressionSectionId, 'opening')
-  assert.equal(exercises[2].preparedExpressionSectionTitle, '产品定义')
+  assert.equal(exercises[1].preparedExpressionSectionTitle, '产品定义')
   assert.deepEqual(
-    exercises[2].preparedExpressionKeywords,
+    exercises[1].preparedExpressionKeywords,
     ['构音障碍', '燃言'],
   )
   assert.deepEqual(
-    exercises[2].preparedExpressionFallbackPhrases,
+    exercises[1].preparedExpressionFallbackPhrases,
     ['燃言最核心做三件事。'],
   )
 })

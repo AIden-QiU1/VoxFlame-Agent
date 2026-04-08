@@ -31,6 +31,11 @@ export interface LiveKitPreparationContext {
   listenerGuidance: string[]
   supportStrategies: string[]
   hotwords: string[]
+  asrHotwordEntries: Array<{
+    text: string
+    weight: number
+    lang: 'zh' | 'en'
+  }>
   riskyTerms: string[]
   commonConfusions: string[]
   fallbackPhrases: string[]
@@ -79,6 +84,7 @@ export class LiveKitSessionService {
               listener_guidance: input.preparationContext.listenerGuidance,
               support_strategies: input.preparationContext.supportStrategies,
               hotwords: input.preparationContext.hotwords,
+              asr_hotword_entries: input.preparationContext.asrHotwordEntries,
               risky_terms: input.preparationContext.riskyTerms,
               common_confusions: input.preparationContext.commonConfusions,
               fallback_phrases: input.preparationContext.fallbackPhrases,
@@ -181,6 +187,7 @@ export class LiveKitSessionService {
                 listener_guidance: input.preparationContext.listenerGuidance,
                 support_strategies: input.preparationContext.supportStrategies,
                 hotwords: input.preparationContext.hotwords,
+                asr_hotword_entries: input.preparationContext.asrHotwordEntries,
                 risky_terms: input.preparationContext.riskyTerms,
                 common_confusions: input.preparationContext.commonConfusions,
                 fallback_phrases: input.preparationContext.fallbackPhrases,

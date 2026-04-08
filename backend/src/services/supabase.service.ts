@@ -9,8 +9,16 @@ import {
   type WorkspaceSceneId,
 } from './expression-kit.service';
 import {
-  getDefaultPreparedExpressionTemplate,
+  createPreparedExpressionAssetFromDraft,
+  normalizePreparedExpressionAsset,
+  type PreparedExpressionAsset,
+  type PreparedExpressionAsrHotwordEntry,
 } from './prepared-expression.service';
+import {
+  PreparedExpressionSummaryService,
+  type PreparedExpressionSummaryTrigger,
+  type PreparedExpressionTrainingSample,
+} from './prepared-expression-summary.service';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -119,6 +127,7 @@ export interface WorkspaceMemorySnapshot {
     listener_guidance: string[];
     support_strategies: string[];
     hotwords: string[];
+    asr_hotword_entries: PreparedExpressionAsrHotwordEntry[];
     next_step: string | null;
     updated_at: string;
   };
@@ -134,7 +143,19 @@ export interface WorkspaceMemorySnapshot {
     hotwords: string[];
     high_risk_phrases: string[];
     fallback_phrases: string[];
+    asr_hotword_entries: PreparedExpressionAsrHotwordEntry[];
     next_focus: string[];
+    rehearsal_summary: {
+      summary: string;
+      hotwords: string[];
+      recurring_errors: string[];
+      pronunciation_patterns: string[];
+      support_strategies: string[];
+      next_focus: string[];
+      based_on_training_count: number;
+      model: string;
+      updated_at: string;
+    } | null;
     sections: Array<{
       id: string;
       title: string;
@@ -320,6 +341,7 @@ export class SupabaseService {
   private client: SupabaseClient;
   private adminClient: SupabaseClient; // service_role client for system operations
   private static instance: SupabaseService;
+  private readonly preparedExpressionSummaryService = new PreparedExpressionSummaryService();
 
   private constructor() {
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -476,6 +498,107 @@ export class SupabaseService {
     return normalizeCommunicationPreferences(
       isRecord(updated.preferences) ? updated.preferences.communication_preferences : undefined,
     );
+  }
+
+  async getPreparedExpressionAsset(userId: string): Promise<PreparedExpressionAsset | null> {
+    const userProfile = await this.getUserProfile(userId);
+    return this.readPreparedExpressionAssetFromProfile(userProfile);
+  }
+
+  async savePreparedExpressionAsset(
+    userId: string,
+    input: {
+      title?: string | null;
+      scene?: string | null;
+      source?: string | null;
+      content: string;
+    },
+  ): Promise<PreparedExpressionAsset | null> {
+    await this.ensureUserProfile(userId);
+
+    const userProfile = await this.getUserProfile(userId);
+    const existingPreferences = isRecord(userProfile?.preferences)
+      ? userProfile.preferences
+      : {};
+    const existingAsset = this.readPreparedExpressionAssetFromProfile(userProfile);
+    const nextAsset = createPreparedExpressionAssetFromDraft({
+      id: existingAsset?.draft.id ?? null,
+      title: input.title ?? existingAsset?.draft.title ?? null,
+      scene: input.scene ?? existingAsset?.draft.scene ?? null,
+      source: input.source ?? existingAsset?.draft.source ?? null,
+      content: input.content,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const nextPreferences: JsonRecord = {
+      ...existingPreferences,
+      prepared_expression_asset: nextAsset,
+    };
+
+    const updated = await this.updateUserProfile(userId, {
+      preferences: nextPreferences,
+      hotwords: dedupeStrings(
+        [
+          ...(userProfile?.hotwords ?? []),
+          ...nextAsset.structured.hotwords,
+        ],
+        20,
+      ),
+    });
+
+    if (!updated) {
+      return null;
+    }
+
+    return this.readPreparedExpressionAssetFromProfile(updated);
+  }
+
+  async summarizePreparedExpressionAsset(
+    userId: string,
+    trigger: PreparedExpressionSummaryTrigger = 'manual',
+  ): Promise<PreparedExpressionAsset | null> {
+    await this.ensureUserProfile(userId);
+
+    const userProfile = await this.getUserProfile(userId);
+    const existingPreferences = isRecord(userProfile?.preferences)
+      ? userProfile.preferences
+      : {};
+    const existingAsset = this.readPreparedExpressionAssetFromProfile(userProfile);
+    if (!existingAsset) {
+      return null;
+    }
+    const samples = await this.getPreparedExpressionTrainingSamples(
+      userId,
+      existingAsset.structured.id,
+    );
+    const summarized = await this.preparedExpressionSummaryService.summarize(
+      existingAsset,
+      samples,
+      trigger,
+    );
+
+    const nextPreferences: JsonRecord = {
+      ...existingPreferences,
+      prepared_expression_asset: summarized,
+    };
+
+    const updated = await this.updateUserProfile(userId, {
+      preferences: nextPreferences,
+      hotwords: dedupeStrings(
+        [
+          ...(userProfile?.hotwords ?? []),
+          ...summarized.structured.hotwords,
+          ...(summarized.rehearsal_summary?.hotwords ?? []),
+        ],
+        20,
+      ),
+    });
+
+    if (!updated) {
+      return null;
+    }
+
+    return this.readPreparedExpressionAssetFromProfile(updated);
   }
 
   // === Sessions ===
@@ -692,6 +815,58 @@ export class SupabaseService {
     };
   }
 
+  private readPreparedExpressionAssetFromProfile(
+    userProfile: UserProfile | null,
+  ): PreparedExpressionAsset | null {
+    const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
+    return normalizePreparedExpressionAsset(preferences?.prepared_expression_asset);
+  }
+
+  private async getPreparedExpressionTrainingSamples(
+    userId: string,
+    preparedExpressionId: string,
+  ): Promise<PreparedExpressionTrainingSample[]> {
+    const memories = await this.getMemories(userId, 240);
+
+    return memories
+      .filter((memory) => {
+        const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+        return (
+          readString(metadata, 'kind') === 'training_result' &&
+          readString(metadata, 'prepared_expression_id') === preparedExpressionId
+        );
+      })
+      .sort((left, right) => {
+        const leftTime = new Date(left.created_at ?? 0).getTime();
+        const rightTime = new Date(right.created_at ?? 0).getTime();
+        return rightTime - leftTime;
+      })
+      .slice(0, 80)
+      .map((memory) => {
+        const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+
+        return {
+          created_at: memory.created_at ?? null,
+          target_text: readString(metadata, 'target_text') ?? readString(metadata, 'exercise_text') ?? '',
+          recognized_text: readString(metadata, 'recognized_text') ?? readString(metadata, 'raw_transcript') ?? '',
+          feedback_status: readString(metadata, 'feedback_status'),
+          prepared_expression_section_id: readString(metadata, 'prepared_expression_section_id'),
+          prepared_expression_section_title: readString(metadata, 'prepared_expression_section_title'),
+          high_risk_phrases: readStringList(metadata?.high_risk_phrases),
+          hotwords: dedupeStrings(
+            [
+              ...readStringList(metadata?.hotwords),
+              ...readStringList(metadata?.keywords),
+            ],
+            8,
+          ),
+          speech_patterns: readStringList(metadata?.speech_patterns),
+          articulation_tips: readStringList(metadata?.articulation_tips),
+          pronunciation_summary: readString(metadata, 'pronunciation_summary'),
+        };
+      });
+  }
+
   async getWorkspaceMemorySnapshot(
     userId: string,
     options: { sceneId?: WorkspaceSceneId } = {},
@@ -703,7 +878,7 @@ export class SupabaseService {
     ]);
 
     const syncedAt = new Date().toISOString();
-    const preparedExpression = this.buildPreparedExpressionSnapshot(profileSnapshot, syncedAt);
+    const preparedExpression = this.buildPreparedExpressionSnapshot(profileSnapshot, userProfile, syncedAt);
 
     return {
       profile_bundle: this.buildProfileBundle(profileSnapshot, userProfile),
@@ -1033,11 +1208,13 @@ export class SupabaseService {
       readString(latestTrainingMetadata, 'next_step') ||
       communicationPreferences.opening_phrase ||
       null;
+    const rehearsalSummary = preparedExpression?.rehearsal_summary;
     const supportStrategies = dedupeStrings(
       [
         preparedExpression?.fallback_phrases[0]
           ? `保底句先准备好：${preparedExpression.fallback_phrases[0]}`
           : '',
+        ...(rehearsalSummary?.support_strategies ?? []),
         communicationPreferences.opening_phrase
           ? `先用固定开场白把节奏稳住：${communicationPreferences.opening_phrase}`
           : '',
@@ -1097,12 +1274,14 @@ export class SupabaseService {
     const riskyTerms = dedupeStrings(
       [
         ...(preparedExpression?.high_risk_phrases ?? []),
+        ...(rehearsalSummary?.recurring_errors ?? []),
         ...growthProfile.frequentConfusions.slice(0, 4).map((item) => item.label),
       ],
       6,
     );
     const pronunciationPatterns = dedupeStrings(
       [
+        ...(rehearsalSummary?.pronunciation_patterns ?? []),
         ...growthProfile.frequentFocus.slice(0, 3).map((item) => item.label),
         ...growthProfile.frequentSpeechPatterns.slice(0, 4).map((item) => item.label),
         ...growthProfile.articulationTips.slice(0, 2).map((item) => item.label),
@@ -1112,6 +1291,7 @@ export class SupabaseService {
     const hotwords = dedupeStrings(
       [
         ...(preparedExpression?.hotwords ?? []),
+        ...(rehearsalSummary?.hotwords ?? []),
         ...snapshot.hotword_profiles.slice(0, 6).map((profile) => profile.phrase),
         ...snapshot.hotwords.slice(0, 6),
       ],
@@ -1162,6 +1342,7 @@ export class SupabaseService {
       listener_guidance: listenerGuidance,
       support_strategies: supportStrategies,
       hotwords,
+      asr_hotword_entries: preparedExpression?.asr_hotword_entries ?? [],
       next_step: growthProfile.nextStep ?? null,
       updated_at: syncedAt,
     };
@@ -1169,9 +1350,14 @@ export class SupabaseService {
 
   private buildPreparedExpressionSnapshot(
     snapshot: MemoryProfileSnapshot,
+    userProfile: UserProfile | null,
     syncedAt: string,
   ): WorkspaceMemorySnapshot['prepared_expression'] {
-    const template = getDefaultPreparedExpressionTemplate();
+    const asset = this.readPreparedExpressionAssetFromProfile(userProfile);
+    if (!asset) {
+      return null;
+    }
+    const template = asset.structured;
     const preparedTrainingMemories = snapshot.memories
       .filter((memory) => {
         const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
@@ -1241,18 +1427,23 @@ export class SupabaseService {
     const lastRehearsedAt = preparedTrainingMemories[0]?.created_at ?? null;
     const rehearsedSectionCount = sections.filter((section) => section.rehearsal_count > 0).length;
     const nextFocus = dedupeStrings(
-      sections
-        .filter((section) => section.is_priority)
-        .flatMap((section) => [
-          section.title,
-          section.high_risk_phrases[0] ?? '',
-          section.fallback_phrases[0] ?? '',
-        ]),
+      [
+        ...(asset.rehearsal_summary?.nextFocus ?? []),
+        ...sections
+          .filter((section) => section.is_priority)
+          .flatMap((section) => [
+            section.title,
+            section.high_risk_phrases[0] ?? '',
+            section.fallback_phrases[0] ?? '',
+          ]),
+      ],
       5,
     );
-    const summary = lastRehearsedAt
-      ? `“${template.title}”已经练过 ${preparedTrainingMemories.length} 次，当前覆盖 ${rehearsedSectionCount}/${sections.length} 个结构段落。优先继续收口：${nextFocus[0] ?? sections[0]?.title ?? '开场段落'}。`
-      : template.summary;
+    const summary = asset.rehearsal_summary?.summary
+      ? asset.rehearsal_summary.summary
+      : lastRehearsedAt
+        ? `“${template.title}”已经练过 ${preparedTrainingMemories.length} 次，当前覆盖 ${rehearsedSectionCount}/${sections.length} 个结构段落。优先继续收口：${nextFocus[0] ?? sections[0]?.title ?? '开场段落'}。`
+        : template.summary;
 
     return {
       id: template.id,
@@ -1266,6 +1457,7 @@ export class SupabaseService {
       hotwords: dedupeStrings(
         [
           ...template.hotwords,
+          ...(asset.rehearsal_summary?.hotwords ?? []),
           ...sections.flatMap((section) => section.hotwords),
         ],
         10,
@@ -1282,13 +1474,28 @@ export class SupabaseService {
       fallback_phrases: dedupeStrings(
         [
           ...template.fallbackPhrases,
+          ...(asset.rehearsal_summary?.fallbackPhrases ?? []),
           ...sections
             .filter((section) => section.is_priority)
             .flatMap((section) => section.fallback_phrases),
         ],
         6,
       ),
+      asr_hotword_entries: asset.rehearsal_summary?.asrHotwordEntries ?? [],
       next_focus: nextFocus,
+      rehearsal_summary: asset.rehearsal_summary
+        ? {
+            summary: asset.rehearsal_summary.summary,
+            hotwords: asset.rehearsal_summary.hotwords,
+            recurring_errors: asset.rehearsal_summary.recurringErrors,
+            pronunciation_patterns: asset.rehearsal_summary.pronunciationPatterns,
+            support_strategies: asset.rehearsal_summary.supportStrategies,
+            next_focus: asset.rehearsal_summary.nextFocus,
+            based_on_training_count: asset.rehearsal_summary.basedOnTrainingCount,
+            model: asset.rehearsal_summary.model,
+            updated_at: asset.rehearsal_summary.updated_at,
+          }
+        : null,
       sections,
       updated_at: syncedAt,
     };

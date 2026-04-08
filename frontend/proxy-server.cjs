@@ -9,20 +9,31 @@ const rtcTarget = new URL(
 );
 
 function isRtcPath(url = '/') {
-  return url.startsWith('/rtc/');
+  return url === '/rtc' || url.startsWith('/rtc?') || url.startsWith('/rtc/');
 }
 
 function getTarget(url) {
   return isRtcPath(url) ? rtcTarget : appTarget;
 }
 
+function getForwardedHeader(req, name, fallback = '') {
+  const value = req.headers[name];
+  if (Array.isArray(value)) {
+    return value[0] || fallback;
+  }
+  return value || fallback;
+}
+
 function proxyHttp(req, res) {
   const target = getTarget(req.url);
+  const isRtcRequest = isRtcPath(req.url);
+  const forwardedHost = getForwardedHeader(req, 'x-forwarded-host', req.headers.host || '');
+  const forwardedProto = getForwardedHeader(req, 'x-forwarded-proto', 'http');
   const headers = {
     ...req.headers,
-    host: target.host,
-    'x-forwarded-host': req.headers.host || '',
-    'x-forwarded-proto': 'http',
+    host: isRtcRequest ? target.host : forwardedHost || target.host,
+    'x-forwarded-host': forwardedHost,
+    'x-forwarded-proto': forwardedProto,
   };
 
   const upstream = http.request(
@@ -53,14 +64,21 @@ function proxyHttp(req, res) {
 
 function proxyUpgrade(req, socket, head) {
   const target = getTarget(req.url);
+  const isRtcRequest = isRtcPath(req.url);
+  const forwardedHost = getForwardedHeader(req, 'x-forwarded-host', req.headers.host || '');
+  const forwardedProto = getForwardedHeader(
+    req,
+    'x-forwarded-proto',
+    req.headers.upgrade ? 'wss' : 'ws',
+  );
   const upstream = net.connect(Number(target.port), target.hostname, () => {
     const headerLines = Object.entries({
       ...req.headers,
-      host: target.host,
+      host: isRtcRequest ? target.host : forwardedHost || target.host,
       connection: req.headers.connection || 'Upgrade',
       upgrade: req.headers.upgrade || 'websocket',
-      'x-forwarded-host': req.headers.host || '',
-      'x-forwarded-proto': 'ws',
+      'x-forwarded-host': forwardedHost,
+      'x-forwarded-proto': forwardedProto,
     }).map(([key, value]) => `${key}: ${value}`);
 
     upstream.write(

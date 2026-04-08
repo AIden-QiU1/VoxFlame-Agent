@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 
 const LOCAL_RUNTIME_RESET_KEY = 'voxflame-local-runtime-reset-session-v1'
+const allowLocalhostPwa = process.env.NEXT_PUBLIC_PWA_ALLOW_LOCALHOST === '1'
 
 export function LocalRuntimeReset() {
   useEffect(() => {
@@ -14,7 +15,7 @@ export function LocalRuntimeReset() {
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1'
 
-    if (!isLocalOrigin) {
+    if (!isLocalOrigin || allowLocalhostPwa) {
       return
     }
 

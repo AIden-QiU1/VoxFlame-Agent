@@ -59,10 +59,27 @@
   - `80/tcp`
   - `443/tcp`
   - `7881/tcp`
-  - `7881/udp`
+  - `7882/udp`
+- 当前这套公网预览如果要让浏览器真实建立语音链路，还应放开：
+  - `3478/udp` for TURN/UDP
 - 正式 LiveKit 生产化时，还应继续补：
-  - `3478/udp` 或 `5349/tcp`/`443/tcp` for TURN/TLS
+  - `5349/tcp` for TURN/TLS preview
+  - `443/tcp` for TURN/TLS production without separate L4 LB
   - `50000-60000/udp` for 更稳的 WebRTC 媒体连通
+
+说明：
+- 当前已经确认：
+  - `livekit-server` 现在会稳定监听 `7880/tcp`、`7881/tcp`、`7882/udp`、`3478/udp`
+  - 浏览器侧 ICE server 现在只收到 `turn:公网IP:3478?transport=udp`
+  - `/api/rtc/session/start` 与 LiveKit signaling 已经能成功命中
+- 如果页面仍提示“当前网络没能建立实时语音连接”，优先说明：
+  - 腾讯云安全组还没有完整放行 `3478/udp + 7882/udp + 7881/tcp`；或
+  - 用户网络本身限制了纯 UDP/ICE，当前预览形态又没有 TURN/TLS 兜底
+- 这次排查也确认：宿主机本地 `ufw` 未启用，`iptables` 默认 `INPUT ACCEPT`，所以当前更像是腾讯云安全组/上游网络问题，而不是机内防火墙问题。
+
+腾讯云官方参考：
+- 安全组概述：https://cloud.tencent.com/document/product/213/12452
+- 添加安全组规则：https://cloud.tencent.com/document/product/213/39740
 
 ### 3.2 DNS
 
@@ -97,6 +114,17 @@
 - `LIVEKIT_SERVER_DEV_MODE`
   - 本地开发：`1`
   - 公网预览：`0`
+- `VOXFLAME_LIVEKIT_TURN_UDP_PORT`
+  - 当前预览：`3478`
+  - 作用：只给 `start-livekit.sh` 使用，避免被 `livekit-server` 误读成原生 TURN/TLS 环境变量
+- `VOXFLAME_LIVEKIT_TURN_TLS_PORT`
+  - 当前预览：`5349`
+  - 仅在真正启用 TURN/TLS 时写入生成配置
+- `VOXFLAME_LIVEKIT_TURN_TLS_ENABLED`
+  - 当前预览：`0`
+  - 预览环境默认关闭 TURN/TLS，避免与网站 HTTPS 抢占同一个 `443/tcp`
+- `VOXFLAME_LIVEKIT_TURN_DOMAIN`
+  - 正式启用 TURN/TLS 时再填写，例如 `turn.example.com`
 
 ## 5. 当前可直接使用的公网 HTTPS 预览方案
 
@@ -109,6 +137,22 @@
 - 不等于：
   - 中国大陆正式备案完成
   - 完整 LiveKit TURN/TLS 生产部署
+  - 受限网络下的高覆盖率 WebRTC 连通
+
+补充说明：
+- LiveKit 官方文档明确要求：
+  - 生产部署应有正式域名和可信证书
+  - 如果使用 TURN，通常还需要独立 TURN 域名与证书
+  - 如果没有四层负载均衡，`turn.tls_port` 应直接用 `443`
+- 当前这台机子的预览形态是：
+  - 网站 HTTPS 由 Caddy 占用 `443`
+  - LiveKit 当前只开 `TURN/UDP 3478`
+  - LiveKit 当前没有开启 `TURN/TLS`
+  - 这能作为“先跑通公网 HTTPS”的预览方案
+  - 但不等于 LiveKit 官方意义上的高可靠正式形态
+- 因此：
+  - 普通家庭网络或手机热点下，放行 `7881/tcp + 7882/udp + 3478/udp` 后通常有机会跑通
+  - 公司 VPN、校园网、部分运营商或更严格网络下，因为没有 `TURN/TLS` 兜底，仍可能失败
 
 ### 5.2 预览入口
 
@@ -125,6 +169,8 @@ sudo env \
   LIVEKIT_BROWSER_URL=wss://111.230.35.89 \
   LIVEKIT_CONFIG_FILE=./infra/livekit/livekit.public.yaml \
   LIVEKIT_SERVER_DEV_MODE=0 \
+  VOXFLAME_LIVEKIT_TURN_UDP_PORT=3478 \
+  VOXFLAME_LIVEKIT_TURN_TLS_ENABLED=0 \
   docker compose --profile https up -d --build livekit-server backend frontend livekit-agent caddy
 ```
 
@@ -151,8 +197,15 @@ sudo docker compose logs --tail=100 livekit-server
 - 不再使用默认开发密钥
 - 补正式 API key / secret 管理
 - 打开 TURN/TLS
+- 为 `app / rtc / turn` 做正式域名与证书规划
+- 评估单独公网 IP 或 L4/SNI 路由，避免网站 HTTPS 与 TURN/TLS 同抢 `443`
 - 打开公网 UDP 媒体端口范围
 - 评估是否引入 Redis 作为单机以外的生产依赖
+
+官方参考：
+- LiveKit self-hosting deployment：https://docs.livekit.io/transport/self-hosting/deployment/
+- LiveKit ports & firewall：https://docs.livekit.io/transport/self-hosting/ports-firewall/
+- LiveKit VM guide：https://docs.livekit.io/transport/self-hosting/vm/
 
 ## 7. 时间评估
 
@@ -174,6 +227,8 @@ sudo docker compose logs --tail=100 livekit-server
 - `/api/rtc/health` 可从同域 HTTPS 正常访问
 - 后端创建 RTC session 时返回浏览器可用的 `wss://...` LiveKit URL
 - LiveKit room 可从外网浏览器成功连接
+- LiveKit 日志里用户 participant 不再以 `SIGNAL_SOURCE_CLOSE` 在 `sessionDuration: 0s` 关闭
+- ICE 日志里至少能看到可用的 `udp/tcp/relay` 之一成功建立
 - 语音链路至少完成一次真实麦克风 smoke
 
 ## 9. 当前结论

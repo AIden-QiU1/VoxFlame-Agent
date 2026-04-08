@@ -42,6 +42,24 @@ export interface PreparedExpressionSectionSnapshot {
   is_priority: boolean
 }
 
+export interface PreparedExpressionAsrHotwordEntry {
+  text: string
+  weight: number
+  lang: 'zh' | 'en'
+}
+
+export interface PreparedExpressionRehearsalSummarySnapshot {
+  summary: string
+  hotwords: string[]
+  recurring_errors: string[]
+  pronunciation_patterns: string[]
+  support_strategies: string[]
+  next_focus: string[]
+  based_on_training_count: number
+  model: string
+  updated_at: string
+}
+
 export interface PreparedExpressionSnapshot {
   id: string
   title: string
@@ -54,7 +72,9 @@ export interface PreparedExpressionSnapshot {
   hotwords: string[]
   high_risk_phrases: string[]
   fallback_phrases: string[]
+  asr_hotword_entries: PreparedExpressionAsrHotwordEntry[]
   next_focus: string[]
+  rehearsal_summary: PreparedExpressionRehearsalSummarySnapshot | null
   sections: PreparedExpressionSectionSnapshot[]
   updated_at: string
 }
@@ -87,6 +107,7 @@ export interface WorkspaceMemorySnapshot {
     listener_guidance: string[]
     support_strategies: string[]
     hotwords: string[]
+    asr_hotword_entries: PreparedExpressionAsrHotwordEntry[]
     next_step: string | null
     updated_at: string
   }
@@ -94,6 +115,14 @@ export interface WorkspaceMemorySnapshot {
   expression_kit: {
     active_scene_id: StarterKitScene['id'] | null
     personalized_phrases: ExpressionKitSuggestion[]
+    quick_phrases: Array<{
+      id: string
+      text: string
+      category: string
+      usage_count: number
+      order_index: number
+      updated_at?: string
+    }>
     recommended_focus: string[]
     communication_preferences: CommunicationPreferences
   }

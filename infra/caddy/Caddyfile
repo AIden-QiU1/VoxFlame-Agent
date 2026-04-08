@@ -1,6 +1,9 @@
 {
     admin off
     default_sni {$VOXFLAME_PUBLIC_HOST}
+    servers {
+        protocols h1 h2
+    }
 }
 
 {$VOXFLAME_PUBLIC_HOST} {
@@ -18,6 +21,9 @@
         X-Frame-Options "DENY"
         Referrer-Policy "strict-origin-when-cross-origin"
     }
+
+    @livekit path /rtc /rtc/*
+    reverse_proxy @livekit 127.0.0.1:7880
 
     reverse_proxy 127.0.0.1:3000
 }

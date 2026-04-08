@@ -1,5 +1,4 @@
 import {
-  applyTrainingCoachFeedback,
   applyAssistantResponseDelta,
   applyConnectedState,
   applyCurrentAsrText,
@@ -15,7 +14,6 @@ import type {
   RtmMessageEvent,
   SessionControlClient,
   StartRtcSessionResponse,
-  TrainingCoachFeedbackEvent,
   VoiceProfileSyncEvent,
 } from './session-types'
 
@@ -207,21 +205,6 @@ export function reduceRtcEnvelope(
   prev: RtcAgentState,
   message: RtcMessageEnvelope,
 ): RtcAgentState {
-  if (message.type === 'training_coach_feedback') {
-    const feedback: TrainingCoachFeedbackEvent = {
-      requestId: message.feedback_request_id || '',
-      exerciseId: message.exercise_id || '',
-      exerciseText: message.exercise_text || '',
-      recognizedText: message.recognized_text || '',
-      feedbackText: message.feedback_text || '',
-      source: typeof message.source === 'string' ? message.source : 'unknown',
-      model: typeof message.model === 'string' ? message.model : 'unknown',
-      timestamp: new Date(),
-      error: typeof message.error === 'string' ? message.error : null,
-    }
-    return applyTrainingCoachFeedback(prev, feedback)
-  }
-
   if (message.type === 'voice_profile_updated') {
     const sync: VoiceProfileSyncEvent = {
       source: typeof message.source === 'string' ? message.source : 'unknown',

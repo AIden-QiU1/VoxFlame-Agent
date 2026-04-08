@@ -24,7 +24,6 @@ export type RtcSurface =
 export type RtcSessionStrategy = 'heavy_realtime' | 'light_voice'
 export type RtcCapabilityId =
   | 'transport_send_control'
-  | 'training_feedback_request'
   | 'voice_profile_update'
   | 'workspace_snapshot_read'
   | 'upload_artifact_persist'
@@ -134,6 +133,7 @@ export interface StartRtcSessionInput {
   botUid?: number
   timeoutSeconds?: number
   properties?: RtcPropertyOverrides
+  browserOrigin?: string | null
 }
 
 export interface StopRtcSessionInput {
@@ -193,7 +193,6 @@ const MODE_CAPABILITY_MATRIX: Record<RtcSessionMode, RtcCapabilityId[]> = {
   training: [
     'transport_send_control',
     'workspace_snapshot_read',
-    'training_feedback_request',
     'voice_profile_update',
     'upload_artifact_persist',
   ],
@@ -214,6 +213,13 @@ export class RtcOrchestrationService {
   private readonly liveKitConfig = new LiveKitConfigService()
   private readonly liveKitSessionService = new LiveKitSessionService()
   private readonly supabaseService = createSupabaseService()
+  private readonly liveKitAgentHealthUrl =
+    normalizeOptionalUrl(process.env.LIVEKIT_AGENT_HEALTH_URL) ??
+    'http://livekit-agent:8081/'
+  private readonly liveKitAgentHealthTimeoutMs = this.parseTimeout(
+    process.env.LIVEKIT_AGENT_HEALTH_TIMEOUT_MS,
+    2000,
+  )
   private readonly defaultGraph =
     (process.env.RTC_DEFAULT_GRAPH || 'voxflame_livekit_agent').trim()
   private readonly defaultTimeoutSeconds = this.parseTimeout(
@@ -284,6 +290,11 @@ export class RtcOrchestrationService {
       normalizePositiveInt(input.timeoutSeconds) ?? this.defaultTimeoutSeconds
 
     const liveKitStatus = this.assertLiveKitCanStart()
+    await this.assertLiveKitAgentCanAcceptJobs()
+    const browserServerUrl =
+      deriveRtcBrowserWebSocketUrl(input.browserOrigin) ??
+      liveKitStatus.browserUrl ??
+      liveKitStatus.serverUrl!
     const preparationContext = await this.loadPreparationContext(
       input.authenticatedUserId,
       intent,
@@ -315,10 +326,10 @@ export class RtcOrchestrationService {
       rtmChannelName: liveKitSession.roomName,
       rtmToken: liveKitSession.participantToken,
       timeoutSeconds,
-      controlServerUrl: liveKitStatus.browserUrl ?? liveKitStatus.serverUrl!,
+      controlServerUrl: browserServerUrl,
       transport: {
         provider: 'livekit',
-        serverUrl: liveKitStatus.browserUrl ?? liveKitStatus.serverUrl!,
+        serverUrl: browserServerUrl,
         roomName: liveKitSession.roomName,
         participantIdentity: liveKitSession.participantIdentity,
         participantName: liveKitSession.participantName,
@@ -343,6 +354,31 @@ export class RtcOrchestrationService {
   private parseTimeout(value: string | undefined, fallback: number): number {
     const parsed = Number.parseInt(value || '', 10)
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+  }
+
+  private async assertLiveKitAgentCanAcceptJobs(): Promise<void> {
+    const controller = new AbortController()
+    const timeout = globalThis.setTimeout(() => {
+      controller.abort()
+    }, this.liveKitAgentHealthTimeoutMs)
+
+    try {
+      const response = await fetch(this.liveKitAgentHealthUrl, {
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        throw new Error(`Unexpected livekit-agent health status: ${response.status}`)
+      }
+    } catch (error) {
+      console.warn('[RTC] LiveKit agent health probe failed:', error)
+      throw new RtcOrchestrationError(
+        '实时转录助手当前还没有准备好，请稍后再试。',
+        503,
+      )
+    } finally {
+      globalThis.clearTimeout(timeout)
+    }
   }
 
   private assertLiveKitCanStart(): ReturnType<LiveKitConfigService['getStatus']> {
@@ -384,6 +420,7 @@ export class RtcOrchestrationService {
       )
 
       const fallbackPhrases = [
+        ...(snapshot.prepared_expression?.fallback_phrases ?? []),
         ...snapshot.expression_kit.personalized_phrases.map((item) => item.text),
         ...snapshot.expression_kit.quick_phrases.map((item) => item.text),
       ]
@@ -400,6 +437,7 @@ export class RtcOrchestrationService {
         listenerGuidance: snapshot.preparation.listener_guidance.slice(0, 4),
         supportStrategies: snapshot.preparation.support_strategies.slice(0, 4),
         hotwords: snapshot.preparation.hotwords.slice(0, 8),
+        asrHotwordEntries: snapshot.preparation.asr_hotword_entries.slice(0, 12),
         riskyTerms: snapshot.preparation.risky_terms.slice(0, 6),
         commonConfusions: snapshot.preparation.pronunciation_patterns.slice(0, 6),
         fallbackPhrases: dedupeStrings(fallbackPhrases).slice(0, 6),
@@ -459,6 +497,30 @@ function buildChannelName(mode: RtcSessionMode | undefined): string {
   return `${prefix}_${Date.now().toString(36)}_${uuidv4().slice(0, 8)}`
 }
 
+export function deriveRtcBrowserWebSocketUrl(
+  browserOrigin: string | null | undefined,
+): string | null {
+  const trimmed = browserOrigin?.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  try {
+    const url = new URL(trimmed)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null
+    }
+
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    url.pathname = ''
+    url.search = ''
+    url.hash = ''
+    return url.toString().replace(/\/$/, '')
+  } catch {
+    return null
+  }
+}
+
 function mapRtcSceneToWorkspaceSceneId(
   scene: RtcScene | null,
 ): WorkspaceSceneId | undefined {
@@ -485,6 +547,11 @@ function dedupeStrings(values: string[]): string[] {
   return Array.from(
     new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)),
   )
+}
+
+function normalizeOptionalUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
 }
 
 function createSupabaseService(): SupabaseService | null {

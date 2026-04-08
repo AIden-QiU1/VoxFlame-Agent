@@ -57,7 +57,6 @@ export function buildPreparedExpressionPracticeExercises(
     const lines = dedupeStrings([
       section.anchor_line,
       ...section.practice_lines,
-      ...section.fallback_phrases.slice(0, 1),
     ])
 
     return lines.map((line, index) => ({

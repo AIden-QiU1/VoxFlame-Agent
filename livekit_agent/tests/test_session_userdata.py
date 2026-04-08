@@ -49,6 +49,9 @@ class SessionUserDataTests(unittest.TestCase):
                         "immediate_goal": "先准备描述症状的关键一句。",
                         "profile_summary": "用户当前需要稳定描述症状和持续时间。",
                         "hotwords": ["头痛", "三天"],
+                        "asr_hotword_entries": [
+                            {"text": "挂号", "weight": 6, "lang": "zh"},
+                        ],
                         "listener_guidance": ["如果没听清，请先复述症状。"],
                     },
                 },
@@ -57,6 +60,10 @@ class SessionUserDataTests(unittest.TestCase):
 
         self.assertEqual(userdata.preparation.source, "metadata")
         self.assertEqual(userdata.preparation.hotwords, ["头痛", "三天"])
+        self.assertEqual(
+            userdata.preparation.asr_hotword_entries,
+            [{"text": "挂号", "weight": 6, "lang": "zh"}],
+        )
         self.assertIn("描述症状", userdata.preparation.immediate_goal)
 
     def test_note_user_transcript_tracks_hotword_hits(self) -> None:
@@ -67,13 +74,16 @@ class SessionUserDataTests(unittest.TestCase):
                         "immediate_goal": "先准备描述症状的关键一句。",
                         "profile_summary": "用户当前需要稳定描述症状和持续时间。",
                         "hotwords": ["头痛", "三天"],
+                        "asr_hotword_entries": [
+                            {"text": "挂号", "weight": 6, "lang": "zh"},
+                        ],
                     },
                 },
             ),
         )
 
         userdata.note_user_transcript("我头痛三天了，想先挂号。")
-        self.assertEqual(userdata.active_hotwords, ["头痛", "三天"])
+        self.assertEqual(userdata.active_hotwords, ["头痛", "三天", "挂号"])
 
 
 if __name__ == "__main__":

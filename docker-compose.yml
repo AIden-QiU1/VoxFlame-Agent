@@ -6,28 +6,24 @@ services:
   livekit-server:
     image: ${LIVEKIT_SERVER_IMAGE:-docker.m.daocloud.io/livekit/livekit-server:v1.10.1}
     container_name: voxflame-livekit-server
+    network_mode: host
     environment:
       - LIVEKIT_SERVER_DEV_MODE=${LIVEKIT_SERVER_DEV_MODE:-1}
       - VOXFLAME_PUBLIC_HOST=${VOXFLAME_PUBLIC_HOST:-}
-      - LIVEKIT_TURN_UDP_PORT=${LIVEKIT_TURN_UDP_PORT:-3478}
-      - LIVEKIT_TURN_TLS_PORT=${LIVEKIT_TURN_TLS_PORT:-5349}
+      # Keep TURN tuning behind VOXFLAME_* names so livekit-server
+      # does not auto-interpret partial TURN/TLS env as a native config.
+      - VOXFLAME_LIVEKIT_TURN_UDP_PORT=${VOXFLAME_LIVEKIT_TURN_UDP_PORT:-443}
+      - VOXFLAME_LIVEKIT_TURN_TLS_PORT=${VOXFLAME_LIVEKIT_TURN_TLS_PORT:-5349}
+      - VOXFLAME_LIVEKIT_TURN_TLS_ENABLED=${VOXFLAME_LIVEKIT_TURN_TLS_ENABLED:-0}
+      - VOXFLAME_LIVEKIT_TURN_DOMAIN=${VOXFLAME_LIVEKIT_TURN_DOMAIN:-}
     entrypoint:
       - /bin/sh
       - /etc/livekit/start-livekit.sh
-    ports:
-      - "7880:7880"
-      - "7881:7881/tcp"
-      - "7881:7881/udp"
-      - "7882:7882/udp"
-      - "${LIVEKIT_TURN_UDP_PORT:-3478}:${LIVEKIT_TURN_UDP_PORT:-3478}/udp"
-      - "${LIVEKIT_TURN_TLS_PORT:-5349}:${LIVEKIT_TURN_TLS_PORT:-5349}/tcp"
     volumes:
       - ${LIVEKIT_CONFIG_FILE:-./infra/livekit/livekit.dev.yaml}:/etc/livekit/livekit.yaml:ro
       - ./infra/livekit/start-livekit.sh:/etc/livekit/start-livekit.sh:ro
       - caddy_data:/var/lib/caddy:ro
     restart: unless-stopped
-    networks:
-      - voxflame-network
 
   frontend:
     build:
@@ -49,10 +45,12 @@ services:
       - BACKEND_INTERNAL_URL=http://backend:3001
       - VOXFLAME_ENABLE_PWA=${VOXFLAME_ENABLE_PWA:-1}
       - NEXT_PUBLIC_RTC_EXECUTION_BACKEND=${NEXT_PUBLIC_RTC_EXECUTION_BACKEND:-livekit}
-      - LIVEKIT_SIGNAL_PROXY_TARGET=${LIVEKIT_SIGNAL_PROXY_TARGET:-http://livekit-server:7880}
+      - LIVEKIT_SIGNAL_PROXY_TARGET=${LIVEKIT_SIGNAL_PROXY_TARGET:-http://host.docker.internal:7880}
       - npm_config_registry=https://registry.npmmirror.com
     volumes:
       - ./logs:/app/logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backend
     healthcheck:
@@ -83,14 +81,22 @@ services:
       - RTC_ENABLE_LIVEKIT_EXPERIMENT=${RTC_ENABLE_LIVEKIT_EXPERIMENT:-1}
       - RTC_DEFAULT_GRAPH=voxflame_voice_assistant_rtc_preview
       - RTC_DEFAULT_TIMEOUT=120
-      - LIVEKIT_URL=${LIVEKIT_URL:-ws://livekit-server:7880}
+      - LIVEKIT_URL=${LIVEKIT_INTERNAL_URL:-ws://host.docker.internal:7880}
       - LIVEKIT_BROWSER_URL=${LIVEKIT_BROWSER_URL:-ws://localhost:3000}
       - VOXFLAME_PUBLIC_BASE_URL=${VOXFLAME_PUBLIC_BASE_URL:-}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-voxflame_livekit_dev_secret_32chars}
       - LIVEKIT_AGENT_NAME=${LIVEKIT_AGENT_NAME:-voxflame-agent}
+      - LIVEKIT_AGENT_HEALTH_URL=${LIVEKIT_AGENT_HEALTH_URL:-http://livekit-agent:8081/}
+      - LIVEKIT_AGENT_HEALTH_TIMEOUT_MS=${LIVEKIT_AGENT_HEALTH_TIMEOUT_MS:-2000}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+      - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      - DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_MODEL=${DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_MODEL:-qwen3.5-plus}
+      - DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_TIMEOUT_SECONDS=${DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_TIMEOUT_SECONDS:-12}
     volumes:
       - ./logs:/app/logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - livekit-server
     healthcheck:
@@ -113,7 +119,7 @@ services:
       - ./livekit_agent/.env
     container_name: voxflame-livekit-agent
     environment:
-      - LIVEKIT_URL=${LIVEKIT_DOCKER_URL:-ws://livekit-server:7880}
+      - LIVEKIT_URL=${LIVEKIT_DOCKER_URL:-ws://host.docker.internal:7880}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-voxflame_livekit_dev_secret_32chars}
       - LIVEKIT_AGENT_NAME=${LIVEKIT_AGENT_NAME:-voxflame-agent}
@@ -132,6 +138,8 @@ services:
     depends_on:
       - livekit-server
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - voxflame-network
 

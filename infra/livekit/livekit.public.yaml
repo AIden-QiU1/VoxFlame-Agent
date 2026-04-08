@@ -4,7 +4,8 @@ log_level: info
 rtc:
   udp_port: 7882
   tcp_port: 7881
-  use_external_ip: true
+  use_external_ip: false
+  node_ip: 111.230.35.89
 
 keys:
   devkey: voxflame_livekit_dev_secret_32chars

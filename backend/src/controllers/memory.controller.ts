@@ -34,6 +34,19 @@ interface MemoryCommunicationPreferencesRequestBody {
   communication_preferences?: CommunicationPreferences;
 }
 
+interface MemoryPreparedExpressionRequestBody {
+  user_id?: string;
+  title?: string;
+  scene?: string | null;
+  source?: string | null;
+  content?: string;
+}
+
+interface MemoryPreparedExpressionSummarizeRequestBody {
+  user_id?: string;
+  trigger?: 'manual' | 'periodic_auto';
+}
+
 function readNumber(record: Record<string, unknown> | undefined, key: string): number | undefined {
   const value = record?.[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -96,6 +109,114 @@ function buildSessionPayload(
 }
 
 export class MemoryController {
+  async getPreparedExpressionAsset(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { userId } = req.params;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (!userId || userId !== authenticatedUserId) {
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      const asset = await SupabaseService.getInstance().getPreparedExpressionAsset(authenticatedUserId);
+      res.json({ prepared_expression_asset: asset });
+    } catch (error) {
+      console.error('Error in getPreparedExpressionAsset:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  async syncPreparedExpressionAsset(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { userId } = req.params;
+      const {
+        user_id,
+        title,
+        scene,
+        source,
+        content,
+      } = req.body as MemoryPreparedExpressionRequestBody;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (!userId || userId !== authenticatedUserId || (user_id && user_id !== authenticatedUserId)) {
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      if (!content || !content.trim()) {
+        res.status(400).json({ error: 'Missing required field: content' });
+        return;
+      }
+
+      const asset = await SupabaseService.getInstance().savePreparedExpressionAsset(
+        authenticatedUserId,
+        {
+          title,
+          scene,
+          source,
+          content,
+        },
+      );
+
+      if (!asset) {
+        res.status(500).json({ error: 'Failed to save prepared expression asset' });
+        return;
+      }
+
+      res.json({ prepared_expression_asset: asset });
+    } catch (error) {
+      console.error('Error in syncPreparedExpressionAsset:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  async summarizePreparedExpressionAsset(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { userId } = req.params;
+      const {
+        user_id,
+        trigger,
+      } = req.body as MemoryPreparedExpressionSummarizeRequestBody;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (!userId || userId !== authenticatedUserId || (user_id && user_id !== authenticatedUserId)) {
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      const asset = await SupabaseService.getInstance().summarizePreparedExpressionAsset(
+        authenticatedUserId,
+        trigger === 'periodic_auto' ? 'periodic_auto' : 'manual',
+      );
+
+      if (!asset) {
+        res.status(400).json({ error: 'Missing prepared expression asset' });
+        return;
+      }
+
+      res.json({ prepared_expression_asset: asset });
+    } catch (error) {
+      console.error('Error in summarizePreparedExpressionAsset:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
   // PUT /api/memory/workspace/:userId/preferences - Persist durable communication preferences via workspace owner
   async syncCommunicationPreferences(req: Request, res: Response): Promise<void> {
     try {

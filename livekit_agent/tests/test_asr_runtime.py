@@ -32,8 +32,6 @@ def create_config() -> LiveKitAgentConfig:
         dashscope_llm_model="qwen3.6-plus",
         dashscope_timeout_seconds=15.0,
         dashscope_reply_timeout_seconds=4.5,
-        dashscope_training_extension_model="qwen3.5-plus",
-        dashscope_training_extension_timeout_seconds=8.0,
         dashscope_asr_url="wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
         dashscope_asr_model="qwen3-asr-flash-realtime-2026-02-10",
         dashscope_asr_sample_rate=16000,

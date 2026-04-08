@@ -1,10 +1,11 @@
 import type {
   ConversationMessage,
   RtcAgentState,
-  TrainingCoachFeedbackEvent,
   VoiceProfileSyncEvent,
 } from './session-types'
 import type { StartRtcSessionResponse } from './session-types'
+
+const MAX_CONVERSATION_MESSAGES = 80
 
 export function createMessage(
   role: ConversationMessage['role'],
@@ -18,8 +19,17 @@ export function createMessage(
   }
 }
 
+function appendMessage(
+  messages: ConversationMessage[],
+  message: ConversationMessage,
+): ConversationMessage[] {
+  const nextMessages = [...messages, message]
+  return nextMessages.slice(-MAX_CONVERSATION_MESSAGES)
+}
+
 export function createInitialRtcAgentState(): RtcAgentState {
   return {
+    isConnecting: false,
     isConnected: false,
     isRecording: false,
     isThinking: false,
@@ -34,18 +44,7 @@ export function createInitialRtcAgentState(): RtcAgentState {
     sessionIntent: null,
     sessionReadiness: null,
     grantedCapabilities: [],
-    lastTrainingCoachFeedback: null,
     lastVoiceProfileSync: null,
-  }
-}
-
-export function applyTrainingCoachFeedback(
-  prev: RtcAgentState,
-  feedback: TrainingCoachFeedbackEvent,
-): RtcAgentState {
-  return {
-    ...prev,
-    lastTrainingCoachFeedback: feedback,
   }
 }
 
@@ -65,7 +64,17 @@ export function applyRtcError(
 ): RtcAgentState {
   return {
     ...prev,
+    isConnecting: false,
     error,
+  }
+}
+
+export function applyConnectingState(prev: RtcAgentState): RtcAgentState {
+  return {
+    ...prev,
+    isConnecting: true,
+    isConnected: false,
+    error: null,
   }
 }
 
@@ -76,8 +85,9 @@ export function applyFinalUserTranscript(
   return {
     ...prev,
     currentASRText: '',
+    isThinking: true,
     latestUserTranscript: text,
-    messages: [...prev.messages, createMessage('user', text)],
+    messages: appendMessage(prev.messages, createMessage('user', text)),
   }
 }
 
@@ -89,7 +99,7 @@ export function applyFinalAssistantTranscript(
     ...prev,
     currentResponseText: '',
     isThinking: false,
-    messages: [...prev.messages, createMessage('assistant', text)],
+    messages: appendMessage(prev.messages, createMessage('assistant', text)),
   }
 }
 
@@ -122,7 +132,7 @@ export function applyAssistantResponseDelta(
     ...prev,
     currentResponseText: '',
     messages: delta
-      ? [...prev.messages, createMessage('assistant', nextResponse)]
+      ? appendMessage(prev.messages, createMessage('assistant', nextResponse))
       : prev.messages,
   }
 }
@@ -130,6 +140,7 @@ export function applyAssistantResponseDelta(
 export function applyDisconnectedState(prev: RtcAgentState): RtcAgentState {
   return {
     ...prev,
+    isConnecting: false,
     isConnected: false,
     isRecording: false,
     isSpeaking: false,
@@ -138,7 +149,6 @@ export function applyDisconnectedState(prev: RtcAgentState): RtcAgentState {
     sessionIntent: null,
     sessionReadiness: null,
     grantedCapabilities: [],
-    lastTrainingCoachFeedback: null,
     lastVoiceProfileSync: null,
   }
 }
@@ -150,6 +160,7 @@ export function applyConnectedState(
 ): RtcAgentState {
   return {
     ...prev,
+    isConnecting: false,
     isConnected: true,
     sessionId: session.channelName,
     error: null,
@@ -158,10 +169,7 @@ export function applyConnectedState(
     grantedCapabilities: session.intent.grantedCapabilities,
     messages:
       connectionNotice
-        ? [
-            ...prev.messages,
-            createMessage('system', connectionNotice),
-          ]
+        ? appendMessage(prev.messages, createMessage('system', connectionNotice))
         : prev.messages,
   }
 }
@@ -191,7 +199,7 @@ export function applyLocalUserText(
   return {
     ...prev,
     error: null,
-    messages: [...prev.messages, createMessage('user', text)],
+    messages: appendMessage(prev.messages, createMessage('user', text)),
   }
 }
 
@@ -202,7 +210,6 @@ export function applyClearedMessages(prev: RtcAgentState): RtcAgentState {
     currentASRText: '',
     currentResponseText: '',
     latestUserTranscript: '',
-    lastTrainingCoachFeedback: null,
     lastVoiceProfileSync: null,
   }
 }

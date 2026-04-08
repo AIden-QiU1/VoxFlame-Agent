@@ -62,6 +62,7 @@ export default function ChatInterface({
 }: ChatInterfaceProps) {
   const requestedRuntimeScene = mapStarterSceneToRuntimeScene(initialStarterSceneId)
   const {
+    isConnecting,
     isConnected,
     isRecording,
     isThinking,
@@ -80,12 +81,14 @@ export default function ChatInterface({
     stopRecording,
     toggleRecording,
     sendText,
+    sendControlEvent,
   } = useRtcAgentSession({
     userId,
     accessToken,
     surface: 'communication_workspace',
     scene: requestedRuntimeScene,
     executionBackend: 'livekit',
+    timeoutSeconds: 1800,
   })
 
   const [textInput, setTextInput] = useState('')
@@ -130,6 +133,16 @@ export default function ChatInterface({
   useEffect(() => {
     setActiveStarterSceneId(initialStarterSceneId)
   }, [initialStarterSceneId])
+
+  useEffect(() => {
+    if (!isConnected) {
+      return
+    }
+
+    void sendControlEvent('caption_mode_update', {
+      enabled: isCaptionMode,
+    })
+  }, [isCaptionMode, isConnected, sendControlEvent])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -177,13 +190,19 @@ export default function ChatInterface({
     }
   }
 
-  const latestAssistantText = [...messages]
-    .reverse()
-    .find((message) => message.role === 'assistant')?.content
-  const captionText = currentResponseText || latestAssistantText || currentASRText
+  const recentCaptionMessages = useMemo(
+    () => messages.filter((message) => message.role === 'assistant').slice(-6),
+    [messages],
+  )
+  const latestAssistantText = recentCaptionMessages[recentCaptionMessages.length - 1]?.content
+  const captionText = currentResponseText
+    || latestAssistantText
+    || (isThinking ? '正在整理本句...' : '正在等待语音输入...')
   const hasConversationStarted = messages.length > 0 || Boolean(currentResponseText) || Boolean(currentASRText)
   const statusText = isRecording
     ? '正在听你说话'
+    : isConnecting
+      ? '助手正在进入房间'
     : isSpeaking
       ? '正在为你代播'
       : isThinking
@@ -278,6 +297,11 @@ export default function ChatInterface({
                 已连接
               </span>
             )}
+            {!sessionId && isConnecting && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                连接中
+              </span>
+            )}
           </div>
           
           <div className="flex items-center gap-2 sm:gap-3">
@@ -314,9 +338,10 @@ export default function ChatInterface({
                 onClick={() => {
                   void connect()
                 }}
+                disabled={isConnecting}
                 className="rounded-full bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600"
               >
-                连接助手
+                {isConnecting ? '正在连接...' : '连接助手'}
               </button>
             ) : (
               <button
@@ -366,9 +391,10 @@ export default function ChatInterface({
                       onClick={() => {
                         void connect()
                       }}
+                      disabled={isConnecting}
                       className="rounded-full bg-amber-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-600"
                     >
-                      先连接助手
+                      {isConnecting ? '正在连接...' : '先连接助手'}
                     </button>
                   ) : null}
                 </div>
@@ -654,11 +680,13 @@ export default function ChatInterface({
             {isConnected ? (
               isRecording ? (
                 '正在录音... 再次点击或按空格停止'
+              ) : isConnecting ? (
+                '正在等待助手真正进入房间，请稍候...'
               ) : (
                 '可以直接说话、打字，或者先点一句场景句、再慢慢补充。'
               )
             ) : (
-              '先连接助手，或者先点一条开口句开始'
+              isConnecting ? '正在等待助手真正进入房间，请稍候...' : '先连接助手，或者先点一条开口句开始'
             )}
           </div>
           {microphoneEnvironmentWarning ? (
@@ -689,10 +717,12 @@ export default function ChatInterface({
               退出
             </button>
           </div>
-          <div className="flex-1 flex items-center justify-center px-8">
-            <p className="text-center text-4xl md:text-6xl leading-tight font-semibold max-w-5xl">
-              {captionText || '正在等待语音输入...'}
-            </p>
+          <div className="flex-1 overflow-y-auto px-8 py-10">
+            <div className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center">
+              <p className="text-center text-4xl font-semibold leading-tight md:text-6xl">
+                {captionText}
+              </p>
+            </div>
           </div>
         </div>
       )}
