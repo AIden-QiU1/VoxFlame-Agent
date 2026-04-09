@@ -4,17 +4,14 @@ import asyncio
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from assistant_runtime import (
+    AssistantReplyGenerationError,
     CommunicationAssistantRuntime,
-    DashScopeChatClient,
     build_current_turn_prompt,
-    build_fallback_text,
     build_preparation_prompt,
-    compute_reply_timeout_seconds,
     estimate_clarity_score,
     extract_text_from_completion,
 )
@@ -88,16 +85,12 @@ class FakeDashScopeClient:
         return self.text
 
 
-class TestAssistantRuntime(unittest.TestCase):
-    def test_compute_reply_timeout_seconds_adapts_to_short_inputs(self) -> None:
-        self.assertEqual(compute_reply_timeout_seconds(4.5, "好"), 1.2)
-        self.assertEqual(compute_reply_timeout_seconds(4.5, "我想挂号"), 1.2)
-        self.assertEqual(compute_reply_timeout_seconds(4.5, "我想先去挂号，然后找医生看看。"), 2.2)
-        self.assertEqual(
-            compute_reply_timeout_seconds(4.5, "我今天想先去挂号，再问一下要不要先做检查，然后再去找医生。"),
-            4.5,
-        )
+class FailingDashScopeClient:
+    def complete(self, messages: list[dict[str, str]]) -> str:  # noqa: ARG002
+        raise RuntimeError("The read operation timed out")
 
+
+class TestAssistantRuntime(unittest.TestCase):
     def test_estimate_clarity_score_prefers_identical_text(self) -> None:
         self.assertEqual(estimate_clarity_score("我想挂号", "我想挂号"), 1.0)
 
@@ -129,22 +122,26 @@ class TestAssistantRuntime(unittest.TestCase):
         )
         self.assertEqual(text, "第一句。第二句。")
 
-    def test_generate_reply_uses_fallback_without_dashscope(self) -> None:
+    def test_generate_reply_raises_when_dashscope_is_unavailable(self) -> None:
         runtime = CommunicationAssistantRuntime(
             config=create_config(),
             ctx=create_context(),
             userdata=build_session_userdata(create_context()),
         )
-        reply, source = asyncio.run(runtime.generate_reply("请帮我叫医生"))
-        self.assertEqual(source, "livekit_agent_fallback")
-        self.assertEqual(reply, build_fallback_text(create_context(), "请帮我叫医生"))
+
+        with self.assertRaises(AssistantReplyGenerationError) as exc:
+            asyncio.run(runtime.generate_reply("请帮我叫医生"))
+
+        self.assertEqual(exc.exception.code, "llm_unavailable")
 
     def test_generate_reply_uses_client_when_available(self) -> None:
         fake_client = FakeDashScopeClient("请先帮我叫医生，我需要马上处理。")
+        userdata = build_session_userdata(create_context())
+        userdata.preparation.document_content = "医生您好，我叫邱生峰。我想先挂号。"
         runtime = CommunicationAssistantRuntime(
             config=create_config(),
             ctx=create_context(),
-            userdata=build_session_userdata(create_context()),
+            userdata=userdata,
             client=fake_client,
         )
         reply, source = asyncio.run(runtime.generate_reply("请帮我叫医生"))
@@ -152,7 +149,11 @@ class TestAssistantRuntime(unittest.TestCase):
         self.assertEqual(reply, "请先帮我叫医生，我需要马上处理。")
         self.assertIn("本轮 ASR 最终文本：请帮我叫医生", fake_client.requests[0][-1]["content"])
         self.assertTrue(
-            any("稳定准备上下文" in message["content"] for message in fake_client.requests[0][:-1]),
+            any(
+                isinstance(message["content"], list)
+                and "稳定准备上下文" in message["content"][0]["text"]
+                for message in fake_client.requests[0][:-1]
+            ),
         )
 
     def test_generate_reply_uses_caption_prompt_without_history_when_caption_mode_enabled(self) -> None:
@@ -169,57 +170,48 @@ class TestAssistantRuntime(unittest.TestCase):
         asyncio.run(runtime.generate_reply("请帮我叫医生"))
         asyncio.run(runtime.generate_reply("我现在很难受"))
 
-        self.assertIn("实时字幕纠错助手", fake_client.requests[0][0]["content"])
+        self.assertIn("实时字幕纠错助手", fake_client.requests[0][0]["content"][0]["text"])
         self.assertIn("最终展示字幕", fake_client.requests[0][-1]["content"])
-        self.assertEqual(len(fake_client.requests[1]), 4)
+        self.assertEqual(len(fake_client.requests[1]), 2)
 
-    def test_generate_reply_falls_back_quickly_when_dashscope_reply_times_out(self) -> None:
-        config = create_config()
-        object.__setattr__(config, "dashscope_reply_timeout_seconds", 0.01)
+    def test_generate_reply_raises_error_when_dashscope_times_out(self) -> None:
         runtime = CommunicationAssistantRuntime(
-            config=config,
+            config=create_config(),
             ctx=create_context(),
             userdata=build_session_userdata(create_context()),
-            client=DashScopeChatClient(
-                api_key="dashscope-test",
-                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                model="qwen3.6-plus",
-                timeout_seconds=0.01,
-            ),
+            client=FailingDashScopeClient(),
         )
 
-        async def slow_to_thread(*args, **kwargs):  # noqa: ANN002, ANN003
-            await asyncio.sleep(0.05)
-            return "这条不该返回"
+        with self.assertRaises(AssistantReplyGenerationError) as exc:
+            asyncio.run(runtime.generate_reply("我渴了"))
 
-        with (
-            patch("assistant_runtime.asyncio.to_thread", slow_to_thread),
-            patch("assistant_runtime.compute_reply_timeout_seconds", return_value=0.01),
-        ):
-            reply, source = asyncio.run(runtime.generate_reply("我渴了"))
+        self.assertEqual(exc.exception.code, "correction_timeout")
+        self.assertIn("超时", exc.exception.user_message)
 
-        self.assertEqual(source, "livekit_agent_fallback")
-        self.assertEqual(reply, "我渴了")
-
-    def test_build_preparation_prompt_includes_hotwords(self) -> None:
+    def test_build_preparation_prompt_includes_document_and_pairs(self) -> None:
         userdata = build_session_userdata(create_context())
-        userdata.preparation.hotwords = ["挂号", "复诊"]
+        userdata.preparation.document_content = "大家好，我叫邱生峰。"
+        userdata.preparation.training_pairs = [
+            {"target": "我叫邱生峰。", "heard": "我叫邱文峰。", "occurrence_count": 2},
+        ]
         prompt = build_preparation_prompt(userdata)
         self.assertIn("稳定准备上下文", prompt)
-        self.assertIn("挂号", prompt)
+        self.assertIn("邱生峰", prompt)
+        self.assertIn("系统常听成", prompt)
 
-    def test_build_current_turn_prompt_prefers_active_hotwords(self) -> None:
+    def test_build_current_turn_prompt_prefers_prepared_content_and_pairs(self) -> None:
         userdata = build_session_userdata(create_context())
-        userdata.preparation.hotwords = ["挂号", "复诊"]
-        userdata.preparation.risky_terms = ["甲状腺结节"]
-        userdata.preparation.fallback_phrases = ["医生您好，我想先挂号。"]
-        userdata.note_user_transcript("我想先挂号")
+        userdata.preparation.document_content = "医生您好，我叫邱生峰。我想先挂号。"
+        userdata.preparation.reference_lines = ["医生您好，我叫邱生峰。"]
+        userdata.preparation.training_pairs = [
+            {"target": "我叫邱生峰。", "heard": "我叫邱文峰。", "occurrence_count": 3},
+        ]
 
-        prompt = build_current_turn_prompt("我想先挂号", userdata)
+        prompt = build_current_turn_prompt("我叫邱文峰", userdata)
 
-        self.assertIn("本轮 ASR 最终文本：我想先挂号", prompt)
-        self.assertIn("优先核对热词：挂号", prompt)
-        self.assertIn("甲状腺结节", prompt)
+        self.assertIn("本轮 ASR 最终文本：我叫邱文峰", prompt)
+        self.assertIn("准备稿参考原句", prompt)
+        self.assertIn("目标句", prompt)
 
 
 if __name__ == "__main__":

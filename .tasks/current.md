@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-04-08
+> 最后更新: 2026-04-09
 
 ## 当前主线
 
@@ -12,6 +12,21 @@
   - 登录态仍有过期 token 噪音，需要继续收口
 
 ## 最新收口
+
+0. 演讲稿识别提升这轮已经切到“全文准备稿 + 训练句对”主链
+   - 当前不再把 `qwen3-asr` 热词能力当成现役前提
+   - prepared-expression / workspace snapshot / LiveKit metadata / livekit_agent prompt 现在都已开始正式携带：
+     - `document_content`
+     - `reference_lines`
+     - `training_pairs`
+   - 当前 correction runtime 的稳定前缀已改成：
+     - 系统约束
+     - 场景
+     - 准备稿全文
+     - 已训练的 `目标句 -> 系统听到` 句对
+   - 当前也已按 DashScope explicit context cache 方式把这个稳定前缀做成单条 cacheable system message
+   - 现在真正需要控制的是最近几轮 history window，而不是把 6000 字级准备稿过度摘要
+   - 记忆页 / 训练页可见 summary 卡片也已从“热词 / ASR 热词包”切成“训练句对 / 高频误听 / 下一轮重点”
 
 1. `speech mode` 的 prepared-expression 主链已经继续打通
    - backend 已新增 prepared-expression asset 的读写/总结接口
@@ -32,8 +47,8 @@
      - `每 50 句更新一次的纠错总结`
    - 记忆页已改成最小闭环：
      - `准备内容`
-     - `自定义热词`
-     - `训练总结 / 高频误听 / ASR 热词包`
+     - `自定义重点词`
+     - `训练总结 / 高频误听 / 训练句对`
    - 逐句 `training coach` 链路已退出现役主线：
      - 前端不再请求逐句大模型点评
      - RTC capability 不再声明 `training_feedback_request`
@@ -42,18 +57,20 @@
    - `prepared expression` 自动总结节奏已改成 `50` 句
 
 3. LiveKit correction context 已进一步收口
-   - backend `rtc-orchestration` 已把 `asr_hotword_entries` 注入 `LiveKitPreparationContext`
-   - `livekit_agent` 已会读取：
-     - `hotwords`
-     - `asr_hotword_entries`
-     - `risky_terms`
-     - `common_confusions`
-     - `fallback_phrases`
+   - backend `rtc-orchestration` 现在会把准备稿全文和训练句对注入 `LiveKitPreparationContext`
+   - `livekit_agent` 现役 correction prompt 现在优先读取：
+     - `document_content`
+     - `reference_lines`
+     - `training_pairs`
    - `CommunicationAssistantRuntime` 现在已经改成：
-     - 稳定前缀
+     - 单条 cacheable 稳定前缀
      - 小窗口 recent history
      - 当前轮独立 prompt
-     - 优先做“最小必要纠错”，减少大幅改写
+     - 如果当前 ASR 和准备稿 / 训练目标句明显接近，优先恢复到对应原句
+   - 同时已收掉 `timeout -> raw ASR` 伪成功路径：
+     - 只有真正拿到 correction 时才发布 assistant transcript
+     - DashScope 超时/失败时改发 `error` envelope，前端会退出 `isThinking`
+     - 真实 HTTP 超时现在由 `DASHSCOPE_TIMEOUT_SECONDS` 控制，agent 日志会记录 `latency_ms / prompt_tokens / cached_tokens`
 
 4. PWA 已重新开启并补了一轮本地行为治理
    - frontend 生产 build 现在默认启用 PWA，已经重新生成 `public/sw.js`
@@ -62,14 +79,31 @@
    - 默认 localhost 仍会清 runtime cache，避免开发时被旧 PWA 缓存污染
 
 5. 最新验证已通过
-   - `cd frontend && npm run build`
-   - `cd frontend && npm test`
-   - `cd backend && npm run build`
-   - `python3 -m unittest discover livekit_agent/tests -v`
+  - `cd frontend && npm run build`
+  - `cd backend && npm run build`
+  - `python3 -m unittest discover livekit_agent/tests -v`
    - `sudo docker compose --profile https build --no-cache frontend backend livekit-agent`
    - `sudo docker compose --profile https up -d --force-recreate livekit-server backend frontend livekit-agent caddy`
+   - 同时已补一轮 Docker 提速治理：
+     - 根 `.env` 已去掉 `LIVEKIT_AGENT_BASE_IMAGE=voxflame-agent-livekit-agent:latest` 这种自引用配置
+   - `frontend/.dockerignore`、`backend/.dockerignore` 已补齐
+   - `livekit_agent/.dockerignore` 也已加严
 
-6. 腾讯云公网 HTTPS 预览入口已成立
+6. 训练数据导出现在多了一个最小入口
+   - backend 已新增：
+     - `npm run export:audio-target -- --email <email> --include-pending --output-dir <dir>`
+   - 当前导出产物会落到服务器本地目录，结构为：
+     - `audio/*.webm`
+     - `samples.jsonl`
+   - `samples.jsonl` 每行只保留：
+     - `audio`
+     - `target`
+   - 已对账号 `2307294809@qq.com` 做 smoke：
+     - `/tmp/voxflame-audio-target-smoke/audio/...`
+     - `/tmp/voxflame-audio-target-smoke/samples.jsonl`
+   - 同时修掉了导出脚本的 `.env` 载入顺序问题，避免错误导出 `0` 条
+
+7. 腾讯云公网 HTTPS 预览入口已成立
    - 当前已新增 `https` profile 下的 `Caddy` 入口
    - 当前公网 HTTPS 预览地址：`https://111.230.35.89`
    - 浏览器级访问已通过；首页可正常打开
@@ -80,35 +114,39 @@
    - 已新增部署清单文档：
      - [docs/TENCENT_CLOUD_MAINLAND_DEPLOY_CHECKLIST_2026-04-07.md](/home/ubuntu/VoxFlame-Agent/docs/TENCENT_CLOUD_MAINLAND_DEPLOY_CHECKLIST_2026-04-07.md)
 
-7. 大陆正式上线边界已查清
+8. 大陆正式上线边界已查清
    - `sslip.io` 这类未备案临时域名在腾讯云大陆机上会撞备案拦截，不适合继续作为正式路线
    - 这台机器已经成功签到 `Let's Encrypt` 的公网 IP 证书
    - 正式品牌入口仍然建议使用自有备案域名，而不是长期停留在 IP 入口
 
-8. LiveKit 部署配置已补一层稳定性
+9. LiveKit 部署配置已补一层稳定性
    - 已新增 `infra/livekit/start-livekit.sh`
    - `docker-compose.yml` 现在会把 `LIVEKIT_SERVER_DEV_MODE` 传进 `livekit-server`
    - 当前公网预览配置来源于 `infra/livekit/livekit.public.yaml`
 
-9. 沟通页展示已收口
+10. 沟通页展示已收口
    - 已移除 `表达对照`
    - 已从前端状态树中删除 `currentDualLine / DualLineSubtitle` 残留
    - 当前用户界面不再单独展示“机器听到的”
    - fallback 文案不再输出“现在先按当前沟通场景继续 / 我先帮你把这句话往前推进”这类铺垫
 
-10. LiveKit 连接主链已成立
+11. LiveKit 连接主链已成立
    - 沟通页现在已经可以连接助手
    - 之前的前端自断连问题已通过稳定 `disconnect` callback 修复
 
-11. 当前慢的主要根因已经查清
-   - `livekit-agent` 日志已出现：
-     - `DashScope reply generation failed: The read operation timed out`
-   - 说明当前慢点主要在纠错/改写调用，不是 LiveKit 连接本身
-   - 当前已增加 `reply timeout` 自适应策略：
-     - 短句不再傻等完整超时上限
+12. 当前慢的主要根因已经查清
+   - 慢点仍主要在 `ASR final -> DashScope correction/reply -> TTS`，不是 LiveKit 建链本身
+   - 现在已不再用“超时后回退成 raw ASR”掩盖真实延迟
+   - 当前线上试运行模型已临时切到 `qwen3.5-flash`
+     - 目标是先压掉 `qwen3.6-plus` 的 correction timeout
+     - 等拿到新一轮 `latency_ms` / 体感结果后，再决定是否做 `flash 预处理 + plus 最终纠错`
+   - 接下来可以直接从 `livekit-agent` 日志读取真实 `latency_ms`，判断是否要再做：
+     - 只保留字幕模式下的 correction
+     - 先显示 interim/final ASR，再用 correction 最终替换
+     - 或继续压 `max_tokens / history window / TTS` 节奏
      - 更长表达仍保留较宽容的等待窗口
 
-12. turn/audio 主线现状
+13. turn/audio 主线现状
    - 已有：
      - RMS VAD
      - barge-in 门槛
@@ -118,7 +156,7 @@
      - `room_options.audio_input`
      - 更稳的 endpointing / interruption policy
      - 会话内 `speaker differentiation`
-13. 现场字幕主链已进一步收口
+14. 现场字幕主链已进一步收口
    - 继续复用现有 `字幕辅助 / 全屏字幕模式`
    - 沟通页启动时已显式申请 `1800s` 长会话
    - 前端进入字幕模式时会发送 `caption_mode_update`
@@ -131,7 +169,7 @@
      - 最近字幕
      - `识别中 / 正在整理本句...`
    - 前端消息列表已加上限裁剪，减少长时会话状态膨胀
-14. 公网登录跳转与新账号 smoke 已补齐
+15. 公网登录跳转与新账号 smoke 已补齐
    - 未登录访问 `/contribute` / `/memory` 现在会正确跳到：
      - `https://111.230.35.89/login?next=%2Fcontribute`
      - `https://111.230.35.89/login?next=%2Fmemory`
@@ -141,7 +179,7 @@
      - 训练页已是新布局
      - 记忆页已是新布局
      - 不会再自动带出默认 `speech.md` prepared-expression
-15. HTTPS RTC 运行态根因已继续收口
+16. HTTPS RTC 运行态根因已继续收口
    - 已确认并修掉两个 livekit-server 级问题：
      - `docker-compose` 直传 `LIVEKIT_TURN_TLS_PORT` 会让 `livekit-server v1.10.1` 即使在“脚本逻辑关闭 TURN/TLS”时仍报 `TURN domain required`
      - `livekit.public.yaml` 在当前腾讯云单公网 IP 预览形态下继续使用 `rtc.use_external_ip: true`，会诱发 `listen udp ...:7882: bind: address already in use`
@@ -161,7 +199,7 @@
    - 当前剩余 blocker 更像网络面：
      - 本机 `ufw` 未启用，`iptables INPUT ACCEPT`
      - 更像腾讯云安全组或用户上游网络还没放通 `3478/udp + 7882/udp + 7881/tcp`
-16. HTTPS 公网 RTC 已补到可用态
+17. HTTPS 公网 RTC 已补到可用态
    - 腾讯云防火墙已确认放开：
      - `80/tcp`
      - `443/tcp`
@@ -178,7 +216,7 @@
      - `livekit-server` 出现 `mediaTrack published`
    - 当前判断：
      - HTTPS 公网主链已从“无法连通”推进到“可建立真实 UDP RTC + 发布音轨”
-17. “录音后没有转录”这条假成功链已继续收口
+18. “录音后没有转录”这条假成功链已继续收口
    - backend 现在会在发 session token 前先探测：
      - `LIVEKIT_AGENT_HEALTH_URL`
      - 默认值：`http://livekit-agent:8081/`

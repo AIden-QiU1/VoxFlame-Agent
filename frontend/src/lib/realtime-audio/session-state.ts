@@ -65,6 +65,8 @@ export function applyRtcError(
   return {
     ...prev,
     isConnecting: false,
+    isThinking: false,
+    currentResponseText: '',
     error,
   }
 }
@@ -87,6 +89,7 @@ export function applyFinalUserTranscript(
     currentASRText: '',
     isThinking: true,
     latestUserTranscript: text,
+    error: null,
     messages: appendMessage(prev.messages, createMessage('user', text)),
   }
 }
@@ -99,6 +102,7 @@ export function applyFinalAssistantTranscript(
     ...prev,
     currentResponseText: '',
     isThinking: false,
+    error: null,
     messages: appendMessage(prev.messages, createMessage('assistant', text)),
   }
 }

@@ -30,15 +30,14 @@ export interface LiveKitPreparationContext {
   profileSummary: string
   listenerGuidance: string[]
   supportStrategies: string[]
-  hotwords: string[]
-  asrHotwordEntries: Array<{
-    text: string
-    weight: number
-    lang: 'zh' | 'en'
+  documentSummary: string | null
+  documentContent: string | null
+  referenceLines: string[]
+  trainingPairs: Array<{
+    target: string
+    heard: string
+    occurrenceCount: number
   }>
-  riskyTerms: string[]
-  commonConfusions: string[]
-  fallbackPhrases: string[]
 }
 
 export interface LiveKitSessionResult {
@@ -83,11 +82,14 @@ export class LiveKitSessionService {
               profile_summary: input.preparationContext.profileSummary,
               listener_guidance: input.preparationContext.listenerGuidance,
               support_strategies: input.preparationContext.supportStrategies,
-              hotwords: input.preparationContext.hotwords,
-              asr_hotword_entries: input.preparationContext.asrHotwordEntries,
-              risky_terms: input.preparationContext.riskyTerms,
-              common_confusions: input.preparationContext.commonConfusions,
-              fallback_phrases: input.preparationContext.fallbackPhrases,
+              document_summary: input.preparationContext.documentSummary,
+              document_content: input.preparationContext.documentContent,
+              reference_lines: input.preparationContext.referenceLines,
+              training_pairs: input.preparationContext.trainingPairs.map((pair) => ({
+                target: pair.target,
+                heard: pair.heard,
+                occurrence_count: pair.occurrenceCount,
+              })),
             },
           }
         : {}),
@@ -186,11 +188,14 @@ export class LiveKitSessionService {
                 profile_summary: input.preparationContext.profileSummary,
                 listener_guidance: input.preparationContext.listenerGuidance,
                 support_strategies: input.preparationContext.supportStrategies,
-                hotwords: input.preparationContext.hotwords,
-                asr_hotword_entries: input.preparationContext.asrHotwordEntries,
-                risky_terms: input.preparationContext.riskyTerms,
-                common_confusions: input.preparationContext.commonConfusions,
-                fallback_phrases: input.preparationContext.fallbackPhrases,
+                document_summary: input.preparationContext.documentSummary,
+                document_content: input.preparationContext.documentContent,
+                reference_lines: input.preparationContext.referenceLines,
+                training_pairs: input.preparationContext.trainingPairs.map((pair) => ({
+                  target: pair.target,
+                  heard: pair.heard,
+                  occurrence_count: pair.occurrenceCount,
+                })),
               },
             }
           : {}),

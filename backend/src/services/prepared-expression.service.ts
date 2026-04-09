@@ -37,6 +37,12 @@ export interface PreparedExpressionAsrHotwordEntry {
   lang: 'zh' | 'en';
 }
 
+export interface PreparedExpressionCorrectionPair {
+  target: string;
+  heard: string;
+  occurrenceCount: number;
+}
+
 export interface PreparedExpressionRehearsalSummary {
   summary: string;
   hotwords: string[];
@@ -46,6 +52,8 @@ export interface PreparedExpressionRehearsalSummary {
   fallbackPhrases: string[];
   nextFocus: string[];
   asrHotwordEntries: PreparedExpressionAsrHotwordEntry[];
+  referenceLines: string[];
+  trainingPairs: PreparedExpressionCorrectionPair[];
   basedOnTrainingCount: number;
   model: string;
   updated_at: string;
@@ -422,6 +430,116 @@ export function buildAsrHotwordEntries(
   }));
 }
 
+export function buildPreparedExpressionReferenceLines(
+  template: PreparedExpressionTemplate,
+  options?: {
+    maxLines?: number;
+    maxChars?: number;
+  },
+): string[] {
+  const maxLines = Math.max(1, options?.maxLines ?? 60);
+  const maxChars = Math.max(120, options?.maxChars ?? 3200);
+  const results: string[] = [];
+  let totalChars = 0;
+
+  const candidates = template.sections.flatMap((section) => [
+    section.anchorLine,
+    ...section.practiceLines,
+  ]);
+
+  for (const candidate of dedupeStrings(candidates)) {
+    const normalized = candidate.trim();
+    if (!normalized) {
+      continue;
+    }
+
+    const nextTotalChars = totalChars + normalized.length;
+    if (results.length > 0 && nextTotalChars > maxChars) {
+      break;
+    }
+
+    results.push(normalized);
+    totalChars = nextTotalChars;
+
+    if (results.length >= maxLines) {
+      break;
+    }
+  }
+
+  return results;
+}
+
+export function buildPreparedExpressionCorrectionPairs(
+  values: Array<{
+    target: string | null | undefined;
+    heard: string | null | undefined;
+  }>,
+  options?: {
+    maxPairs?: number;
+    maxChars?: number;
+  },
+): PreparedExpressionCorrectionPair[] {
+  const maxPairs = Math.max(1, options?.maxPairs ?? 60);
+  const maxChars = Math.max(120, options?.maxChars ?? 3200);
+  const aggregated = new Map<
+    string,
+    PreparedExpressionCorrectionPair & { order: number }
+  >();
+
+  values.forEach((value, index) => {
+    const target = value.target?.trim();
+    const heard = value.heard?.trim();
+    if (!target || !heard || target === heard) {
+      return;
+    }
+
+    const key = `${target}__${heard}`;
+    const current = aggregated.get(key);
+    if (current) {
+      current.occurrenceCount += 1;
+      return;
+    }
+
+    aggregated.set(key, {
+      target,
+      heard,
+      occurrenceCount: 1,
+      order: index,
+    });
+  });
+
+  const ranked = [...aggregated.values()].sort((left, right) => {
+    if (right.occurrenceCount !== left.occurrenceCount) {
+      return right.occurrenceCount - left.occurrenceCount;
+    }
+
+    return left.order - right.order;
+  });
+
+  const results: PreparedExpressionCorrectionPair[] = [];
+  let totalChars = 0;
+
+  for (const item of ranked) {
+    const pairChars = item.target.length + item.heard.length + 12;
+    if (results.length > 0 && totalChars + pairChars > maxChars) {
+      break;
+    }
+
+    results.push({
+      target: item.target,
+      heard: item.heard,
+      occurrenceCount: item.occurrenceCount,
+    });
+    totalChars += pairChars;
+
+    if (results.length >= maxPairs) {
+      break;
+    }
+  }
+
+  return results;
+}
+
 export function buildPreparedExpressionDraft(params: {
   title?: string | null;
   scene?: string | null;
@@ -568,6 +686,30 @@ function normalizeAsrHotwordEntry(value: unknown): PreparedExpressionAsrHotwordE
   };
 }
 
+function normalizeCorrectionPair(value: unknown): PreparedExpressionCorrectionPair | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const target = readString(value, 'target');
+  const heard = readString(value, 'heard');
+  if (!target || !heard || target === heard) {
+    return null;
+  }
+
+  const rawOccurrenceCount = value.occurrenceCount ?? value.occurrence_count;
+  const occurrenceCount =
+    typeof rawOccurrenceCount === 'number' && Number.isFinite(rawOccurrenceCount)
+      ? Math.max(1, Math.trunc(rawOccurrenceCount))
+      : 1;
+
+  return {
+    target,
+    heard,
+    occurrenceCount,
+  };
+}
+
 function normalizeSection(value: unknown, fallbackIndex: number): PreparedExpressionSectionTemplate | null {
   if (!isRecord(value)) {
     return null;
@@ -705,6 +847,21 @@ export function normalizePreparedExpressionAsset(value: unknown): PreparedExpres
                   .map((entry) => normalizeAsrHotwordEntry(entry))
                   .filter((entry): entry is PreparedExpressionAsrHotwordEntry => Boolean(entry))
               : [],
+          referenceLines: dedupeStrings(
+            readStringList(rehearsalSummaryValue.referenceLines).concat(
+              readStringList(rehearsalSummaryValue.reference_lines),
+            ),
+            60,
+          ),
+          trainingPairs: Array.isArray(rehearsalSummaryValue.trainingPairs)
+            ? rehearsalSummaryValue.trainingPairs
+                .map((pair) => normalizeCorrectionPair(pair))
+                .filter((pair): pair is PreparedExpressionCorrectionPair => Boolean(pair))
+            : Array.isArray(rehearsalSummaryValue.training_pairs)
+              ? rehearsalSummaryValue.training_pairs
+                  .map((pair) => normalizeCorrectionPair(pair))
+                  .filter((pair): pair is PreparedExpressionCorrectionPair => Boolean(pair))
+              : [],
           basedOnTrainingCount:
             typeof rehearsalSummaryValue.basedOnTrainingCount === 'number'
               ? rehearsalSummaryValue.basedOnTrainingCount
@@ -718,7 +875,26 @@ export function normalizePreparedExpressionAsset(value: unknown): PreparedExpres
 
   const normalizedRehearsalSummary =
     rehearsalSummary && rehearsalSummary.basedOnTrainingCount > 0
-      ? rehearsalSummary
+      ? {
+          ...rehearsalSummary,
+          referenceLines:
+            rehearsalSummary.referenceLines.length > 0
+              ? rehearsalSummary.referenceLines
+              : buildPreparedExpressionReferenceLines(structured, {
+                  maxLines: 60,
+                  maxChars: 3200,
+                }),
+          trainingPairs: buildPreparedExpressionCorrectionPairs(
+            rehearsalSummary.trainingPairs.map((pair) => ({
+              target: pair.target,
+              heard: pair.heard,
+            })),
+            {
+              maxPairs: 60,
+              maxChars: 3200,
+            },
+          ),
+        }
       : null;
 
   return {

@@ -57,11 +57,10 @@ def build_session_userdata_ack(
             "profile_summary": preparation.profile_summary,
             "listener_guidance": preparation.listener_guidance,
             "support_strategies": preparation.support_strategies,
-            "hotwords": preparation.hotwords,
-            "asr_hotword_entries": preparation.asr_hotword_entries,
-            "risky_terms": preparation.risky_terms,
-            "common_confusions": preparation.common_confusions,
-            "fallback_phrases": preparation.fallback_phrases,
+            "document_summary": preparation.document_summary,
+            "document_content": preparation.document_content,
+            "reference_lines": preparation.reference_lines,
+            "training_pairs": preparation.training_pairs,
         },
     }
 

@@ -14,11 +14,10 @@ class PreparationContextPack:
     profile_summary: str
     listener_guidance: list[str] = field(default_factory=list)
     support_strategies: list[str] = field(default_factory=list)
-    hotwords: list[str] = field(default_factory=list)
-    asr_hotword_entries: list[dict[str, Any]] = field(default_factory=list)
-    risky_terms: list[str] = field(default_factory=list)
-    common_confusions: list[str] = field(default_factory=list)
-    fallback_phrases: list[str] = field(default_factory=list)
+    document_summary: str = ""
+    document_content: str = ""
+    reference_lines: list[str] = field(default_factory=list)
+    training_pairs: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -30,18 +29,12 @@ class VoxFlameSessionUserData:
     interruption_count: int = 0
     barge_in_count: int = 0
     caption_mode_enabled: bool = False
-    active_hotwords: list[str] = field(default_factory=list)
 
     def note_user_transcript(self, transcript: str) -> None:
         normalized = transcript.strip()
         if not normalized:
             return
         self.last_user_transcript = normalized
-        matched_hotwords: list[str] = []
-        for hotword in _build_matchable_hotwords(self.preparation):
-            if hotword and hotword in normalized and hotword not in matched_hotwords:
-                matched_hotwords.append(hotword)
-        self.active_hotwords = matched_hotwords[:6]
 
     def note_assistant_reply(self, reply: str) -> None:
         normalized = reply.strip()
@@ -123,11 +116,10 @@ def _read_preparation_payload(ctx: VoxFlameSessionContext) -> PreparationContext
             or "当前准备上下文已载入，请优先参考这些准备信息帮助用户表达。",
             listener_guidance=_read_string_list(payload.get("listener_guidance")),
             support_strategies=_read_string_list(payload.get("support_strategies")),
-            hotwords=_read_string_list(payload.get("hotwords")),
-            asr_hotword_entries=_read_hotword_entries(payload.get("asr_hotword_entries")),
-            risky_terms=_read_string_list(payload.get("risky_terms")),
-            common_confusions=_read_string_list(payload.get("common_confusions")),
-            fallback_phrases=_read_string_list(payload.get("fallback_phrases")),
+            document_summary=_read_string(payload, "document_summary"),
+            document_content=_read_string(payload, "document_content"),
+            reference_lines=_read_string_list(payload.get("reference_lines")),
+            training_pairs=_read_training_pairs(payload.get("training_pairs")),
         )
 
     return None
@@ -153,10 +145,9 @@ def _read_string_list(value: Any) -> list[str]:
         normalized = item.strip()
         if normalized and normalized not in deduped:
             deduped.append(normalized)
-    return deduped[:8]
+    return deduped[:80]
 
-
-def _read_hotword_entries(value: Any) -> list[dict[str, Any]]:
+def _read_training_pairs(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
 
@@ -164,39 +155,23 @@ def _read_hotword_entries(value: Any) -> list[dict[str, Any]]:
     for item in value:
         if not isinstance(item, dict):
             continue
-        text = item.get("text")
-        if not isinstance(text, str) or not text.strip():
+        target = item.get("target")
+        heard = item.get("heard")
+        if not isinstance(target, str) or not target.strip():
             continue
-        lang = item.get("lang")
-        weight = item.get("weight")
-        normalized_weight = (
-            int(weight)
-            if isinstance(weight, (int, float)) and int(weight) > 0
-            else 4
+        if not isinstance(heard, str) or not heard.strip():
+            continue
+        raw_occurrence = item.get("occurrence_count")
+        occurrence_count = (
+            int(raw_occurrence)
+            if isinstance(raw_occurrence, (int, float)) and int(raw_occurrence) > 0
+            else 1
         )
         entries.append(
             {
-                "text": text.strip(),
-                "lang": lang if lang in {"zh", "en"} else "zh",
-                "weight": normalized_weight,
+                "target": target.strip(),
+                "heard": heard.strip(),
+                "occurrence_count": occurrence_count,
             }
         )
-    return entries[:12]
-
-
-def _build_matchable_hotwords(preparation: PreparationContextPack) -> list[str]:
-    combined: list[str] = []
-
-    for value in preparation.hotwords:
-        normalized = value.strip()
-        if normalized and normalized not in combined:
-            combined.append(normalized)
-
-    for entry in preparation.asr_hotword_entries:
-        text = entry.get("text")
-        if isinstance(text, str):
-            normalized = text.strip()
-            if normalized and normalized not in combined:
-                combined.append(normalized)
-
-    return combined
+    return entries[:80]

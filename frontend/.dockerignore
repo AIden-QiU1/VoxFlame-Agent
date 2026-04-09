@@ -1,0 +1,13 @@
+.git
+.gitignore
+.next
+node_modules
+logs
+coverage
+playwright-report
+test-results
+.playwright-mcp
+out
+dist
+*.log
+tsconfig.tsbuildinfo

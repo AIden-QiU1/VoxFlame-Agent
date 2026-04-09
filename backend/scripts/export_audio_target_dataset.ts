@@ -1,6 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 import dotenv from 'dotenv'
+import OSS from 'ali-oss'
 import { createClient } from '@supabase/supabase-js'
 
 dotenv.config({ path: path.join(__dirname, '../.env') })
@@ -10,8 +11,13 @@ interface ScriptOptions {
   userId?: string
   limit: number
   includePending: boolean
-  output?: string
+  outputDir?: string
   batchId?: string
+}
+
+interface AudioTargetEntry {
+  audio: string
+  target: string
 }
 
 function parseArgs(argv: string[]): ScriptOptions {
@@ -44,8 +50,8 @@ function parseArgs(argv: string[]): ScriptOptions {
       continue
     }
 
-    if (arg === '--output' && argv[index + 1]) {
-      options.output = argv[index + 1]
+    if (arg === '--output-dir' && argv[index + 1]) {
+      options.outputDir = argv[index + 1]
       index += 1
       continue
     }
@@ -62,6 +68,29 @@ function parseArgs(argv: string[]): ScriptOptions {
   }
 
   return options
+}
+
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim()
+  if (!value) {
+    throw new Error(`${name} 缺失，无法导出 audio+target 数据集。`)
+  }
+  return value
+}
+
+function createOssClient(): OSS {
+  return new OSS({
+    region: process.env.OSS_REGION?.trim() || 'oss-cn-hangzhou',
+    accessKeyId: requireEnv('OSS_ACCESS_KEY_ID'),
+    accessKeySecret: requireEnv('OSS_ACCESS_KEY_SECRET'),
+    bucket: requireEnv('OSS_BUCKET'),
+    secure: true,
+  })
+}
+
+function buildLocalAudioFilename(recordingId: string, objectPath: string): string {
+  const ext = path.extname(objectPath).trim() || '.bin'
+  return `${recordingId}${ext}`
 }
 
 async function resolveUserId(
@@ -84,11 +113,13 @@ async function resolveUserId(
 async function main() {
   const { datasetExportService } = require('../src/services/dataset-export.service') as typeof import('../src/services/dataset-export.service')
   const options = parseArgs(process.argv.slice(2))
-  const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+  const supabaseUrl = requireEnv('SUPABASE_URL')
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_ANON_KEY?.trim()
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 缺失，无法导出 dataset manifest。')
+  if (!supabaseKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY 缺失，无法导出 audio+target 数据集。')
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey)
@@ -101,25 +132,46 @@ async function main() {
     }
   }
 
-  const batchId = options.batchId || `dataset_export_${new Date().toISOString().replace(/[:.]/g, '-')}`
+  const batchId = options.batchId || `audio_target_export_${new Date().toISOString().replace(/[:.]/g, '-')}`
+  const outputDir = options.outputDir
+    ? path.resolve(options.outputDir)
+    : path.resolve('/tmp', batchId)
+  const audioDir = path.join(outputDir, 'audio')
+  const manifestPath = path.join(outputDir, 'samples.jsonl')
+
+  await fs.mkdir(audioDir, { recursive: true })
+
   const entries = await datasetExportService.buildExportManifest(batchId, {
     contributorId: userId || undefined,
     acceptedOnly: !options.includePending,
     limit: options.limit,
   })
 
-  const outputPath = options.output
-    ? path.resolve(options.output)
-    : path.resolve('/tmp', `${batchId}.jsonl`)
-  const content = entries.map((entry) => JSON.stringify(entry)).join('\n')
-  await fs.writeFile(outputPath, content.length > 0 ? `${content}\n` : '', 'utf8')
+  const ossClient = createOssClient()
+  const rows: AudioTargetEntry[] = []
+
+  for (const entry of entries) {
+    const objectPath = entry.audio.path
+    const localFilename = buildLocalAudioFilename(entry.recording_id, objectPath)
+    const localAudioPath = path.join(audioDir, localFilename)
+
+    await ossClient.get(objectPath, localAudioPath)
+
+    rows.push({
+      audio: path.posix.join('audio', localFilename),
+      target: entry.transcript.target_text,
+    })
+  }
+
+  const content = rows.map((row) => JSON.stringify(row)).join('\n')
+  await fs.writeFile(manifestPath, content.length > 0 ? `${content}\n` : '', 'utf8')
 
   console.log(
-    `[export_dataset_manifest] batch=${batchId} count=${entries.length} acceptedOnly=${!options.includePending} output=${outputPath}${userId ? ` user=${userId}` : ''}`,
+    `[export_audio_target_dataset] batch=${batchId} count=${rows.length} acceptedOnly=${!options.includePending} outputDir=${outputDir}${userId ? ` user=${userId}` : ''}`,
   )
 }
 
 void main().catch((error) => {
-  console.error('[export_dataset_manifest] failed:', error)
+  console.error('[export_audio_target_dataset] failed:', error)
   process.exit(1)
 })

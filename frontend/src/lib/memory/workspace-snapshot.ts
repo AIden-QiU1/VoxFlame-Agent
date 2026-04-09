@@ -48,6 +48,12 @@ export interface PreparedExpressionAsrHotwordEntry {
   lang: 'zh' | 'en'
 }
 
+export interface PreparedExpressionCorrectionPair {
+  target: string
+  heard: string
+  occurrenceCount: number
+}
+
 export interface PreparedExpressionRehearsalSummarySnapshot {
   summary: string
   hotwords: string[]
@@ -55,6 +61,8 @@ export interface PreparedExpressionRehearsalSummarySnapshot {
   pronunciation_patterns: string[]
   support_strategies: string[]
   next_focus: string[]
+  reference_lines: string[]
+  training_pairs: PreparedExpressionCorrectionPair[]
   based_on_training_count: number
   model: string
   updated_at: string
@@ -66,6 +74,7 @@ export interface PreparedExpressionSnapshot {
   summary: string
   scene: string | null
   source: string
+  document_content: string
   last_rehearsed_at: string | null
   rehearsal_count: number
   low_confidence_sections: number
@@ -73,6 +82,8 @@ export interface PreparedExpressionSnapshot {
   high_risk_phrases: string[]
   fallback_phrases: string[]
   asr_hotword_entries: PreparedExpressionAsrHotwordEntry[]
+  reference_lines: string[]
+  training_pairs: PreparedExpressionCorrectionPair[]
   next_focus: string[]
   rehearsal_summary: PreparedExpressionRehearsalSummarySnapshot | null
   sections: PreparedExpressionSectionSnapshot[]
@@ -108,6 +119,10 @@ export interface WorkspaceMemorySnapshot {
     support_strategies: string[]
     hotwords: string[]
     asr_hotword_entries: PreparedExpressionAsrHotwordEntry[]
+    document_context_summary: string | null
+    document_content: string | null
+    reference_lines: PreparedExpressionSnapshot['reference_lines']
+    training_pairs: PreparedExpressionCorrectionPair[]
     next_step: string | null
     updated_at: string
   }

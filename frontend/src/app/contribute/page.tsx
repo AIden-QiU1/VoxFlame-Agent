@@ -91,9 +91,13 @@ interface NoticeState {
 
 interface PreparedCorrectionSummaryView {
   summary: string
-  hotwords: string[]
   recurringErrors: string[]
   nextFocus: string[]
+  trainingPairs: Array<{
+    target: string
+    heard: string
+    occurrenceCount: number
+  }>
   model: string
   basedOnTrainingCount: number
 }
@@ -498,9 +502,9 @@ export default function ContributePage() {
     if (assetSummary) {
       return {
         summary: assetSummary.summary,
-        hotwords: assetSummary.hotwords,
         recurringErrors: assetSummary.recurringErrors,
         nextFocus: assetSummary.nextFocus,
+        trainingPairs: assetSummary.trainingPairs,
         model: assetSummary.model,
         basedOnTrainingCount: assetSummary.basedOnTrainingCount,
       }
@@ -513,9 +517,9 @@ export default function ContributePage() {
 
     return {
       summary: snapshotSummary.summary,
-      hotwords: snapshotSummary.hotwords,
       recurringErrors: snapshotSummary.recurring_errors,
       nextFocus: snapshotSummary.next_focus,
+      trainingPairs: snapshotSummary.training_pairs,
       model: snapshotSummary.model,
       basedOnTrainingCount: snapshotSummary.based_on_training_count,
     }
@@ -1047,7 +1051,7 @@ export default function ContributePage() {
               </div>
               <h2 className="mt-3 text-2xl font-semibold text-gray-900">用户自己管理准备内容，不做任何场景硬编码</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
-                把你后面要说的全文、提纲或说明贴进来。保存后，系统会按标点和拆句结果生成可练内容，训练满 50 句后自动总结热词和高频误听。
+                把你后面要说的全文、提纲或说明贴进来。保存后，系统会按标点和拆句结果生成可练内容，训练满 50 句后自动总结训练句对和高频误听。
               </p>
             </div>
             <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
@@ -1462,7 +1466,7 @@ export default function ContributePage() {
             <div>
               <h2 className="text-xl font-semibold text-gray-900">纠错总结</h2>
               <p className="mt-1 text-sm text-gray-600">
-                这里只展示每 50 句更新一次的规律、重点词和高频误听，用来服务 correction。
+                这里只展示每 50 句更新一次的训练句对、高频误听和下一轮重点，用来服务 correction。
               </p>
             </div>
             <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
@@ -1482,12 +1486,19 @@ export default function ContributePage() {
               </div>
 
               <div className="rounded-[20px] bg-amber-50 px-4 py-4">
-                <p className="text-sm font-medium text-gray-900">热词</p>
-                <div className="mt-3">
-                  {correctionSummary.hotwords.length > 0
-                    ? renderChips(correctionSummary.hotwords, 'amber')
-                    : <p className="text-sm text-gray-600">当前还没有热词。</p>}
-                </div>
+                <p className="text-sm font-medium text-gray-900">训练句对</p>
+                {correctionSummary.trainingPairs.length > 0 ? (
+                  <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+                    {correctionSummary.trainingPairs.slice(0, 8).map((pair) => (
+                      <p key={`${pair.target}-${pair.heard}`}>
+                        {pair.target}{' <- '}{pair.heard}
+                        {pair.occurrenceCount > 1 ? ` · ${pair.occurrenceCount}次` : ''}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-gray-600">当前还没有稳定训练句对。</p>
+                )}
               </div>
 
               <div className="rounded-[20px] bg-sky-50 px-4 py-4">
@@ -1513,12 +1524,12 @@ export default function ContributePage() {
               </div>
             </div>
           ) : (
-            <div className="mt-5 rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
-              {preparedExpressionTrainingCount > 0
+              <div className="mt-5 rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
+                {preparedExpressionTrainingCount > 0
                 ? '现在还没有 50 句级别的训练总结。可以继续练，或者点“用训练记录刷新总结”先手动整理一版。'
-                : '现在还没有训练总结。先开始录音，系统会只根据真实训练结果回流规律、重点词和高频误听。'}
-            </div>
-          )}
+                : '现在还没有训练总结。先开始录音，系统会只根据真实训练结果回流训练句对和高频误听。'}
+              </div>
+            )}
         </section>
       </main>
     </div>

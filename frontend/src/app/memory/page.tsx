@@ -31,16 +31,16 @@ interface RemoteMemoryProfileResponse {
 
 interface PreparedCorrectionSummaryView {
   summary: string
-  hotwords: string[]
   recurringErrors: string[]
   nextFocus: string[]
+  referenceLines: string[]
+  trainingPairs: Array<{
+    target: string
+    heard: string
+    occurrenceCount: number
+  }>
   model: string
   basedOnTrainingCount: number
-  asrHotwordEntries: Array<{
-    text: string
-    weight: number
-    lang: 'zh' | 'en'
-  }>
 }
 
 const HOTWORD_CATEGORY_LABELS: Record<HotwordCategory, string> = {
@@ -273,7 +273,7 @@ export default function MemoryPage() {
       const data = await response.json() as { profiles?: HotwordProfile[] }
       setRemoteHotwordProfiles(data.profiles ?? nextProfiles)
       await refreshWorkspaceSnapshot()
-      setHotwordStatus('热词已保存，并会进入后续 ASR / correction 上下文。')
+      setHotwordStatus('重点词已保存，并会进入后续 correction 上下文。')
     } catch (error) {
       console.error('[MemoryPage] Failed to sync hotwords:', error)
       setHotwordStatus('已保存到当前设备；后端同步暂时失败。')
@@ -360,7 +360,7 @@ export default function MemoryPage() {
 
       applyPreparedExpressionAsset(asset)
       await refreshWorkspaceSnapshot()
-      setPreparedExpressionStatus('准备内容已经保存。训练页和纠错上下文会围着它继续收紧。')
+      setPreparedExpressionStatus('准备内容已经保存。训练页和纠错上下文会直接围着这份稿子继续收紧。')
     } catch (error) {
       console.error('[MemoryPage] Failed to save prepared expression asset:', error)
       setPreparedExpressionStatus('准备内容保存失败了，请稍后再试一次。')
@@ -378,12 +378,12 @@ export default function MemoryPage() {
     if (assetSummary) {
       return {
         summary: assetSummary.summary,
-        hotwords: assetSummary.hotwords,
         recurringErrors: assetSummary.recurringErrors,
         nextFocus: assetSummary.nextFocus,
+        referenceLines: assetSummary.referenceLines,
+        trainingPairs: assetSummary.trainingPairs,
         model: assetSummary.model,
         basedOnTrainingCount: assetSummary.basedOnTrainingCount,
-        asrHotwordEntries: assetSummary.asrHotwordEntries,
       }
     }
 
@@ -395,12 +395,12 @@ export default function MemoryPage() {
 
     return {
       summary: snapshotSummary.summary,
-      hotwords: snapshotSummary.hotwords,
       recurringErrors: snapshotSummary.recurring_errors,
       nextFocus: snapshotSummary.next_focus,
+      referenceLines: snapshotSummary.reference_lines,
+      trainingPairs: snapshotSummary.training_pairs,
       model: snapshotSummary.model,
       basedOnTrainingCount: snapshotSummary.based_on_training_count,
-      asrHotwordEntries: snapshotPreparedExpression?.asr_hotword_entries ?? [],
     }
   }, [preparedExpressionAsset, workspaceSnapshot?.prepared_expression])
 
@@ -423,7 +423,7 @@ export default function MemoryPage() {
             </Link>
             <h1 className="mt-2 text-2xl font-semibold text-gray-900">记忆页</h1>
             <p className="mt-1 text-sm text-gray-600">
-              这里只保留准备内容、自定义热词和每 50 句更新一次的训练总结。
+              这里只保留准备内容、自定义重点词和每 50 句更新一次的训练总结。
             </p>
           </div>
           <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700">
@@ -536,10 +536,10 @@ export default function MemoryPage() {
           <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">训练总结</h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  这里只展示对 correction 真正有用的规律、重点词和高频误听。
-                </p>
+              <h2 className="text-xl font-semibold text-gray-900">训练总结</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                  这里只展示对 correction 真正有用的训练句对、高频误听和下一轮重点。
+              </p>
               </div>
               <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
                 {correctionSummary
@@ -556,12 +556,19 @@ export default function MemoryPage() {
                 </div>
 
                 <div className="rounded-[20px] bg-amber-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">热词</p>
-                  <div className="mt-3">
-                    {correctionSummary.hotwords.length > 0
-                      ? renderChips(correctionSummary.hotwords, 'amber')
-                      : <p className="text-sm text-gray-600">当前还没有热词。</p>}
-                  </div>
+                  <p className="text-sm font-medium text-gray-900">训练句对</p>
+                  {correctionSummary.trainingPairs.length > 0 ? (
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+                      {correctionSummary.trainingPairs.slice(0, 8).map((pair) => (
+                      <p key={`${pair.target}-${pair.heard}`}>
+                        {pair.target}{' <- '}{pair.heard}
+                        {pair.occurrenceCount > 1 ? ` · ${pair.occurrenceCount}次` : ''}
+                      </p>
+                    ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-gray-600">当前还没有稳定训练句对。</p>
+                  )}
                 </div>
 
                 <div className="rounded-[20px] bg-sky-50 px-4 py-4">
@@ -586,42 +593,25 @@ export default function MemoryPage() {
                   </div>
                 </div>
 
-                <div className="rounded-[20px] bg-white px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">ASR 热词包</p>
-                  {correctionSummary.asrHotwordEntries.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {correctionSummary.asrHotwordEntries.map((entry) => (
-                        <span
-                          key={`${entry.lang}-${entry.text}`}
-                          className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700"
-                        >
-                          {entry.text} · {entry.weight}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-sm text-gray-600">当前还没有 ASR 热词包。</p>
-                  )}
-                </div>
               </div>
             ) : (
               <div className="mt-5 rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
-                现在还没有训练总结。先去训练页按拆句开始录，累计到总结门槛后，这里会自动回流热词和高频误听。
+                现在还没有训练总结。先去训练页按拆句开始录，累计到总结门槛后，这里会自动回流训练句对和高频误听。
               </div>
             )}
           </section>
 
           <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">自定义热词</h2>
+              <h2 className="text-xl font-semibold text-gray-900">自定义重点词</h2>
               <p className="mt-1 text-sm text-gray-600">
-                这些词会和训练总结一起进入后续 ASR / correction 上下文。
+                这些词会和准备稿、训练句对一起进入后续 correction 上下文。
               </p>
             </div>
 
             <form className="mt-5 space-y-4 rounded-[24px] bg-stone-50 p-5" onSubmit={handleHotwordSubmit}>
               <label className="space-y-2">
-                <span className="text-sm font-medium text-gray-900">热词</span>
+                <span className="text-sm font-medium text-gray-900">重点词</span>
                 <input
                   value={hotwordPhrase}
                   onChange={(event) => setHotwordPhrase(event.target.value)}
@@ -670,7 +660,7 @@ export default function MemoryPage() {
                 className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Plus className="h-4 w-4" />
-                {isSavingHotwords ? '保存中…' : '加入热词'}
+                {isSavingHotwords ? '保存中…' : '加入重点词'}
               </button>
             </form>
 
@@ -719,7 +709,7 @@ export default function MemoryPage() {
                 ))
               ) : (
                 <div className="rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
-                  这里还没有自定义热词。先加 3 到 5 个最容易被听错、但在你场景里最关键的词。
+                  这里还没有自定义重点词。先加 3 到 5 个最容易被听错、但在你场景里最关键的词。
                 </div>
               )}
             </div>

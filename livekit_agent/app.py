@@ -10,6 +10,7 @@ from livekit import rtc
 from livekit.agents import AgentServer, AutoSubscribe, JobContext, cli
 
 from assistant_runtime import (
+    AssistantReplyGenerationError,
     CommunicationAssistantRuntime,
     estimate_clarity_score,
 )
@@ -18,6 +19,7 @@ from config import load_config, should_bypass_proxy_for_livekit
 from data_contract import (
     build_audio_input_telemetry_output,
     build_assistant_text_output,
+    build_error_output,
     build_session_init_ack,
     build_session_userdata_ack,
     build_speech_activity_output,
@@ -118,13 +120,13 @@ async def entrypoint(ctx: JobContext) -> None:
     )
     session_userdata = build_session_userdata(session_context)
     logger.info(
-        "LiveKit session userdata prepared room=%s participant=%s source=%s scene=%s hotwords=%s asr_hotword_entries=%s support_strategies=%s",
+        "LiveKit session userdata prepared room=%s participant=%s source=%s scene=%s reference_lines=%s training_pairs=%s support_strategies=%s",
         session_context.room_name,
         session_context.participant_identity,
         session_userdata.preparation.source,
         session_userdata.preparation.scene,
-        len(session_userdata.preparation.hotwords),
-        len(session_userdata.preparation.asr_hotword_entries),
+        len(session_userdata.preparation.reference_lines),
+        len(session_userdata.preparation.training_pairs),
         len(session_userdata.preparation.support_strategies),
     )
     assistant_runtime = CommunicationAssistantRuntime(
@@ -192,7 +194,19 @@ async def entrypoint(ctx: JobContext) -> None:
         *,
         correction_original: str | None = None,
     ) -> None:
-        reply_text, source = await assistant_runtime.generate_reply(user_text)
+        try:
+            reply_text, source = await assistant_runtime.generate_reply(user_text)
+        except AssistantReplyGenerationError as exc:
+            logger.warning(
+                "LiveKit assistant correction unavailable room=%s participant=%s code=%s detail=%s",
+                session_context.room_name,
+                session_context.participant_identity,
+                exc.code,
+                exc.detail,
+            )
+            await publish_payload(build_error_output(exc.user_message))
+            return
+
         logger.info(
             "LiveKit assistant reply prepared room=%s participant=%s source=%s chars=%s",
             session_context.room_name,

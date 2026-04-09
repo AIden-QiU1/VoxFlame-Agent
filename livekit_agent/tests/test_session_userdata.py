@@ -48,9 +48,10 @@ class SessionUserDataTests(unittest.TestCase):
                         "scene": "medical",
                         "immediate_goal": "先准备描述症状的关键一句。",
                         "profile_summary": "用户当前需要稳定描述症状和持续时间。",
-                        "hotwords": ["头痛", "三天"],
-                        "asr_hotword_entries": [
-                            {"text": "挂号", "weight": 6, "lang": "zh"},
+                        "document_content": "大家好，我叫邱生峰。今天我想先介绍 VoxFlame。",
+                        "reference_lines": ["大家好，我叫邱生峰。"],
+                        "training_pairs": [
+                            {"target": "我叫邱生峰。", "heard": "我叫邱文峰。", "occurrence_count": 3},
                         ],
                         "listener_guidance": ["如果没听清，请先复述症状。"],
                     },
@@ -59,31 +60,28 @@ class SessionUserDataTests(unittest.TestCase):
         )
 
         self.assertEqual(userdata.preparation.source, "metadata")
-        self.assertEqual(userdata.preparation.hotwords, ["头痛", "三天"])
+        self.assertIn("邱生峰", userdata.preparation.document_content)
         self.assertEqual(
-            userdata.preparation.asr_hotword_entries,
-            [{"text": "挂号", "weight": 6, "lang": "zh"}],
+            userdata.preparation.training_pairs,
+            [{"target": "我叫邱生峰。", "heard": "我叫邱文峰。", "occurrence_count": 3}],
         )
         self.assertIn("描述症状", userdata.preparation.immediate_goal)
 
-    def test_note_user_transcript_tracks_hotword_hits(self) -> None:
+    def test_note_user_transcript_stores_latest_text(self) -> None:
         userdata = build_session_userdata(
             create_context(
                 participant_payload={
                     "preparation_context": {
                         "immediate_goal": "先准备描述症状的关键一句。",
                         "profile_summary": "用户当前需要稳定描述症状和持续时间。",
-                        "hotwords": ["头痛", "三天"],
-                        "asr_hotword_entries": [
-                            {"text": "挂号", "weight": 6, "lang": "zh"},
-                        ],
+                        "document_content": "大家好，我叫邱生峰。",
                     },
                 },
             ),
         )
 
         userdata.note_user_transcript("我头痛三天了，想先挂号。")
-        self.assertEqual(userdata.active_hotwords, ["头痛", "三天", "挂号"])
+        self.assertEqual(userdata.last_user_transcript, "我头痛三天了，想先挂号。")
 
 
 if __name__ == "__main__":

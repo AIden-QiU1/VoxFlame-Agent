@@ -9,10 +9,13 @@ import {
   type WorkspaceSceneId,
 } from './expression-kit.service';
 import {
+  buildPreparedExpressionCorrectionPairs,
+  buildPreparedExpressionReferenceLines,
   createPreparedExpressionAssetFromDraft,
   normalizePreparedExpressionAsset,
   type PreparedExpressionAsset,
   type PreparedExpressionAsrHotwordEntry,
+  type PreparedExpressionCorrectionPair,
 } from './prepared-expression.service';
 import {
   PreparedExpressionSummaryService,
@@ -128,6 +131,10 @@ export interface WorkspaceMemorySnapshot {
     support_strategies: string[];
     hotwords: string[];
     asr_hotword_entries: PreparedExpressionAsrHotwordEntry[];
+    document_context_summary: string | null;
+    document_content: string | null;
+    reference_lines: string[];
+    training_pairs: PreparedExpressionCorrectionPair[];
     next_step: string | null;
     updated_at: string;
   };
@@ -137,6 +144,7 @@ export interface WorkspaceMemorySnapshot {
     summary: string;
     scene: string | null;
     source: string;
+    document_content: string;
     last_rehearsed_at: string | null;
     rehearsal_count: number;
     low_confidence_sections: number;
@@ -144,6 +152,8 @@ export interface WorkspaceMemorySnapshot {
     high_risk_phrases: string[];
     fallback_phrases: string[];
     asr_hotword_entries: PreparedExpressionAsrHotwordEntry[];
+    reference_lines: string[];
+    training_pairs: PreparedExpressionCorrectionPair[];
     next_focus: string[];
     rehearsal_summary: {
       summary: string;
@@ -152,6 +162,8 @@ export interface WorkspaceMemorySnapshot {
       pronunciation_patterns: string[];
       support_strategies: string[];
       next_focus: string[];
+      reference_lines: string[];
+      training_pairs: PreparedExpressionCorrectionPair[];
       based_on_training_count: number;
       model: string;
       updated_at: string;
@@ -1316,7 +1328,7 @@ export class SupabaseService {
       }
 
       if (preparedExpression) {
-        return `你已经为“${preparedExpression.title}”建立了一层结构化准备：重点段落、热词、风险句和保底句会继续从 rehearsal 中收紧。`;
+        return `你已经为“${preparedExpression.title}”建立了一层结构化准备：重点原句、训练错配对和保底句会继续从 rehearsal 中收紧。`;
       }
 
       return '这里会逐步压缩出你的个人表达画像：你最常面对什么场景、系统最容易听偏什么、什么表达和补救方式最适合你。';
@@ -1327,7 +1339,7 @@ export class SupabaseService {
         ? `${sceneBrief}${immediateGoal ? ` 当前最该先准备的是：${immediateGoal}` : ''}`
         : immediateGoal
           ? `当前最该先准备的是：${immediateGoal}`
-          : '先固定一条开场白、一句补救句和 3 个最关键热词，现场会稳很多。';
+          : '先固定一条开场白、一句补救句和 3 句最关键原句，现场会稳很多。';
 
     return {
       active_scene_id: sceneId ?? null,
@@ -1343,6 +1355,10 @@ export class SupabaseService {
       support_strategies: supportStrategies,
       hotwords,
       asr_hotword_entries: preparedExpression?.asr_hotword_entries ?? [],
+      document_context_summary: preparedExpression?.summary ?? null,
+      document_content: preparedExpression?.document_content ?? null,
+      reference_lines: preparedExpression?.reference_lines ?? [],
+      training_pairs: preparedExpression?.training_pairs ?? [],
       next_step: growthProfile.nextStep ?? null,
       updated_at: syncedAt,
     };
@@ -1444,6 +1460,29 @@ export class SupabaseService {
       : lastRehearsedAt
         ? `“${template.title}”已经练过 ${preparedTrainingMemories.length} 次，当前覆盖 ${rehearsedSectionCount}/${sections.length} 个结构段落。优先继续收口：${nextFocus[0] ?? sections[0]?.title ?? '开场段落'}。`
         : template.summary;
+    const referenceLines = dedupeStrings(
+      [
+        ...(asset.rehearsal_summary?.referenceLines ?? []),
+        ...buildPreparedExpressionReferenceLines(template, {
+          maxLines: 80,
+          maxChars: 4000,
+        }),
+      ],
+      80,
+    );
+    const trainingPairs = buildPreparedExpressionCorrectionPairs(
+      preparedTrainingMemories.map((memory) => {
+        const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+        return {
+          target: readString(metadata, 'target_text'),
+          heard: readString(metadata, 'recognized_text'),
+        };
+      }),
+      {
+        maxPairs: 80,
+        maxChars: 4000,
+      },
+    );
 
     return {
       id: template.id,
@@ -1451,6 +1490,7 @@ export class SupabaseService {
       summary,
       scene: template.scene,
       source: template.source,
+      document_content: asset.draft.content,
       last_rehearsed_at: lastRehearsedAt,
       rehearsal_count: preparedTrainingMemories.length,
       low_confidence_sections: sections.filter((section) => section.low_confidence_count > 0).length,
@@ -1482,6 +1522,8 @@ export class SupabaseService {
         6,
       ),
       asr_hotword_entries: asset.rehearsal_summary?.asrHotwordEntries ?? [],
+      reference_lines: referenceLines,
+      training_pairs: trainingPairs,
       next_focus: nextFocus,
       rehearsal_summary: asset.rehearsal_summary
         ? {
@@ -1491,6 +1533,8 @@ export class SupabaseService {
             pronunciation_patterns: asset.rehearsal_summary.pronunciationPatterns,
             support_strategies: asset.rehearsal_summary.supportStrategies,
             next_focus: asset.rehearsal_summary.nextFocus,
+            reference_lines: asset.rehearsal_summary.referenceLines,
+            training_pairs: asset.rehearsal_summary.trainingPairs,
             based_on_training_count: asset.rehearsal_summary.basedOnTrainingCount,
             model: asset.rehearsal_summary.model,
             updated_at: asset.rehearsal_summary.updated_at,

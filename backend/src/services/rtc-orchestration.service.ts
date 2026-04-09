@@ -436,11 +436,14 @@ export class RtcOrchestrationService {
           '当前准备上下文已载入，请优先帮助用户把关键表达说清楚。',
         listenerGuidance: snapshot.preparation.listener_guidance.slice(0, 4),
         supportStrategies: snapshot.preparation.support_strategies.slice(0, 4),
-        hotwords: snapshot.preparation.hotwords.slice(0, 8),
-        asrHotwordEntries: snapshot.preparation.asr_hotword_entries.slice(0, 12),
-        riskyTerms: snapshot.preparation.risky_terms.slice(0, 6),
-        commonConfusions: snapshot.preparation.pronunciation_patterns.slice(0, 6),
-        fallbackPhrases: dedupeStrings(fallbackPhrases).slice(0, 6),
+        documentSummary: snapshot.preparation.document_context_summary,
+        documentContent: snapshot.preparation.document_content,
+        referenceLines: dedupeStrings([
+          ...snapshot.preparation.reference_lines,
+          ...snapshot.prepared_expression?.reference_lines ?? [],
+          ...fallbackPhrases,
+        ]).slice(0, 80),
+        trainingPairs: snapshot.preparation.training_pairs.slice(0, 80),
       }
     } catch (error) {
       console.warn('[RTC] Failed to load workspace preparation context:', error)

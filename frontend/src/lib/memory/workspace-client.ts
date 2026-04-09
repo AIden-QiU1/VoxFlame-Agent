@@ -45,6 +45,12 @@ export interface PreparedExpressionAsrHotwordEntryAsset {
   lang: 'zh' | 'en'
 }
 
+export interface PreparedExpressionCorrectionPairAsset {
+  target: string
+  heard: string
+  occurrenceCount: number
+}
+
 export interface PreparedExpressionRehearsalSummaryAsset {
   summary: string
   hotwords: string[]
@@ -54,6 +60,8 @@ export interface PreparedExpressionRehearsalSummaryAsset {
   fallbackPhrases: string[]
   nextFocus: string[]
   asrHotwordEntries: PreparedExpressionAsrHotwordEntryAsset[]
+  referenceLines: string[]
+  trainingPairs: PreparedExpressionCorrectionPairAsset[]
   basedOnTrainingCount: number
   model: string
   updated_at: string

@@ -75,17 +75,19 @@ class DataContractTests(unittest.TestCase):
                 profile_summary="用户当前就医场景下需要优先保真和少扩写。",
                 listener_guidance=["如果没听清，请直接复述确认。"],
                 support_strategies=["优先突出症状和诉求。"],
-                hotwords=["挂号", "疼痛"],
-                asr_hotword_entries=[{"text": "甲状腺结节", "weight": 6, "lang": "zh"}],
+                document_summary="准备稿已经围绕就医场景整理完成。",
+                document_content="医生您好，我叫邱生峰。我想先挂号，再说明症状。",
+                reference_lines=["医生您好，我叫邱生峰。"],
+                training_pairs=[{"target": "我叫邱生峰。", "heard": "我叫邱文峰。", "occurrence_count": 2}],
             ),
         )
 
         self.assertEqual(payload["type"], "session_userdata_ack")
         self.assertEqual(payload["metadata"]["source"], "metadata")
-        self.assertEqual(payload["preparation"]["hotwords"], ["挂号", "疼痛"])
+        self.assertIn("邱生峰", payload["preparation"]["document_content"])
         self.assertEqual(
-            payload["preparation"]["asr_hotword_entries"],
-            [{"text": "甲状腺结节", "weight": 6, "lang": "zh"}],
+            payload["preparation"]["training_pairs"],
+            [{"target": "我叫邱生峰。", "heard": "我叫邱文峰。", "occurrence_count": 2}],
         )
 
     def test_build_assistant_text_output_matches_frontend_reducer_shape(self) -> None:

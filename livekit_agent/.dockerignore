@@ -1,10 +1,16 @@
 .env
 .venv
+.venv/
 .venv_sys
+.venv_sys/
 __pycache__
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.log
 tests
 UNKNOWN.egg-info
+UNKNOWN.egg-info/
+.pytest_cache
+.mypy_cache

@@ -1,7 +1,10 @@
 import {
   buildAsrHotwordEntries,
+  buildPreparedExpressionCorrectionPairs,
+  buildPreparedExpressionReferenceLines,
   buildPreparedExpressionTemplateFromDraft,
   type PreparedExpressionAsset,
+  type PreparedExpressionCorrectionPair,
   type PreparedExpressionRehearsalSummary,
   type PreparedExpressionSectionTemplate,
   type PreparedExpressionTemplate,
@@ -48,6 +51,12 @@ interface PreparedExpressionSummaryPayload {
   support_strategies?: string[];
   fallback_phrases?: string[];
   next_focus?: string[];
+  reference_lines?: string[];
+  correction_pairs?: Array<{
+    target?: string;
+    heard?: string;
+    occurrence_count?: number;
+  }>;
 }
 
 function dedupeStrings(values: Array<string | null | undefined>, limit?: number): string[] {
@@ -92,6 +101,29 @@ function readStringList(value: unknown): string[] {
   return value
     .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     .map((item) => item.trim());
+}
+
+function readCorrectionPairList(value: unknown): PreparedExpressionCorrectionPair[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return buildPreparedExpressionCorrectionPairs(
+    value.map((item) => {
+      if (!isRecord(item)) {
+        return { target: null, heard: null };
+      }
+
+      return {
+        target: readString(item, 'target'),
+        heard: readString(item, 'heard'),
+      };
+    }),
+    {
+      maxPairs: 60,
+      maxChars: 3200,
+    },
+  );
 }
 
 function normalizeSectionSuggestions(
@@ -192,6 +224,20 @@ function buildHeuristicSummary(
     }
   >();
   const targetHeardPairs = buildTargetHeardPairs(samples);
+  const referenceLines = buildPreparedExpressionReferenceLines(fallbackStructured, {
+    maxLines: 60,
+    maxChars: 3200,
+  });
+  const trainingPairs = buildPreparedExpressionCorrectionPairs(
+    samples.map((sample) => ({
+      target: sample.target_text,
+      heard: sample.recognized_text,
+    })),
+    {
+      maxPairs: 60,
+      maxChars: 3200,
+    },
+  );
 
   const recurringErrors = dedupeStrings(
     samples.flatMap((sample) => {
@@ -319,6 +365,8 @@ function buildHeuristicSummary(
         6,
       ),
       asrHotwordEntries: buildAsrHotwordEntries(hotwords),
+      referenceLines,
+      trainingPairs,
       basedOnTrainingCount: samples.length,
       model: 'heuristic',
       updated_at: new Date().toISOString(),
@@ -380,7 +428,7 @@ async function requestDashScopeSummary(
             {
               role: 'system',
               content:
-                '你是 VoxFlame 的 correction memory summarizer。你只返回 JSON，不要 markdown，不要解释。你的目标是把用户自定义准备内容和训练样本压成适合 qwen3.6 / qwen3-asr 使用的最小必要上下文，只保留热词、风险句、目标句和系统听到的差距、保底句与下一轮重点。',
+                '你是 VoxFlame 的 correction memory summarizer。你只返回 JSON，不要 markdown，不要解释。你的目标是把用户自定义准备内容和训练样本压成适合 qwen3.6 correction 使用的最小必要上下文，重点保留准备稿参考原句、训练里稳定复现的目标句/系统听到错配对，以及足够短的摘要。',
             },
             {
               role: 'user',
@@ -463,8 +511,10 @@ function buildModelPrompt(
           '优先提取对实时 correction 最有帮助的信息，不要生成成长报表。',
           '训练总结只从 rehearsal_samples 提炼，不要把准备稿原文伪装成训练结论。',
           '高频错误尽量写成“目标 -> 系统听到”的形式。',
+          'reference_lines 应该优先保留准备稿里可直接对齐的原句，不要改写语气。',
+          'correction_pairs 只保留稳定复现的目标句/系统听到句对，不要编造不存在的 pair。',
           '优先总结稳定复现的局部替换规律，不要重写整句风格。',
-          '热词需要适合直接进入 ASR hotword 列表和 LLM preparation context。',
+          '不要假设实时 ASR 支持热词注入，重点是服务 LLM correction。',
         ],
         output_schema: {
           document_summary: 'string',
@@ -491,6 +541,14 @@ function buildModelPrompt(
           support_strategies: ['string'],
           fallback_phrases: ['string'],
           next_focus: ['string'],
+          reference_lines: ['string'],
+          correction_pairs: [
+            {
+              target: 'string',
+              heard: 'string',
+              occurrence_count: 1,
+            },
+          ],
         },
       },
       prepared_expression: {
@@ -606,6 +664,29 @@ export class PreparedExpressionSummaryService {
       ],
       6,
     );
+    const referenceLines = dedupeStrings(
+      [
+        ...readStringList(payload?.reference_lines),
+        ...heuristic.rehearsal.referenceLines,
+      ],
+      60,
+    );
+    const trainingPairs = buildPreparedExpressionCorrectionPairs(
+      [
+        ...heuristic.rehearsal.trainingPairs.map((pair) => ({
+          target: pair.target,
+          heard: pair.heard,
+        })),
+        ...readCorrectionPairList(payload?.correction_pairs).map((pair) => ({
+          target: pair.target,
+          heard: pair.heard,
+        })),
+      ],
+      {
+        maxPairs: 60,
+        maxChars: 3200,
+      },
+    );
 
     return {
       draft: asset.draft,
@@ -643,6 +724,8 @@ export class PreparedExpressionSummaryService {
           6,
         ),
         asrHotwordEntries: buildAsrHotwordEntries(rehearsalHotwords),
+        referenceLines,
+        trainingPairs,
         basedOnTrainingCount: samples.length,
         model: payload ? model : heuristic.rehearsal.model,
         updated_at: new Date().toISOString(),

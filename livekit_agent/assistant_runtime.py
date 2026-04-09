@@ -4,6 +4,7 @@ import asyncio
 import difflib
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 from urllib import error, request
@@ -27,10 +28,11 @@ SYSTEM_PROMPT = """你是 VoxFlame 的沟通助手。
 6. 不要输出“现在先按当前沟通场景继续”“我先帮你把这句话往前推进”这类铺垫。
 7. 把输入视为 ASR 最终文本，默认先做最小必要纠错，而不是大幅改写。
 8. 优先保留用户已经表达出的事实、专有名词、数字、时间、地点、疾病名和产品名。
-9. 如果某个词和热词/风险词明显接近，优先按准备上下文修正到这些词。
-10. 如果信息仍不确定，选择更短、更保守、不新增事实的表达。
-11. 把输入视为“多数高置信片段 + 少量误听片段”，优先保留高置信片段原样，只做局部替换。
-12. 只允许做同音/近音纠错、漏字补齐、标点整理和热词纠偏，不要整句改写。
+9. 如果当前 ASR 和准备稿原句或训练过的目标句明显接近，优先恢复到这些原句。
+10. 尤其保护人名、机构名、产品名、数字和专业术语，尽量不要把它们改坏。
+11. 如果信息仍不确定，选择更短、更保守、不新增事实的表达。
+12. 把输入视为“多数高置信片段 + 少量误听片段”，优先保留高置信片段原样，只做局部替换。
+13. 只允许做同音/近音纠错、漏字补齐、标点整理和准备稿对齐，不要整句改写。
 """
 
 CAPTION_SYSTEM_PROMPT = """你是 VoxFlame 的实时字幕纠错助手。
@@ -43,27 +45,12 @@ CAPTION_SYSTEM_PROMPT = """你是 VoxFlame 的实时字幕纠错助手。
 3. 先保留用户原意、专有名词、数字、时间、地点和疾病名。
 4. 只做最小必要纠错，不要为了更顺而新增事实。
 5. 如果信息仍不确定，优先保守保留，不要猜测。
-6. 把这句话视为“多数高置信片段 + 少量误听片段”，优先复制正确片段，只修局部错误。
+6. 如果这句话和准备稿参考原句或训练过的目标句明显接近，优先恢复到对应原句。
+7. 把这句话视为“多数高置信片段 + 少量误听片段”，优先复制正确片段，只修局部错误。
 """
 
 REPLY_HISTORY_WINDOW_MESSAGES = 6
 REPLY_HISTORY_STORAGE_LIMIT = 12
-
-
-def compute_reply_timeout_seconds(
-    configured_timeout_seconds: float,
-    user_text: str,
-) -> float:
-    normalized = user_text.strip()
-    if not normalized:
-        return max(0.8, configured_timeout_seconds)
-
-    text_length = len(normalized)
-    if text_length <= 8:
-        return max(0.8, min(configured_timeout_seconds, 1.2))
-    if text_length <= 20:
-        return max(1.2, min(configured_timeout_seconds, 2.2))
-    return max(1.5, configured_timeout_seconds)
 
 
 def estimate_clarity_score(original_text: str, corrected_text: str) -> float:
@@ -75,13 +62,6 @@ def estimate_clarity_score(original_text: str, corrected_text: str) -> float:
         return 1.0
     ratio = difflib.SequenceMatcher(a=original, b=corrected).ratio()
     return max(0.0, min(1.0, round(ratio, 4)))
-
-
-def build_fallback_text(ctx: VoxFlameSessionContext, user_text: str) -> str:
-    normalized = user_text.strip()
-    if normalized:
-        return normalized
-    return "请再说一遍。"
 
 
 def build_scene_prompt(
@@ -118,32 +98,75 @@ def _truncate_text(value: str, limit: int) -> str:
     return f"{normalized[: limit - 1]}…"
 
 
-def build_priority_hotwords(userdata: VoxFlameSessionUserData) -> list[str]:
-    weighted_entries = sorted(
-        userdata.preparation.asr_hotword_entries,
-        key=lambda item: int(item.get("weight", 4))
-        if isinstance(item.get("weight"), int)
-        else 4,
-        reverse=True,
-    )
-    weighted_hotwords = [
-        item["text"].strip()
-        for item in weighted_entries
-        if isinstance(item.get("text"), str) and item["text"].strip()
-    ]
-    return _dedupe_strings(
-        [
-            *userdata.active_hotwords,
-            *weighted_hotwords,
-            *userdata.preparation.hotwords,
-        ],
-        8,
-    )
+def _format_reference_lines(lines: list[str], *, max_items: int, max_chars: int) -> list[str]:
+    results: list[str] = []
+    total_chars = 0
+
+    for line in lines:
+        normalized = line.strip()
+        if not normalized or normalized in results:
+            continue
+        next_total_chars = total_chars + len(normalized)
+        if results and next_total_chars > max_chars:
+            break
+        results.append(normalized)
+        total_chars = next_total_chars
+        if len(results) >= max_items:
+            break
+
+    return results
+
+
+def _format_training_pairs(
+    pairs: list[dict[str, Any]],
+    *,
+    max_items: int,
+    max_chars: int,
+) -> list[str]:
+    results: list[str] = []
+    total_chars = 0
+
+    for pair in pairs:
+        target = pair.get("target")
+        heard = pair.get("heard")
+        if not isinstance(target, str) or not target.strip():
+            continue
+        if not isinstance(heard, str) or not heard.strip():
+            continue
+        occurrence_count = pair.get("occurrence_count")
+        normalized_occurrence_count = (
+            int(occurrence_count)
+            if isinstance(occurrence_count, int) and occurrence_count > 1
+            else 1
+        )
+        line = (
+            f"{normalized_occurrence_count}次 | 目标：{target.strip()} | 系统常听成：{heard.strip()}"
+        )
+        if line in results:
+            continue
+        next_total_chars = total_chars + len(line)
+        if results and next_total_chars > max_chars:
+            break
+        results.append(line)
+        total_chars = next_total_chars
+        if len(results) >= max_items:
+            break
+
+    return results
 
 
 def build_preparation_prompt(userdata: VoxFlameSessionUserData) -> str:
     preparation = userdata.preparation
-    priority_hotwords = build_priority_hotwords(userdata)
+    reference_lines = _format_reference_lines(
+        preparation.reference_lines,
+        max_items=80,
+        max_chars=3600,
+    )
+    training_pairs = _format_training_pairs(
+        preparation.training_pairs,
+        max_items=80,
+        max_chars=3600,
+    )
     lines = [
         "稳定准备上下文：",
         f"- 当前目标：{_truncate_text(preparation.immediate_goal, 120)}",
@@ -157,22 +180,17 @@ def build_preparation_prompt(userdata: VoxFlameSessionUserData) -> str:
         lines.append(
             f"- 支持策略：{'；'.join(_truncate_text(item, 48) for item in preparation.support_strategies[:2])}"
         )
-    if priority_hotwords:
-        lines.append(f"- 优先热词：{'、'.join(priority_hotwords)}")
-    if preparation.risky_terms:
-        lines.append(
-            f"- 高风险词句：{'；'.join(_truncate_text(item, 32) for item in preparation.risky_terms[:4])}"
-        )
-    if preparation.common_confusions:
-        lines.append(
-            f"- 常见误听：{'；'.join(_truncate_text(item, 32) for item in preparation.common_confusions[:4])}"
-        )
-    if preparation.fallback_phrases:
-        lines.append(
-            f"- 保底句：{'；'.join(_truncate_text(item, 40) for item in preparation.fallback_phrases[:2])}"
-        )
-    if userdata.active_hotwords:
-        lines.append(f"- 本轮命中热词：{'、'.join(userdata.active_hotwords[:4])}")
+    if preparation.document_summary and not preparation.document_content:
+        lines.append(f"- 准备稿摘要：{_truncate_text(preparation.document_summary, 220)}")
+    if preparation.document_content:
+        lines.append("- 准备稿全文：")
+        lines.append(preparation.document_content.strip())
+    elif reference_lines:
+        lines.append("- 准备稿参考原句：")
+        lines.extend(f"  {index + 1}. {_truncate_text(line, 80)}" for index, line in enumerate(reference_lines))
+    if training_pairs:
+        lines.append("- 已训练错配对：")
+        lines.extend(f"  - {_truncate_text(line, 120)}" for line in training_pairs)
     return "\n".join(lines)
 
 
@@ -186,25 +204,27 @@ def build_current_turn_prompt(
         "以下是用户本轮 ASR 最终文本，可能仍有误听、漏字或同音词偏差。",
         f"本轮 ASR 最终文本：{user_text.strip() or '未提供'}",
     ]
-    if userdata.active_hotwords:
-        lines.append(f"优先核对热词：{'、'.join(userdata.active_hotwords[:4])}")
-    elif userdata.preparation.hotwords:
-        lines.append(f"优先参考热词：{'、'.join(build_priority_hotwords(userdata)[:6])}")
-    if userdata.preparation.risky_terms:
-        lines.append(
-            f"优先核对风险词句：{'；'.join(_truncate_text(item, 32) for item in userdata.preparation.risky_terms[:3])}"
-        )
-    if userdata.preparation.fallback_phrases:
-        lines.append(
-            f"如果原句不完整，可优先参考这些保底句的表达方式，但不要凭空补事实：{'；'.join(_truncate_text(item, 40) for item in userdata.preparation.fallback_phrases[:2])}"
-        )
-    lines.append("只允许做局部纠错：同音/近音替换、漏字补齐、标点整理、热词纠偏。")
+    if userdata.preparation.reference_lines:
+        lines.append("如果当前句和准备稿参考原句明显接近，优先恢复到对应原句。")
+    if userdata.preparation.training_pairs:
+        lines.append("如果当前句和已训练的目标句/误听句对明显接近，优先恢复到对应目标句。")
+    lines.append("只允许做局部纠错：同音/近音替换、漏字补齐、标点整理、准备稿对齐。")
     lines.append(
         "请只输出当前这句话的最终展示字幕。"
         if caption_mode_enabled
         else "请只输出最终可直接说出去的话。"
     )
     return "\n".join(lines)
+
+
+def build_cacheable_content(text: str) -> list[dict[str, Any]]:
+    return [
+        {
+            "type": "text",
+            "text": text,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
 
 
 def build_recent_history_window(
@@ -250,7 +270,7 @@ class DashScopeChatClient:
     model: str
     timeout_seconds: float
 
-    def complete(self, messages: list[dict[str, str]]) -> str:
+    def complete(self, messages: list[dict[str, Any]]) -> "DashScopeCompletionResult":
         payload = json.dumps(
             {
                 "model": self.model,
@@ -286,7 +306,77 @@ class DashScopeChatClient:
         text = extract_text_from_completion(parsed)
         if not text:
             raise RuntimeError("DashScope returned no usable text content")
-        return text
+        usage = parsed.get("usage")
+        prompt_tokens = usage.get("prompt_tokens") if isinstance(usage, dict) else None
+        completion_tokens = usage.get("completion_tokens") if isinstance(usage, dict) else None
+
+        prompt_token_details = usage.get("prompt_tokens_details") if isinstance(usage, dict) else None
+        cached_tokens = (
+            prompt_token_details.get("cached_tokens")
+            if isinstance(prompt_token_details, dict)
+            else None
+        )
+        cache_creation_input_tokens = (
+            prompt_token_details.get("cache_creation_input_tokens")
+            if isinstance(prompt_token_details, dict)
+            else None
+        )
+        return DashScopeCompletionResult(
+            text=text,
+            prompt_tokens=prompt_tokens if isinstance(prompt_tokens, int) else None,
+            completion_tokens=completion_tokens if isinstance(completion_tokens, int) else None,
+            cached_tokens=cached_tokens if isinstance(cached_tokens, int) else None,
+            cache_creation_input_tokens=(
+                cache_creation_input_tokens
+                if isinstance(cache_creation_input_tokens, int)
+                else None
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class DashScopeCompletionResult:
+    text: str
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    cached_tokens: int | None = None
+    cache_creation_input_tokens: int | None = None
+
+
+class AssistantReplyGenerationError(RuntimeError):
+    def __init__(self, user_message: str, *, code: str, detail: str | None = None) -> None:
+        super().__init__(detail or user_message)
+        self.user_message = user_message
+        self.code = code
+        self.detail = detail or user_message
+
+
+def _normalize_completion_result(
+    raw_result: str | DashScopeCompletionResult,
+) -> DashScopeCompletionResult:
+    if isinstance(raw_result, DashScopeCompletionResult):
+        return raw_result
+
+    normalized = raw_result.strip()
+    if not normalized:
+        raise RuntimeError("DashScope returned an empty reply")
+    return DashScopeCompletionResult(text=normalized)
+
+
+def _classify_generation_failure(exc: Exception) -> AssistantReplyGenerationError:
+    detail = str(exc).strip() or exc.__class__.__name__
+    lowered = detail.lower()
+    if "timed out" in lowered or "timeout" in lowered:
+        return AssistantReplyGenerationError(
+            "本句整理超时，请再说一次完整句子。",
+            code="correction_timeout",
+            detail=detail,
+        )
+    return AssistantReplyGenerationError(
+        "本句整理失败，请再说一次完整句子。",
+        code="correction_failed",
+        detail=detail,
+    )
 
 
 @dataclass
@@ -303,7 +393,7 @@ class CommunicationAssistantRuntime:
                 api_key=self.config.dashscope_api_key,
                 base_url=self.config.dashscope_base_url,
                 model=self.config.dashscope_llm_model,
-                timeout_seconds=self.config.dashscope_reply_timeout_seconds,
+                timeout_seconds=self.config.dashscope_timeout_seconds,
             )
 
     def _build_system_prompt(self) -> str:
@@ -312,30 +402,39 @@ class CommunicationAssistantRuntime:
     async def generate_reply(self, user_text: str) -> tuple[str, str]:
         normalized = user_text.strip()
         if not normalized:
-            return build_fallback_text(self.ctx, normalized), "livekit_agent_fallback"
+            raise AssistantReplyGenerationError(
+                "未收到可整理的语音内容，请再说一遍。",
+                code="empty_transcript",
+            )
 
         self.userdata.note_user_transcript(normalized)
 
         if self.client is None:
-            reply = build_fallback_text(self.ctx, normalized)
-            self._remember_turn(normalized, reply)
-            return reply, "livekit_agent_fallback"
+            raise AssistantReplyGenerationError(
+                "纠错模型未配置，暂时无法整理这句话。",
+                code="llm_unavailable",
+            )
 
         history_window = (
             []
             if self.userdata.caption_mode_enabled
             else build_recent_history_window(self.history)
         )
-        messages = [
-            {"role": "system", "content": self._build_system_prompt()},
-            {
-                "role": "system",
-                "content": build_scene_prompt(
+        stable_prompt = "\n\n".join(
+            [
+                self._build_system_prompt(),
+                build_scene_prompt(
                     self.ctx,
                     caption_mode_enabled=self.userdata.caption_mode_enabled,
                 ),
+                build_preparation_prompt(self.userdata),
+            ]
+        )
+        messages = [
+            {
+                "role": "system",
+                "content": build_cacheable_content(stable_prompt),
             },
-            {"role": "system", "content": build_preparation_prompt(self.userdata)},
             *history_window,
             {
                 "role": "user",
@@ -346,26 +445,53 @@ class CommunicationAssistantRuntime:
                 ),
             },
         ]
-        reply_timeout_seconds = compute_reply_timeout_seconds(
-            self.config.dashscope_reply_timeout_seconds,
-            normalized,
-        )
+        started_at = time.perf_counter()
+        soft_target_ms = round(self.config.dashscope_reply_timeout_seconds * 1000)
 
         try:
             if isinstance(self.client, DashScopeChatClient):
-                reply = await asyncio.wait_for(
-                    asyncio.to_thread(self.client.complete, messages),
-                    timeout=reply_timeout_seconds,
-                )
+                raw_result = await asyncio.to_thread(self.client.complete, messages)
             else:
-                reply = self.client.complete(messages)
+                raw_result = self.client.complete(messages)
         except Exception as exc:
-            logger.warning("DashScope reply generation failed, falling back to deterministic text: %s", exc)
-            reply = build_fallback_text(self.ctx, normalized)
-            source = "livekit_agent_fallback"
-        else:
-            source = "dashscope_chat_completion"
+            elapsed_ms = round((time.perf_counter() - started_at) * 1000)
+            classified_error = _classify_generation_failure(exc)
+            logger.warning(
+                "DashScope correction failed room=%s participant=%s scene=%s latency_ms=%s soft_target_ms=%s code=%s error=%s",
+                self.ctx.room_name,
+                self.ctx.participant_identity,
+                self.ctx.scene,
+                elapsed_ms,
+                soft_target_ms,
+                classified_error.code,
+                classified_error.detail,
+            )
+            raise classified_error from exc
 
+        completion = _normalize_completion_result(raw_result)
+        reply = completion.text.strip()
+        if not reply:
+            raise AssistantReplyGenerationError(
+                "本句整理失败，请再说一次完整句子。",
+                code="empty_correction",
+            )
+
+        elapsed_ms = round((time.perf_counter() - started_at) * 1000)
+        logger.info(
+            "DashScope correction completed room=%s participant=%s scene=%s latency_ms=%s soft_target_ms=%s exceeded_soft_target=%s prompt_tokens=%s cached_tokens=%s cache_creation_input_tokens=%s completion_tokens=%s reply_chars=%s",
+            self.ctx.room_name,
+            self.ctx.participant_identity,
+            self.ctx.scene,
+            elapsed_ms,
+            soft_target_ms,
+            elapsed_ms > soft_target_ms,
+            completion.prompt_tokens,
+            completion.cached_tokens,
+            completion.cache_creation_input_tokens,
+            completion.completion_tokens,
+            len(reply),
+        )
+        source = "dashscope_chat_completion"
         self._remember_turn(normalized, reply)
         self.userdata.note_assistant_reply(reply)
         return reply, source
