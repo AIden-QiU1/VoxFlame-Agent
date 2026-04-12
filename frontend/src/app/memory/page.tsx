@@ -373,6 +373,34 @@ export default function MemoryPage() {
     ? localHotwordProfiles
     : remoteHotwordProfiles
 
+  const hasSavedPreparedExpression = Boolean(preparedExpressionAsset?.draft.id)
+  const preparedExpressionDirty = useMemo(() => {
+    if (!preparedExpressionAsset) {
+      return Boolean(
+        preparedExpressionTitle.trim()
+        || preparedExpressionScene.trim()
+        || preparedExpressionSource.trim() !== 'manual_input'
+        || preparedExpressionContent.trim(),
+      )
+    }
+
+    return (
+      preparedExpressionTitle !== (preparedExpressionAsset.draft.title ?? '')
+      || preparedExpressionScene !== (preparedExpressionAsset.draft.scene ?? '')
+      || preparedExpressionSource !== (preparedExpressionAsset.draft.source ?? 'manual_input')
+      || preparedExpressionContent !== (preparedExpressionAsset.draft.content ?? '')
+    )
+  }, [
+    preparedExpressionAsset,
+    preparedExpressionContent,
+    preparedExpressionScene,
+    preparedExpressionSource,
+    preparedExpressionTitle,
+  ])
+  const canSavePreparedExpression = Boolean(preparedExpressionContent.trim()) && (
+    !hasSavedPreparedExpression || preparedExpressionDirty
+  )
+
   const correctionSummary = useMemo<PreparedCorrectionSummaryView | null>(() => {
     const assetSummary = preparedExpressionAsset?.rehearsal_summary
     if (assetSummary) {
@@ -458,6 +486,14 @@ export default function MemoryPage() {
             </div>
           ) : null}
 
+          <div className="mt-4 rounded-[24px] border border-stone-200 bg-stone-50 px-4 py-4">
+            <p className="text-sm leading-6 text-gray-600">
+              {hasSavedPreparedExpression
+                ? '这里就是当前参考文档的编辑区。直接改内容后点“更新参考文档”就会覆盖保存到原位置，不需要删掉旧稿再重传。'
+                : '这里还没有保存过参考文档。先贴入或上传第一份，后面都可以直接在这里改并更新。'}
+            </p>
+          </div>
+
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
               <span className="text-sm font-medium text-gray-900">标题</span>
@@ -520,11 +556,11 @@ export default function MemoryPage() {
             <button
               type="button"
               onClick={() => void handleSavePreparedExpression()}
-              disabled={isSavingPreparedExpression}
+              disabled={isSavingPreparedExpression || !canSavePreparedExpression}
               className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSavingPreparedExpression ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              保存内容
+              {hasSavedPreparedExpression ? '更新参考文档' : '保存第一份参考文档'}
             </button>
             <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
               训练总结只会根据训练页真实录音结果自动更新

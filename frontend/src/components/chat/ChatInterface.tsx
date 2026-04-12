@@ -26,6 +26,7 @@ import {
   defaultStrategyForMode,
   type RtcScene,
 } from '@/lib/realtime-audio/session-contract'
+import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
 import { cn } from '@/lib/utils'
 import { XIcon } from 'lucide-react'
 
@@ -50,6 +51,44 @@ function mapStarterSceneToRuntimeScene(
   }
 
   return sceneId
+}
+
+function buildPreparationContextUpdate(
+  snapshot: WorkspaceMemorySnapshot | null,
+  runtimeScene: RtcScene | undefined,
+) {
+  const preparation = snapshot?.preparation
+  const preparedExpression = snapshot?.prepared_expression
+  if (!preparation && !preparedExpression) {
+    return null
+  }
+
+  const documentContent =
+    preparation?.document_content?.trim()
+    || preparedExpression?.document_content?.trim()
+    || ''
+  const trainingPairsSource = preparation?.training_pairs?.length
+    ? preparation.training_pairs
+    : (preparedExpression?.training_pairs ?? [])
+  const trainingPairs = trainingPairsSource
+    .filter((pair) => pair.target.trim() && pair.heard.trim())
+    .map((pair) => ({
+      target: pair.target,
+      heard: pair.heard,
+      occurrence_count: Math.max(1, pair.occurrenceCount || 1),
+    }))
+
+  return {
+    scene: runtimeScene ?? null,
+    immediate_goal: preparation?.immediate_goal ?? '',
+    profile_summary: preparation?.profile_summary ?? '',
+    listener_guidance: preparation?.listener_guidance ?? [],
+    support_strategies: preparation?.support_strategies ?? [],
+    document_summary: preparation?.document_context_summary ?? preparedExpression?.summary ?? '',
+    document_content: documentContent,
+    reference_lines: [],
+    training_pairs: trainingPairs,
+  }
 }
 
 export default function ChatInterface({
@@ -93,6 +132,8 @@ export default function ChatInterface({
 
   const [textInput, setTextInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const lastPreparationSyncKeyRef = useRef<string | null>(null)
+  const pendingPreparationSyncKeyRef = useRef<string | null>(null)
   const [showPhrasesPanel, setShowPhrasesPanel] = useState(false)
   const [isCaptionMode, setIsCaptionMode] = useState(false)
   const [isLaunchingStarter, setIsLaunchingStarter] = useState(false)
@@ -136,6 +177,7 @@ export default function ChatInterface({
 
   useEffect(() => {
     if (!isConnected) {
+      lastPreparationSyncKeyRef.current = null
       return
     }
 
@@ -232,6 +274,41 @@ export default function ChatInterface({
     () => mapStarterSceneToRuntimeScene(effectiveSceneId),
     [effectiveSceneId],
   )
+  const preparationContextUpdate = useMemo(
+    () => buildPreparationContextUpdate(workspaceSnapshot, runtimeScene),
+    [runtimeScene, workspaceSnapshot],
+  )
+
+  useEffect(() => {
+    if (!isConnected || !preparationContextUpdate) {
+      return
+    }
+
+    const syncKey = JSON.stringify(preparationContextUpdate)
+    if (
+      lastPreparationSyncKeyRef.current === syncKey
+      || pendingPreparationSyncKeyRef.current === syncKey
+    ) {
+      return
+    }
+
+    pendingPreparationSyncKeyRef.current = syncKey
+    void sendControlEvent('preparation_context_update', {
+      preparation: preparationContextUpdate,
+    })
+      .then(() => {
+        lastPreparationSyncKeyRef.current = syncKey
+      })
+      .catch((error: unknown) => {
+        console.warn('[chat] failed to sync preparation context:', error)
+      })
+      .finally(() => {
+        if (pendingPreparationSyncKeyRef.current === syncKey) {
+          pendingPreparationSyncKeyRef.current = null
+        }
+      })
+  }, [isConnected, preparationContextUpdate, sendControlEvent])
+
   const plannedIntent = useMemo(() => ({
     surface: 'communication_workspace' as const,
     mode: 'communication' as const,

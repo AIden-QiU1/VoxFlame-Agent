@@ -405,6 +405,7 @@ export default function ContributePage() {
 
   const disconnectRef = useRef(disconnect)
   const preparedContentFileInputRef = useRef<HTMLInputElement | null>(null)
+  const previousHasPreparedContentRef = useRef(false)
   disconnectRef.current = disconnect
 
   const canSaveTrainingSample = hasRequiredLegalConsent(user)
@@ -474,13 +475,13 @@ export default function ContributePage() {
     [categoryExercises, preparedExpressionExercises, selectableExerciseState.exercises, selectedExerciseId, visibleExercises],
   )
 
-  const currentPreparedSection = useMemo(
+  const currentPreparedAnchorLine = useMemo(
     () => (
       isPreparedExpressionExercise(currentExercise)
-        ? preparedExpression?.sections.find((section) => section.id === currentExercise.preparedExpressionSectionId) ?? null
+        ? currentExercise.preparedExpressionAnchorLine
         : null
     ),
-    [currentExercise, preparedExpression],
+    [currentExercise],
   )
 
   const currentExerciseTags = useMemo(
@@ -551,17 +552,22 @@ export default function ContributePage() {
     }
 
     setSessionPracticedExerciseIds([])
+    previousHasPreparedContentRef.current = false
     void refreshLocalQueueCount()
   }, [refreshLocalQueueCount, userId])
 
   useEffect(() => {
-    if (hasPreparedContent && practiceMode !== 'prepared_content') {
+    const becameAvailable =
+      hasPreparedContent && !previousHasPreparedContentRef.current
+    previousHasPreparedContentRef.current = hasPreparedContent
+
+    if (becameAvailable) {
       setPracticeMode('prepared_content')
       if (preparedExpressionExercises[0]) {
         setSelectedExerciseId(preparedExpressionExercises[0].id)
       }
     }
-  }, [hasPreparedContent, practiceMode, preparedExpressionExercises])
+  }, [hasPreparedContent, preparedExpressionExercises])
 
   useEffect(() => {
     return () => {
@@ -1340,10 +1346,10 @@ export default function ContributePage() {
                   </div>
                 ) : null}
 
-                {currentPreparedSection ? (
+                {currentPreparedAnchorLine ? (
                   <div className="mt-4 rounded-2xl bg-white px-4 py-4">
                     <p className="text-sm font-medium text-gray-900">当前段落锚点</p>
-                    <p className="mt-2 text-sm leading-6 text-gray-700">{currentPreparedSection.anchor_line}</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-700">{currentPreparedAnchorLine}</p>
                   </div>
                 ) : null}
               </div>

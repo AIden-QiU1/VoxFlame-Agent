@@ -10,6 +10,7 @@ from livekit import rtc
 from livekit.agents import AgentServer, AutoSubscribe, JobContext, cli
 
 from assistant_runtime import (
+    CAPTION_ASR_FALLBACK_SOURCE,
     AssistantReplyGenerationError,
     CommunicationAssistantRuntime,
     estimate_clarity_score,
@@ -27,10 +28,14 @@ from data_contract import (
     extract_caption_mode_update,
     decode_data_packet,
     extract_end_audio_reason,
+    extract_preparation_context_update,
     extract_user_text_input,
 )
 from session_context import build_session_context
-from session_userdata import build_session_userdata
+from session_userdata import (
+    build_preparation_context_pack_from_payload,
+    build_session_userdata,
+)
 from tts_runtime import LiveKitAudioReplyRuntime
 
 load_dotenv()
@@ -120,12 +125,12 @@ async def entrypoint(ctx: JobContext) -> None:
     )
     session_userdata = build_session_userdata(session_context)
     logger.info(
-        "LiveKit session userdata prepared room=%s participant=%s source=%s scene=%s reference_lines=%s training_pairs=%s support_strategies=%s",
+        "LiveKit session userdata prepared room=%s participant=%s source=%s scene=%s document_chars=%s training_pairs=%s support_strategies=%s",
         session_context.room_name,
         session_context.participant_identity,
         session_userdata.preparation.source,
         session_userdata.preparation.scene,
-        len(session_userdata.preparation.reference_lines),
+        len(session_userdata.preparation.document_content),
         len(session_userdata.preparation.training_pairs),
         len(session_userdata.preparation.support_strategies),
     )
@@ -223,7 +228,7 @@ async def entrypoint(ctx: JobContext) -> None:
                 original_text=correction_original,
             ),
         )
-        if correction_original:
+        if correction_original and source != CAPTION_ASR_FALLBACK_SOURCE:
             clarity_score = estimate_clarity_score(correction_original, reply_text)
             await publish_payload(
                 build_voice_profile_updated_output(
@@ -233,11 +238,13 @@ async def entrypoint(ctx: JobContext) -> None:
                     confusion_patterns_count=1 if correction_original != reply_text else 0,
                 ),
             )
-        if session_userdata.caption_mode_enabled:
+        if session_userdata.should_skip_tts():
             logger.info(
-                "LiveKit caption mode active, skipping TTS room=%s participant=%s",
+                "LiveKit text-first reply active, skipping TTS room=%s participant=%s surface=%s caption_mode=%s",
                 session_context.room_name,
                 session_context.participant_identity,
+                session_context.surface,
+                session_userdata.caption_mode_enabled,
             )
             return
 
@@ -376,6 +383,40 @@ async def entrypoint(ctx: JobContext) -> None:
             )
             if caption_mode_enabled:
                 asyncio.create_task(audio_runtime.interrupt())
+            return
+
+        preparation_update = extract_preparation_context_update(message)
+        if preparation_update is not None:
+            next_preparation = build_preparation_context_pack_from_payload(
+                preparation_update,
+                fallback_scene=session_context.scene,
+                source="runtime_update",
+            )
+            if next_preparation is None:
+                logger.warning(
+                    "LiveKit preparation context update ignored room=%s participant=%s reason=invalid_payload",
+                    session_context.room_name,
+                    session_context.participant_identity,
+                )
+                return
+
+            session_userdata.replace_preparation(next_preparation)
+            logger.info(
+                "LiveKit preparation context updated room=%s participant=%s scene=%s document_chars=%s training_pairs=%s",
+                session_context.room_name,
+                session_context.participant_identity,
+                next_preparation.scene,
+                len(next_preparation.document_content),
+                len(next_preparation.training_pairs),
+            )
+            asyncio.create_task(
+                publish_payload(
+                    build_session_userdata_ack(
+                        session_context,
+                        session_userdata.preparation,
+                    )
+                )
+            )
             return
 
         end_audio_reason = extract_end_audio_reason(message)

@@ -5,6 +5,8 @@ import audioop
 import base64
 import json
 import logging
+import re
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -22,6 +24,10 @@ PublishPayload = Callable[[dict[str, Any]], Awaitable[None]]
 FinalTranscriptHandler = Callable[[str], Awaitable[None]]
 SpeechActivityHandler = Callable[[str, bool], Awaitable[None]]
 AudioTelemetryHandler = Callable[[float, float, bool, bool, str], Awaitable[None]]
+TRANSCRIPT_EDGE_PUNCTUATION_PATTERN = re.compile(
+    r"^[\s，。！？!?；;：:、,.…~～-]+|[\s，。！？!?；;：:、,.…~～-]+$"
+)
+MANUAL_STOP_SHORT_TRANSCRIPT_GRACE_SECONDS = 2.0
 
 
 class VADState(Enum):
@@ -99,6 +105,10 @@ def normalized_peak_level(pcm_bytes: bytes) -> float:
     if not pcm_bytes:
         return 0.0
     return audioop.max(pcm_bytes, 2) / 32768.0
+
+
+def semantic_transcript_length(text: str) -> int:
+    return len(TRANSCRIPT_EDGE_PUNCTUATION_PATTERN.sub("", text.strip()))
 
 
 def build_livekit_audio_apm_options(config: LiveKitAgentConfig) -> dict[str, bool]:
@@ -309,6 +319,7 @@ class LiveKitASRRuntime:
     _clipping_detected_since_commit: bool = False
     _clipping_reported_since_commit: bool = False
     _apm_remainder: bytes = b""
+    _ignore_short_transcripts_until: float = 0.0
 
     async def start(self) -> None:
         if self._stream_task is not None:
@@ -355,6 +366,11 @@ class LiveKitASRRuntime:
         if self.client is None or not self._started:
             return
 
+        self._ignore_short_transcripts_until = (
+            time.monotonic() + MANUAL_STOP_SHORT_TRANSCRIPT_GRACE_SECONDS
+            if reason == "manual_stop"
+            else 0.0
+        )
         await self._emit_audio_telemetry(reason or "unknown")
 
         logger.info(
@@ -644,10 +660,13 @@ class LiveKitASRRuntime:
             return
 
         if message_type == "conversation.item.input_audio_transcription.completed":
+            ignore_short_transcript = time.monotonic() <= self._ignore_short_transcripts_until
             transcript = str(payload.get("transcript", "") or "").strip()
             if not transcript:
                 transcript = str(payload.get("text", "") or "").strip()
             if not transcript:
+                if ignore_short_transcript:
+                    self._ignore_short_transcripts_until = 0.0
                 logger.warning(
                     "LiveKit ASR final transcript event had no text room=%s participant=%s payload=%s",
                     self.ctx.room_name,
@@ -655,6 +674,18 @@ class LiveKitASRRuntime:
                     payload,
                 )
                 return
+
+            if ignore_short_transcript:
+                self._ignore_short_transcripts_until = 0.0
+                if semantic_transcript_length(transcript) <= 2:
+                    logger.info(
+                        "LiveKit ASR ignored short manual_stop tail room=%s participant=%s chars=%s transcript=%s",
+                        self.ctx.room_name,
+                        self.ctx.participant_identity,
+                        len(transcript),
+                        transcript,
+                    )
+                    return
 
             logger.info(
                 "LiveKit ASR final transcript room=%s participant=%s chars=%s transcript=%s",

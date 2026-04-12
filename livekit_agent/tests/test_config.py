@@ -20,9 +20,12 @@ class ConfigTests(unittest.TestCase):
             "VOXFLAME_LIVEKIT_AGENT_MODE": "communication_stub",
             "DASHSCOPE_API_KEY": "dashscope-test",
             "DASHSCOPE_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-            "DASHSCOPE_LLM_MODEL": "qwen3.6-plus",
+            "DASHSCOPE_LLM_MODEL": "qwen-flash",
             "DASHSCOPE_TIMEOUT_SECONDS": "9.5",
             "DASHSCOPE_REPLY_TIMEOUT_SECONDS": "3.2",
+            "DASHSCOPE_LLM_TEMPERATURE": "0.1",
+            "DASHSCOPE_LLM_MAX_TOKENS": "32",
+            "DASHSCOPE_SESSION_CACHE_ENABLED": "1",
             "QWEN_ASR_REALTIME_URL": "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
             "QWEN_ASR_REALTIME_MODEL": "qwen3-asr-flash-realtime-2026-02-10",
             "QWEN_ASR_REALTIME_SAMPLE_RATE": "16000",
@@ -67,9 +70,12 @@ class ConfigTests(unittest.TestCase):
             config.dashscope_base_url,
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
         )
-        self.assertEqual(config.dashscope_llm_model, "qwen3.6-plus")
+        self.assertEqual(config.dashscope_llm_model, "qwen-flash")
         self.assertEqual(config.dashscope_timeout_seconds, 9.5)
         self.assertEqual(config.dashscope_reply_timeout_seconds, 3.2)
+        self.assertEqual(config.dashscope_llm_temperature, 0.1)
+        self.assertEqual(config.dashscope_llm_max_tokens, 32)
+        self.assertTrue(config.dashscope_session_cache_enabled)
         self.assertEqual(config.dashscope_asr_url, "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")
         self.assertEqual(config.dashscope_asr_model, "qwen3-asr-flash-realtime-2026-02-10")
         self.assertEqual(config.dashscope_asr_sample_rate, 16000)

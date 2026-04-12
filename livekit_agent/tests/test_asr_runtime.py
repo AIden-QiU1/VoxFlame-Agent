@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 import unittest
 from pathlib import Path
@@ -14,6 +15,7 @@ from asr_runtime import (
     build_livekit_audio_apm_options,
     frame_to_pcm_bytes,
     normalized_rms_energy,
+    semantic_transcript_length,
     should_enable_livekit_audio_apm,
     with_model_query,
 )
@@ -32,6 +34,9 @@ def create_config() -> LiveKitAgentConfig:
         dashscope_llm_model="qwen3.6-plus",
         dashscope_timeout_seconds=15.0,
         dashscope_reply_timeout_seconds=4.5,
+        dashscope_llm_temperature=0.1,
+        dashscope_llm_max_tokens=32,
+        dashscope_session_cache_enabled=True,
         dashscope_asr_url="wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
         dashscope_asr_model="qwen3-asr-flash-realtime-2026-02-10",
         dashscope_asr_sample_rate=16000,
@@ -118,6 +123,11 @@ class TestASRRuntime(unittest.TestCase):
     def test_normalized_rms_energy_returns_zero_for_silence(self) -> None:
         self.assertEqual(normalized_rms_energy(b"\x00\x00" * 160), 0.0)
 
+    def test_semantic_transcript_length_ignores_edge_punctuation(self) -> None:
+        self.assertEqual(semantic_transcript_length("。"), 0)
+        self.assertEqual(semantic_transcript_length("嗯。"), 1)
+        self.assertEqual(semantic_transcript_length("我想挂号。"), 4)
+
     def test_vad_detector_emits_start_then_stop_after_silence_window(self) -> None:
         detector = RMSVoiceActivityDetector(threshold=0.01, silence_duration_ms=20)
         speech_frame = (1000).to_bytes(2, byteorder="little", signed=True) * 160
@@ -160,6 +170,79 @@ class TestASRRuntime(unittest.TestCase):
         self.assertEqual(len(first), 640)
         self.assertEqual(second, b"")
         self.assertEqual(len(runtime._apm_remainder), 160)
+
+    def test_handle_server_event_ignores_short_manual_stop_tail_transcript(self) -> None:
+        published_payloads: list[dict[str, object]] = []
+        final_transcripts: list[str] = []
+
+        async def publish_payload(payload: dict[str, object]) -> None:
+            published_payloads.append(payload)
+
+        async def on_final_transcript(text: str) -> None:
+            final_transcripts.append(text)
+
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type(
+                "Ctx",
+                (),
+                {"room_name": "room", "participant_identity": "user", "request_id": "req-1"},
+            )(),
+            participant=None,
+            publish_payload=publish_payload,
+            on_final_transcript=on_final_transcript,
+        )
+        runtime._ignore_short_transcripts_until = float("inf")
+
+        asyncio.run(
+            runtime._handle_server_event(
+                {
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "transcript": "嗯。",
+                }
+            )
+        )
+
+        self.assertEqual(published_payloads, [])
+        self.assertEqual(final_transcripts, [])
+        self.assertEqual(runtime._ignore_short_transcripts_until, 0.0)
+
+    def test_handle_server_event_keeps_meaningful_manual_stop_transcript(self) -> None:
+        published_payloads: list[dict[str, object]] = []
+        final_transcripts: list[str] = []
+
+        async def publish_payload(payload: dict[str, object]) -> None:
+            published_payloads.append(payload)
+
+        async def on_final_transcript(text: str) -> None:
+            final_transcripts.append(text)
+
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type(
+                "Ctx",
+                (),
+                {"room_name": "room", "participant_identity": "user", "request_id": "req-1"},
+            )(),
+            participant=None,
+            publish_payload=publish_payload,
+            on_final_transcript=on_final_transcript,
+        )
+        runtime._ignore_short_transcripts_until = float("inf")
+
+        asyncio.run(
+            runtime._handle_server_event(
+                {
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "transcript": "我想挂号。",
+                }
+            )
+        )
+
+        self.assertEqual(len(published_payloads), 1)
+        self.assertEqual(final_transcripts, ["我想挂号。"])
+        self.assertEqual(published_payloads[0]["text"], "我想挂号。")
+        self.assertEqual(runtime._ignore_short_transcripts_until, 0.0)
 
 
 if __name__ == "__main__":

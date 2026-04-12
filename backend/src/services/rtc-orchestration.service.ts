@@ -419,12 +419,6 @@ export class RtcOrchestrationService {
         },
       )
 
-      const fallbackPhrases = [
-        ...(snapshot.prepared_expression?.fallback_phrases ?? []),
-        ...snapshot.expression_kit.personalized_phrases.map((item) => item.text),
-        ...snapshot.expression_kit.quick_phrases.map((item) => item.text),
-      ]
-
       return {
         source: 'workspace_snapshot',
         scene: snapshot.preparation.active_scene_id ?? intent.scene ?? null,
@@ -438,11 +432,7 @@ export class RtcOrchestrationService {
         supportStrategies: snapshot.preparation.support_strategies.slice(0, 4),
         documentSummary: snapshot.preparation.document_context_summary,
         documentContent: snapshot.preparation.document_content,
-        referenceLines: dedupeStrings([
-          ...snapshot.preparation.reference_lines,
-          ...snapshot.prepared_expression?.reference_lines ?? [],
-          ...fallbackPhrases,
-        ]).slice(0, 80),
+        referenceLines: snapshot.preparation.reference_lines.slice(0, 80),
         trainingPairs: snapshot.preparation.training_pairs.slice(0, 80),
       }
     } catch (error) {

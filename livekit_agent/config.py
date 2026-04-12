@@ -17,6 +17,9 @@ class LiveKitAgentConfig:
     dashscope_llm_model: str
     dashscope_timeout_seconds: float
     dashscope_reply_timeout_seconds: float
+    dashscope_llm_temperature: float
+    dashscope_llm_max_tokens: int
+    dashscope_session_cache_enabled: bool
     dashscope_asr_url: str
     dashscope_asr_model: str
     dashscope_asr_sample_rate: int
@@ -68,11 +71,21 @@ def load_config() -> LiveKitAgentConfig:
             .strip()
             .rstrip("/")
         ),
-        dashscope_llm_model=os.getenv("DASHSCOPE_LLM_MODEL", "qwen3.6-plus").strip()
-        or "qwen3.6-plus",
+        dashscope_llm_model=os.getenv("DASHSCOPE_LLM_MODEL", "qwen-flash").strip()
+        or "qwen-flash",
         dashscope_timeout_seconds=float(os.getenv("DASHSCOPE_TIMEOUT_SECONDS", "15").strip() or "15"),
         dashscope_reply_timeout_seconds=float(
             os.getenv("DASHSCOPE_REPLY_TIMEOUT_SECONDS", "4.5").strip() or "4.5"
+        ),
+        dashscope_llm_temperature=float(
+            os.getenv("DASHSCOPE_LLM_TEMPERATURE", "0.1").strip() or "0.1"
+        ),
+        dashscope_llm_max_tokens=int(
+            os.getenv("DASHSCOPE_LLM_MAX_TOKENS", "32").strip() or "32"
+        ),
+        dashscope_session_cache_enabled=(
+            os.getenv("DASHSCOPE_SESSION_CACHE_ENABLED", "0").strip().lower()
+            not in {"0", "false", "no"}
         ),
         dashscope_asr_url=(
             os.getenv("QWEN_ASR_REALTIME_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")

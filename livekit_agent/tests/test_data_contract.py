@@ -18,6 +18,7 @@ from data_contract import (
     build_voice_profile_updated_output,
     decode_data_packet,
     extract_end_audio_reason,
+    extract_preparation_context_update,
     extract_user_text_input,
 )
 from session_context import VoxFlameSessionContext
@@ -57,6 +58,21 @@ class DataContractTests(unittest.TestCase):
         self.assertEqual(extract_user_text_input(message), "请帮我说慢一点")
         self.assertIsNone(extract_user_text_input({"type": "end_audio"}))
         self.assertEqual(extract_end_audio_reason({"type": "end_audio", "reason": "manual_stop"}), "manual_stop")
+
+    def test_extract_preparation_context_update_reads_payload(self) -> None:
+        message = {
+            "type": "preparation_context_update",
+            "preparation": {
+                "document_content": "大家好，我叫邱生峰。",
+                "training_pairs": [{"target": "邱生峰", "heard": "邱文峰"}],
+            },
+        }
+
+        payload = extract_preparation_context_update(message)
+
+        self.assertIsNotNone(payload)
+        assert payload is not None
+        self.assertEqual(payload["document_content"], "大家好，我叫邱生峰。")
 
     def test_build_session_init_ack_exposes_runtime_metadata(self) -> None:
         payload = build_session_init_ack(create_context())

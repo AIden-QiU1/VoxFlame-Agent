@@ -23,6 +23,7 @@ class PreparationContextPack:
 @dataclass(slots=True)
 class VoxFlameSessionUserData:
     preparation: PreparationContextPack
+    voice_reply_enabled: bool = True
     current_turn_state: str = "idle"
     last_user_transcript: str | None = None
     last_assistant_reply: str | None = None
@@ -51,9 +52,18 @@ class VoxFlameSessionUserData:
     def set_caption_mode(self, enabled: bool) -> None:
         self.caption_mode_enabled = enabled
 
+    def should_skip_tts(self) -> bool:
+        return self.caption_mode_enabled or not self.voice_reply_enabled
+
+    def replace_preparation(self, preparation: PreparationContextPack) -> None:
+        self.preparation = preparation
+
 
 def build_session_userdata(ctx: VoxFlameSessionContext) -> VoxFlameSessionUserData:
-    return VoxFlameSessionUserData(preparation=build_preparation_context_pack(ctx))
+    return VoxFlameSessionUserData(
+        preparation=build_preparation_context_pack(ctx),
+        voice_reply_enabled=ctx.surface != "communication_workspace",
+    )
 
 
 def build_preparation_context_pack(
@@ -103,26 +113,59 @@ def _read_preparation_payload(ctx: VoxFlameSessionContext) -> PreparationContext
         if not isinstance(payload, dict):
             continue
 
-        immediate_goal = _read_string(payload, "immediate_goal")
-        profile_summary = _read_string(payload, "profile_summary")
-        if not immediate_goal and not profile_summary:
-            continue
-
-        return PreparationContextPack(
+        preparation = build_preparation_context_pack_from_payload(
+            payload,
+            fallback_scene=ctx.scene,
             source="metadata",
-            scene=_read_optional_string(payload, "scene") or ctx.scene,
-            immediate_goal=immediate_goal or "当前优先先准备最关键的一句表达。",
-            profile_summary=profile_summary
-            or "当前准备上下文已载入，请优先参考这些准备信息帮助用户表达。",
-            listener_guidance=_read_string_list(payload.get("listener_guidance")),
-            support_strategies=_read_string_list(payload.get("support_strategies")),
-            document_summary=_read_string(payload, "document_summary"),
-            document_content=_read_string(payload, "document_content"),
-            reference_lines=_read_string_list(payload.get("reference_lines")),
-            training_pairs=_read_training_pairs(payload.get("training_pairs")),
         )
+        if preparation is not None:
+            return preparation
 
     return None
+
+
+def build_preparation_context_pack_from_payload(
+    payload: dict[str, Any],
+    *,
+    fallback_scene: str | None = None,
+    source: str = "runtime_update",
+) -> PreparationContextPack | None:
+    immediate_goal = _read_string(payload, "immediate_goal")
+    profile_summary = _read_string(payload, "profile_summary")
+    listener_guidance = _read_string_list(payload.get("listener_guidance"))
+    support_strategies = _read_string_list(payload.get("support_strategies"))
+    document_summary = _read_string(payload, "document_summary")
+    document_content = _read_string(payload, "document_content")
+    training_pairs = _read_training_pairs(payload.get("training_pairs"))
+    reference_lines = _read_string_list(payload.get("reference_lines"))
+
+    if not any(
+        (
+            immediate_goal,
+            profile_summary,
+            listener_guidance,
+            support_strategies,
+            document_summary,
+            document_content,
+            reference_lines,
+            training_pairs,
+        )
+    ):
+        return None
+
+    return PreparationContextPack(
+        source=source,
+        scene=_read_optional_string(payload, "scene") or fallback_scene,
+        immediate_goal=immediate_goal or "当前优先先准备最关键的一句表达。",
+        profile_summary=profile_summary
+        or "当前准备上下文已载入，请优先参考这些准备信息帮助用户表达。",
+        listener_guidance=listener_guidance,
+        support_strategies=support_strategies,
+        document_summary=document_summary,
+        document_content=document_content,
+        reference_lines=reference_lines,
+        training_pairs=training_pairs,
+    )
 
 
 def _read_string(payload: dict[str, Any], key: str) -> str:

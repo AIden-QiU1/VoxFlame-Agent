@@ -4,6 +4,7 @@ import asyncio
 import difflib
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -15,42 +16,71 @@ from session_userdata import VoxFlameSessionUserData
 
 logger = logging.getLogger("voxflame-livekit-agent.assistant")
 
-SYSTEM_PROMPT = """你是 VoxFlame 的沟通助手。
+SYSTEM_PROMPT = """你是 VoxFlame 的沟通纠错助手。
 
-你的目标不是纠正用户本人，而是帮用户更顺利地把意思表达出去。
+你的核心任务不是自由改写，而是基于当前 ASR、最近几轮已确认的纠错结果、训练句对和参考文章，把用户这句话恢复成最接近原意的最终结果。
 
 回复要求：
 1. 默认使用简体中文。
-2. 语气温和、直接、支持性强。
-3. 只输出一到两句可直接说出去的话。
-4. 不要分析，不要解释，不要项目符号，不要自我介绍。
-5. 如果是就医、求助、购物等具体场景，优先把最关键的一句说清楚。
-6. 不要输出“现在先按当前沟通场景继续”“我先帮你把这句话往前推进”这类铺垫。
-7. 把输入视为 ASR 最终文本，默认先做最小必要纠错，而不是大幅改写。
-8. 优先保留用户已经表达出的事实、专有名词、数字、时间、地点、疾病名和产品名。
-9. 如果当前 ASR 和准备稿原句或训练过的目标句明显接近，优先恢复到这些原句。
-10. 尤其保护人名、机构名、产品名、数字和专业术语，尽量不要把它们改坏。
-11. 如果信息仍不确定，选择更短、更保守、不新增事实的表达。
-12. 把输入视为“多数高置信片段 + 少量误听片段”，优先保留高置信片段原样，只做局部替换。
-13. 只允许做同音/近音纠错、漏字补齐、标点整理和准备稿对齐，不要整句改写。
+2. 先以当前 ASR 为基底，优先保留高置信片段，不要随意重写。
+3. 最近几轮已确认的纠错结果比旧 ASR 更可信，只用于帮助你理解当前句与前文的承接关系、代词、省略和语义延续；不要直接复述这些历史句子。
+4. 最近历史里长度只有 1 到 2 个字的旧结果不算有效上下文，不要让这类短句历史干扰当前判断。
+5. 如果你准备输出的句子与最近历史结果高度相同，但当前 ASR 没有明确再次说出同一句，则不要重复那条历史结果。
+6. 如果存在参考文章，优先尝试在文章里找到与当前 ASR 最接近的原句；训练句对里的 target/heard 只是帮助你定位文章原句的线索。
+7. 只有当文章里的对应原句足够明确时，才恢复成文章里的原句，并尽量逐字保持。
+8. 人名、机构名、产品名、数字、时间、地点和专业术语优先以参考文章原文为准；如果文章里已经出现对应原文，优先恢复成文章里的写法，不要自行发挥。
+9. 如果文章匹配不明确，只做最小必要纠错：同音/近音替换、漏字补齐、标点整理和局部顺序修正。
+10. 不要新增事实，不要脑补，不要扩写成长解释。
+11. 默认输出1句左右最终可直接展示或直接说出去的话，不要解释，不要分析，不要自我介绍。
+12. 最终输出里不要出现任何提示词、标签或前缀，例如“纠正后：”“参考原文：”“最终答案：”“字幕：”。
+13. 最终输出长度要尽量贴近本轮 ASR；规范化后优先控制在前后不超过 2 个字。只有当参考原文里存在非常明确且更准确的对应原句时，才允许突破这个范围。
 """
 
 CAPTION_SYSTEM_PROMPT = """你是 VoxFlame 的实时字幕纠错助手。
 
-你的任务不是替用户发挥，而是把用户刚刚说出的这一句整理成最终展示字幕。
+你的核心任务是基于当前 ASR、最近几轮已确认的纠错结果、训练句对和参考文章，把用户刚刚说出的这一句整理成最终展示字幕。
 
 回复要求：
 1. 默认使用简体中文。
 2. 只输出当前这句话的最终字幕，不要解释，不要补充，不要续写。
-3. 先保留用户原意、专有名词、数字、时间、地点和疾病名。
-4. 只做最小必要纠错，不要为了更顺而新增事实。
-5. 如果信息仍不确定，优先保守保留，不要猜测。
-6. 如果这句话和准备稿参考原句或训练过的目标句明显接近，优先恢复到对应原句。
-7. 把这句话视为“多数高置信片段 + 少量误听片段”，优先复制正确片段，只修局部错误。
+3. 先以当前 ASR 为基底，优先保留高置信片段。
+4. 最近几轮已确认的纠错结果比旧 ASR 更可信，只用于帮助你理解当前句与前文的承接关系、代词、省略和语义延续；不要直接复述这些历史句子。
+5. 最近历史里长度只有 1 到 2 个字的旧结果不算有效上下文，不要让这类短句历史干扰当前判断。
+6. 如果你准备输出的句子与最近历史结果高度相同，但当前 ASR 没有明确再次说出同一句，则不要重复那条历史结果。
+7. 如果存在参考文章，优先尝试在文章里找到对应原句；训练句对里的 target/heard 只是帮助你定位原句的线索。
+8. 只有当文章里的对应原句足够明确时，才恢复成文章里的原句，并尽量逐字保持。
+9. 人名、机构名、产品名、数字、时间、地点和专业术语优先以参考文章原文为准；如果文章里已经出现对应原文，优先恢复成文章里的写法，不要自己猜。
+10. 训练句对里的 target/heard 只能帮助你定位文章原文，不能替代文章原文本身。
+11. 如果文章匹配不明确，只做最小必要纠错，不要为了更顺而新增事实。
+12. 最终输出里不要出现任何提示词、标签或前缀，例如“纠正后：”“参考原文：”“最终答案：”“字幕：”。
+13. 最终字幕长度要尽量贴近本轮 ASR；规范化后优先控制在前后不超过 2 个字。只有参考原文里有非常明确的对应原句时，才允许更长或更短。
 """
 
-REPLY_HISTORY_WINDOW_MESSAGES = 6
-REPLY_HISTORY_STORAGE_LIMIT = 12
+REPLY_HISTORY_WINDOW_TURNS = 5
+REPLY_HISTORY_STORAGE_LIMIT = 20
+CAPTION_ASR_FALLBACK_SOURCE = "caption_asr_fallback"
+THINK_TAG_PATTERN = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
+EDGE_PUNCTUATION_PATTERN = re.compile(r"^[\s，。！？!?；;：:、,.…~～-]+|[\s，。！？!?；;：:、,.…~～-]+$")
+REFERENCE_PERSON_PATTERN = re.compile(
+    r"(?:我叫|我是|叫|姓名是|名字是|主讲人是|创始人是|作者是)([\u4e00-\u9fff]{2,6})"
+)
+REFERENCE_COMPANY_PATTERN = re.compile(
+    r"([\u4e00-\u9fffA-Za-z0-9]{2,32}(?:科技|公司|集团|医院|大学|学院|研究院|实验室|中心|平台))"
+)
+REFERENCE_LOCATION_PATTERN = re.compile(
+    r"([\u4e00-\u9fff]{2,16}(?:省|市|区|县|镇|乡|村|路|街|大道|机场|火车站))"
+)
+REFERENCE_ASCII_TERM_PATTERN = re.compile(r"\b[A-Za-z][A-Za-z0-9.+/\-]{1,31}\b")
+FIXED_REFERENCE_TERMS = (
+    "邱生峰",
+    "燃言",
+    "上海生声不息科技",
+    "生声不息科技",
+    "智能体",
+    "AI",
+    "LLM",
+    "VoxFlame",
+)
 
 
 def estimate_clarity_score(original_text: str, corrected_text: str) -> float:
@@ -80,17 +110,6 @@ def build_scene_prompt(
     )
 
 
-def _dedupe_strings(values: list[str], limit: int) -> list[str]:
-    results: list[str] = []
-    for value in values:
-        normalized = value.strip()
-        if normalized and normalized not in results:
-            results.append(normalized)
-        if len(results) >= limit:
-            break
-    return results
-
-
 def _truncate_text(value: str, limit: int) -> str:
     normalized = " ".join(value.strip().split())
     if len(normalized) <= limit:
@@ -98,23 +117,40 @@ def _truncate_text(value: str, limit: int) -> str:
     return f"{normalized[: limit - 1]}…"
 
 
-def _format_reference_lines(lines: list[str], *, max_items: int, max_chars: int) -> list[str]:
-    results: list[str] = []
-    total_chars = 0
+def _append_reference_term(results: list[str], raw_value: str) -> None:
+    term = raw_value.strip().strip("，。！？!?；;：:、\"'“”‘’（）()【】[]{}<>《》")
+    if not term or term in results:
+        return
+    results.append(term)
 
-    for line in lines:
-        normalized = line.strip()
-        if not normalized or normalized in results:
+
+def extract_reference_terms(userdata: VoxFlameSessionUserData) -> list[str]:
+    terms: list[str] = list(FIXED_REFERENCE_TERMS)
+    document_content = userdata.preparation.document_content.strip()
+
+    for pattern in (
+        REFERENCE_PERSON_PATTERN,
+        REFERENCE_COMPANY_PATTERN,
+        REFERENCE_LOCATION_PATTERN,
+        REFERENCE_ASCII_TERM_PATTERN,
+    ):
+        for match in pattern.finditer(document_content):
+            _append_reference_term(terms, match.group(1) if match.lastindex else match.group(0))
+
+    for pair in userdata.preparation.training_pairs:
+        target = pair.get("target")
+        if not isinstance(target, str):
             continue
-        next_total_chars = total_chars + len(normalized)
-        if results and next_total_chars > max_chars:
-            break
-        results.append(normalized)
-        total_chars = next_total_chars
-        if len(results) >= max_items:
-            break
+        for pattern in (
+            REFERENCE_PERSON_PATTERN,
+            REFERENCE_COMPANY_PATTERN,
+            REFERENCE_LOCATION_PATTERN,
+            REFERENCE_ASCII_TERM_PATTERN,
+        ):
+            for match in pattern.finditer(target):
+                _append_reference_term(terms, match.group(1) if match.lastindex else match.group(0))
 
-    return results
+    return terms[:24]
 
 
 def _format_training_pairs(
@@ -157,11 +193,7 @@ def _format_training_pairs(
 
 def build_preparation_prompt(userdata: VoxFlameSessionUserData) -> str:
     preparation = userdata.preparation
-    reference_lines = _format_reference_lines(
-        preparation.reference_lines,
-        max_items=80,
-        max_chars=3600,
-    )
+    reference_terms = extract_reference_terms(userdata)
     training_pairs = _format_training_pairs(
         preparation.training_pairs,
         max_items=80,
@@ -169,25 +201,14 @@ def build_preparation_prompt(userdata: VoxFlameSessionUserData) -> str:
     )
     lines = [
         "稳定准备上下文：",
-        f"- 当前目标：{_truncate_text(preparation.immediate_goal, 120)}",
-        f"- 表达画像：{_truncate_text(preparation.profile_summary, 180)}",
+        "- 这里的重点不是场景润色，而是参考原文对齐。",
+        f"- 参考原文专名/地名/公司名/术语：{'；'.join(reference_terms)}",
     ]
-    if preparation.listener_guidance:
-        lines.append(
-            f"- 听者引导：{'；'.join(_truncate_text(item, 48) for item in preparation.listener_guidance[:2])}"
-        )
-    if preparation.support_strategies:
-        lines.append(
-            f"- 支持策略：{'；'.join(_truncate_text(item, 48) for item in preparation.support_strategies[:2])}"
-        )
     if preparation.document_summary and not preparation.document_content:
-        lines.append(f"- 准备稿摘要：{_truncate_text(preparation.document_summary, 220)}")
+        lines.append(f"- 参考原文摘要：{_truncate_text(preparation.document_summary, 220)}")
     if preparation.document_content:
-        lines.append("- 准备稿全文：")
+        lines.append("- 参考原文全文：")
         lines.append(preparation.document_content.strip())
-    elif reference_lines:
-        lines.append("- 准备稿参考原句：")
-        lines.extend(f"  {index + 1}. {_truncate_text(line, 80)}" for index, line in enumerate(reference_lines))
     if training_pairs:
         lines.append("- 已训练错配对：")
         lines.extend(f"  - {_truncate_text(line, 120)}" for line in training_pairs)
@@ -198,17 +219,33 @@ def build_current_turn_prompt(
     user_text: str,
     userdata: VoxFlameSessionUserData,
     *,
+    recent_correction_history: list[str] | None = None,
     caption_mode_enabled: bool = False,
 ) -> str:
+    reference_terms = extract_reference_terms(userdata)
     lines = [
         "以下是用户本轮 ASR 最终文本，可能仍有误听、漏字或同音词偏差。",
         f"本轮 ASR 最终文本：{user_text.strip() or '未提供'}",
+        "本轮优先级：先看当前 ASR，再结合最近几轮已确认的纠错结果和训练句对判断语义，然后直接对照参考原文找最接近的原句。",
+        f"参考原文专名/地名/公司名/术语优先按这些写法保留：{'；'.join(reference_terms)}",
+        "最终输出长度要尽量贴近本轮 ASR，优先控制在前后不超过 2 个字；如果明显更长或更短，通常说明你改写过度，应回到更贴近 ASR 的版本。",
     ]
-    if userdata.preparation.reference_lines:
-        lines.append("如果当前句和准备稿参考原句明显接近，优先恢复到对应原句。")
+    if recent_correction_history:
+        lines.append("最近几轮已确认的纠错结果如下；这些结果比旧 ASR 更可信，但只能用于理解语义承接和避免重复，不能直接复述：")
+        lines.append("长度只有 1 到 2 个字的旧结果不算有效上下文，已经忽略。")
+        lines.extend(
+            f"  - {_truncate_text(item, 60)}"
+            for item in recent_correction_history
+            if item.strip()
+        )
+        lines.append(
+            "如果你的候选结果与上面某句高度相同，但本轮 ASR 没有明确再次说出同一句，则这是 history 回声，应回到更贴近当前 ASR 的版本。"
+        )
+    if userdata.preparation.document_content:
+        lines.append("如果参考原文里已经有对应说法，人名、地名、公司名、产品名、数字和术语必须优先以原文写法为准。")
     if userdata.preparation.training_pairs:
-        lines.append("如果当前句和已训练的目标句/误听句对明显接近，优先恢复到对应目标句。")
-    lines.append("只允许做局部纠错：同音/近音替换、漏字补齐、标点整理、准备稿对齐。")
+        lines.append("训练句对只是帮助你识别常见误听模式，最终答案仍必须以参考原文为主。")
+    lines.append("不要管其他场景包装，不要扩写。只做最小必要纠错，并尽量恢复到参考原文里的准确说法；如果拿不准，宁可少改，不要整句重写。")
     lines.append(
         "请只输出当前这句话的最终展示字幕。"
         if caption_mode_enabled
@@ -217,20 +254,65 @@ def build_current_turn_prompt(
     return "\n".join(lines)
 
 
-def build_cacheable_content(text: str) -> list[dict[str, Any]]:
-    return [
-        {
-            "type": "text",
-            "text": text,
-            "cache_control": {"type": "ephemeral"},
-        }
-    ]
+def build_recent_correction_history(
+    history: list[str],
+) -> list[str]:
+    results: list[str] = []
+    seen: set[str] = set()
+
+    for item in reversed(history):
+        normalized = normalize_history_correction_text(item)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        results.append(normalized)
+        if len(results) >= REPLY_HISTORY_WINDOW_TURNS:
+            break
+
+    return list(reversed(results))
 
 
-def build_recent_history_window(
-    history: list[dict[str, str]],
-) -> list[dict[str, str]]:
-    return history[-REPLY_HISTORY_WINDOW_MESSAGES:]
+def strip_think_tags(text: str) -> str:
+    return THINK_TAG_PATTERN.sub("", text).strip()
+
+
+def normalize_history_correction_text(text: str) -> str:
+    normalized = strip_think_tags(text)
+    if not normalized:
+        return ""
+
+    normalized = normalized.strip()
+    semantic_length = len(EDGE_PUNCTUATION_PATTERN.sub("", normalized))
+    if not normalized or semantic_length <= 2:
+        return ""
+    return normalized
+
+
+def sanitize_correction_reply(text: str) -> str:
+    normalized = strip_think_tags(text)
+    if not normalized:
+        return ""
+
+    lines = [line.strip() for line in normalized.splitlines() if line.strip()]
+    if not lines:
+        return ""
+
+    label_patterns = (
+        r"^(?:纠正后|修正后|更正后|最终答案|最终结果|最终字幕|字幕|输出|答案|参考原文|原文|改写后)\s*[：:]\s*",
+    )
+
+    cleaned_lines: list[str] = []
+    for line in lines:
+        cleaned_line = line
+        for pattern in label_patterns:
+            cleaned_line = re.sub(pattern, "", cleaned_line)
+        if cleaned_line:
+            cleaned_lines.append(cleaned_line)
+
+    if not cleaned_lines:
+        return ""
+
+    return " ".join(cleaned_lines).strip()
 
 
 def extract_text_from_completion(payload: dict[str, Any]) -> str | None:
@@ -248,7 +330,8 @@ def extract_text_from_completion(payload: dict[str, Any]) -> str | None:
 
     content = message.get("content")
     if isinstance(content, str) and content.strip():
-        return content.strip()
+        normalized = sanitize_correction_reply(content)
+        return normalized or None
 
     if isinstance(content, list):
         text_parts: list[str] = []
@@ -257,7 +340,7 @@ def extract_text_from_completion(payload: dict[str, Any]) -> str | None:
                 continue
             if item.get("type") == "text" and isinstance(item.get("text"), str):
                 text_parts.append(item["text"].strip())
-        combined = "".join(part for part in text_parts if part)
+        combined = sanitize_correction_reply("".join(part for part in text_parts if part))
         return combined or None
 
     return None
@@ -269,28 +352,31 @@ class DashScopeChatClient:
     base_url: str
     model: str
     timeout_seconds: float
+    temperature: float
+    max_tokens: int
 
     def complete(self, messages: list[dict[str, Any]]) -> "DashScopeCompletionResult":
         payload = json.dumps(
             {
                 "model": self.model,
                 "messages": messages,
-                "temperature": 0.2,
-                "max_tokens": 48,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
                 "parameters": {
                     "enable_thinking": False,
                 },
             },
             ensure_ascii=False,
         ).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
         req = request.Request(
             url=f"{self.base_url}/chat/completions",
             data=payload,
             method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
+            headers=headers,
         )
 
         try:
@@ -355,11 +441,18 @@ def _normalize_completion_result(
     raw_result: str | DashScopeCompletionResult,
 ) -> DashScopeCompletionResult:
     if isinstance(raw_result, DashScopeCompletionResult):
-        return raw_result
+        cleaned_text = sanitize_correction_reply(raw_result.text)
+        return DashScopeCompletionResult(
+            text=cleaned_text,
+            prompt_tokens=raw_result.prompt_tokens,
+            completion_tokens=raw_result.completion_tokens,
+            cached_tokens=raw_result.cached_tokens,
+            cache_creation_input_tokens=raw_result.cache_creation_input_tokens,
+        )
 
-    normalized = raw_result.strip()
+    normalized = sanitize_correction_reply(raw_result)
     if not normalized:
-        raise RuntimeError("DashScope returned an empty reply")
+        raise RuntimeError("LLM returned an empty reply")
     return DashScopeCompletionResult(text=normalized)
 
 
@@ -384,8 +477,8 @@ class CommunicationAssistantRuntime:
     config: LiveKitAgentConfig
     ctx: VoxFlameSessionContext
     userdata: VoxFlameSessionUserData
-    client: DashScopeChatClient | None = None
-    history: list[dict[str, str]] = field(default_factory=list)
+    client: DashScopeChatClient | Any | None = None
+    history: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.client is None and self.config.dashscope_api_key:
@@ -394,10 +487,20 @@ class CommunicationAssistantRuntime:
                 base_url=self.config.dashscope_base_url,
                 model=self.config.dashscope_llm_model,
                 timeout_seconds=self.config.dashscope_timeout_seconds,
+                temperature=self.config.dashscope_llm_temperature,
+                max_tokens=self.config.dashscope_llm_max_tokens,
             )
 
     def _build_system_prompt(self) -> str:
         return CAPTION_SYSTEM_PROMPT if self.userdata.caption_mode_enabled else SYSTEM_PROMPT
+
+    def _build_caption_fallback_reply(self, user_text: str) -> tuple[str, str] | None:
+        if not self.userdata.caption_mode_enabled:
+            return None
+        fallback = user_text.strip()
+        if not fallback:
+            return None
+        return fallback, CAPTION_ASR_FALLBACK_SOURCE
 
     async def generate_reply(self, user_text: str) -> tuple[str, str]:
         normalized = user_text.strip()
@@ -410,37 +513,38 @@ class CommunicationAssistantRuntime:
         self.userdata.note_user_transcript(normalized)
 
         if self.client is None:
+            caption_fallback = self._build_caption_fallback_reply(normalized)
+            if caption_fallback is not None:
+                logger.warning(
+                    "DashScope correction unavailable, using caption ASR fallback room=%s participant=%s reason=llm_unavailable chars=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    len(normalized),
+                )
+                return caption_fallback
             raise AssistantReplyGenerationError(
                 "纠错模型未配置，暂时无法整理这句话。",
                 code="llm_unavailable",
             )
 
-        history_window = (
-            []
-            if self.userdata.caption_mode_enabled
-            else build_recent_history_window(self.history)
-        )
+        recent_correction_history = build_recent_correction_history(self.history)
         stable_prompt = "\n\n".join(
             [
                 self._build_system_prompt(),
-                build_scene_prompt(
-                    self.ctx,
-                    caption_mode_enabled=self.userdata.caption_mode_enabled,
-                ),
                 build_preparation_prompt(self.userdata),
             ]
         )
         messages = [
             {
                 "role": "system",
-                "content": build_cacheable_content(stable_prompt),
+                "content": stable_prompt,
             },
-            *history_window,
             {
                 "role": "user",
                 "content": build_current_turn_prompt(
                     normalized,
                     self.userdata,
+                    recent_correction_history=recent_correction_history,
                     caption_mode_enabled=self.userdata.caption_mode_enabled,
                 ),
             },
@@ -453,6 +557,10 @@ class CommunicationAssistantRuntime:
                 raw_result = await asyncio.to_thread(self.client.complete, messages)
             else:
                 raw_result = self.client.complete(messages)
+            completion = _normalize_completion_result(raw_result)
+            reply = completion.text.strip()
+            if not reply:
+                raise RuntimeError("LLM returned an empty reply")
         except Exception as exc:
             elapsed_ms = round((time.perf_counter() - started_at) * 1000)
             classified_error = _classify_generation_failure(exc)
@@ -466,15 +574,19 @@ class CommunicationAssistantRuntime:
                 classified_error.code,
                 classified_error.detail,
             )
+            caption_fallback = self._build_caption_fallback_reply(normalized)
+            if caption_fallback is not None:
+                logger.info(
+                    "DashScope correction fallback to ASR room=%s participant=%s scene=%s latency_ms=%s code=%s chars=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    self.ctx.scene,
+                    elapsed_ms,
+                    classified_error.code,
+                    len(normalized),
+                )
+                return caption_fallback
             raise classified_error from exc
-
-        completion = _normalize_completion_result(raw_result)
-        reply = completion.text.strip()
-        if not reply:
-            raise AssistantReplyGenerationError(
-                "本句整理失败，请再说一次完整句子。",
-                code="empty_correction",
-            )
 
         elapsed_ms = round((time.perf_counter() - started_at) * 1000)
         logger.info(
@@ -492,15 +604,10 @@ class CommunicationAssistantRuntime:
             len(reply),
         )
         source = "dashscope_chat_completion"
-        self._remember_turn(normalized, reply)
+        self._remember_turn(reply)
         self.userdata.note_assistant_reply(reply)
         return reply, source
 
-    def _remember_turn(self, user_text: str, reply: str) -> None:
-        self.history.extend(
-            [
-                {"role": "user", "content": user_text},
-                {"role": "assistant", "content": reply},
-            ]
-        )
+    def _remember_turn(self, reply: str) -> None:
+        self.history.append(reply)
         self.history = self.history[-REPLY_HISTORY_STORAGE_LIMIT:]

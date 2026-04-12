@@ -218,3 +218,13 @@ def extract_caption_mode_update(message: dict[str, Any]) -> bool | None:
 
     enabled = message.get("enabled")
     return enabled if isinstance(enabled, bool) else None
+
+
+def extract_preparation_context_update(
+    message: dict[str, Any],
+) -> dict[str, Any] | None:
+    if message.get("type") != "preparation_context_update":
+        return None
+
+    preparation = message.get("preparation")
+    return preparation if isinstance(preparation, dict) else None

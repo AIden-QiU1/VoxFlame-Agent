@@ -1,7 +1,7 @@
 # Backend Dockerfile for VoxFlame
-# 使用 DaoCloud Node 镜像 + 国内镜像源加速
+# Multi-stage build so TypeScript can compile before pruning dev deps.
 
-FROM docker.m.daocloud.io/library/node:20-alpine
+FROM docker.m.daocloud.io/library/node:20-alpine AS base
 
 WORKDIR /app
 
@@ -11,17 +11,26 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 # 配置 npm 阿里云镜像源
 RUN npm config set registry https://registry.npmmirror.com
 
-# Copy package files
+FROM base AS deps
+
 COPY package*.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm ci --only=production
+FROM deps AS builder
 
-# Copy source code
 COPY . .
-
-# Build TypeScript
 RUN npm run build
+
+FROM base AS runner
+
+ENV NODE_ENV=production
+
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/scripts ./scripts
 
 # Create logs directory
 RUN mkdir -p /app/logs && chmod 777 /app/logs
