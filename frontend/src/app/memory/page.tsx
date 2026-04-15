@@ -81,6 +81,13 @@ function renderChips(
   )
 }
 
+const LOAD_BEHAVIOR_LABELS = {
+  manual: '手动加载',
+  recommended: '推荐加载',
+  always_on: '默认常驻',
+  derived: '系统生成',
+} as const
+
 export default function MemoryPage() {
   const { userId, isAuthenticated, isLoading } = useAuth({
     redirectToLogin: true,
@@ -431,6 +438,7 @@ export default function MemoryPage() {
       basedOnTrainingCount: snapshotSummary.based_on_training_count,
     }
   }, [preparedExpressionAsset, workspaceSnapshot?.prepared_expression])
+  const objectZones = workspaceSnapshot?.object_zones ?? []
 
   if (isLoading || !userId) {
     return (
@@ -461,6 +469,76 @@ export default function MemoryPage() {
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+        <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-sm font-medium text-sky-800">
+                <Sparkles className="h-4 w-4" />
+                workspace object zones
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold text-gray-900">记忆页先收成 4 个正式对象区</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
+                这里先把当前 `workspace snapshot` 收成统一对象视图：自定义材料、场景/热词模板、用户个人画像、训练总结。后面沟通页的 loadout 和 context assembly 会围着这 4 类对象继续收口。
+              </p>
+            </div>
+            <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
+              {objectZones.length > 0
+                ? `${objectZones.reduce((count, zone) => count + zone.items.length, 0)} 个对象已进入当前 workspace`
+                : '当前还没有可展示对象'}
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 xl:grid-cols-2">
+            {objectZones.map((zone) => (
+              <section
+                key={zone.id}
+                className="rounded-[24px] border border-stone-200 bg-stone-50 p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{zone.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-gray-600">{zone.description}</p>
+                  </div>
+                  <span className="rounded-full bg-white px-4 py-2 text-sm text-gray-700">
+                    {zone.items.length} 项
+                  </span>
+                </div>
+
+                {zone.items.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {zone.items.map((item) => (
+                      <article
+                        key={item.id}
+                        className="rounded-[20px] border border-stone-200 bg-white px-4 py-4"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-900">{item.title}</span>
+                          <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-gray-700">
+                            {LOAD_BEHAVIOR_LABELS[item.load_behavior]}
+                          </span>
+                          <span className={`rounded-full px-3 py-1 text-xs font-medium ${item.editable ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'}`}>
+                            {item.editable ? '可编辑' : '系统对象'}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-gray-700">{item.summary}</p>
+                        {item.tags.length > 0 ? (
+                          <div className="mt-3">
+                            {renderChips(item.tags)}
+                          </div>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-[20px] border border-dashed border-stone-300 bg-white px-4 py-6 text-sm leading-6 text-gray-600">
+                    {zone.empty_state}
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
+        </section>
+
         <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

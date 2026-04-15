@@ -30,7 +30,7 @@
 当前关于 LiveKit 的现役判断与下一步，以这些文档为准：
 
 - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
-- [VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
+- [.tasks/current.md](/home/ubuntu/VoxFlame-Agent/.tasks/current.md)
 - [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
 
 ## 2. 五层架构怎么落到当前代码

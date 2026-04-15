@@ -14,9 +14,7 @@
    当前页面系统、共享 `workspace` contract、训练资产链路与 PWA 边界。
 5. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
    当前数据录入、上传、manifest 和 recorder queue 的权威 contract。
-6. [长时表达模式执行计划（2026-04-05）](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
-   面向“5 天内验证高压、长时、结构化表达能力”的专项执行文档，明确 rehearsal / live / review 闭环、当前 LiveKit/agent 现状，以及接入 LiveKit 官方 best practices 的实施顺序。
-7. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+6. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
    把 LiveKit 官方的 session/state/data 原语翻成 VoxFlame 可执行的 memory 分层判断，明确 `LiveKit != durable memory owner`，以及 `Qdrant / Redis` 应分别放在哪一层。
 
 ## 综合参考
@@ -27,9 +25,7 @@
    吸收 `TEN ceiling / 五层映射 / Agora 替换 / light voice surface` 后的统一 runtime 与 surface 参考。
 2. [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
    吸收 `memory mechanisms / voice-agent-tooling` 后的统一 agent、memory、tooling 参考。
-3. [长时表达模式执行计划（2026-04-05）](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
-   说明为什么当前主线应转成“长时重要表达专项体验”，以及 5 天内最该做和不该做的事。
-4. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+3. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
    说明 LiveKit 的 `userdata / chat_ctx / participant attributes / session report` 各自适合承接什么，以及它和 `workspace snapshot / Qdrant / Redis` 的正确分工。
 
 ## 分类导航
@@ -51,7 +47,6 @@
 |------|------|--------|
 | [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前产品设计与架构蓝图主文档 | ⭐⭐⭐ |
 | [Runtime And Surface Reference（2026-03-26）](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) | runtime、surface 与历史架构演进的综合参考；不再代表当前执行面唯一真相 | ⭐⭐ |
-| [长时表达模式执行计划（2026-04-05）](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md) | 围绕 `speech.md` 和外部参考，把 rehearsal / live / review 收成 5 天可执行专项计划 | ⭐⭐⭐ |
 | [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md) | 把 LiveKit 官方 session/state/data 原语翻成 VoxFlame 的 memory 分层、context assembly 和 recall 判断 | ⭐⭐⭐ |
 | [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) | agent、memory、tooling 与 dataset/memory 边界的综合参考 | ⭐⭐⭐ |
 | [control-plane.md](control-plane.md) | backend 控制面实现、schema 与诊断深文档 | ⭐⭐ |
@@ -68,8 +63,7 @@
 
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
-| [统一记忆系统报告（2026-03-05）](VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md) | 记忆系统统一方案 | ⭐⭐⭐ |
-| [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) | 本地事实源、typed profile bundle、context service 的长期参考 | ⭐⭐⭐ |
+| [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) | 统一后的 memory 主文档：本地事实源、typed profile bundle、context service、context-engine 分层与上线前稳态要求 | ⭐⭐⭐ |
 | [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md) | 当前 LiveKit memory/session 官方 best practices 与 VoxFlame 的具体映射 | ⭐⭐⭐ |
 
 ### 前端与体验面
@@ -97,7 +91,7 @@
 **继续开发应该先看什么**
 1. [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md)
 2. [当前任务状态](../.tasks/current.md)
-3. [长时表达模式执行计划（2026-04-05）](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md)
+3. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
 4. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
 5. [主项目 README](../README.md)
 
@@ -108,8 +102,7 @@
 
 **要判断 agent / memory / tooling 边界**
 1. [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
-2. [统一记忆系统报告（2026-03-05）](VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md)
-3. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+2. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
 
 **要继续做录音、上传和训练资产**
 1. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)

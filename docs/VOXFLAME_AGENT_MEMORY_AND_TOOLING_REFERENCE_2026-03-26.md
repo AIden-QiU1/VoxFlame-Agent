@@ -1,238 +1,211 @@
-# VoxFlame Agent, Memory And Tooling Reference（2026-03-26）
+# VoxFlame Agent / Memory / Tooling Reference（精简版，2026-04-14）
 
-> 这份文档吸收并取代了以下几类仓库研究文档的核心结论：
-> - `VOXFLAME_MEMORY_MECHANISMS_RESEARCH_2026-03-24.md`
-> - `voice-agent-tooling-architecture.md`
->
-> 目标不是保留研究过程，而是把对 `openclaw / supermemory / memU / deerflow` 的判断翻成对 `VoxFlame` 真正可执行的 agent、memory、tooling 边界。
+> 这份文档只回答 4 个问题：
+> 1. memory 和 dataset 到底怎么分
+> 2. durable owner 是谁
+> 3. runtime 现在到底做到哪一步
+> 4. 上线前还必须补哪些 contract
 
-## 1. 结论先行
+---
 
-对 `VoxFlame` 来说，长期最重要的 6 个判断是：
+## 1. 先说结论
 
-1. 实时能力优先做成 typed runtime capabilities，而不是 prompt 技巧。
-2. `tool`、`skill`、`workflow`、`MCP` 必须分层，不要混写。
-3. 记忆不是一个“向量库桶”，而是 `本地事实源 + typed profile bundle + 可调用 context service` 的组合。
-4. `dataset` 和 `memory` 必须持续分层：录音资产进 dataset，摘要与画像进 memory。
-5. backend 应成为 durable profile / session review / expression kit 的 owner。
-6. TEN runtime 只保留低延迟 working memory，不继续长成长期画像治理层。
+截至 2026-04-14，VoxFlame 的正确边界是：
 
-## 2. Tool / Skill / Workflow / MCP 的边界
+1. `backend workspace` 是 durable memory owner。
+2. `livekit_agent` 只应该拥有 session-local working memory。
+3. `dataset` 是录音资产、review、export 的体系，不是长期记忆。
+4. `tooling` 现在不该扩成通用 agent 平台，只该服务实时沟通、训练录音和会后沉淀。
 
-### 2.1 Tool
+---
 
-在 `VoxFlame` 里，tool 更适合指：
+## 2. 当前代码里的真实状态
 
-- expression kit 取用
-- starter context 组装
-- upload asset persistence
-- training feedback emit
-- session review read/write
-- future device actions
+### 2.1 已经成立的部分
 
-原则：
+当前代码已经具备：
 
-- typed
-- side effect 可审计
-- 明确输入输出 schema
-- 不把工具能力藏在 prompt 或页面胶水里
+1. backend `workspace snapshot`
+   - 位置：`backend/src/services/supabase.service.ts`
+   - 已经能聚合：
+     - `profile_bundle`
+     - `session_review`
+     - `preparation`
+     - `prepared_expression`
+     - `expression_kit`
+2. frontend 已经开始只消费 `workspace snapshot`
+   - 沟通页、训练页、记忆页都已接这一层
+3. `prepared_expression` 已经能成为准备稿 owner
+   - 可读
+   - 可写
+   - 可 summarize
+4. dataset 录音链已经成立
+   - `recording envelope`
+   - `recorder queue`
+   - `upload receipt`
+   - `manifest.jsonl`
+   - `review metadata`
 
-### 2.2 Skill
+### 2.2 还只是“过渡态”的部分
 
-skill 更适合承载：
+当前 `livekit_agent` 只有最小 session-local state：
 
-- 什么时候用哪类表达
-- 什么时候该先补救、再继续说
-- 训练页的提示逻辑
-- 外环工程/研究 workflow
+1. `PreparationContextPack`
+2. `last_user_transcript`
+3. `last_assistant_reply`
+4. `interruption_count`
+5. `barge_in_count`
+6. `caption_mode_enabled`
 
-原则：
+也就是说：
 
-- skill 主要负责方法，不负责低延迟 runtime 执行
+1. 已经不是“完全没有记忆”
+2. 但也远没到“完整 typed session memory”
 
-### 2.3 Workflow
+另外一个关键事实：
 
-workflow 更适合：
+1. `session_compaction` 目前是由前端 `memoryService.endSession()` 生成的过渡方案
+2. `livekit_agent` 本身还没有真正完成 server-side `flush -> compact -> durable write`
 
-- 长任务研究
-- 复杂报告生成
-- 数据治理和异步整理
-- 后续训练资产抽样、评测、导出
+所以文档里不能再把这件事写成“已经彻底落地”。
 
-原则：
+---
 
-- workflow 不要侵入主实时回合
+## 3. durable memory 与 dataset 的明确边界
 
-### 2.4 MCP
+### 3.1 应该进入 dataset 的
 
-MCP 更适合：
+1. 音频文件
+2. `recording_id / session_id`
+3. `target_text / recognized_text`
+4. sample quality
+5. review queue
+6. export decision
+7. manifest / upload receipt
 
-- 跨系统接入
-- 外部知识、issue、design、docs 等开发协作能力
-- future companion / external tools / therapist console 对接
+### 3.2 应该进入 durable memory 的
 
-原则：
+1. 用户长期准备稿
+2. 高价值 hotword / phrase
+3. 会后压缩出的稳定表达规律
+4. session review
+5. 对下一次沟通真的有帮助的 profile summary
 
-- MCP 是外部接入层，不是实时主循环的默认内核
+### 3.3 不该直接进入 durable memory 的
 
-## 3. Memory 的正确结构
+1. 原始 transcript 流水
+2. 每一条训练录音原样
+3. 暂时不可信的 heuristic
+4. review 还没通过的 dataset 判断
 
-### 3.1 L1 本地事实源
+一句话：
 
-适合保存：
+`dataset != memory` 必须继续作为硬边界。
 
-- 本地 recorder queue
-- 本地草稿
-- 本地最近沟通痕迹
-- future companion 的本地 durable state
+---
 
-价值：
+## 4. owner 划分
 
-- 可审计
-- 可导出
-- 可离线
-- 可人工修改
+### 4.1 Frontend
 
-### 3.2 L2 Typed Profile Bundle
+frontend 负责：
 
-适合保存：
+1. 采集
+2. 展示
+3. 本地 queue 兜底
+4. 调用 backend 和 runtime
 
-- hotword profiles
-- confusion patterns
-- recent wins
-- communication preferences
-- training focus
-- session review summary
-- expression kit merge inputs
+frontend 不应该再承担：
 
-当前最适合的 owner 是 backend。
+1. 长期画像 owner
+2. durable memory 决策
+3. 页面级拼装长期上下文
 
-### 3.3 L3 Context Service
+### 4.2 Backend
 
-适合做：
+backend 负责：
 
-- 每次会话前按 scene 拉取 profile bundle
-- 每次训练前补当前 focus / recent review
-- future cross-device profile injection
+1. `workspace` durable owner
+2. `prepared_expression` owner
+3. `session_review` / `profile_bundle` 聚合
+4. dataset artifact / review / export contract
 
-原则：
+### 4.3 livekit_agent
 
-- context service 不是事实源本身
-- 它是把 durable profile 组装成可供 runtime 使用的 bundle
+`livekit_agent` 负责：
 
-## 4. `dataset != memory`
+1. realtime ASR / correction / TTS
+2. 当前会话 working memory
+3. runtime context consume
+4. 会后 flush / compact / write 的执行入口
 
-这条规则对 `VoxFlame` 尤其重要。
+但当前第 4 点还没有完全做完。
 
-应该进入 dataset 的：
+---
 
-- 原始录音
-- `recording_id / session_id / audio_path`
-- raw/final transcript
-- manifest
-- 评测和质检 artifact
+## 5. 上线前必须补齐的 memory contract
 
-应该进入 memory 的：
+正式上线前，至少要把下面 3 层补齐。
 
-- 高频表达
-- 热词与混淆模式
-- session review
-- 周期趋势
-- 当前最值得记住的训练重点
+### 5.1 typed session memory
 
-不该直接进入长期 memory 的：
+至少明确：
 
-- 单句原始 transcript
-- 原始音频路径
-- 每句完整训练反馈文本
+1. 当前轮事实
+2. 最近几轮承接
+3. 当前 preparation snapshot
+4. interruption / audio telemetry
+5. 哪些字段只活在 session
 
-## 5. 当前代码里的 owner 建议
+### 5.2 context assembly
 
-### Frontend
+至少明确三个阶段：
 
-负责：
+1. `assemble_context`
+   - 从 `workspace snapshot` 取最小必要上下文
+2. `after_turn`
+   - 更新本轮 working memory
+3. `compact`
+   - 会后提炼可写回 durable memory 的最小结果
 
-- local cache
-- recorder queue
-- optimistic UI
-- current session reducer
+### 5.3 session-close durable write
 
-不负责：
+正式链路应固定为：
 
-- durable profile merge
-- 长期画像真相层
-- runtime capability 的最终定义
+`flush -> compact -> durable write`
 
-### Backend
+在这条链真正进 agent server-side 之前，不能再把 compaction 写成“已完全稳定”。
 
-负责：
+---
 
-- `workspace`
-- `profile bundle`
-- `session review`
-- `expression kit`
-- upload receipt / manifest persistence
+## 6. 上线前必须补齐的 dataset contract
 
-### TEN Runtime
+dataset 侧至少要稳定到：
 
-负责：
+1. review queue 不是只存在于 metadata
+2. accepted / rejected / retry 的规则固定
+3. export 前字段边界固定
+4. 有最小运营指标：
+   - 覆盖率
+   - 复核命中率
+   - 退回复录率
+   - 样本从录入到可用的时延
 
-- 低延迟 working state
-- realtime turn handling
-- training feedback emit
-- correction / ASR / TTS loop
+---
 
-不负责：
+## 7. 当前不做的事
 
-- durable profile governance
-- 产品级表达策略治理
-- 页面级文案与交互判断
+在这轮上线前，不做：
 
-## 6. 对 PRD 和真正有用的产品真正有帮助的地方
+1. 通用向量记忆平台
+2. 复杂多 agent
+3. 通用 workflow 平台化
+4. 为了“更先进”而再开一套 memory backend
 
-PRD 和后续开发真正该引用这份文档的地方是：
+---
 
-1. 为什么 personalized phrase rail 要来自 typed `expression kit`，而不是页面自己拼
-2. 为什么训练页、沟通页、沟通档案要共享同一份 `workspace`
-3. 为什么 dataset / memory 必须分开
-4. 为什么 backend 应拥有 durable `profile bundle / session review`
-5. 为什么 future mobile / desktop companion 也应该沿同一套 memory/tooling 边界扩展
-6. 为什么“产品真的有用”不只靠 runtime 通了，还要靠：
-   - 当前该说什么
-   - 最近哪类场景更常用
-   - 哪些表达适合先给用户
-   - 哪些训练结果值得沉淀成下一次准备
+## 8. 当前最重要的决定
 
-## 7. memory / agent 框架现在要推进到什么程度
+当前最重要的决定只有一句：
 
-对当前 `VoxFlame` 来说，memory / agent 框架不需要先做成“万能智能体平台”，但至少要做到下面 4 层：
-
-1. durable workspace
-   - `profile bundle`
-   - `session review`
-   - `expression kit`
-   - `communication preferences`
-2. write boundary
-   - 哪些训练结果自动进画像
-   - 哪些只保留为 dataset artifact
-   - 哪些需要阈值、抽样或人工确认
-3. runtime context service
-   - 每次沟通前按 scene 取 bundle
-   - 每次训练前按 focus 取 bundle
-4. tool / workflow boundary
-   - runtime tool 负责低延迟执行
-   - workflow 负责复核、导出、异步整理
-
-做到这一步，memory / agent 才足以支撑“真正有用的产品”；再往上做更复杂的自治 agent、多层 planner 或通用知识系统，都不该抢当前主线。
-
-## 8. 当前最该继续做的下一步
-
-1. 继续把 `workspace` 真正变成 backend owner 的 durable contract
-2. 补清 `expression kit / session review / profile bundle` 的写入边界
-3. 继续让前端只消费 `workspace` 和 upload receipt，而不是再长临时画像逻辑
-4. 继续限制 TEN 主控的职责增长
-5. 让 dataset -> profile summary 的沉淀路径更显式，而不是靠页面级胶水逻辑
-
-一句话总结：
-
-`VoxFlame` 的长期能力不该长成“一个万能 agent”，而应该长成“typed runtime capabilities + durable profile bundle + clear workflow boundary”的系统；而这套系统必须先服务一个真正有用的多端产品。`
+VoxFlame 先做成“实时沟通工作台 + 训练录音入口 + 可持续沉淀的 workspace owner”，而不是先做成“万能 agent 平台”。

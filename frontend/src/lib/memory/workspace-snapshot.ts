@@ -91,6 +91,22 @@ export interface PreparedExpressionSnapshot {
 }
 
 export interface WorkspaceMemorySnapshot {
+  object_zones: Array<{
+    id: 'custom_materials' | 'scene_and_hotword_templates' | 'user_profile' | 'training_summaries'
+    title: string
+    description: string
+    empty_state: string
+    items: Array<{
+      id: string
+      type: 'custom_material' | 'scene_template' | 'user_profile' | 'training_summary'
+      title: string
+      summary: string
+      tags: string[]
+      load_behavior: 'manual' | 'recommended' | 'always_on' | 'derived'
+      editable: boolean
+      updated_at: string
+    }>
+  }>
   profile_bundle: {
     static: ProfileBundleItem[]
     dynamic: ProfileBundleItem[]
@@ -130,6 +146,15 @@ export interface WorkspaceMemorySnapshot {
   expression_kit: {
     active_scene_id: StarterKitScene['id'] | null
     personalized_phrases: ExpressionKitSuggestion[]
+    hotword_profiles: Array<{
+      id: string
+      phrase: string
+      category: string
+      scenario: string
+      note?: string
+      createdAt: number
+      updatedAt: number
+    }>
     quick_phrases: Array<{
       id: string
       text: string

@@ -63,6 +63,8 @@
    web、PWA、未来 desktop / mobile recorder 都写向同一套 schema。
 5. `local-first, sync-later`
    先确保录音不丢，再做对象存储上传和云端索引。
+6. `auto-verify before manual annotation`
+   句子录入后默认自动校验“这段录音是否真的对应这句目标句/目标翻译”；P0 不先做独立 annotation UI，只有高风险样本才进入复核流。
 
 ## 现状映射
 
@@ -107,6 +109,9 @@
 - `transcripts.txt` 现在只保留兼容导出角色，后续评测、质检、画像应继续以 `manifest.jsonl` 为准
 - recorder queue 已进入 IndexedDB，但仍要继续补 `最后尝试时间 / 重试次数 / 失败原因 / companion 共享边界`
 - 监督训练样本的 contract 还需要继续强调：云端 canonical label 是目标句，`recognized_text` 只作为前端反馈和样本诊断字段，不应与监督标签混用
+- 句子录入后的“一句一音对应性”还缺自动判定主链：
+  - 默认应在上传完成后自动判断录音是否确实对应当前目标句/目标翻译
+  - 只有低置信、不覆盖、明显跑题或疑似串句样本才进入 review queue / retry
 
 ## 当前去重规则
 
@@ -371,6 +376,12 @@ recording envelope
 - `recognized_text` 仅用于反馈显示、样本诊断和后续复核
 - `upload_receipt + manifest.jsonl` 才是“已进入训练资产链”的正式标志
 
+当前还要继续固定一条新 contract：
+
+- 句子一旦进入录入流程，系统默认自动执行 `target_text(or target_translation) <-> recorded audio` 的对应性校验
+- P0 不要求用户再手动做一遍 annotation
+- 人工复核只处理自动校验命中风险的样本，而不是处理全部样本
+
 ### Stage 5: Dataset Review Signals
 
 这层已经不是计划，而是现役 metadata contract 的一部分：
@@ -388,6 +399,13 @@ recording envelope
 - `review_summary`
 
 当前差的不是字段定义，而是把它们继续推进成真正的 worker / export / 人工复核流程。
+
+在当前主线里，这层还需要补一个更直接的产品判断：
+
+- 默认路径应该是 `句子录入 -> 录音 -> ASR/final transcript -> 自动对应性校验 -> auto_verified | sampled_for_review | retry_recommended`
+- 自动校验的目标不是“再生成一份标签”，而是确认保留下来的音频确实对应当前目标句
+- `recognized_text`、覆盖率、时长异常、静音比例、串句迹象应优先作为自动分流信号
+- 只有自动校验认为不稳的样本，才值得进入人工 review queue
 
 ### Stage 6: Memory-Safe Aggregation
 
@@ -522,6 +540,7 @@ recording envelope
 ### Phase B：把 dataset 治理层补齐
 
 1. 把 review queue 推进成真正的 worker contract
+   - 默认只消费自动校验命中风险的样本，不接管全部句子录入
 2. 让对象存储目录、manifest 和 export 清单保持同一套字段语言
 3. 用一条真实 accepted sample 完成 export manifest 闭环
 
@@ -535,4 +554,4 @@ recording envelope
 
 `VoxFlame` 的 dataset 链路已经不再停留在“能录、能传、能存一条数据库记录”的阶段，而是已经具备了支撑多端产品复用的第一版骨架。
 
-现在真正要推进的，不是继续发散更多训练句子，而是把 `recording envelope + upload receipt + manifest + review signals` 做成跨 surface 可复用的长期 contract；等这条链收尾验证完成后，dataset 就应该退到次主线，主线转向 runtime / surface / workspace owner。
+现在真正要推进的，不是继续发散更多训练句子，而是把 `recording envelope + upload receipt + manifest + 自动对应性校验 + review signals` 做成跨 surface 可复用的长期 contract；等这条链收尾验证完成后，dataset 就应该退到次主线，主线转向 runtime / surface / workspace owner。

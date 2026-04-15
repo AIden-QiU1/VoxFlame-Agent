@@ -115,6 +115,22 @@ export interface ExpressionKitSuggestion {
 }
 
 export interface WorkspaceMemorySnapshot {
+  object_zones: Array<{
+    id: 'custom_materials' | 'scene_and_hotword_templates' | 'user_profile' | 'training_summaries';
+    title: string;
+    description: string;
+    empty_state: string;
+    items: Array<{
+      id: string;
+      type: 'custom_material' | 'scene_template' | 'user_profile' | 'training_summary';
+      title: string;
+      summary: string;
+      tags: string[];
+      load_behavior: 'manual' | 'recommended' | 'always_on' | 'derived';
+      editable: boolean;
+      updated_at: string;
+    }>;
+  }>;
   profile_bundle: ProfileBundleSnapshot;
   session_review: SessionReviewSnapshot;
   preparation: {
@@ -893,6 +909,13 @@ export class SupabaseService {
     const preparedExpression = this.buildPreparedExpressionSnapshot(profileSnapshot, userProfile, syncedAt);
 
     return {
+      object_zones: this.buildObjectZones(
+        profileSnapshot,
+        userProfile,
+        preparedExpression,
+        syncedAt,
+        options.sceneId,
+      ),
       profile_bundle: this.buildProfileBundle(profileSnapshot, userProfile),
       session_review: this.buildSessionReview(profileSnapshot, syncedAt),
       preparation: this.buildPreparationSnapshot(
@@ -911,6 +934,194 @@ export class SupabaseService {
       ),
       synced_at: syncedAt,
     };
+  }
+
+  private buildObjectZones(
+    snapshot: MemoryProfileSnapshot,
+    userProfile: UserProfile | null,
+    preparedExpression: WorkspaceMemorySnapshot['prepared_expression'],
+    syncedAt: string,
+    sceneId?: WorkspaceSceneId,
+  ): WorkspaceMemorySnapshot['object_zones'] {
+    const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
+    const communicationPreferences = normalizeCommunicationPreferences(
+      preferences?.communication_preferences,
+    );
+    const growthProfile = snapshot.growth_profile;
+
+    const customMaterialsItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
+    if (preparedExpression) {
+      customMaterialsItems.push({
+        id: preparedExpression.id,
+        type: 'custom_material',
+        title: preparedExpression.title,
+        summary: preparedExpression.summary,
+        tags: dedupeStrings(
+          [
+            preparedExpression.scene,
+            preparedExpression.next_focus[0],
+            preparedExpression.high_risk_phrases[0],
+          ].filter((value): value is string => typeof value === 'string' && value.length > 0),
+          4,
+        ),
+        load_behavior: 'manual',
+        editable: true,
+        updated_at: preparedExpression.updated_at,
+      });
+    }
+
+    const sceneTemplateItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
+    const sceneLabel = sceneId ?? preparedExpression?.scene ?? snapshot.hotword_profiles[0]?.scenario ?? null;
+    if (sceneLabel) {
+      sceneTemplateItems.push({
+        id: `scene-template-${sceneLabel}`,
+        type: 'scene_template',
+        title: `场景模板：${sceneLabel}`,
+        summary:
+          preparedExpression?.summary ||
+          growthProfile.nextStep ||
+          '系统会根据这个场景优先推荐常用模板、热词和沟通焦点。',
+        tags: dedupeStrings(
+          [
+            sceneLabel,
+            ...snapshot.hotword_profiles
+              .filter((profile) => profile.scenario === sceneLabel)
+              .slice(0, 3)
+              .map((profile) => profile.phrase),
+          ],
+          4,
+        ),
+        load_behavior: 'recommended',
+        editable: false,
+        updated_at: syncedAt,
+      });
+    }
+
+    snapshot.hotword_profiles.slice(0, 4).forEach((profile) => {
+      sceneTemplateItems.push({
+        id: `hotword-template-${profile.id}`,
+        type: 'scene_template',
+        title: profile.phrase,
+        summary: profile.note || profile.scenario || '用户当前重点保真的词。',
+        tags: dedupeStrings([profile.category, profile.scenario], 3),
+        load_behavior: 'recommended',
+        editable: true,
+        updated_at: new Date(profile.updatedAt).toISOString(),
+      });
+    });
+
+    const userProfileItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
+    if (growthProfile.nextStep || growthProfile.frequentFocus[0]?.label) {
+      userProfileItems.push({
+        id: 'profile-speaking-pattern',
+        type: 'user_profile',
+        title: '用户个人画像',
+        summary:
+          growthProfile.nextStep ||
+          `当前最值得继续盯住的是：${growthProfile.frequentFocus[0]?.label ?? '稳定表达'}`,
+        tags: dedupeStrings(
+          [
+            growthProfile.frequentFocus[0]?.label,
+            growthProfile.frequentSpeechPatterns[0]?.label,
+            growthProfile.frequentConfusions[0]?.label,
+          ].filter((value): value is string => typeof value === 'string' && value.length > 0),
+          4,
+        ),
+        load_behavior: 'always_on',
+        editable: false,
+        updated_at: syncedAt,
+      });
+    }
+    if (
+      communicationPreferences.opening_phrase ||
+      communicationPreferences.pace_hint ||
+      communicationPreferences.repair_phrase
+    ) {
+      userProfileItems.push({
+        id: 'profile-communication-preferences',
+        type: 'user_profile',
+        title: '沟通偏好',
+        summary:
+          communicationPreferences.opening_phrase ||
+          communicationPreferences.pace_hint ||
+          communicationPreferences.repair_phrase ||
+          '当前还没有固定沟通偏好。',
+        tags: dedupeStrings(
+          [
+            communicationPreferences.opening_phrase,
+            communicationPreferences.pace_hint,
+            communicationPreferences.repair_phrase,
+          ].filter((value): value is string => typeof value === 'string' && value.length > 0),
+          3,
+        ),
+        load_behavior: 'always_on',
+        editable: true,
+        updated_at: syncedAt,
+      });
+    }
+
+    const trainingSummaryItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
+    if (preparedExpression?.rehearsal_summary) {
+      trainingSummaryItems.push({
+        id: `training-summary-${preparedExpression.id}`,
+        type: 'training_summary',
+        title: '当前训练总结',
+        summary: preparedExpression.rehearsal_summary.summary,
+        tags: dedupeStrings(
+          [
+            ...preparedExpression.rehearsal_summary.next_focus.slice(0, 2),
+            ...preparedExpression.rehearsal_summary.recurring_errors.slice(0, 2),
+          ],
+          4,
+        ),
+        load_behavior: 'derived',
+        editable: false,
+        updated_at: preparedExpression.rehearsal_summary.updated_at,
+      });
+    }
+    trainingSummaryItems.push({
+      id: `session-review-${snapshot.synced_at}`,
+      type: 'training_summary',
+      title: '最近一次会话复盘',
+      summary:
+        this.buildSessionReview(snapshot, syncedAt).summary ||
+        '最近一次会话复盘会在这里继续沉淀。',
+      tags: this.buildSessionReview(snapshot, syncedAt).focus.slice(0, 4),
+      load_behavior: 'derived',
+      editable: false,
+      updated_at: syncedAt,
+    });
+
+    return [
+      {
+        id: 'custom_materials',
+        title: '自定义材料区',
+        description: '用户自己维护的稿件、提纲和本次表达材料。',
+        empty_state: '这里还没有自定义材料，先保存第一份准备稿。',
+        items: customMaterialsItems,
+      },
+      {
+        id: 'scene_and_hotword_templates',
+        title: '场景 / 热词模板',
+        description: '按场景和重点词组织的推荐模板，会优先进入后续上下文装配。',
+        empty_state: '这里还没有可用模板，先补 3 到 5 个关键热词。',
+        items: sceneTemplateItems,
+      },
+      {
+        id: 'user_profile',
+        title: '用户个人画像',
+        description: '常驻上下文的小而稳的用户画像与沟通偏好。',
+        empty_state: '这里还没有稳定画像，继续训练后会逐步形成。',
+        items: userProfileItems,
+      },
+      {
+        id: 'training_summaries',
+        title: '训练总结',
+        description: '系统按训练结果和会话复盘生成的精简总结。',
+        empty_state: '这里还没有训练总结，先录满一个周期再回来查看。',
+        items: trainingSummaryItems,
+      },
+    ];
   }
 
   private collectHotwords(memories: Memory[], sessions: Session[]): string[] {

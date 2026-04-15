@@ -1,17 +1,49 @@
 # 当前任务状态
 
-> 最后更新: 2026-04-11
+> 最后更新: 2026-04-12
 
 ## 当前主线
 
-- 主任务：把当前产品主线收成 `长时重要表达准备 -> 现场沟通辅助 -> 复盘记忆沉淀` 的 5 天闭环。
+- 主任务：把当前产品主线收成 `沟通成功率 -> typed memory -> 句子级准备资产 -> 数据录入/标注 -> 会后压缩写回` 的稳态闭环，不再新增大功能。
 - 当前执行面：`frontend -> backend -> self-hosted livekit-server -> livekit_agent`。
-- 当前最重要的体验问题：
-  - 沟通页链路偏慢，主要慢在 `ASR final -> DashScope correction/reply -> TTS`
-  - 当前沟通页应只显示最终可直接说出去的结果，不再展示“表达对照”
-  - 登录态仍有过期 token 噪音，需要继续收口
+- 当前最重要的产品/工程重点：
+  - 把 `session-local typed memory -> session-close compaction -> workspace snapshot` 的 owner 与写回边界做扎实
+  - 把 `prepared-expression / important-expression / 高频句` 的录入和复用入口统一起来
+  - 把 dataset review queue、annotation 流程和质量指标收成明确 contract，而不是只看“收了多少条”
 
 ## 最新收口
+
+0. 2026-04-14 已开始按 PRD 落第一刀代码：`workspace document model + memory page object zones`
+   - backend `workspace snapshot` 已新增 `object_zones`
+   - 当前先把现有数据正式收成 4 个对象区：
+     - `自定义材料区`
+     - `场景 / 热词模板`
+     - `用户个人画像`
+     - `训练总结`
+   - 记忆页顶部已改成对象区视图，但底下仍继续复用现有准备稿 / 热词 / 训练总结编辑与展示能力
+   - 这一刀的目标不是一次性做完新对象存储，而是先把后续 `loadout / context assembly / compaction` 需要依赖的前端与 snapshot 骨架立起来
+   - 已验证：
+     - `cd frontend && npm run build`
+     - `cd backend && npm run build`
+
+0. 2026-04-14 已把主文档口径重新压缩并对齐代码现状
+   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 已改成短版现状 PRD
+   - [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) 已改成短版边界文档
+   - 最新统一判断：
+     - 网站主骨架已成立，可以做真实试用
+     - 正式上线前最关键的 3 个 blocker 仍是：
+       - `livekit_agent` 侧 typed session memory / context assembly
+       - server-side `flush -> compact -> durable write`
+       - dataset review / annotation / export 的真实闭环
+
+0. `speech mode` 的 5 天专项执行计划已经完成阶段使命
+   - 独立执行文档已从 `docs/` 删除
+   - 仍然有效的判断已经并回：
+     - `PRD`
+     - `.tasks/current.md`
+     - `dataset schema`
+     - `LiveKit memory best practices`
+   - 后续不再单独维护 `speech mode execution plan` 入口
 
 0. 训练页“通用句库没结果”这轮已经查清并修掉
    - 根因不在后端，也不是通用句库数据为空
@@ -430,22 +462,26 @@
 
 ## 下一步
 
-1. 做 10 分钟级别的真实长时字幕 smoke
-   - 重点看 room / RTM / ASR websocket / worker 是否稳定
-   - 重点看字幕模式下 queue size 是否持续堆积
+1. 先把 `livekit_agent` 的 typed session memory 和 context assembly 制度化
+   - 明确 `session.userdata / PreparationContextPack / room runtime state` 的 owner 边界
+   - 明确哪些字段只活在 session，哪些字段允许进入 durable memory
 
-2. 继续做真实 prepared-expression -> rehearsal -> correction context smoke
-   - 重点确认训练满 `50` 句后的 auto summary 是否稳定回流到 workspace snapshot
-   - 重点确认记忆页热词 + 训练总结是否真实影响现场 correction
+2. 把会后 compaction 稳定写回 `workspace snapshot`
+   - 优先提炼高频误听 / 热词 / listener guidance / 当前最稳表达
+   - 避免把 transcript 流水原样灌进长期记忆
 
-3. 继续压缩字幕主链的 finalize / correction 节奏
-   - 优先查清 DashScope correction timeout 是否仍会造成 backlog
-   - 继续调 turn detection / endpointing，减少过早 finalize 与闪烁
+3. 把句子级准备资产的录入入口统一起来
+   - 收口 `prepared-expression / important-expression / 高频句 / personalized phrase`
+   - 让沟通页、训练页、记忆页消费同一份句子级 owner，而不是各自维护
 
-4. 基于当前 HTTPS 预览入口继续做真实公网字幕 smoke
-   - 重点验证浏览器麦克风权限
-   - 重点验证腾讯云安全组放通 `3478/udp + 7882/udp + 7881/tcp` 后的外网 RTC 连接和长时间保持
-   - 重点验证这轮 `session_init_ack gate + auto retry once` 在真实公网登录账号下是否稳定挡住“无 worker 假连接”
+4. 把数据录入和标注流程收成可执行 contract
+   - review queue、失败重试、人工修订、canonical label 边界要继续写清
+   - 句子录入后默认自动跑“一句一音是否对应目标句”的校验，不先造独立 annotation UI
+   - 先补“哪些样本必须进复核队列、哪些标签允许覆盖、哪些字段只做诊断不做监督”的规则
 
-5. 继续把会后 compaction 收回 workspace snapshot
-   - 让高频误听 / 热词 / 规律继续回流到现场纠错上下文
+5. 为标注补一轮硬指标调查
+   - 至少明确样本覆盖率、复核命中率、标注一致性、退回复录率、从录入到可用的时延
+   - 当前默认先不做独立 annotation UI；只有自动校验命中风险的样本才进入轻量复核流
+
+6. 在以上边界收稳后，再回到 10 分钟级别和公网条件下的真实沟通 smoke
+   - 验证这些沉淀是否真实改善现场 correction，而不是只让后台数据更复杂

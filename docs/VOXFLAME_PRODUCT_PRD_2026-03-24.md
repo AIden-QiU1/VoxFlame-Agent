@@ -1,1134 +1,667 @@
-# VoxFlame Product PRD（2026-03-24）
+# VoxFlame Product PRD（精简版，2026-04-14）
 
-> 这份文档是当前产品设计、前端体验和技术架构的单一主文档。它不是品牌宣言，而是后续产品判断、UI 设计和工程拆解的权威入口。
+> 这份 PRD 只保留 4 类内容：
+> 1. 产品主线
+> 2. 当前代码已经做到什么
+> 3. 正式上线前还缺什么
+> 4. 接下来只做哪几件事
 >
-> 本文档基于三类输入重写：
-> - 2026-03-24 的产品笔记与外部产品观察
-> - 当前代码现状：`frontend -> backend -> self-hosted LiveKit + livekit_agent`
-> - 既有路线文档中的仍然有效部分
-
-> 文档边界：
-> - 这份 PRD 负责定义产品、页面职责、当前代码现状意味着什么，以及下一阶段产品该收成什么样
-> - [VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md](VOXFLAME_SPEECH_MODE_EXECUTION_PLAN_2026-04-05.md) 负责 5 天窗口内的专项执行顺序、验收标准与取舍
-> - 两份都保留，但不再互相重复扮演对方角色
+> 不再在这里保留大段研究过程、远期架构想象或重复执行计划。
 
 ---
 
-## 1. 重新定锚
+## 1. 产品一句话
 
-### 1.1 产品一句话
+VoxFlame 不是“纠正用户声音”的产品，而是“帮助系统更准确理解构音障碍用户意图”的沟通工作台。
 
-**VoxFlame 是面向构音障碍用户的主动沟通助手。它先帮助用户开口并被理解，再把练习、记忆和复盘慢慢收回到一个长期变好的系统里。**
+当前主产品链路固定为：
 
-### 1.2 当前最重要的判断
+`首页 -> 沟通工作台 -> 练习工作台 -> 沟通档案`
 
-现在仓库最大的问题，不是底层链路不存在，而是：
-
-1. 已经有一条可运行的实时主链，但产品入口仍然像“功能说明书”。
-2. 沟通、训练、记忆三页方向大体正确，但还没有被组织成一个连贯产品。
-3. 用户最需要的不是“我们模型很强”，而是“我现在能不能顺利说出这句话并被理解”。
-
-### 1.3 创始人即用户的一手研究结论
-
-这轮 PRD 不再只基于抽象用户画像，也直接吸收了创始人本人作为目标用户的一手材料。
-
-最重要的结论不是“语音识别还不够准”，而是：
-
-1. 沟通失败常常发生在高压场景，而不是低压试用场景。
-2. 最伤人的时刻往往不是某个字识别错，而是被打断、被催促、被忽视、被别人替你回答。
-3. 面试、工作协作、医疗问诊、陌生人求助这类时刻，比“了解产品功能”更值得首页优先服务。
-4. 产品不能增加用户的社交压力，必须低存在感、可随时打断、像助手或老朋友，而不是抢戏的机器。
-5. 对构音障碍人群而言，长期训练当然重要，但第一价值始终是“这一次沟通先成功”。
-
-### 1.4 这次重排后的优先级
-
-1. 可理解性
-2. 开口速度
-3. 沟通兜底
-4. 训练反馈
-5. 记忆沉淀
-6. 更远期的硬件、轻入口、主动复盘
-
-### 1.5 这次重排吸收的文档结论
-
-本 PRD 已吸收并统一了以下几类判断：
-
-1. 五层架构：`Control / Execution / Memory / Capability / Surface`
-2. 当前现役执行面已经是 `self-hosted LiveKit + livekit_agent`，但产品 contract 仍应保持 vendor-neutral
-3. memory 需要 `本地事实源 + typed memory + profile bundle` 三层组合，而不是一个“万能记忆桶”
-4. 语音 agent 的长期方向应该是 `runtime tools + skills + workflow + MCP` 分层，而不是把一切塞回 prompt 或页面按钮
-
-这些仓库分析文档已经在 2026-03-26 被进一步收口成 2 份综合参考：
-
-- [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)
-- [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
-
-后续继续开发时，应优先以本 PRD、根 `README.md` 和 `.tasks/current.md` 为主入口，而不是让多份研究稿继续平级竞争。
-
----
-
-## 2. 基于代码的现状评估
-
-## 2.1 已经具备的基础
-
-### A. 实时主链已经成立
-
-当前唯一事实源已经是：
+当前唯一现役执行面固定为：
 
 `Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`
 
-这意味着项目并不是“还停留在想法阶段”，而是已经有明确执行面。
+---
 
-### B. 三个核心页面已经成形
+## 2. 基于代码的现状判断
 
-- 首页：`/`，有公开首页和沟通入口切换
-- 沟通页：`/?mode=communicate`
-- 训练页：`/contribute`
-- 记忆页：`/memory`
+截至 2026-04-14，VoxFlame 已经不是“还在搭框架”的阶段，而是“主链能跑，但上线前还缺最后几层治理”的阶段。
 
-### C. 训练页是当前最接近产品闭环的部分
+更准确地说：
 
-从代码看，训练页已经具备：
+1. 网站骨架已经成立，可以完成一次真实的登录、进入沟通页、进入训练页、进入记忆页的闭环。
+2. 实时语音主链已经成立，LiveKit 不是 demo，而是现役运行路径。
+3. 训练录音和 dataset 入口已经成立，录音不会因为一次上传失败就静默丢失。
+4. `workspace snapshot` 已经开始作为共享读模型存在。
+5. 真正还没收稳的，不是页面有没有，而是：
+   - 记忆系统 owner 和写回边界
+   - 句子级准备资产的统一 owner
+   - 录音数据进入 dataset 后的 review / annotation / export 规范
 
-1. 真实录音开始/停止
-2. RTC 实时转写
-3. 本地反馈分析
-4. 登录页前置授权后的自动样本保存
-5. 训练画像累计与 voice profile 同步
+一句话判断：
 
-这说明“训练不是空概念”，而是已有可深化的工作台。
-
-### D. 记忆与画像已经有骨架
-
-记忆页已经能处理：
-
-1. 本地和远端画像聚合
-2. hotword profile
-3. 训练趋势与增长统计
-
-这说明后续不是从零做记忆，而是要把“展示什么”和“允许用户编辑什么”重新设计清楚。
-
-## 2.2 当前最明显的产品漂移
-
-### A. 沟通页主路径已经成立，但首页到沟通页的“带任务进入”还没做透
-
-现在的沟通页已经不再是旧的 chat-first 形态：
-
-1. `CommunicationStarterKit` 已进入主首屏
-2. `QuickPhrasesPanel` 已退到表达工具箱第二层
-3. `workspace` 已开始为 personalized phrase rail 和 session review 提供统一读模型
-
-首页把用户直接送进正确 starter context 这一步已经打通；当前真正还没收住的，是 starter rail 的内容质量与 live session 的产品感：
-
-1. personalized phrase rail 还没充分吸收 recent wins / hotwords / session review
-2. 沟通首屏还要继续削弱旧聊天壳，强化“先开口、再补救”
-3. 沟通、练习、档案三块还没围绕同一份“今天先做什么”组织成连续任务流
-
-### B. 训练页 UI 主线已经收口，但产品可靠性还没到 multi-surface-ready
-
-训练页这轮已经不是旧采集页：
-
-1. 主叙事已收口到 `选句 -> 录音 -> 反馈`
-2. 反馈区已经贴近录音区
-3. 登录授权已前置，停录后已按主路径自动保存
-
-当前更关键的问题已经从“页面像不像练习工作台”，变成：
-
-1. `recording envelope -> upload receipt -> manifest` 是否对 web / PWA / future mobile / desktop companion 都成立
-2. 录完后的云端登记是否足够稳定，不再让用户背“手动同步”心智
-3. dataset review / sample quality / export contract 是否已经足够支撑训练、复核、画像和跨端复用
-
-### C. 沟通档案已经开始吃同一份 `workspace`，但还没有成为真正的 owner 入口
-
-当前记忆页已经不只是统计页：
-
-1. `profile_bundle / session_review / expression_kit` 已有统一读模型
-2. 沟通页、训练页、记忆页已经开始消费同一份 snapshot
-
-但接下来还缺：
-
-1. expression kit 的正式编辑边界
-2. session review 的持续沉淀策略
-3. durable profile 的 owner 与写入规则
-
-### D. 文档与架构治理出现了新的漂移
-
-当前不是功能缺文档，而是：
-
-1. `PRD`
-2. `Runtime And Surface Reference`
-3. `control-plane`
-4. `capability-registry`
-
-这几份文档对同一层问题有重叠叙述。
-
-尤其 `capability-registry` 现在把“产品运行时能力”和“repo engineering capabilities”混写在一起，这对工程协作有帮助，但对产品和多端规划反而会制造噪音。
-
-### E. 多端准备的最大风险不是单点能力不够，而是三层基础还没一起成立
-
-从 CEO 视角看，下一阶段最大的风险不是某一层单独不够强，而是：
-
-1. web、PWA、future mobile、future desktop 会不会各长一套会话启动协议
-2. recorder queue、upload receipt、manifest 会不会只停留在 web 端心智
-3. `workspace / profile bundle / expression kit / agent tooling boundary` 会不会仍然只停留在研究稿里
-
-## 2.4 当前前端 / agent 代码现状一览
-
-### Frontend
-
-当前前端已经围绕 `workspace + live session` 在组织产品，而不是旧 transport demo：
-
-1. 沟通页已经显式固定 `LiveKit` 执行面
-2. 训练页已经能把每次录音结果直接写成 `training_result -> training_profile_summary` 接进现有 memory 链
-3. 记忆页已经开始展示：
-   - `profile_summary`
-   - `listener_guidance`
-   - `workspaceSnapshot.preparation`
-4. 还没收好的地方也很明确：
-   - 沟通页还没有完全做到“只消费当前场景最小准备”
-   - 训练页还没有稳定产出更强的规律提取
-   - 记忆页还没有完全成为“用户画像 + 当前准备 owner”
-5. 新的实现原则也已经固定：
-   - 不再为了“字段完整”保留空占位
-   - 不再默认写宽泛 `keywords`
-   - 前端展示优先来自真实 corpus、结构化 feedback、workspace snapshot 和可解释规则
-   - 训练页、记忆页后续继续淡出拼音/声母/韵母/声调这类产品语义，收口到用户真正需要的三类信息：`热词 / 用户发音规律 / 场景总结`
-
-### livekit_agent
-
-当前 `livekit_agent` 已经不是迁移 stub，而是现役 execution runtime 的一部分。
-
-已具备：
-
-1. room connect + data contract
-2. DashScope realtime ASR
-3. correction-style transcript 输出
-4. DashScope realtime TTS
-5. basic interrupt / turn-taking
-6. `training_result -> training_profile_summary`
-
-但要更准确地说：
-
-1. 当前 interruption / turn-taking 仍主要是 `自定义 RMS VAD + silence window + 工程默认门槛`
-2. 当前 `QWEN_ASR_BARGE_IN_MIN_SPEECH_MS=220` 只是工程默认起始值，不是官方推荐定值
-3. 当前 audio processing 已经不只依赖浏览器侧 `echoCancellation / noiseSuppression / autoGainControl`
-   - agent 侧也已接入 LiveKit Python RTC `AudioProcessingModule` 第一片
-   - 当前采用保守配置：
-     - `noise_suppression=true`
-     - `high_pass_filter=true`
-     - `echo_cancellation=false`
-     - `auto_gain_control=false`
-4. 当前还没有把 LiveKit 官方更完整的：
-   - `turn_detection / min_interruption_duration / endpointing`
-   - `manual / hybrid turn control`
-   - `room_options.audio_input`
-   - `session.userdata / participant attributes`
-   真正制度化进现役 agent
-
-还缺：
-
-1. 更强的 session-close compaction
-2. 多人场景下更稳的 interruption policy
-3. 会话内 speaker differentiation
-4. LiveKit 官方 `room_options.audio_input` 接入下更完整、更可控的 audio processing strategy
-
-当前已经补齐的则是：
-
-1. `session.userdata` 第一片
-2. backend 注入 `PreparationContextPack`
-3. `session-close compaction` 第一片
-4. 输入电平与收音质量反馈第一片
-5. LiveKit Python RTC `AudioProcessingModule` 第一片
-6. server-side audio telemetry 第一片
-7. 记忆页和训练画像的现役用户语义第一片
-   - 当前产品面已经开始统一往：`热词 / 用户发音规律 / 场景总结`
-   - 不再继续把声母 / 韵母 / 声调 / 重点音节当成前端主栏目
-
-所以现在优先级应该是三件事一起收口：
-
-1. runtime / surface / control contract
-2. memory / agent tooling contract
-3. dataset / review / export contract
-
-## 2.3 架构层的现状判断
-
-### A. Backend 已是控制面雏形
-
-`rtc-orchestration.service.ts` 和 `/api/rtc/session/*` 已经承担控制面职责。
-
-这条路径应该继续加固，而不是让前端 hook 或 TEN 主控继续长产品治理逻辑。
-
-### B. 前端 hook 还承担了过多编排责任
-
-`useRtcAgentSession` 现在同时在做：
-
-1. 会话拉起
-2. 事件路由
-3. transcript 聚合
-4. feedback / voice profile sync
-
-它是必要的，但已经靠近“第二控制面”的边界。
-
-### C. LiveKit 执行面已经足够承载当前 P0/P1
-
-当前 `livekit_agent` 已经具备：
-
-1. VAD / turn-taking
-2. DashScope realtime ASR/TTS
-3. correction-style transcript
-4. training feedback 最小 contract
-5. session review / memory 写回过渡链
-
-所以近期不应该把主精力放在“继续折腾执行面替换”，而应该把训练页、记忆页和现场准备能力补满。
-
-但这里也要补一条更严格的工程判断：
-
-1. 当前执行面已经够用，不代表它已经符合官方最佳实践的完整形态
-2. 下一阶段不是“再迁移一次”，而是沿 LiveKit 官方 primitives 做深：
-   - `session.userdata`
-   - `participant attributes`
-   - 更成熟的 `turn_detection / interruption`
-   - `room_options.audio_input` 与保守型 audio processing
-3. 也就是说，`LiveKit execution plane` 要继续保留，但 agent 能力需要从“已跑通”升级到“更完整、更官方、更适合构音障碍”
-
-### D. 当前数据流已经开始收口成产品 contract，但 owner 还没完全制度化
-
-现在长期用户状态主要落在两处主层、一处待补的 session-local 层：
-
-1. 前端 [memory-service.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/memory-service.ts)
-2. backend [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts)
-3. `livekit_agent` 当前尚未显式制度化的 session-local typed state
-
-这已经不再是纯粹“混乱状态”，因为 backend 已经开始向 `workspace / profile bundle / session review / expression kit` 收口。
-
-但它还不是一个完全制度化的 owner 模型。
-
-当前真正缺的不是更多存储点，而是更明确的所有权：
-
-1. frontend local store 负责本地缓存、离线兜底和最近会话草稿
-2. backend 负责共享的 `profile bundle / session review / hotword profile`
-3. `livekit_agent` 应显式承接 typed session working memory 和适配状态
-
-在这些 ownership 没写清之前，继续长页面功能，只会让每一层都开始拼自己的“长期画像”。
-
-### E. `livekit_agent` 现在的真正缺口，不是 transport，而是 memory discipline
-
-从当前 [livekit_agent/app.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/app.py) 现状看，执行面已经能跑，但还没有把：
-
-1. `session.userdata`
-2. `PreparationContextPack`
-3. 更完整的 `session-close compaction`
-
-这三层补到更完整、更符合官方实践。
-
-所以下一步应该是“补会话内记忆与压缩边界”，而不是再让 room data glue 和 callback 逻辑继续自然生长。
+现在可以做小范围真实试用，但还不适合当作“已经完成正式上线准备”的产品来宣告。
 
 ---
 
-## 3. CEO / Design / Eng 三视角收敛结论
+## 3. 代码里已经做到的部分
 
-## 3.1 CEO 视角
+### 3.1 首页与沟通工作台
 
-### 要坚持什么
+当前代码已具备：
 
-1. 不做泛化“全能语音 Agent”
-2. 不让硬件、听障辅助、复盘陪伴抢走构音障碍主线
-3. 不把模型能力叙事放在用户问题前面
+1. 首页已经不再是纯说明页，而是任务入口。
+   - 入口代码：`frontend/src/app/page.tsx`
+2. 沟通工作台已经是现役 LiveKit 会话面。
+   - 主组件：`frontend/src/components/chat/ChatInterface.tsx`
+   - 会话 hook：`frontend/src/hooks/useRtcAgentSession.ts`
+3. backend 已经负责 RTC orchestration。
+   - 入口：`backend/src/services/rtc-orchestration.service.ts`
+4. `workspace snapshot.preparation` 已经会注入实时会话。
+5. agent 已经能完成：
+   - ASR
+   - 文本纠错/改写
+   - caption mode
+   - TTS 可打断
+   - preparation context runtime update
 
-### 真正的产品承诺
+这说明“沟通页主链不存在”已经不是问题。
 
-1. 我现在要说一句很重要的话，VoxFlame 帮我说出去
-2. 别人没听懂我，VoxFlame 帮我更快补救
-3. 我想长期变好，VoxFlame 帮我看见进步并准备下一次沟通
+### 3.2 训练工作台
 
-### CEO 对下一阶段基础设施的判断
+当前代码已具备：
 
-1. `Runtime And Surface Reference` 和 `Agent Memory And Tooling Reference` 都应该进入现役主线
-2. 前者负责回答：
-   - 多端 surface 如何共用一条 runtime / control 语言
-   - 会话怎么启动
-   - capability 怎么按 surface / mode 暴露
-3. 后者负责回答：
-   - 真正有用的产品上下文从哪里来
-   - `workspace / profile bundle / expression kit / session review` 谁来拥有
-   - agent / tool / workflow / MCP 的边界怎么定
-4. dataset 文档则负责回答：
-   - 样本怎么可靠保存
-   - 怎么复核、导出、沉淀成画像
-   - 数据面做到哪一层就够支撑产品，而不无限膨胀
+1. 训练页已经直接走 LiveKit 训练会话。
+   - 页面：`frontend/src/app/contribute/page.tsx`
+   - 训练 hook：`frontend/src/hooks/useMandarinTrainingSession.ts`
+2. 本地录音 envelope 已经成形。
+3. 上传链已经成形：
+   - recorder queue
+   - signed upload
+   - upload receipt
+   - OSS artifact
+   - `manifest.jsonl`
+4. 样本会带结构化 metadata：
+   - `recording_id`
+   - `session_id`
+   - `target_text`
+   - `recognized_text`
+   - `sample_quality_*`
+   - `review_*`
+5. 准备稿练习已经接进训练页：
+   - `prepared_expression` 可拆句训练
+   - 训练结果会反哺 rehearsal summary
 
-### CEO 对文档治理的决策
+这说明“录音数据还完全没规范化”也已经不是事实。现在缺的是把现有 contract 真正变成稳定流程。
 
-1. `PRD` 继续是产品主文档
-2. `Runtime And Surface Reference` 升级为 multi-surface / control contract 的主参考
-3. `Agent Memory And Tooling Reference` 升级为 memory / agent / tooling contract 的主参考
-4. `control-plane.md` 继续保留，但定位收紧为 backend 控制面实现与 schema 深文档
-5. `capability-registry.md` 不再继续承担产品主参考角色
-   - 其中的产品运行时 capability 应逐步并回 `Runtime And Surface Reference`
-   - 其中的 repo engineering capabilities 应回到 `AGENTS.md` 与协作文档体系
+但从产品价值看，训练页当前最重要的还不是“更多分析”，而是：
 
-## 3.2 Design 视角
+1. 让用户录音更舒服
+2. 让用户有继续录下去的动力
+3. 让用户清楚今天为什么录、录多少、录完得到什么
 
-### 当前设计问题
+### 3.3 沟通档案 / 记忆页
 
-1. 页面更像文档，不像工作台
-2. 主任务不够强，二级信息太多
-3. 沟通页默认是聊天界面，缺少“先开口”的仪式感和安全感
-4. 记忆页偏统计展示，还没有形成“个人表达档案”
+当前代码已具备：
 
-### 设计方向
+1. 记忆页已经能编辑和保存准备稿。
+   - 页面：`frontend/src/app/memory/page.tsx`
+   - API：`GET/PUT /api/memory/workspace/:userId/prepared-expression`
+2. 重点词 hotword 已经能本地维护并同步后端。
+3. `workspace snapshot` 已经会返回：
+   - `profile_bundle`
+   - `session_review`
+   - `preparation`
+   - `prepared_expression`
+   - `expression_kit`
+4. rehearsal summary 已经能基于训练样本生成并回流。
 
-1. 首页是任务分发页，不是产品介绍页
-2. 沟通页是“沟通工作台”，不是聊天 App
-3. 训练页是“练一句今天真会用的话”，不是采集控制台
-4. 记忆页是“沟通档案 + 下次准备页”，不是数据仓库
+这说明“记忆页还是空壳”不成立。问题在于它还没有成为真正唯一、清晰、可信的 durable owner。
 
-## 3.3 Eng 视角
+### 3.4 Backend / 数据层
 
-### 不该做的事
+当前 backend 已具备：
 
-1. 不恢复 websocket 主链
-2. 不并行再造一套 runtime
-3. 不让 `compat` 长新逻辑
-4. 不把 dataset 和 memory 混成一套存储心智
+1. `workspace snapshot` 聚合接口。
+2. `prepared expression` 读写与 summarize。
+3. upload artifact 持久化与 manifest 写入。
+4. dataset review queue 的后端接口。
+5. memory growth 聚合，能把 `training_result / training_profile_summary / session_compaction` 吃进 snapshot。
 
-### 该做的事
-
-1. 明确 control plane contract
-2. 统一 starter kit、quick phrase、memory recommendation 的边界
-3. 把 communication / training / memory 的数据对象做成明确 bundle
-4. 为未来轻入口预留 `session_strategy`，但不抢当前主线
-
----
-
-## 4. 产品对象模型
-
-## 4.1 三个主工作台
-
-### A. 沟通工作台
-
-用户目标：
-
-1. 快速开口
-2. 在沟通失败时迅速补救
-3. 在高压场景里保持可控
-
-### B. 练习工作台
-
-用户目标：
-
-1. 练今天真会说的话
-2. 立刻知道系统听成了什么
-3. 获得下一步练法
-
-### C. 沟通档案
-
-用户目标：
-
-1. 看高频表达和热词
-2. 看最近卡住的点
-3. 为下一次沟通做准备
-
-## 4.2 一个延后但重要的能力
-
-### D. 沟通复盘 / 陪练教练
-
-这是未来重要方向，但不是现在的首页主入口。
-
-它更适合建立在：
-
-1. 正式沟通记录
-2. 训练画像
-3. 用户明确同意的复盘上下文
-
-之后再逐步形成“会后复盘”和“主动陪练”。
+这说明后端已经是控制面雏形，不再只是转发层。
 
 ---
 
-## 5. PRD：核心需求定义
+## 4. 现在还没做到的关键部分
 
-## 5.1 首页
+### 4.1 记忆系统还没有真正收稳
 
-### 目标
+这是当前离正式上线最近、也是最关键的缺口。
 
-用 10 秒告诉用户：
+当前真实情况是：
 
-1. 现在就能做什么
-2. 应该点哪个入口
-3. 这次不需要先理解复杂系统
-4. 在高压场景里，燃言会先帮助我完成一次沟通，而不是要求我先阅读说明书
+1. `livekit_agent/session_userdata.py` 只有最小 session-local state：
+   - `PreparationContextPack`
+   - `last_user_transcript`
+   - `last_assistant_reply`
+   - `interruption_count`
+   - `barge_in_count`
+   - `caption_mode_enabled`
+2. 还没有更明确的 typed session working memory contract。
+3. 还没有正式的 `assemble_context / after_turn / compact` 三阶段接口。
+4. 还没有“哪些字段只活在 session，哪些字段允许写回 durable memory”的稳定制度。
 
-### 首页必须只有三个一级入口
+所以当前说“记忆系统已经完成”是不准确的。
 
-1. `现在沟通`
-2. `练今天要说的话`
-3. `查看我的沟通档案`
+### 4.2 session-close compaction 还不是 server-side 稳态
 
-### 首页 P0 信息架构
+这是另一个必须从文档里纠偏的地方。
 
-1. 首屏直接露出高压场景：`求职 / 面试`、`工作协作`、`医疗沟通`、`陌生人求助`
-2. 首屏直接解释燃言先帮什么：`开场`、`补救`、`准备`
-3. 首屏明确说明：`机器不是主角，用户始终可以打断、覆盖和改写`
-4. 三个一级入口只服务三件事：`先开口`、`练今天要说的话`、`为下次准备`
+当前代码里：
 
-### 首页不该成为重点的信息
+1. `frontend/src/lib/memory/memory-service.ts` 在前端 `endSession()` 时会生成 `session_compaction`。
+2. backend `memory-growth` 确实会消费 `session_compaction`。
+3. 但 `livekit_agent/app.py` 本身并没有真正实现：
+   - turn flush
+   - session-close compaction
+   - durable write back
 
-1. 模型栈
-2. 实时架构
-3. 字幕展示
-4. 宏大愿景
+也就是说：
 
-## 5.2 沟通工作台
+目前存在的是“前端本地 compaction 过渡方案”，不是“agent server-side 稳定会后写回链”。
 
-### P0 功能
+这件事对正式上线是 blocker，因为它直接决定：
 
-1. 先选场景：医疗 / 家庭 / 陌生人 / 紧急
-2. 首屏展示 starter kit，而不是先展示空聊天区
-3. 可直接点击第一句话代播
-4. personalized quick phrases 作为第二层入口
-5. 支持语音、文字、代播三种输入
-6. 支持打断、重试、确认没听清
-7. 保留双行对照，只在真正不同的时候显示
+1. 会后沉淀是否可信
+2. 换设备后是否一致
+3. 线上长会话和异常断开时是否还能保留有效记忆
 
-### P1 功能
+### 4.3 句子级准备资产 owner 还没有完全统一
 
-1. 会话结束后生成轻量复盘卡
-2. 自动建议把本次高频句加入表达工具箱
-3. 根据记忆推荐下次更常用的 starter
+当前已经有这些对象：
 
-### 明确不做
+1. `prepared_expression`
+2. `hotword_profiles`
+3. `quick_phrases`
+4. `expression_kit.personalized_phrases`
 
-1. 把沟通页做成“万能社交 feed”
-2. 让用户先配置大量参数再开始沟通
-3. 让全屏字幕继续主导整个页面叙事
+但它们还没有完全收成同一个“句子级准备资产 owner”。
 
-## 5.3 练习工作台
+当前结果是：
 
-### P0 功能
+1. 用户已经可以准备稿、加重点词、练句子。
+2. 但“重要句 / 高频句 / personalized phrase / prepared expression section” 之间仍然有轻微分裂。
 
-1. 按真实场景句组织练习，而不是按抽象音素入口组织
-2. 每次录音后立刻给出：
-   - 目标句
-   - 系统听到的内容
-   - 本次最该先改的点
-   - 下一次建议
-3. 上传必须是明确授权
-4. 数据进入 dataset，不自动等于长期记忆
-5. 累积到门槛后再生成训练画像摘要
+这不会阻止内测，但会阻止正式上线后的长期可维护性。
 
-### P1 功能
+### 4.4 dataset review / annotation 只完成了后端 contract，没完成运营闭环
 
-1. 根据沟通档案生成今日训练任务
-2. 把训练页从“句库浏览”升级为“练习任务流”
-3. 支持用户标注“这句话对我特别重要”
+当前代码里：
 
-### 明确不做
+1. review queue 的 metadata 已经会写进样本。
+2. backend 已有：
+   - `GET /api/upload/review-queue`
+   - `PATCH /api/upload/review-queue/:contributionId`
+3. 样本质量、review priority、accepted_for_export 这些字段都已有后端语义。
 
-1. 医学诊断式表达
-2. 复杂但不可解释的评分系统
-3. 以采集量替代用户价值
+但当前还缺：
 
-## 5.4 沟通档案
+1. 前端 review UI
+2. 谁来复核、何时复核、复核后如何进入 export 的运营闭环
+3. 标注硬指标
+   - 覆盖率
+   - 复核命中率
+   - 退回复录率
+   - 从录入到可用的时延
 
-### P0 功能
-
-1. 高频表达
-2. 热词和场景词
-3. 易混淆模式
-4. 最近训练趋势
-5. 可编辑的个人偏好和重要词
-
-### P1 功能
-
-1. 今日建议练习
-2. 下次沟通准备包
-3. 会话复盘摘要
-
-### 明确不做
-
-1. 把所有历史细节直接堆给用户
-2. 用大量图表替代行动建议
-3. 把原始训练数据当作记忆页主内容
+所以现在可以说“dataset contract 已经开始规范”，但不能说“数据治理已经完成”。
 
 ---
 
-## 6. 统一的信息架构
+## 5. 对“离网站上线还差什么”的直接回答
 
-## 6.1 Surface Map
+如果按当前代码现实来判断，离正式上线主要还差 3 件事，而且正是你指出的这几件：
 
-```text
-Home
-  -> 现在沟通
-       -> 场景选择
-       -> Starter Kit
-       -> Personalized Phrase Rail
-       -> Live Session
-       -> 轻量复盘
-  -> 练今天要说的话
-       -> 今日任务 / 句类
-       -> 录音
-       -> 即时反馈
-       -> 授权上传
-       -> 画像更新
-  -> 查看我的沟通档案
-       -> 高频表达
-       -> 热词
-       -> 易混淆点
-       -> 训练趋势
-       -> 下次准备
-```
+### 5.1 记忆系统
 
-## 6.2 统一对象
+上线前必须补到：
 
-### A. Expression Kit
+1. 明确 session-local typed memory schema
+2. 明确 `assemble_context -> after_turn -> session-close compact -> durable write`
+3. 保证 `workspace` 继续是唯一 durable owner
 
-把以下内容统一看成一个对象，而不是三个散模块：
+### 5.2 录音与数据录入
 
-1. 策展式 starter phrases
-2. 用户自定义 quick phrases
-3. memory 推荐的高频表达
+上线前必须补到：
 
-其中：
+1. 录音主路径稳定
+   - 开始录音
+   - 停止录音
+   - 上传
+   - receipt
+   - 后台补传
+2. 同一句可多次练习，但同一条录音重传不重复写 manifest
+3. 样本回流到 prepared expression summary 的节奏稳定
+4. 训练页必须把“舒服录音、愿意录、知道目标”当成主功能，而不是附加体验
 
-- `starter kit` 负责高风险场景开口
-- `quick phrases` 负责个人常用表达
-- `memory recommendation` 负责动态排序和补充
+### 5.3 数据整理与标注规范
 
-### B. Profile Bundle
+上线前必须补到：
 
-对运行时真正有用的长期画像只保留：
-
-1. hotwords
-2. common confusions
-3. dominant scenes
-4. expression preferences
-5. recent training focus
-
-### C. Session Review
-
-会话结束后只沉淀最有用的摘要：
-
-1. 本次最常用表达
-2. 被误解点
-3. 推荐补入的短语
-4. 是否值得转成训练任务
-
-### D. Dataset Recorder
-
-只负责：
-
-1. 用户授权
-2. 录音与监督标签元数据
-3. 质量控制
-4. 训练集 manifest
-
-它不等于 memory。
+1. review queue 真正进入可操作流程
+2. 自动规则和人工复核的边界写清
+3. export 前的 accepted / rejected 规则固定
+4. 不把 dataset 直接当 memory
 
 ---
 
-## 7. UI / UX 设计方向
+## 6. 上线前的最小执行顺序
 
-## 7.1 设计原则
+接下来不扩 scope，只按这个顺序推进：
 
-1. 中文优先，减少英文式产品噪声
-2. 让用户感觉“被接住”，不是“被系统评估”
-3. 先突出一个动作，再展示状态和解释
-4. 主表面尽量实体底色，不靠大面积半透明营造高级感
-5. 页面根据任务切换宽度，而不是一套 `max-width`
-
-## 7.2 页面视觉语言
-
-### 首页
-
-- 任务卡片清晰、层级少、标题短
-- 更像“今天做什么”，不像“阅读品牌页”
-- 首屏优先承接高压沟通场景，而不是先做品牌宣言
-- 要把“被接住”和“用户仍主导”明确传达出来
-
-### 沟通工作台
-
-- 首屏先给场景和第一句话，不先给消息气泡墙
-- 把录音、代播、重试、确认做成低认知负担的大动作区
-- 实时区域要像工作台，不像社交聊天
-
-### 练习工作台
-
-- 目标句和反馈是主角
-- 录完后如果登录授权已确认，目标句和录音应自动进入训练样本链路
-- ASR 识别句子只服务即时反馈，不应混成监督样本标签
-- 同一句允许保留多次练习样本；系统只对同一条录音的重试与补传做安全去重
-- 上传和系统解释是次级信息
-- 让用户读完一屏就知道自己下一步做什么
-
-### 沟通档案
-
-- 以“准备下一次沟通”为目标组织内容
-- 先给建议和高频表达，再给趋势
-
-## 7.3 具体前端指引
-
-1. 沟通页使用更宽工作台宽度
-2. 表单与编辑页维持较窄阅读宽度
-3. 标题减少营销化修辞，更多用任务化短句
-4. 颜色以温暖中性色 + 一个清晰强调色为主
-5. 动效只服务状态转换，不做浮夸反馈
-
-## 7.4 Google-like UI 目标
-
-这里说的“更像 Google”，不是参考已经失效的某个单产品，而是借鉴 Google 当前产品语言里真正有价值的部分：
-
-1. `glanceable`
-   - 重要信息先被看到，不需要先阅读长说明
-2. `fluid`
-   - 状态切换轻、顺、快，不靠重动画炫技
-3. `personal`
-   - 个体偏好、热词、表达工具箱能自然露出
-4. `editable`
-   - transcript、短语、标签、热词都应允许用户修订
-5. `opt-in sync`
-   - 记录、同步、分享、上传都默认可控，而不是偷偷发生
-
-对 VoxFlame 的直接翻译：
-
-1. 沟通页首屏要像一个可信赖的沟通工具，而不是聊天演示页
-2. 训练页要像一个轻、清楚、可回看的练习工作台
-3. 记忆页要像个人表达档案，而不是复杂报表中心
-4. 首页要有 Google 式“干净、明确、低噪音”的任务入口感
-5. Google-like 不等于冷冰冰；对 VoxFlame 来说，它还必须传达“低压力、可信赖、不会替你夺走话语权”
+1. 先把 `livekit_agent` 的 typed session memory 和 context assembly 收口。
+2. 再把 server-side `flush -> compact -> durable write` 做成稳定链路。
+3. 再把句子级准备资产收成统一 owner。
+4. 再把 dataset review / annotation / export contract 做成真正可执行流程。
+5. 最后回到真实场景做长会话 smoke，确认这些沉淀真的改善沟通成功率。
 
 ---
 
-## 8. 技术架构蓝图
+## 7. CEO / 产品视角下的新收敛
 
-## 8.1 保持不变的唯一事实源
+### 7.1 我们刚刚讨论后，产品真正该长成什么样
 
-正式沟通与训练主链当前已经基于：
+从 CEO 视角看，VoxFlame 不该继续被理解成：
 
-`Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`
+1. 一个更强的纠错页面
+2. 一个更花哨的训练页
+3. 一个抽象的 memory 系统
 
-这已经是当前现役执行面，不再是迁移中的备用路径。
+它更应该被收成：
 
-### 8.1.1 长期执行面判断
+1. 一个能让用户在重要时刻“带着准备材料进入沟通”的系统
+2. 一个能在平时“陪用户练习并持续沉淀”的系统
+3. 一个能把“沟通成功”和“训练反馈”收进同一份长期 workspace 的系统
 
-从现有替换研究和代码耦合看：
+一句话重定锚：
 
-1. 当前执行面已经切到 `LiveKit + livekit_agent`
-2. 产品 contract 仍然不能继续写死在任何单一 vendor 语义
-3. 未来应逐步切到 vendor-neutral 的 `session / transport / participant / capability` 语言
+**VoxFlame 的核心产品不是聊天，也不是记忆库，而是 `沟通 loadout + 训练助手 + durable workspace`。**
 
-这意味着：
+### 7.2 Memory 不再抽象描述，直接变成产品对象
 
-- 近期继续吃透当前主链
-- 中期开始为执行面替换做 contract 收口
-- 不把当前供应商语义继续抬升为产品语义
+记忆系统在产品上不再叫“memory bucket”，而是前端可编辑、可加载、可管理的材料系统。
 
-## 8.2 新的控制面 contract
+P0 先固定成 4 个对象区：
 
-后续控制面统一围绕下列请求对象展开：
+1. `自定义材料区`
+   - 面向一次演讲、一次面试、一次陌生人自我介绍、一次医疗说明
+   - 这是用户自己写、自己维护的 source docs
+   - 用户在沟通前主动选择是否加载
+2. `场景 / 热词模板`
+   - 平台提供多套模板
+   - 可按场景 / 病种 / 严重程度给出不同模板
+   - 目标是提升识别率、降低第一次配置门槛
+   - 用户可以加载到上下文，但默认不等于长期自定义材料
+3. `用户个人画像`
+   - 发音规律
+   - 高频误听
+   - 澄清关键词
+   - 固定开场白 / 补救句
+   - 这是 always-on 的核心长期资料
+4. `训练总结`
+   - 今日训练总结
+   - 周期性训练总结
+   - 当前最稳表达
+   - 当前高风险误听
+   - 推荐新增材料
+   - 这是系统生成、用户可查看和选择吸收的 derived docs
 
-```ts
-type SessionIntent = {
-  surface: 'home_main' | 'communication_workspace' | 'training_workspace' | 'memory_workspace' | 'pwa_quick_talk' | 'mobile_companion'
-  mode: 'communication' | 'training' | 'quick_talk'
-  session_strategy: 'heavy_realtime' | 'light_voice'
-  user_id?: string
-  requested_capabilities?: string[]
-  scene?: 'medical' | 'family' | 'stranger' | 'emergency'
-}
-```
+每个文档区都必须支持：
 
-控制面不应只返回 transport 凭证；它还应逐步成为三类对象的统一出口：
+1. 新建
+2. 编辑
+3. 删除
+4. 保存后进入文档列表
+5. 随时打开继续修改
 
-1. `session bootstrap`
-   - transport session handle
-   - requested capabilities
-   - diagnostics
-2. `profile bundle`
-   - hotwords
-   - common confusions
-   - dominant scenes
-   - recent training focus
-3. `expression kit`
-   - starter kit
-   - personalized quick phrases
-   - memory-ranked recommendations
+但补充一个重要边界：
 
-一句话说，后续页面不该再“自己去不同层凑上下文”，而应该向 backend/control plane 领取一份面向当前任务的工作包。
+1. `场景 / 热词模板` 更像模板库，不一定都支持自由编辑
+2. `训练总结` 是系统生成对象，默认以“接受 / 忽略 / 吸收入画像或材料”的方式管理，不要求像原始文档一样全文编辑
 
-## 8.3 Heavy / Light 双策略
+### 7.3 对话开始前，不再只是“进房间”，而是先组装 loadout
 
-### Heavy Realtime
+沟通页在产品上必须新增一个更明确的概念：
 
-适用：
+`Communication Loadout`
 
-1. 正式沟通
-2. 训练页实时反馈
-3. 需要打断与低延迟状态同步的场景
+它的目标不是让用户做复杂配置，而是让用户在进入对话前知道：
 
-### Light Voice
+1. 这次默认已经加载了什么
+2. 这次还可以再挂哪些材料
+3. 哪些长期资料会始终常驻
 
-保留给未来：
+P0 的 loadout 装配规则固定为：
 
-1. quick talk
-2. widget
-3. mobile companion
-4. 轻训练录制器
+1. always-on
+   - 用户画像摘要
+   - 发音规律摘要
+   - 澄清关键词
+   - 固定补救句
+2. scene pack
+   - 当前场景 / 热词模板摘要
+3. task pack
+   - 用户这次手动勾选的自定义材料
+4. recent compaction
+   - 最近几次相关沟通的高价值沉淀
 
-现在只做 contract 预留，不抢当前主线资源。
+runtime 不直接吃原始文档全文；原始文档是 source docs，runtime 优先吃 derived packs。
 
-### 对 future mobile 的当前判断
+### 7.4 沟通页拆成两种模式
 
-从 2026-04-06 的新增外部工程观察看，future mobile 最值得吸收的不是“现在立刻开一条新 app 研发线”，而是先把多端共享 contract 收稳。
+沟通页建议明确拆成：
 
-当前更合理的顺序是：
+1. `紧急沟通区`
+2. `长时间沟通区`
 
-1. 先把 web / PWA 主链里的 `session intent / bootstrap / profile bundle / expression kit / preparation` 稳成共享语言
-2. 再让 future mobile companion 复用同一套 contract
-3. 最后才评估具体客户端形态
+它们不只是 UI tab，而是两套不同的产品 contract。
 
-当前 PRD 对 future mobile 的建议保持：
-
-1. 如果后续需要低摩擦 companion app，优先考虑 `React Native + Expo` 这一类更贴近现有 TypeScript 心智的路线
-2. 但这属于 surface 选择，不应倒逼当前 backend / runtime 主线临时重构
-3. 现在的优先级仍是先把 contract 稳住，而不是先把 app 壳做出来
-
-## 8.4 执行面替换路线
-
-### 当前判断
-
-1. 不再继续维护旧执行面 compat
-2. 继续保持 `transport adapter + vendor-neutral session contract`
-3. 把主力转到 `session memory / preparation context / pattern compaction`
-4. 再在需要时引入 recall 增强层
-
-### 当前最合理的中期方向
-
-1. control plane 保持在 backend
-2. frontend 先抽 transport adapter
-3. execution plane 的长期候选以 room/session 型 runtime 为主
-4. runtime 替换时优先保证 capability contract 不变，而不是追求一次性大迁移
-
-### 替换时不能破坏的能力 contract
-
-1. `session_start / session_stop / session_ping`
-2. `transport_send_control`
-3. `voice_profile_update`
-4. `voice_profile_update`
-5. `memory_profile_read / write`
-6. `session_review_build`
-
-## 8.5 五层架构下的职责
-
-### Surface
-
-- 首页、沟通工作台、练习工作台、沟通档案、未来轻入口
-
-### Control
-
-- session lifecycle
-- mode routing
-- capability gating
-- diagnostics
-
-### Execution
-
-- self-hosted livekit-server
-- livekit_agent
-- ASR / correction / TTS / training feedback / turn-taking
-
-### Memory
-
-- profile bundle
-- session review
-- hotword profiles
-
-### Capability
-
-- expression kit
-- training feedback
-- voice profile sync
-- future review coach
-
-## 8.6 记忆系统深设计
-
-### L0 实时工作记忆
-
-- 当前 turn
-- 打断恢复
-- 临时 transcript buffer
-
-### L1 本地事实源
-
-- 本地 store
-- 可读摘要
-- 可审计用户事实
+#### 紧急沟通区
 
 目标：
 
-- 可解释
-- 可导出
-- 可人工修订
+1. 少操作
+2. 快进入
+3. 快说出关键一句
+4. 低延迟
 
-### L2 typed memory 层
+默认只加载：
 
-第一版建议至少拆成：
+1. 长期资料
+2. 紧急 / 高频场景模板
+3. 保底句 / 快捷短语
 
-1. `communication_profile`
-2. `training_event`
-3. `confusion_pattern`
-4. `hotword_group`
-5. `scenario_preference`
-6. `guidance_preference`
-7. `session_review`
+界面重点：
 
-### L3 profile bundle 上下文层
+1. 大按钮开始
+2. 保底句 rail
+3. 澄清关键词
+4. caption / text-first
+5. 不展示复杂材料面板
 
-对运行时只输出统一 bundle：
+#### 长时间沟通区
 
-```json
-{
-  "static": [],
-  "dynamic": [],
-  "relevant": []
-}
-```
+目标：
 
-沟通页、训练页、未来 app 都消费这同一份 bundle，而不是各自拼自己的 memory context。
+1. 带材料进入
+2. 支持结构化表达
+3. 支持持续对话中的上下文承接
 
-### L3.5 context assembly 层
+允许加载：
 
-在 `durable memory owner` 与 runtime 之间，后续需要一层更明确的 `context assembly`。
+1. 自定义材料
+2. 场景模板
+3. 用户个人画像
+4. 最近 relevant compaction
 
-它的职责不是保存长期事实，而是为当前任务装配“这轮模型最该看到的最小必要上下文”。
+界面重点：
 
-默认装配来源：
+1. 已加载材料列表
+2. 当前 session goal
+3. 本次保底句和 listener guidance
+4. 长时表达时的 summary / fallback 提示
 
-1. `profile bundle`
-2. `workspace snapshot.preparation`
-3. `expression kit`
-4. `session intent`
-5. 最近一次相关 `session review / compaction`
+### 7.5 训练页要长出“录音助手”，但先做 web-first 版本
 
-默认装配结果应至少区分：
+你提的录音助手是非常值得做的，但 P0/P1 要分开。
 
-1. `static`
-   - 低频稳定画像
-2. `dynamic`
-   - 当前场景、当前段落、当前目标
-3. `relevant`
-   - 当前最相关热词、风险句、保底句、误听规律
+训练页第一原则先固定：
 
-一句话：
+1. 用户录音要舒服
+2. 用户录音要有动力
+3. 用户录音要有明确目标
 
-`memory source of truth` 和 `runtime context assembly` 不能再混成一个抽象。
+也就是说，录音助手首先不是一个“会聊天的助手”，而是一个：
 
-### L4 选择性多模态索引
+1. 帮用户更轻松开始录
+2. 帮用户坚持完成今天目标
+3. 帮用户看到今天录音的意义
 
-只针对高价值音频片段做异步索引，不进入默认实时主链。
+的训练陪伴层。
 
-### 记忆写入边界
+P0 先做：
 
-1. `dataset` 不是 `memory`
-2. `transcript` 不是天然长期记忆
-3. `voice_profile` 必须是结构化字段 + 少量摘要
-4. 长期记忆默认“提炼后写入”，不是原文直灌
+1. 录音舒适度提升
+   - 录音前预检
+   - 设备 / 音量提示
+   - 停止后立刻重录
+   - 更清楚的状态反馈：正在听、已停止、上传中、已入库、后台补传中
+2. 每日训练目标
+   - 今日 10 句 / 20 句
+3. 每日完成后生成一次训练建议
+   - 发音纠正建议
+   - 新材料准备建议
+   - 次日训练计划建议
+4. 生成一份可编辑的“今日训练计划”
+5. 这份计划可以挂到沟通区，用户可：
+   - 修改
+   - 勾选完成
+   - 标记跳过
 
-## 8.7 Agent 系统深设计
+P1 再做：
 
-VoxFlame 不该把 agent 系统理解成“一个更复杂的 prompt”。
+1. 录音助手带 TTS，能直接语音和用户对话
+2. 主动提醒是否完成今日计划
+3. PWA / 本地提醒 / 站内提醒
 
-后续应明确四层：
+也就是说，P0 先把“舒服录音 + 目标感 + 建议 + 计划 + 挂载沟通区”做成，P1 再把它变成更像“龙虾一样追着你”的主动助手。
 
-### Realtime Core Tools
+### 7.6 训练助手的产品职责
 
-- `session_start`
-- `transport_send_control`
-- `interrupt_control`
-- `tts_speak`
-- `transcript_finalize`
+训练助手不该只是聊天陪练，它应该有 4 个明确职责：
 
-### Memory & Profile Tools
+1. `recording companion`
+   - 让录音更顺手、更低负担
+2. `daily coach`
+   - 每日录音后给建议
+3. `plan maker`
+   - 生成下一个训练计划
+4. `material strategist`
+   - 建议用户补哪些新材料
+5. `summarizer`
+   - 周期性压缩训练结果，生成精简有用文档
 
-- `memory_bundle_get`
-- `voice_profile_read`
-- `voice_profile_update`
-- `session_review_write`
+这个助手的输出默认不直接进入 always-on memory，而是先进：
 
-### Training & Dataset Tools
+1. plan draft
+2. suggestion draft
+3. compact summary draft
 
-- `upload_artifact_persist`
-- `recorder_enqueue`
-- `dataset_manifest_append`
-- `sample_quality_score`
+只有用户确认或系统通过稳定规则筛过后，才回写 durable workspace。
 
-### Async Workflow / MCP
+### 7.7 模型分层建议
 
-- `provider_health_check`
-- `report_generate`
-- `issue_workflow_ops`
-- 未来外部知识库 / 设备状态 / CRM / 康复机构接入
+当前继续以 `qwen-flash` 承担实时链路是对的。
 
-一句话原则：
+下一步更合理的模型分工是：
 
-`实时能力做 tool，长期方法做 skill，重任务编排做 workflow，跨系统接入做 MCP。`
+1. 实时模型
+   - 用于 ASR 后纠错、短回复、低延迟沟通辅助
+   - 继续优先 `qwen-flash`
+2. 异步总结模型
+   - 用于 prepared material compaction
+   - 用于 session summary
+   - 用于训练归纳和计划生成
+   - 可以评估接入更高容量的 Qwen 系列模型，例如 `Qwen 32B` 一类非实时总结模型
+3. 批处理模型
+   - 用于夜间或定期 summary / dataset distillation / material refresh
 
-### 关于多 agent 的当前边界
+产品原则固定为：
 
-2026-04-06 新增判断：
-
-1. 多 agent / fork / swarm 更适合研发协作、离线分析和后台重任务
-2. 不适合直接进入构音障碍用户的现场主链
-3. 现场 runtime 的第一目标仍然是：
-   - 低延迟
-   - 可预测
-   - 可打断
-   - 不越权
-
-所以产品 runtime 继续优先：
-
-1. 单主链 realtime assistant
-2. 明确的 tool / skill / workflow 分层
-3. session close 后再做更重的 extraction / synthesis / review
-
-而不是把现场表达链路直接做成 agent swarm。
-
-## 8.8 关键工程边界
-
-1. dataset != memory
-2. frontend hook != control plane
-3. TEN main control != product governance layer
-4. starter kit != quick phrase CRUD
-5. light voice != new primary runtime
-6. transport vendor != product language
-7. docs current task != historical execution archive
-8. frontend local cache != shared durable profile
-9. runtime working memory != user-facing communication archive
+1. 实时链只追求快、稳、够用
+2. 复杂总结和计划生成交给异步链
+3. 不把高时延模型直接塞进实时沟通主循环
 
 ---
 
-## 9. 指标框架
+## 8. 可落地的功能 / UI / 执行步骤
 
-## 9.1 北极星指标
+### 8.1 Phase 1：把记忆系统变成“材料系统”
 
-- 陌生人沟通成功率
+先落地的 UI：
 
-## 9.2 P0 核心指标
+1. 记忆页顶部改成 4 个对象区：
+   - 自定义材料区
+   - 场景 / 热词模板
+   - 用户个人画像
+   - 训练总结
+2. 每个区显示文档列表
+3. 右侧或下方显示文档编辑器
+4. 支持：
+   - 新建
+   - 打开
+   - 删除
+   - 编辑
+   - 保存
 
-1. 第一话发起成功率
-2. 沟通失败后的兜底完成率
-3. p95 从点击到首次可播出响应时间
-4. 双行对照触发后的用户纠偏成功率
+工程步骤：
 
-## 9.3 P1 成长指标
+1. 设计 `workspace documents` 数据结构
+2. backend 新增文档 CRUD
+3. 记忆页改成文档列表 + 编辑器
+4. 把现有 `prepared_expression / hotword / preferences / rehearsal summary` 迁入新对象模型
 
-1. 训练后 7 天再次使用率
-2. 训练样本到训练画像形成率
-3. 高频表达命中率
-4. 训练任务完成率
+### 8.2 Phase 2：把沟通页变成 loadout 页面
+
+先落地的 UI：
+
+1. 进入沟通前展示：
+   - 默认已加载材料
+   - 可勾选材料
+   - 当前模式：紧急沟通 / 长时间沟通
+2. 沟通中始终可展开“本次已加载”
+
+工程步骤：
+
+1. 设计 `communication_loadout` 数据结构
+2. `workspace snapshot` 增加可消费的 loadout view
+3. 沟通页接入 mode selector
+4. runtime `assemble_context` 改成按 loadout 装配，而不是按页面零散拼装
+
+### 8.3 Phase 3：拆出紧急沟通 / 长时间沟通双模式
+
+UI 重点：
+
+1. 首页入口直接拆成：
+   - 现在紧急沟通
+   - 长时间沟通
+2. 紧急沟通默认更轻
+3. 长时间沟通默认展示已加载材料和 session goal
+
+工程步骤：
+
+1. 在现有 `sessionStrategy` 上补产品语义
+2. 让 `urgent` 和 `long_form` 拥有不同 loadout policy
+3. 调整沟通页组件，而不是新开另一套 runtime
+
+### 8.4 Phase 4：训练页长出录音助手
+
+P0 UI：
+
+1. 录音前准备卡片
+   - 当前设备
+   - 音量状态
+   - 今日目标
+2. 今日目标卡片
+3. 完成进度
+4. 今日建议
+5. 明日计划
+6. “挂到沟通区”按钮
+
+P1 UI：
+
+1. 助手对话卡片
+2. TTS 播报建议
+3. 提醒中心
+
+工程步骤：
+
+1. 先补录音舒适度层
+   - 预检
+   - 状态反馈
+   - 快速重录
+2. 训练页完成 10 / 20 句后触发异步总结
+3. 生成：
+   - correction advice
+   - material advice
+   - next-day plan
+4. 存成 `training coach summary`
+5. 将计划挂到沟通页与记忆页
+6. 再补 TTS 助手和提醒
+
+### 8.5 Phase 5：让总结系统真正接管“精简有用文档”
+
+要落地的文档对象：
+
+1. 今日训练总结
+2. 近 7 天训练总结
+3. 当前最稳表达清单
+4. 当前高风险误听清单
+5. 推荐新增材料清单
+
+工程步骤：
+
+1. 把 prepared expression summary 扩成通用 compact summary pipeline
+2. 引入异步总结模型
+3. 固定 `flush -> compact -> durable write`
+4. 只把确认有价值的精简文档写回 workspace
+
+### 8.6 当前推荐执行顺序
+
+按 CEO 视角，最有杠杆的顺序不是“先做提醒”，而是：
+
+1. 先做 3 个文档区和文档列表
+2. 再做 loadout
+3. 再拆紧急沟通 / 长时间沟通
+4. 再把训练页收成“舒服录音 + 明确目标 + 有动力坚持”的工作台
+5. 再做训练页录音助手的建议与计划
+6. 最后再做语音化助手、主动提醒和更强总结
+
+这样做的原因是：
+
+1. 文档和 loadout 是系统骨架
+2. 双模式是用户价值放大器
+3. 训练页如果录得不舒服，再好的训练助手都留不住人
+4. 训练助手是增强层，不该先于骨架存在
 
 ---
 
-## 10. 分阶段路线图
+## 9. 当前明确不优先
 
-## Phase 0：产品语言与主路径收口
+以下内容在正式上线前都不优先：
 
-当前状态：大部分已完成
-
-1. 首页、README、docs、AGENTS 已基本统一到“主动沟通助手 + 练习工作台 + 沟通档案”
-2. 沟通页首屏已接入 starter kit
-3. expression kit / profile bundle / dataset recorder 边界已初步成立
-4. 旧 roadmap / reset / strategy 主文已退出现役维护
-
-## Phase 1：沟通工作台继续变强
-
-当前状态：接近完成，剩内容质量与连续任务流
-
-1. 首页高压场景已可直接带 starter intent 进入沟通页
-2. personalized phrase rail 继续吸收 `workspace` 与 recent review
-3. live session 区继续减弱聊天壳，强化“先开口 + 补救”
-
-## Phase 2：练习工作台升级为 multi-surface-ready 训练入口
-
-当前状态：基础 contract 已成立，进入收尾验证
-
-1. 稳定 `recording envelope -> upload receipt -> manifest`
-2. 把样本质量、review queue、云端登记做成可信主链
-3. 让训练页继续服务用户练习，而不是暴露采集心智
-4. 开始抽离 future mobile / desktop companion 也要复用的 shared types / contract，而不是让多端各自复制 schema
-
-## Phase 3：控制面与 surface contract 收口
-
-当前状态：进行中，当前主任务
-
-1. 正式化 `session / transport / capability / session_strategy`
-2. 为 web / PWA / future mobile / future desktop 统一 surface 语言
-3. 把 `Runtime And Surface Reference` 升级成多端规划的主参考
-4. 补出 `context assembly` 这一层，禁止页面和 runtime 继续各自拼上下文
-
-## Phase 4：沟通档案与 memory/tooling 深化
-
-当前状态：排在 runtime/surface 之后
-
-1. 让 `workspace` 真正成为 durable profile owner 入口
-2. 支持 expression kit 编辑与更清楚的 session review 治理
-3. 再继续深化 memory / tooling / future coach
-4. 逐步形成“日志追加 -> 异步蒸馏 -> 长期主题化记忆”的 compaction 节奏，而不是继续积累原始流水
-
-## 10.1 按现状代码的最可行开发路径
-
-在当前仓库里，最可行的顺序已经调整为“在现有 LiveKit 执行面上把训练页、记忆页和现场准备做完整”，而不是继续围绕迁移 seam 打转：
-
-1. 先冻结上层 contract，不再让后续功能打散产品语言
-   - `workspace owner`
-   - `dataset schema`
-   - `session intent / readiness / capability gating`
-   - shared `session / review / preparation / feedback` objects
-2. 在 `livekit_agent` 内补齐 typed session memory
-   - `session.userdata`
-   - `PreparationContextPack`
-   - 当前场景 / 热词 / listener guidance / outline 锚点
-   - `context assembly` 输出
-3. 在会话结束时做 `pattern extraction + compaction`
-   - `training_result`
-   - `training_profile_summary`
-   - `workspace preparation`
-   - `session_review`
-   - 主题化 important-expression synthesis
-4. 再继续加固 backend `workspace`
-   - `profile bundle`
-   - `preparation`
-   - `expression kit merge`
-5. 再让沟通页只消费“当前场景最小必要准备”
-6. 再为训练页和记忆页补更强的 recall / hotword / prepared-expression 能力
-7. 然后才评估 `Qdrant` 作为 semantic recall layer 的正式接入
-
-当前判断（2026-04-05）：
-
-1. LiveKit 迁移已经完成主执行面切换，不再是专项主任务
-2. 现役模型/语音执行面以 `DashScope / Qwen-first` 为准
-3. 当前最真实的缺口不是 transport，而是：
-   - 训练页 AI parity
-   - 记忆页作为“准备 owner”的完整度
-   - `session memory -> durable memory` 的压缩质量
+1. 多 agent / handoff
+2. 通用向量记忆平台
+3. 新开一套 runtime
+4. 独立移动端 / 桌面端大扩张
+5. 大范围 UI 翻新
 
 ---
 
-## 11. 当前不优先
+## 10. 本文档取代关系
 
-1. 不保兼容、直接切主链的 big bang runtime 重写
-2. 用硬件叙事替代主产品闭环
-3. 把听障辅助并入当前首页主线
-4. 复杂社交页 / feed 页
-5. 医学诊断式训练报告
+这份精简版 PRD 现在只承担两件事：
 
----
+1. 说明当前代码现状意味着什么
+2. 说明上线前只剩哪几件头等大事
 
-## 12. 本文档取代关系
+更细的 memory 边界以：
 
-本文档取代并合并以下文档中的产品主结论：
+- [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
 
-- `docs/COMMUNICATION_FIRST_PRODUCT_RESET_2026-03-09.md`
-- `docs/VOXFLAME_PRODUCT_STRATEGY_AND_USER_RESEARCH_2026-03-05.md`
-- `docs/VOXFLAME_EXECUTION_ROADMAP_2026-03-05.md`
+更细的短期执行状态以：
 
-这些旧文档中的部分研究结论已被吸收；后续不再作为产品主文继续维护。
+- [../.tasks/current.md](../.tasks/current.md)
+
+为准。

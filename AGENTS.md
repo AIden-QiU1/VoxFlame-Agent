@@ -151,7 +151,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 - [docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)：吸收 `memory mechanisms / voice-agent-tooling` 后的统一 agent、memory、tooling 参考文档。
 - [frontend/README.md](frontend/README.md)：当前前端页面系统、共享 `workspace` contract、训练资产链路与 PWA 边界。
 - [docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md](docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md)：纠错链路设计。
-- [docs/VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md](docs/VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md)：记忆系统统一方案。
+- [docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)：统一后的记忆系统主参考（含历史统一报告合并结论）。
 - [docs/control-plane.md](docs/control-plane.md)：控制面的职责、边界、现有实现映射与后续收口方向。
 - [docs/capability-registry.md](docs/capability-registry.md)：产品运行时能力与工程协作能力的 registry，明确 owner、调用边界、副作用和 smoke。
 - [docs/VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md](docs/VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)：基于 `ququ + vocotype-cli` 的实施文档，定义训练数据 schema、recorder pipeline、manifest 与本地 recorder queue 的收口方向。

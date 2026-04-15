@@ -220,9 +220,9 @@ LiveKit 官方 external data 文档强调：
 
 ### 4.1 Qdrant：异步 recall layer，不是主记忆 owner
 
-结合仓库现状和旧统一报告：
+结合仓库现状和当前 memory 主文档：
 
-- [VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md)
+- [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
 
 Qdrant 最适合的角色是：
 
@@ -403,5 +403,4 @@ Qdrant 最适合的角色是：
 
 ### 仓库现有记忆参考
 
-- [VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_UNIFIED_MEMORY_REPORT_2026-03-05.md)
 - [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
