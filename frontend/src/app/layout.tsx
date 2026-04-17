@@ -7,17 +7,12 @@ import './globals.css'
 const pwaEnabled = process.env.NEXT_PUBLIC_PWA_ENABLED === '1'
 const allowLocalhostPwa = process.env.NEXT_PUBLIC_PWA_ALLOW_LOCALHOST === '1'
 const shouldResetLocalRuntime = !pwaEnabled || !allowLocalhostPwa
-const LOCAL_RUNTIME_RESET_SESSION_KEY = 'voxflame-local-runtime-reset-session-v1'
 const LOCAL_RUNTIME_RESET_BOOTSTRAP = `
 (() => {
   if (typeof window === 'undefined') return;
 
   const host = window.location.hostname;
   if (host !== 'localhost' && host !== '127.0.0.1') return;
-
-  if (window.sessionStorage.getItem('${LOCAL_RUNTIME_RESET_SESSION_KEY}') === '1') {
-    return;
-  }
 
   const resetRuntimeState = async () => {
     const registrations =
@@ -34,8 +29,6 @@ const LOCAL_RUNTIME_RESET_BOOTSTRAP = `
     if ('caches' in window && cacheNames.length > 0) {
       await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
     }
-
-    window.sessionStorage.setItem('${LOCAL_RUNTIME_RESET_SESSION_KEY}', '1');
 
     if (hadRuntimeState) {
       window.location.reload();

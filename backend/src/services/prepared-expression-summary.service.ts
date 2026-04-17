@@ -1,12 +1,11 @@
 import {
-  buildAsrHotwordEntries,
   buildPreparedExpressionCorrectionPairs,
-  buildPreparedExpressionReferenceLines,
   buildPreparedExpressionTemplateFromDraft,
   type PreparedExpressionAsset,
   type PreparedExpressionCorrectionPair,
-  type PreparedExpressionRehearsalSummary,
-  type PreparedExpressionSectionTemplate,
+  type PreparedExpressionTrainingPlan,
+  type PreparedExpressionTrainingReports,
+  type PreparedExpressionTrainingSummaryWindow,
   type PreparedExpressionTemplate,
 } from './prepared-expression.service';
 
@@ -26,37 +25,33 @@ export interface PreparedExpressionTrainingSample {
 
 export type PreparedExpressionSummaryTrigger = 'manual' | 'periodic_auto';
 
-const SUMMARY_SAMPLE_WINDOW = 50;
+const DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const WEEKLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const DAILY_MODEL_SAMPLE_LIMIT = 24;
+const WEEKLY_MODEL_SAMPLE_LIMIT = 56;
 
-interface PreparedExpressionSummaryPayload {
-  document_summary?: string;
-  document_hotwords?: string[];
-  document_high_risk_phrases?: string[];
-  document_fallback_phrases?: string[];
-  sections?: Array<{
-    id?: string;
-    title?: string;
-    summary?: string;
-    anchor_line?: string;
-    practice_lines?: string[];
-    high_risk_phrases?: string[];
-    fallback_phrases?: string[];
-    hotwords?: string[];
-    base_priority?: number;
-  }>;
-  rehearsal_summary?: string;
-  rehearsal_hotwords?: string[];
-  recurring_errors?: string[];
-  pronunciation_patterns?: string[];
-  support_strategies?: string[];
-  fallback_phrases?: string[];
-  next_focus?: string[];
-  reference_lines?: string[];
-  correction_pairs?: Array<{
+interface SummaryWindowPayload {
+  summary?: string;
+  mismatch_pairs?: Array<{
     target?: string;
     heard?: string;
     occurrence_count?: number;
   }>;
+  next_focus?: string[];
+  stable_wins?: string[];
+  pronunciation_patterns?: string[];
+  support_strategies?: string[];
+}
+
+interface TrainingPlanPayload {
+  summary?: string;
+  items?: string[];
+}
+
+interface PreparedExpressionTrainingReportPayload {
+  daily_summary?: SummaryWindowPayload;
+  weekly_summary?: SummaryWindowPayload;
+  training_plan?: TrainingPlanPayload;
 }
 
 function dedupeStrings(values: Array<string | null | undefined>, limit?: number): string[] {
@@ -103,214 +98,75 @@ function readStringList(value: unknown): string[] {
     .map((item) => item.trim());
 }
 
-function readCorrectionPairList(value: unknown): PreparedExpressionCorrectionPair[] {
-  if (!Array.isArray(value)) {
-    return [];
+function toTimestamp(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
   }
 
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function buildMismatchPairs(
+  samples: PreparedExpressionTrainingSample[],
+  limit: number,
+  maxChars: number,
+): PreparedExpressionCorrectionPair[] {
   return buildPreparedExpressionCorrectionPairs(
-    value.map((item) => {
-      if (!isRecord(item)) {
-        return { target: null, heard: null };
-      }
-
-      return {
-        target: readString(item, 'target'),
-        heard: readString(item, 'heard'),
-      };
-    }),
-    {
-      maxPairs: 60,
-      maxChars: 3200,
-    },
-  );
-}
-
-function normalizeSectionSuggestions(
-  existing: PreparedExpressionSectionTemplate[],
-  payload: PreparedExpressionSummaryPayload | null,
-): PreparedExpressionSectionTemplate[] {
-  if (!payload?.sections || payload.sections.length === 0) {
-    return existing;
-  }
-
-  return existing.map((section) => {
-    const suggested = payload.sections?.find((item) => {
-      if (!item) {
-        return false;
-      }
-
-      const suggestedId = typeof item.id === 'string' ? item.id.trim() : '';
-      const suggestedTitle = typeof item.title === 'string' ? item.title.trim() : '';
-      return suggestedId === section.id || suggestedTitle === section.title;
-    });
-
-    if (!suggested) {
-      return section;
-    }
-
-    return {
-      ...section,
-      title: suggested.title?.trim() || section.title,
-      summary: suggested.summary?.trim() || section.summary,
-      anchorLine: suggested.anchor_line?.trim() || section.anchorLine,
-      practiceLines: dedupeStrings(
-        [
-          ...readStringList(suggested.practice_lines),
-          ...section.practiceLines,
-        ],
-        4,
-      ),
-      highRiskPhrases: dedupeStrings(
-        [
-          ...readStringList(suggested.high_risk_phrases),
-          ...section.highRiskPhrases,
-        ],
-        4,
-      ),
-      fallbackPhrases: dedupeStrings(
-        [
-          ...readStringList(suggested.fallback_phrases),
-          ...section.fallbackPhrases,
-        ],
-        3,
-      ),
-      hotwords: dedupeStrings(
-        [
-          ...readStringList(suggested.hotwords),
-          ...section.hotwords,
-        ],
-        6,
-      ),
-      basePriority:
-        typeof suggested.base_priority === 'number'
-          ? Math.max(1, Math.min(6, suggested.base_priority))
-          : section.basePriority,
-    };
-  });
-}
-
-function buildTargetHeardPairs(
-  samples: PreparedExpressionTrainingSample[],
-): string[] {
-  return dedupeStrings(
-    samples.flatMap((sample) => {
-      const target = sample.target_text.trim();
-      const recognized = sample.recognized_text.trim();
-      if (!target || !recognized || target === recognized) {
-        return [];
-      }
-
-      return [`目标“${truncateText(target, 18)}”常被听成“${truncateText(recognized, 18)}”`];
-    }),
-    8,
-  );
-}
-
-function buildHeuristicSummary(
-  asset: PreparedExpressionAsset,
-  samples: PreparedExpressionTrainingSample[],
-): {
-  structured: PreparedExpressionTemplate;
-  rehearsal: PreparedExpressionRehearsalSummary;
-} {
-  const fallbackStructured = buildPreparedExpressionTemplateFromDraft(asset.draft);
-  const sectionStats = new Map<
-    string,
-    {
-      title: string;
-      total: number;
-      weak: number;
-    }
-  >();
-  const targetHeardPairs = buildTargetHeardPairs(samples);
-  const referenceLines = buildPreparedExpressionReferenceLines(fallbackStructured, {
-    maxLines: 60,
-    maxChars: 3200,
-  });
-  const trainingPairs = buildPreparedExpressionCorrectionPairs(
     samples.map((sample) => ({
       target: sample.target_text,
       heard: sample.recognized_text,
     })),
     {
-      maxPairs: 60,
-      maxChars: 3200,
+      maxPairs: limit,
+      maxChars,
     },
   );
+}
 
-  const recurringErrors = dedupeStrings(
+function buildStableWins(samples: PreparedExpressionTrainingSample[], limit: number): string[] {
+  return dedupeStrings(
     samples.flatMap((sample) => {
       const target = sample.target_text.trim();
       const recognized = sample.recognized_text.trim();
-      if (!target || !recognized || target === recognized) {
-        return [
-          ...sample.speech_patterns,
-          ...sample.articulation_tips,
-        ];
+      const exactMatch = target && recognized && target === recognized;
+      const excellent = sample.feedback_status === 'excellent';
+
+      if (!exactMatch && !excellent) {
+        return [];
       }
 
-      return [
-        `目标“${truncateText(target, 18)}”常被听成“${truncateText(recognized, 18)}”`,
+      return [truncateText(target || recognized, 18)];
+    }),
+    limit,
+  );
+}
+
+function buildNextFocus(
+  samples: PreparedExpressionTrainingSample[],
+  asset: PreparedExpressionAsset,
+  limit: number,
+): string[] {
+  return dedupeStrings(
+    [
+      ...samples.flatMap((sample) => [
+        sample.prepared_expression_section_title,
+        ...sample.high_risk_phrases,
         ...sample.speech_patterns,
         ...sample.articulation_tips,
-      ];
-    }),
-    8,
-  );
-
-  samples.forEach((sample) => {
-    const sectionKey =
-      sample.prepared_expression_section_id?.trim() ||
-      sample.prepared_expression_section_title?.trim();
-    const sectionTitle = sample.prepared_expression_section_title?.trim();
-    if (!sectionKey || !sectionTitle) {
-      return;
-    }
-
-    const current = sectionStats.get(sectionKey) ?? {
-      title: sectionTitle,
-      total: 0,
-      weak: 0,
-    };
-
-    current.total += 1;
-    if (sample.feedback_status !== 'excellent') {
-      current.weak += 1;
-    }
-
-    sectionStats.set(sectionKey, current);
-  });
-
-  const prioritizedSections = [...sectionStats.values()]
-    .sort((left, right) => {
-      if (right.weak !== left.weak) {
-        return right.weak - left.weak;
-      }
-      return right.total - left.total;
-    })
-    .slice(0, 3)
-    .map((item) => item.title);
-
-  const hotwords = dedupeStrings(
-    [
-      ...asset.structured.hotwords,
-      ...asset.structured.sections.flatMap((section) => section.hotwords),
-      ...samples.flatMap((sample) => sample.hotwords),
-      ...samples.flatMap((sample) => sample.high_risk_phrases),
+      ]),
+      ...asset.structured.highRiskPhrases,
+      ...asset.structured.sections.slice(0, 4).map((section) => section.title),
     ],
-    12,
+    limit,
   );
+}
 
-  const fallbackPhrases = dedupeStrings(
-    [
-      ...asset.structured.fallbackPhrases,
-      ...asset.structured.sections.flatMap((section) => section.fallbackPhrases),
-    ],
-    6,
-  );
-
-  const pronunciationPatterns = dedupeStrings(
+function buildPronunciationPatterns(
+  samples: PreparedExpressionTrainingSample[],
+  limit: number,
+): string[] {
+  return dedupeStrings(
     [
       ...samples.flatMap((sample) => sample.speech_patterns),
       ...samples.flatMap((sample) => sample.articulation_tips),
@@ -318,63 +174,82 @@ function buildHeuristicSummary(
         .map((sample) => sample.pronunciation_summary)
         .filter((item): item is string => typeof item === 'string' && item.trim().length > 0),
     ],
-    8,
+    limit,
   );
+}
 
-  const supportStrategies = dedupeStrings(
-    [
-      fallbackPhrases[0] ? `卡住时先退回保底句：${fallbackPhrases[0]}` : null,
-      prioritizedSections[0] ? `下一轮先把“${prioritizedSections[0]}”里的重点词和短句练稳。` : null,
-      targetHeardPairs[0] ? `先单独纠正这组高频替换，再把整句接回去：${targetHeardPairs[0]}` : null,
-    ],
-    4,
-  );
+function summarizeWindowHeuristically(
+  label: 'daily' | 'weekly',
+  samples: PreparedExpressionTrainingSample[],
+  asset: PreparedExpressionAsset,
+): PreparedExpressionTrainingSummaryWindow | null {
+  if (samples.length === 0) {
+    return null;
+  }
+
+  const mismatchPairs = buildMismatchPairs(samples, 6, 1200);
+  const stableWins = buildStableWins(samples, 3);
+  const nextFocus = buildNextFocus(samples, asset, 4);
+  const summaryLead = label === 'daily' ? '今天' : '最近 7 天';
+  const mismatchLead = mismatchPairs[0]
+    ? `最值得先收口的是“${truncateText(mismatchPairs[0].target, 14)} -> ${truncateText(mismatchPairs[0].heard, 14)}”`
+    : nextFocus[0]
+      ? `优先继续盯住“${truncateText(nextFocus[0], 16)}”`
+      : '继续把今天最常练的句子说稳';
+  const stableLead = stableWins[0] ? `已经较稳的是“${stableWins[0]}”` : null;
 
   return {
-    structured: {
-      ...fallbackStructured,
-      summary:
-        samples.length > 0
-          ? `这份准备内容当前已累计 ${samples.length} 条训练样本，优先继续保护 ${prioritizedSections[0] ?? fallbackStructured.sections[0]?.title ?? '当前重点段落'} 里的热词和风险句。`
-          : fallbackStructured.summary,
-      hotwords,
-      highRiskPhrases: dedupeStrings(
-        [
-          ...fallbackStructured.highRiskPhrases,
-          ...samples.flatMap((sample) => sample.high_risk_phrases),
-        ],
-        8,
-      ),
-      fallbackPhrases,
-    },
-    rehearsal: {
-      summary:
-        samples.length > 0
-          ? `最近 ${samples.length} 条训练样本里，系统最常听偏的是 ${targetHeardPairs[0] ?? prioritizedSections[0] ?? '当前重点段落'}。`
-          : '准备内容已经保存。先继续按拆句训练，积累到下一轮总结门槛后再自动压规律和热词。',
-      hotwords,
-      recurringErrors,
-      pronunciationPatterns,
-      supportStrategies,
-      fallbackPhrases,
-      nextFocus: dedupeStrings(
-        [
-          ...prioritizedSections,
-          ...asset.structured.highRiskPhrases.slice(0, 2),
-        ],
-        6,
-      ),
-      asrHotwordEntries: buildAsrHotwordEntries(hotwords),
-      referenceLines,
-      trainingPairs,
-      basedOnTrainingCount: samples.length,
-      model: 'heuristic',
-      updated_at: new Date().toISOString(),
-    },
+    summary: `${summaryLead}共练了 ${samples.length} 句，${mismatchLead}${stableLead ? `；${stableLead}` : ''}。`,
+    sampleCount: samples.length,
+    mismatchPairs,
+    nextFocus,
+    stableWins,
+    pronunciationPatterns: buildPronunciationPatterns(samples, 8),
+    supportStrategies: dedupeStrings(
+      [
+        mismatchPairs[0]
+          ? `先单独练“${truncateText(mismatchPairs[0].target, 16)}”，避免再被听成“${truncateText(mismatchPairs[0].heard, 16)}”。`
+          : null,
+        asset.structured.fallbackPhrases[0]
+          ? `卡住时先回保底句：${asset.structured.fallbackPhrases[0]}`
+          : null,
+      ],
+      4,
+    ),
+    generated_at: new Date().toISOString(),
   };
 }
 
-function extractJsonObject(rawText: string): PreparedExpressionSummaryPayload | null {
+function summarizePlanHeuristically(
+  dailySummary: PreparedExpressionTrainingSummaryWindow | null,
+  weeklySummary: PreparedExpressionTrainingSummaryWindow | null,
+): PreparedExpressionTrainingPlan | null {
+  const baseFocus = dailySummary?.nextFocus[0] ?? weeklySummary?.nextFocus[0] ?? null;
+  const basePair = dailySummary?.mismatchPairs[0] ?? weeklySummary?.mismatchPairs[0] ?? null;
+
+  const items = dedupeStrings(
+    [
+      basePair
+        ? `先单独练“${truncateText(basePair.target, 18)}”，重点避免再被听成“${truncateText(basePair.heard, 18)}”。`
+        : null,
+      baseFocus ? `下一轮先只盯“${truncateText(baseFocus, 18)}”，不要同时改太多点。` : null,
+      '先完成一轮短句复练，再回到整句，保证目标句和转录句差异明显缩小。',
+    ],
+    3,
+  );
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return {
+    summary: '下一轮计划只保留最少、最具体的动作，先把高频差异收小。',
+    items,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+function extractJsonObject(rawText: string): PreparedExpressionTrainingReportPayload | null {
   const trimmed = rawText.trim();
   if (!trimmed) {
     return null;
@@ -392,17 +267,17 @@ function extractJsonObject(rawText: string): PreparedExpressionSummaryPayload | 
       return null;
     }
 
-    return parsed as PreparedExpressionSummaryPayload;
+    return parsed as PreparedExpressionTrainingReportPayload;
   } catch {
     return null;
   }
 }
 
-async function requestDashScopeSummary(
+async function requestDashScopeTrainingReport(
   prompt: string,
   model: string,
   timeoutMs: number,
-): Promise<PreparedExpressionSummaryPayload | null> {
+): Promise<PreparedExpressionTrainingReportPayload | null> {
   const apiKey = process.env.DASHSCOPE_API_KEY?.trim();
   if (!apiKey) {
     return null;
@@ -423,12 +298,12 @@ async function requestDashScopeSummary(
         body: JSON.stringify({
           model,
           temperature: 0.1,
-          max_tokens: 1200,
+          max_tokens: 1400,
           messages: [
             {
               role: 'system',
               content:
-                '你是 VoxFlame 的 correction memory summarizer。你只返回 JSON，不要 markdown，不要解释。你的目标是把用户自定义准备内容和训练样本压成适合 qwen3.6 correction 使用的最小必要上下文，重点保留准备稿参考原句、训练里稳定复现的目标句/系统听到错配对，以及足够短的摘要。',
+                '你是 VoxFlame 的训练总结器。你只返回 JSON，不要 markdown，不要解释。你的工作只有三件事：基于目标句和转录句的差异，生成今日总结、7天总结、下一轮计划。不要重写准备材料，不要生成 document summary，不要扩写成长文。',
             },
             {
               role: 'user',
@@ -476,16 +351,27 @@ async function requestDashScopeSummary(
 
 function buildModelPrompt(
   asset: PreparedExpressionAsset,
-  samples: PreparedExpressionTrainingSample[],
+  dailySamples: PreparedExpressionTrainingSample[],
+  weeklySamples: PreparedExpressionTrainingSample[],
   trigger: PreparedExpressionSummaryTrigger,
 ): string {
-  const compactSamples = samples.slice(0, SUMMARY_SAMPLE_WINDOW).map((sample) => ({
+  const compactDaily = dailySamples.slice(0, DAILY_MODEL_SAMPLE_LIMIT).map((sample) => ({
     created_at: sample.created_at,
     section: sample.prepared_expression_section_title,
     target_text: sample.target_text,
     recognized_text: sample.recognized_text,
     feedback_status: sample.feedback_status,
-    hotwords: sample.hotwords,
+    speech_patterns: sample.speech_patterns,
+    articulation_tips: sample.articulation_tips,
+    pronunciation_summary: sample.pronunciation_summary,
+  }));
+
+  const compactWeekly = weeklySamples.slice(0, WEEKLY_MODEL_SAMPLE_LIMIT).map((sample) => ({
+    created_at: sample.created_at,
+    section: sample.prepared_expression_section_title,
+    target_text: sample.target_text,
+    recognized_text: sample.recognized_text,
+    feedback_status: sample.feedback_status,
     speech_patterns: sample.speech_patterns,
     articulation_tips: sample.articulation_tips,
     pronunciation_summary: sample.pronunciation_summary,
@@ -493,95 +379,154 @@ function buildModelPrompt(
 
   return JSON.stringify(
     {
-      task: 'prepared_expression_compaction_for_correction',
+      task: 'training_daily_weekly_summary_and_plan',
       trigger,
       instructions: {
-        limits: {
-          document_hotwords: 12,
-          document_high_risk_phrases: 8,
-          document_fallback_phrases: 6,
-          sections: 12,
-          rehearsal_hotwords: 12,
-          recurring_errors: 8,
-          pronunciation_patterns: 8,
-          support_strategies: 6,
-          next_focus: 6,
-        },
         focus: [
-          '优先提取对实时 correction 最有帮助的信息，不要生成成长报表。',
-          '训练总结只从 rehearsal_samples 提炼，不要把准备稿原文伪装成训练结论。',
-          '高频错误尽量写成“目标 -> 系统听到”的形式。',
-          'reference_lines 应该优先保留准备稿里可直接对齐的原句，不要改写语气。',
-          'correction_pairs 只保留稳定复现的目标句/系统听到句对，不要编造不存在的 pair。',
-          '优先总结稳定复现的局部替换规律，不要重写整句风格。',
-          '不要假设实时 ASR 支持热词注入，重点是服务 LLM correction。',
+          'daily_summary 只根据 last_24h_samples 生成。',
+          'weekly_summary 只根据 last_7d_samples 生成。',
+          '只总结 target_text 和 recognized_text 的稳定差异，不要把准备材料本身改写成训练结论。',
+          'mismatch_pairs 只保留真实稳定出现的“目标 -> 系统听到”错配。',
+          'training_plan 只给 2 到 3 条最具体、最窄的下一步动作。',
+          'weekly_summary 会同时服务训练页和纠错链路，所以要精确、短、可复用。',
         ],
+        limits: {
+          daily_mismatch_pairs: 4,
+          weekly_mismatch_pairs: 6,
+          next_focus: 4,
+          stable_wins: 3,
+          plan_items: 3,
+          pronunciation_patterns: 8,
+          support_strategies: 4,
+        },
         output_schema: {
-          document_summary: 'string',
-          document_hotwords: ['string'],
-          document_high_risk_phrases: ['string'],
-          document_fallback_phrases: ['string'],
-          sections: [
-            {
-              id: 'string',
-              title: 'string',
-              summary: 'string',
-              anchor_line: 'string',
-              practice_lines: ['string'],
-              high_risk_phrases: ['string'],
-              fallback_phrases: ['string'],
-              hotwords: ['string'],
-              base_priority: 1,
-            },
-          ],
-          rehearsal_summary: 'string',
-          rehearsal_hotwords: ['string'],
-          recurring_errors: ['string'],
-          pronunciation_patterns: ['string'],
-          support_strategies: ['string'],
-          fallback_phrases: ['string'],
-          next_focus: ['string'],
-          reference_lines: ['string'],
-          correction_pairs: [
-            {
-              target: 'string',
-              heard: 'string',
-              occurrence_count: 1,
-            },
-          ],
+          daily_summary: {
+            summary: 'string',
+            mismatch_pairs: [
+              {
+                target: 'string',
+                heard: 'string',
+                occurrence_count: 1,
+              },
+            ],
+            next_focus: ['string'],
+            stable_wins: ['string'],
+            pronunciation_patterns: ['string'],
+            support_strategies: ['string'],
+          },
+          weekly_summary: {
+            summary: 'string',
+            mismatch_pairs: [
+              {
+                target: 'string',
+                heard: 'string',
+                occurrence_count: 1,
+              },
+            ],
+            next_focus: ['string'],
+            stable_wins: ['string'],
+            pronunciation_patterns: ['string'],
+            support_strategies: ['string'],
+          },
+          training_plan: {
+            summary: 'string',
+            items: ['string'],
+          },
         },
       },
-      prepared_expression: {
-        draft: {
-          title: asset.draft.title,
-          scene: asset.draft.scene,
-          source: asset.draft.source,
-          content: asset.draft.content.slice(0, 7000),
-        },
-        structured: {
-          title: asset.structured.title,
-          summary: asset.structured.summary,
-          hotwords: asset.structured.hotwords,
-          high_risk_phrases: asset.structured.highRiskPhrases,
-          fallback_phrases: asset.structured.fallbackPhrases,
-          sections: asset.structured.sections.map((section) => ({
-            id: section.id,
-            title: section.title,
-            summary: section.summary,
-            anchor_line: section.anchorLine,
-            practice_lines: section.practiceLines,
-            high_risk_phrases: section.highRiskPhrases,
-            fallback_phrases: section.fallbackPhrases,
-            hotwords: section.hotwords,
-            base_priority: section.basePriority,
-          })),
-        },
+      prepared_expression_context: {
+        title: asset.draft.title,
+        scene: asset.draft.scene,
+        source: asset.draft.source,
+        high_risk_phrases: asset.structured.highRiskPhrases.slice(0, 6),
+        section_titles: asset.structured.sections.slice(0, 8).map((section) => section.title),
       },
-      rehearsal_samples: compactSamples,
+      last_24h_samples: compactDaily,
+      last_7d_samples: compactWeekly,
     },
     null,
     2,
   );
+}
+
+function readPayloadPairs(
+  value: unknown,
+  limit: number,
+  maxChars: number,
+): PreparedExpressionCorrectionPair[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return buildPreparedExpressionCorrectionPairs(
+    value
+      .map((pair) => {
+        if (!isRecord(pair)) {
+          return null;
+        }
+
+        return {
+          target: readString(pair, 'target'),
+          heard: readString(pair, 'heard'),
+        };
+      })
+      .filter((pair): pair is { target: string | null; heard: string | null } => Boolean(pair)),
+    {
+      maxPairs: limit,
+      maxChars,
+    },
+  );
+}
+
+function buildWindowFromPayload(
+  payload: SummaryWindowPayload | undefined,
+  heuristic: PreparedExpressionTrainingSummaryWindow | null,
+): PreparedExpressionTrainingSummaryWindow | null {
+  if (!heuristic && !payload) {
+    return null;
+  }
+
+  const mismatchPairs = payload
+    ? readPayloadPairs(payload.mismatch_pairs, 6, 1200)
+    : [];
+
+  return {
+    summary: payload?.summary?.trim() || heuristic?.summary || '',
+    sampleCount: heuristic?.sampleCount || mismatchPairs.length,
+    mismatchPairs: mismatchPairs.length > 0 ? mismatchPairs : heuristic?.mismatchPairs ?? [],
+    nextFocus: dedupeStrings(payload?.next_focus ?? heuristic?.nextFocus ?? [], 4),
+    stableWins: dedupeStrings(payload?.stable_wins ?? heuristic?.stableWins ?? [], 3),
+    pronunciationPatterns: dedupeStrings(
+      payload?.pronunciation_patterns ?? heuristic?.pronunciationPatterns ?? [],
+      8,
+    ),
+    supportStrategies: dedupeStrings(
+      payload?.support_strategies ?? heuristic?.supportStrategies ?? [],
+      4,
+    ),
+    generated_at: heuristic?.generated_at ?? new Date().toISOString(),
+  };
+}
+
+function buildPlanFromPayload(
+  payload: TrainingPlanPayload | undefined,
+  heuristic: PreparedExpressionTrainingPlan | null,
+): PreparedExpressionTrainingPlan | null {
+  if (!heuristic && !payload?.summary?.trim()) {
+    return null;
+  }
+
+  const items = dedupeStrings(payload?.items ?? heuristic?.items ?? [], 3);
+  const summary = payload?.summary?.trim() || heuristic?.summary;
+  if (!summary) {
+    return null;
+  }
+
+  return {
+    summary,
+    items,
+    generated_at: heuristic?.generated_at ?? new Date().toISOString(),
+  };
 }
 
 export class PreparedExpressionSummaryService {
@@ -594,142 +539,62 @@ export class PreparedExpressionSummaryService {
       return {
         draft: asset.draft,
         structured: buildPreparedExpressionTemplateFromDraft(asset.draft),
-        rehearsal_summary: null,
+        training_reports: null,
       };
     }
 
-    const heuristic = buildHeuristicSummary(asset, samples);
-    const model =
-      process.env.DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_MODEL?.trim() ||
-      process.env.DASHSCOPE_LLM_MODEL?.trim() ||
-      'qwen3.5-plus';
+    const structured: PreparedExpressionTemplate =
+      asset.structured.sections.length > 0
+        ? asset.structured
+        : buildPreparedExpressionTemplateFromDraft(asset.draft);
+    const normalizedAsset: PreparedExpressionAsset = {
+      ...asset,
+      structured,
+      training_reports: null,
+    };
+    const now = Date.now();
+    const dailySamples = samples.filter((sample) => {
+      const timestamp = toTimestamp(sample.created_at);
+      return timestamp !== null && now - timestamp <= DAILY_WINDOW_MS;
+    });
+    const weeklySamples = samples.filter((sample) => {
+      const timestamp = toTimestamp(sample.created_at);
+      return timestamp !== null && now - timestamp <= WEEKLY_WINDOW_MS;
+    });
+
+    const heuristicDaily = summarizeWindowHeuristically('daily', dailySamples, normalizedAsset);
+    const heuristicWeekly = summarizeWindowHeuristically('weekly', weeklySamples, normalizedAsset);
+    const heuristicPlan = summarizePlanHeuristically(heuristicDaily, heuristicWeekly);
+
+    const model = process.env.DASHSCOPE_TRAINING_REPORT_MODEL?.trim() || 'qwen3.5-plus';
     const timeoutMs = Math.max(
       3000,
       Number.parseInt(
-        process.env.DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_TIMEOUT_SECONDS || '12000',
+        process.env.DASHSCOPE_TRAINING_REPORT_TIMEOUT_SECONDS
+          || process.env.DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_TIMEOUT_SECONDS
+          || '12000',
         10,
       ) || 12000,
     );
-    const payload = await requestDashScopeSummary(
-      buildModelPrompt(asset, samples, trigger),
+    const payload = await requestDashScopeTrainingReport(
+      buildModelPrompt(normalizedAsset, dailySamples, weeklySamples, trigger),
       model,
       timeoutMs,
     );
 
-    const structuredSections = normalizeSectionSuggestions(heuristic.structured.sections, payload);
-    const structured: PreparedExpressionTemplate = {
-      ...heuristic.structured,
-      summary: payload?.document_summary?.trim() || heuristic.structured.summary,
-      hotwords: dedupeStrings(
-        [
-          ...readStringList(payload?.document_hotwords),
-          ...heuristic.structured.hotwords,
-          ...structuredSections.flatMap((section) => section.hotwords),
-        ],
-        12,
-      ),
-      highRiskPhrases: dedupeStrings(
-        [
-          ...readStringList(payload?.document_high_risk_phrases),
-          ...heuristic.structured.highRiskPhrases,
-          ...structuredSections.flatMap((section) => section.highRiskPhrases),
-        ],
-        8,
-      ),
-      fallbackPhrases: dedupeStrings(
-        [
-          ...readStringList(payload?.document_fallback_phrases),
-          ...heuristic.structured.fallbackPhrases,
-          ...structuredSections.flatMap((section) => section.fallbackPhrases),
-          ...readStringList(payload?.fallback_phrases),
-        ],
-        6,
-      ),
-      sections: structuredSections,
+    const trainingReports: PreparedExpressionTrainingReports = {
+      dailySummary: buildWindowFromPayload(payload?.daily_summary, heuristicDaily),
+      weeklySummary: buildWindowFromPayload(payload?.weekly_summary, heuristicWeekly),
+      trainingPlan: buildPlanFromPayload(payload?.training_plan, heuristicPlan),
     };
-
-    const rehearsalHotwords = dedupeStrings(
-      [
-        ...readStringList(payload?.rehearsal_hotwords),
-        ...structured.hotwords,
-        ...heuristic.rehearsal.hotwords,
-      ],
-      12,
-    );
-    const fallbackPhrases = dedupeStrings(
-      [
-        ...readStringList(payload?.fallback_phrases),
-        ...structured.fallbackPhrases,
-        ...heuristic.rehearsal.fallbackPhrases,
-      ],
-      6,
-    );
-    const referenceLines = dedupeStrings(
-      [
-        ...readStringList(payload?.reference_lines),
-        ...heuristic.rehearsal.referenceLines,
-      ],
-      60,
-    );
-    const trainingPairs = buildPreparedExpressionCorrectionPairs(
-      [
-        ...heuristic.rehearsal.trainingPairs.map((pair) => ({
-          target: pair.target,
-          heard: pair.heard,
-        })),
-        ...readCorrectionPairList(payload?.correction_pairs).map((pair) => ({
-          target: pair.target,
-          heard: pair.heard,
-        })),
-      ],
-      {
-        maxPairs: 60,
-        maxChars: 3200,
-      },
-    );
 
     return {
       draft: asset.draft,
       structured,
-      rehearsal_summary: {
-        summary: payload?.rehearsal_summary?.trim() || heuristic.rehearsal.summary,
-        hotwords: rehearsalHotwords,
-        recurringErrors: dedupeStrings(
-          [
-            ...readStringList(payload?.recurring_errors),
-            ...heuristic.rehearsal.recurringErrors,
-          ],
-          8,
-        ),
-        pronunciationPatterns: dedupeStrings(
-          [
-            ...readStringList(payload?.pronunciation_patterns),
-            ...heuristic.rehearsal.pronunciationPatterns,
-          ],
-          8,
-        ),
-        supportStrategies: dedupeStrings(
-          [
-            ...readStringList(payload?.support_strategies),
-            ...heuristic.rehearsal.supportStrategies,
-          ],
-          6,
-        ),
-        fallbackPhrases,
-        nextFocus: dedupeStrings(
-          [
-            ...readStringList(payload?.next_focus),
-            ...heuristic.rehearsal.nextFocus,
-          ],
-          6,
-        ),
-        asrHotwordEntries: buildAsrHotwordEntries(rehearsalHotwords),
-        referenceLines,
-        trainingPairs,
-        basedOnTrainingCount: samples.length,
-        model: payload ? model : heuristic.rehearsal.model,
-        updated_at: new Date().toISOString(),
-      },
+      training_reports:
+        trainingReports.dailySummary || trainingReports.weeklySummary || trainingReports.trainingPlan
+          ? trainingReports
+          : null,
     };
   }
 }

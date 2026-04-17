@@ -335,6 +335,106 @@ export function createDecodedRtcMessageHandler({
               : previousClippingCount,
         })
       }
+
+      if (message.type === 'session_userdata_ack' && isRecord(message.session_memory)) {
+        const sessionMemory = message.session_memory
+        const compactionCandidate = isRecord(message.compaction_candidate)
+          ? message.compaction_candidate
+          : undefined
+
+        memoryService.updateCurrentSessionMetadata({
+          serverCurrentTurnState:
+            typeof sessionMemory.current_turn_state === 'string'
+              ? sessionMemory.current_turn_state
+              : undefined,
+          serverTurnCount:
+            typeof sessionMemory.turn_count === 'number'
+              ? sessionMemory.turn_count
+              : undefined,
+          serverContextRevision:
+            typeof sessionMemory.context_revision === 'number'
+              ? sessionMemory.context_revision
+              : undefined,
+          serverPreparationSource:
+            typeof sessionMemory.last_preparation_source === 'string'
+              ? sessionMemory.last_preparation_source
+              : undefined,
+          serverInterruptionCount:
+            typeof sessionMemory.interruption_count === 'number'
+              ? sessionMemory.interruption_count
+              : undefined,
+          serverBargeInCount:
+            typeof sessionMemory.barge_in_count === 'number'
+              ? sessionMemory.barge_in_count
+              : undefined,
+          serverCaptionModeEnabled:
+            typeof sessionMemory.caption_mode_enabled === 'boolean'
+              ? sessionMemory.caption_mode_enabled
+              : undefined,
+          serverCompactionSummary:
+            typeof compactionCandidate?.summary === 'string'
+              ? compactionCandidate.summary
+              : undefined,
+          serverCompactionSessionKind:
+            typeof compactionCandidate?.session_kind === 'string'
+              ? compactionCandidate.session_kind
+              : undefined,
+          serverCompactionFallbackPhrases:
+            Array.isArray(compactionCandidate?.fallback_phrases)
+              ? compactionCandidate.fallback_phrases.filter((item): item is string => typeof item === 'string')
+              : undefined,
+          serverCompactionRiskyTerms:
+            Array.isArray(compactionCandidate?.risky_terms)
+              ? compactionCandidate.risky_terms.filter((item): item is string => typeof item === 'string')
+              : undefined,
+          serverCompactionSupportStrategies:
+            Array.isArray(compactionCandidate?.support_strategies)
+              ? compactionCandidate.support_strategies.filter((item): item is string => typeof item === 'string')
+              : undefined,
+          serverCompactionHotwords:
+            Array.isArray(compactionCandidate?.hotwords)
+              ? compactionCandidate.hotwords.filter((item): item is string => typeof item === 'string')
+              : undefined,
+          serverCompactionRecentUserIntents:
+            Array.isArray(compactionCandidate?.recent_user_intents)
+              ? compactionCandidate.recent_user_intents.filter((item): item is string => typeof item === 'string')
+              : undefined,
+          serverCompactionRecentConfirmedPhrases:
+            Array.isArray(compactionCandidate?.recent_confirmed_phrases)
+              ? compactionCandidate.recent_confirmed_phrases.filter((item): item is string => typeof item === 'string')
+              : undefined,
+        })
+
+        setState((prev) => ({
+          ...prev,
+          lastSessionMemoryAck: {
+            currentTurnState:
+              typeof sessionMemory.current_turn_state === 'string'
+                ? sessionMemory.current_turn_state
+                : null,
+            turnCount:
+              typeof sessionMemory.turn_count === 'number'
+                ? sessionMemory.turn_count
+                : null,
+            contextRevision:
+              typeof sessionMemory.context_revision === 'number'
+                ? sessionMemory.context_revision
+                : null,
+            preparationSource:
+              typeof sessionMemory.last_preparation_source === 'string'
+                ? sessionMemory.last_preparation_source
+                : null,
+            interruptionCount:
+              typeof sessionMemory.interruption_count === 'number'
+                ? sessionMemory.interruption_count
+                : null,
+            bargeInCount:
+              typeof sessionMemory.barge_in_count === 'number'
+                ? sessionMemory.barge_in_count
+                : null,
+          },
+        }))
+      }
     }
 
     setState((prev) => reduceRtcEnvelope(prev, message))

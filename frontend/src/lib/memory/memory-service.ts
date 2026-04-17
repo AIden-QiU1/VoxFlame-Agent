@@ -170,6 +170,15 @@ function readNumber(metadata: Record<string, unknown> | undefined, key: string):
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+function readStringArray(metadata: Record<string, unknown> | undefined, key: string): string[] {
+  const value = metadata?.[key]
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+}
+
 function mergeMetadata(
   base: Record<string, unknown> | undefined,
   updates: Record<string, unknown> | undefined,
@@ -209,130 +218,130 @@ function dedupeStrings(values: Array<string | null | undefined>, limit?: number)
   return results
 }
 
-export interface SessionCompactionMemoryInput {
-  type: MemoryType
-  content: string
-  metadata: Record<string, unknown>
-  createdAt?: number
+export interface SessionCloseUserProfileUpdate {
+  summary?: string
+  common_scenarios: string[]
+  risky_terms: string[]
+  support_strategies: string[]
+  updated_at?: string
 }
 
-export function buildSessionCompactionMemoryInput(session: Session): SessionCompactionMemoryInput | null {
+export interface SessionCloseUserProfileUpdateRequestBody {
+  user_id: string
+  session_id: string
+  session: Record<string, unknown>
+  profile_update: SessionCloseUserProfileUpdate
+}
+
+export function buildSessionCloseUserProfileUpdate(session: Session): SessionCloseUserProfileUpdate | null {
   const metadata = isRecord(session.metadata) ? session.metadata : undefined
+  const serverCompactionSessionKind = readString(metadata, 'serverCompactionSessionKind')
+  const sessionKind = (
+    serverCompactionSessionKind
+    ?? readString(metadata, 'kind')
+  ) === 'training' ? 'training' : 'communication'
+  if (sessionKind !== 'communication') {
+    return null
+  }
   const latestCorrectionOriginal = readString(metadata, 'latestCorrectionOriginal')
   const latestCorrectionText = readString(metadata, 'latestCorrectionText')
-  const trainingSummary = readString(metadata, 'lastTrainingFeedbackSummary')
-  const nextStep = readString(metadata, 'lastTrainingFeedbackNextStep')
+  const serverCompactionSummary = readString(metadata, 'serverCompactionSummary')
   const scene = readString(metadata, 'communicationScene') ?? readString(metadata, 'scene')
-  const clarityScore = readNumber(metadata, 'clarity_score')
-  const pronunciationTargets = Array.isArray(metadata?.lastTrainingPronunciationTargets)
-    ? metadata.lastTrainingPronunciationTargets.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    : []
-  const speechPatterns = Array.isArray(metadata?.lastTrainingSpeechPatterns)
-    ? metadata.lastTrainingSpeechPatterns.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    : []
-  const articulationTips = Array.isArray(metadata?.lastTrainingArticulationTips)
-    ? metadata.lastTrainingArticulationTips.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    : []
-  const preparedExpressionId = readString(metadata, 'currentPreparedExpressionId')
   const preparedExpressionTitle = readString(metadata, 'currentPreparedExpressionTitle')
-  const preparedExpressionSectionId = readString(metadata, 'currentPreparedExpressionSectionId')
   const preparedExpressionSectionTitle = readString(metadata, 'currentPreparedExpressionSectionTitle')
-  const interruptionCount = readNumber(metadata, 'interruptionCount') ?? 0
-  const bargeInCount = readNumber(metadata, 'bargeInCount') ?? 0
-  const lastInputTelemetryReason = readString(metadata, 'lastInputTelemetryReason')
-  const lastInputNormalizedLevel = readNumber(metadata, 'lastInputNormalizedLevel')
-  const lastInputPeakLevel = readNumber(metadata, 'lastInputPeakLevel')
-  const lastInputClippingDetected = metadata?.lastInputClippingDetected === true
-  const lastInputApmEnabled = metadata?.lastInputApmEnabled === true
-  const audioClippingEventCount = readNumber(metadata, 'audioClippingEventCount') ?? 0
-  const sessionTurnCount = session.turns.length
+  const serverCompactionRiskyTerms = readStringArray(metadata, 'serverCompactionRiskyTerms')
+  const serverCompactionSupportStrategies = readStringArray(metadata, 'serverCompactionSupportStrategies')
+  const serverCompactionRecentUserIntents = readStringArray(metadata, 'serverCompactionRecentUserIntents')
+  const serverCompactionRecentConfirmedPhrases = readStringArray(metadata, 'serverCompactionRecentConfirmedPhrases')
+  const hasServerCompactionCandidate = Boolean(
+    serverCompactionSummary
+    || serverCompactionRiskyTerms.length
+    || serverCompactionSupportStrategies.length
+    || serverCompactionRecentUserIntents.length
+    || serverCompactionRecentConfirmedPhrases.length,
+  )
 
-  const fallbackPhrases = dedupeStrings([
-    latestCorrectionText,
-  ], 3)
   const riskyTerms = dedupeStrings([
-    latestCorrectionOriginal,
-  ], 3)
-  const pronunciationPatterns = dedupeStrings([
-    ...speechPatterns,
-    ...articulationTips,
-  ], 6)
+    ...serverCompactionRiskyTerms,
+    ...serverCompactionRecentUserIntents,
+    ...(hasServerCompactionCandidate ? [] : [latestCorrectionOriginal]),
+  ], 4)
   const supportStrategies = dedupeStrings([
-    ...articulationTips,
+    ...serverCompactionSupportStrategies,
     preparedExpressionTitle
       ? `这次重要表达聚焦在《${preparedExpressionTitle}》${preparedExpressionSectionTitle ? `的“${preparedExpressionSectionTitle}”` : ''}。`
       : null,
-    nextStep,
-    lastInputClippingDetected
-      ? '现场收音出现过削波，尽量把麦克风稍微拿远一点并保持音量稳定。'
-      : null,
-    lastInputNormalizedLevel !== null && lastInputNormalizedLevel < 0.035
-      ? '现场收音偏小，尽量更靠近麦克风，再开始重要表达。'
-      : null,
-    latestCorrectionText && latestCorrectionOriginal && latestCorrectionText !== latestCorrectionOriginal
+    !hasServerCompactionCandidate && latestCorrectionText && latestCorrectionOriginal && latestCorrectionText !== latestCorrectionOriginal
       ? '现场如果系统听偏，优先切回更稳的改写版本。'
       : null,
   ], 4)
-  const hotwords = dedupeStrings(pronunciationTargets, 6)
 
-  const content = (() => {
-    if (latestCorrectionOriginal && latestCorrectionText && latestCorrectionOriginal !== latestCorrectionText) {
-      return `这次会话里，系统更容易把“${latestCorrectionOriginal}”听偏。当前更稳的表达是“${latestCorrectionText}”。`
+  const summary = (() => {
+    if (serverCompactionSummary) {
+      return serverCompactionSummary
     }
 
-    if (trainingSummary) {
-      if (preparedExpressionTitle) {
-        return `这次《${preparedExpressionTitle}》${preparedExpressionSectionTitle ? `的“${preparedExpressionSectionTitle}”` : ''}里，${trainingSummary}`
-      }
-      return trainingSummary
+    if (latestCorrectionOriginal && latestCorrectionText && latestCorrectionOriginal !== latestCorrectionText) {
+      return `这次会话里，系统更容易把“${latestCorrectionOriginal}”听偏。当前更稳的表达是“${latestCorrectionText}”。`
     }
 
     if (supportStrategies[0]) {
       return `这次会话暴露出的关键准备点是：${supportStrategies[0]}`
     }
 
-    if (pronunciationPatterns[0]) {
-      return `这次会话里最值得继续盯住的是“${pronunciationPatterns[0]}”。`
-    }
-
     return null
   })()
 
-  if (!content) {
+  const commonScenarios = dedupeStrings([scene], 3)
+
+  if (!summary && riskyTerms.length === 0 && supportStrategies.length === 0 && commonScenarios.length === 0) {
     return null
   }
 
   return {
-    type: 'semantic',
-    content,
-    createdAt: session.endTime ?? Date.now(),
+    summary: summary ?? undefined,
+    common_scenarios: commonScenarios,
+    risky_terms: riskyTerms,
+    support_strategies: supportStrategies,
+    updated_at: new Date(session.endTime ?? Date.now()).toISOString(),
+  }
+}
+
+export function buildSessionSyncPayloadFromSession(session: Session): Record<string, unknown> {
+  const durationSeconds = session.endTime
+    ? Math.max(0, Math.round((session.endTime - session.startTime) / 1000))
+    : undefined
+  const transcript = session.turns.map((turn) => turn.content).join('\n')
+
+  return {
+    id: session.id,
+    start_time: new Date(session.startTime).toISOString(),
+    end_time: session.endTime ? new Date(session.endTime).toISOString() : undefined,
+    duration: durationSeconds,
+    transcript: transcript || undefined,
     metadata: {
-      kind: 'session_compaction',
-      scene: scene ?? undefined,
-      clarity_score: clarityScore ?? undefined,
-      risky_terms: riskyTerms,
-      fallback_phrases: fallbackPhrases,
-      pronunciation_patterns: pronunciationPatterns,
-      support_strategies: supportStrategies,
-      hotwords,
-      latest_correction_original: latestCorrectionOriginal ?? undefined,
-      latest_correction_text: latestCorrectionText ?? undefined,
-      interruption_count: interruptionCount,
-      barge_in_count: bargeInCount,
-      last_input_telemetry_reason: lastInputTelemetryReason ?? undefined,
-      last_input_normalized_level: lastInputNormalizedLevel ?? undefined,
-      last_input_peak_level: lastInputPeakLevel ?? undefined,
-      last_input_clipping_detected: lastInputClippingDetected,
-      last_input_apm_enabled: lastInputApmEnabled,
-      audio_clipping_event_count: audioClippingEventCount,
-      prepared_expression_id: preparedExpressionId ?? undefined,
-      prepared_expression_title: preparedExpressionTitle ?? undefined,
-      prepared_expression_section_id: preparedExpressionSectionId ?? undefined,
-      prepared_expression_section_title: preparedExpressionSectionTitle ?? undefined,
-      next_step: nextStep ?? undefined,
-      session_turn_count: sessionTurnCount,
-      summary: content,
+      ...(session.metadata ?? {}),
+      kind: readString(session.metadata, 'kind') ?? 'general',
+      source: readString(session.metadata, 'source') ?? 'local_memory',
+      turnCount: session.turns.length,
     },
+  }
+}
+
+export function buildSessionCloseUserProfileUpdateRequestBody(
+  userId: string,
+  session: Session,
+): SessionCloseUserProfileUpdateRequestBody | null {
+  const profileUpdate = buildSessionCloseUserProfileUpdate(session)
+  if (!profileUpdate) {
+    return null
+  }
+
+  return {
+    user_id: userId,
+    session_id: session.id,
+    session: buildSessionSyncPayloadFromSession(session),
+    profile_update: profileUpdate,
   }
 }
 
@@ -394,6 +403,7 @@ class MemoryService {
   async endSession() {
     if (!this.session) return
     this.session.endTime = Date.now()
+    await this.persistSessionCloseProfileUpdate(this.session)
     const shouldPersistSession =
       this.session.turns.length > 0 || this.hasStoredMemoriesForSession(this.session.id)
     if (shouldPersistSession) {
@@ -401,7 +411,6 @@ class MemoryService {
       this.enqueueSessionForSync(this.session)
     }
     await this.extractMemories(this.session)
-    this.extractSessionCompaction(this.session)
     await this.syncBackend()
     this.session = null
     localStorage.removeItem(userKey(this.userId!, KEYS.CURRENT))
@@ -701,13 +710,36 @@ class MemoryService {
     }
   }
 
-  private extractSessionCompaction(session: Session) {
-    const input = buildSessionCompactionMemoryInput(session)
-    if (!input) {
-      return
+  private async persistSessionCloseProfileUpdate(session: Session): Promise<boolean> {
+    if (!this.userId) {
+      return false
     }
 
-    this.addMemoryEntry(input)
+    const payload = buildSessionCloseUserProfileUpdateRequestBody(this.userId, session)
+    if (!payload) {
+      return true
+    }
+
+    const token = await getValidToken()
+    if (!token) {
+      return false
+    }
+
+    try {
+      const response = await fetch(`${config.api.baseUrl}/memory/session-close`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      return response.ok
+    } catch (error) {
+      console.error('[MemoryService] Session-close profile update error:', error)
+      return false
+    }
   }
 
   private async syncBackend() {
@@ -779,24 +811,7 @@ class MemoryService {
   }
 
   private buildSessionSyncPayload(session: Session): Record<string, unknown> {
-    const durationSeconds = session.endTime
-      ? Math.max(0, Math.round((session.endTime - session.startTime) / 1000))
-      : undefined
-    const transcript = session.turns.map((turn) => turn.content).join('\n')
-
-    return {
-      id: session.id,
-      start_time: new Date(session.startTime).toISOString(),
-      end_time: session.endTime ? new Date(session.endTime).toISOString() : undefined,
-      duration: durationSeconds,
-      transcript: transcript || undefined,
-      metadata: {
-        ...(session.metadata ?? {}),
-        kind: readString(session.metadata, 'kind') ?? 'general',
-        source: readString(session.metadata, 'source') ?? 'local_memory',
-        turnCount: session.turns.length,
-      },
-    }
+    return buildSessionSyncPayloadFromSession(session)
   }
 
   private async syncSessionQueue(token: string) {

@@ -430,6 +430,8 @@ export class RtcOrchestrationService {
           '当前准备上下文已载入，请优先帮助用户把关键表达说清楚。',
         listenerGuidance: snapshot.preparation.listener_guidance.slice(0, 4),
         supportStrategies: snapshot.preparation.support_strategies.slice(0, 4),
+        hotwords: snapshot.preparation.hotwords.slice(0, 8),
+        riskyTerms: snapshot.preparation.risky_terms.slice(0, 6),
         documentSummary: snapshot.preparation.document_context_summary,
         documentContent: snapshot.preparation.document_content,
         referenceLines: snapshot.preparation.reference_lines.slice(0, 80),

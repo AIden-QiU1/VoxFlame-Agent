@@ -29,18 +29,31 @@ interface RemoteMemoryProfileResponse {
   hotword_profiles?: HotwordProfile[]
 }
 
-interface PreparedCorrectionSummaryView {
+interface TrainingSummaryWindowView {
   summary: string
-  recurringErrors: string[]
-  nextFocus: string[]
-  referenceLines: string[]
-  trainingPairs: Array<{
+  sampleCount: number
+  mismatchPairs: Array<{
     target: string
     heard: string
     occurrenceCount: number
   }>
-  model: string
-  basedOnTrainingCount: number
+  nextFocus: string[]
+  stableWins: string[]
+  pronunciationPatterns: string[]
+  supportStrategies: string[]
+  generatedAt: string
+}
+
+interface TrainingPlanView {
+  summary: string
+  items: string[]
+  generatedAt: string
+}
+
+interface TrainingReportsView {
+  dailySummary: TrainingSummaryWindowView | null
+  weeklySummary: TrainingSummaryWindowView | null
+  trainingPlan: TrainingPlanView | null
 }
 
 const HOTWORD_CATEGORY_LABELS: Record<HotwordCategory, string> = {
@@ -367,7 +380,7 @@ export default function MemoryPage() {
 
       applyPreparedExpressionAsset(asset)
       await refreshWorkspaceSnapshot()
-      setPreparedExpressionStatus('准备内容已经保存。训练页和纠错上下文会直接围着这份稿子继续收紧。')
+      setPreparedExpressionStatus('准备内容已经保存。训练页后续会围着这份稿子继续收紧今日总结、7 天总结和计划。')
     } catch (error) {
       console.error('[MemoryPage] Failed to save prepared expression asset:', error)
       setPreparedExpressionStatus('准备内容保存失败了，请稍后再试一次。')
@@ -408,34 +421,62 @@ export default function MemoryPage() {
     !hasSavedPreparedExpression || preparedExpressionDirty
   )
 
-  const correctionSummary = useMemo<PreparedCorrectionSummaryView | null>(() => {
-    const assetSummary = preparedExpressionAsset?.rehearsal_summary
-    if (assetSummary) {
-      return {
-        summary: assetSummary.summary,
-        recurringErrors: assetSummary.recurringErrors,
-        nextFocus: assetSummary.nextFocus,
-        referenceLines: assetSummary.referenceLines,
-        trainingPairs: assetSummary.trainingPairs,
-        model: assetSummary.model,
-        basedOnTrainingCount: assetSummary.basedOnTrainingCount,
-      }
-    }
+  const trainingReports = useMemo<TrainingReportsView | null>(() => {
+    const reports =
+      preparedExpressionAsset?.training_reports
+      ?? workspaceSnapshot?.prepared_expression?.training_reports
+      ?? null
 
-    const snapshotPreparedExpression = workspaceSnapshot?.prepared_expression
-    const snapshotSummary = snapshotPreparedExpression?.rehearsal_summary
-    if (!snapshotSummary) {
+    if (!reports) {
       return null
     }
 
+    const mapWindow = (
+      windowSummary: {
+        summary: string
+        sampleCount?: number
+        sample_count?: number
+        mismatchPairs?: Array<{ target: string; heard: string; occurrenceCount: number }>
+        mismatch_pairs?: Array<{ target: string; heard: string; occurrenceCount: number }>
+        nextFocus?: string[]
+        next_focus?: string[]
+        stableWins?: string[]
+        stable_wins?: string[]
+        pronunciationPatterns?: string[]
+        pronunciation_patterns?: string[]
+        supportStrategies?: string[]
+        support_strategies?: string[]
+        generated_at: string
+      } | null,
+    ): TrainingSummaryWindowView | null => {
+      if (!windowSummary) {
+        return null
+      }
+
+      return {
+        summary: windowSummary.summary,
+        sampleCount: windowSummary.sampleCount ?? windowSummary.sample_count ?? 0,
+        mismatchPairs: windowSummary.mismatchPairs ?? windowSummary.mismatch_pairs ?? [],
+        nextFocus: windowSummary.nextFocus ?? windowSummary.next_focus ?? [],
+        stableWins: windowSummary.stableWins ?? windowSummary.stable_wins ?? [],
+        pronunciationPatterns:
+          windowSummary.pronunciationPatterns ?? windowSummary.pronunciation_patterns ?? [],
+        supportStrategies:
+          windowSummary.supportStrategies ?? windowSummary.support_strategies ?? [],
+        generatedAt: windowSummary.generated_at,
+      }
+    }
+
     return {
-      summary: snapshotSummary.summary,
-      recurringErrors: snapshotSummary.recurring_errors,
-      nextFocus: snapshotSummary.next_focus,
-      referenceLines: snapshotSummary.reference_lines,
-      trainingPairs: snapshotSummary.training_pairs,
-      model: snapshotSummary.model,
-      basedOnTrainingCount: snapshotSummary.based_on_training_count,
+      dailySummary: mapWindow(reports.daily_summary),
+      weeklySummary: mapWindow(reports.weekly_summary),
+      trainingPlan: reports.training_plan
+        ? {
+            summary: reports.training_plan.summary,
+            items: reports.training_plan.items,
+            generatedAt: reports.training_plan.generated_at,
+          }
+        : null,
     }
   }, [preparedExpressionAsset, workspaceSnapshot?.prepared_expression])
   const objectZones = workspaceSnapshot?.object_zones ?? []
@@ -459,11 +500,11 @@ export default function MemoryPage() {
             </Link>
             <h1 className="mt-2 text-2xl font-semibold text-gray-900">记忆页</h1>
             <p className="mt-1 text-sm text-gray-600">
-              这里只保留准备内容、自定义重点词和每 50 句更新一次的训练总结。
+              这里只保留准备内容、自定义重点词，以及训练页回流的今日总结、7 天总结和计划。
             </p>
           </div>
           <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700">
-            correction memory only
+            durable workspace
           </div>
         </div>
       </header>
@@ -548,12 +589,14 @@ export default function MemoryPage() {
               </div>
               <h2 className="mt-3 text-2xl font-semibold text-gray-900">用户自己维护准备内容，系统只做压缩和回流</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
-                把后面要说的全文、提纲或说明放在这里。训练页会按拆句训练，后台会定期把高频误听、重点词和保底句总结回来，供 correction 使用。
+                把后面要说的全文、提纲或说明放在这里。训练页会按拆句训练，后台会基于目标句和转录句差异整理今日总结、7 天总结和下一轮计划。
               </p>
             </div>
             <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-              {correctionSummary
-                ? `最近一次总结基于 ${correctionSummary.basedOnTrainingCount} 条训练样本`
+              {trainingReports?.weeklySummary
+                ? `最近 7 天总结基于 ${trainingReports.weeklySummary.sampleCount} 条训练样本`
+                : trainingReports?.dailySummary
+                  ? `今日总结基于 ${trainingReports.dailySummary.sampleCount} 条训练样本`
                 : '先保存准备内容，再去训练页录音'}
             </div>
           </div>
@@ -650,67 +693,66 @@ export default function MemoryPage() {
           <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-              <h2 className="text-xl font-semibold text-gray-900">训练总结</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                  这里只展示对 correction 真正有用的训练句对、高频误听和下一轮重点。
-              </p>
+                <h2 className="text-xl font-semibold text-gray-900">训练总结</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  这里沉淀训练页回流的今日总结、7 天总结和下一轮计划，不再混成旧的“纠错总结”口径。
+                </p>
               </div>
               <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-                {correctionSummary
-                  ? `${correctionSummary.model} · ${correctionSummary.basedOnTrainingCount} 条`
-                  : '等待训练样本回流'}
+                {trainingReports?.weeklySummary
+                  ? `最近 7 天 ${trainingReports.weeklySummary.sampleCount} 条`
+                  : trainingReports?.dailySummary
+                    ? `今天 ${trainingReports.dailySummary.sampleCount} 条`
+                    : '等待训练样本回流'}
               </span>
             </div>
 
-            {correctionSummary ? (
+            {trainingReports ? (
               <div className="mt-5 space-y-4">
                 <div className="rounded-[20px] bg-stone-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">总结</p>
-                  <p className="mt-3 text-sm leading-7 text-gray-700">{correctionSummary.summary}</p>
+                  <p className="text-sm font-medium text-gray-900">今日总结</p>
+                  <p className="mt-3 text-sm leading-7 text-gray-700">
+                    {trainingReports.dailySummary?.summary ?? '今天还没有新的训练总结。'}
+                  </p>
                 </div>
 
                 <div className="rounded-[20px] bg-amber-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">训练句对</p>
-                  {correctionSummary.trainingPairs.length > 0 ? (
+                  <p className="text-sm font-medium text-gray-900">最近 7 天总结</p>
+                  <p className="mt-3 text-sm leading-7 text-gray-700">
+                    {trainingReports.weeklySummary?.summary ?? '最近 7 天还没有整理出稳定总结。'}
+                  </p>
+                  {trainingReports.weeklySummary?.mismatchPairs.length ? (
                     <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                      {correctionSummary.trainingPairs.slice(0, 8).map((pair) => (
-                      <p key={`${pair.target}-${pair.heard}`}>
-                        {pair.target}{' <- '}{pair.heard}
-                        {pair.occurrenceCount > 1 ? ` · ${pair.occurrenceCount}次` : ''}
-                      </p>
-                    ))}
+                      {trainingReports.weeklySummary.mismatchPairs.slice(0, 6).map((pair) => (
+                        <p key={`${pair.target}-${pair.heard}`}>
+                          {pair.target}{' <- '}{pair.heard}
+                          {pair.occurrenceCount > 1 ? ` · ${pair.occurrenceCount}次` : ''}
+                        </p>
+                      ))}
                     </div>
                   ) : (
-                    <p className="mt-3 text-sm text-gray-600">当前还没有稳定训练句对。</p>
+                    <p className="mt-3 text-sm text-gray-600">最近 7 天还没有稳定错配对。</p>
                   )}
                 </div>
 
                 <div className="rounded-[20px] bg-sky-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">高频误听</p>
-                  {correctionSummary.recurringErrors.length > 0 ? (
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                      {correctionSummary.recurringErrors.map((item) => (
-                        <p key={item}>{item}</p>
-                      ))}
+                  <p className="text-sm font-medium text-gray-900">下一轮计划</p>
+                  <p className="mt-3 text-sm leading-7 text-gray-700">
+                    {trainingReports.trainingPlan?.summary ?? '继续训练后，这里会出现下一轮计划。'}
+                  </p>
+                  {trainingReports.trainingPlan?.items.length ? (
+                    <div className="mt-3">
+                      {renderChips(trainingReports.trainingPlan.items, 'sky')}
                     </div>
                   ) : (
-                    <p className="mt-3 text-sm text-gray-600">当前还没有累计出稳定误听。</p>
+                    <p className="mt-3 text-sm text-gray-600">还没有生成下一轮计划。</p>
                   )}
-                </div>
-
-                <div className="rounded-[20px] bg-emerald-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">下一轮重点</p>
-                  <div className="mt-3">
-                    {correctionSummary.nextFocus.length > 0
-                      ? renderChips(correctionSummary.nextFocus, 'emerald')
-                      : <p className="text-sm text-gray-600">继续训练后会自动浮出下一轮重点。</p>}
-                  </div>
                 </div>
 
               </div>
             ) : (
               <div className="mt-5 rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
-                现在还没有训练总结。先去训练页按拆句开始录，累计到总结门槛后，这里会自动回流训练句对和高频误听。
+                现在还没有训练总结。先去训练页按拆句开始录，这里会按时间窗回流今日总结、7 天总结和下一轮计划。
               </div>
             )}
           </section>
@@ -719,7 +761,7 @@ export default function MemoryPage() {
             <div>
               <h2 className="text-xl font-semibold text-gray-900">自定义重点词</h2>
               <p className="mt-1 text-sm text-gray-600">
-                这些词会和准备稿、训练句对一起进入后续 correction 上下文。
+                这些词会和准备稿、训练总结一起进入后续沟通上下文。
               </p>
             </div>
 

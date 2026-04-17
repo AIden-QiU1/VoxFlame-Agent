@@ -38,6 +38,64 @@ Frontend
 - `/memory`
   沟通档案页，不再只做统计，而是为“下一次沟通前准备什么”服务。
 
+## 如何理解前端目录
+
+一个更成熟的理解方式，不是把这些目录看成“按 React 习惯随便分”，而是把它们看成 4 层：
+
+1. `src/app`
+   - 路由入口层
+   - 负责页面边界、URL、layout、server/client 入口和页面级组装
+   - 这里回答的是“这个产品 surface 从哪里进”
+2. `src/components`
+   - 视图与交互块
+   - 负责某个页面或某个 surface 上能被复用的 UI 片段
+   - `components/home` 不是另一套架构，只是“首页专属组件”的意思
+3. `src/hooks`
+   - React 生命周期里的状态编排层
+   - 负责把 RTC、录音、上传、workspace 等状态流组织成页面可用的 hook
+   - 这里回答的是“这个交互如何在 React 里活起来”
+4. `src/lib`
+   - 领域逻辑、contract、runtime adapter 和纯函数层
+   - 尽量承接不依赖具体页面结构的逻辑
+   - 这里回答的是“这套产品能力在工程上到底怎么实现”
+
+如果用一条更顶尖前端工程师的阅读顺序来理解，就是：
+
+```text
+app (路由/页面入口)
+  -> components (页面里的可见块)
+  -> hooks (状态和副作用编排)
+  -> lib (领域逻辑、协议、runtime adapter)
+```
+
+在 VoxFlame 里，这 4 层对应的真实含义是：
+
+- `app`
+  决定沟通页、训练页、记忆页这些产品 surface
+- `components`
+  决定用户此刻看到什么、点哪里、负担重不重
+- `hooks`
+  决定会话怎么连、录音怎么走、页面状态怎么同步
+- `lib`
+  决定 memory、RTC、上传、workspace、training contract 这些底层能力如何落地
+
+所以一个顶尖前端工程师不会只问“组件放哪”，而会先问：
+
+1. 这是路由边界问题，还是可复用视图块问题？
+2. 这是 React 状态编排问题，还是领域逻辑问题？
+3. 这段代码以后会被多个 surface 共享，还是只服务某一个页面？
+
+用这个标准再看现在的目录：
+
+- `src/app/chat`、`src/app/contribute`、`src/app/memory`
+  是产品 surface
+- `src/components/chat`、`src/components/home`
+  是 surface-specific UI
+- `src/hooks/useRtcAgentSession.ts`
+  是会话 orchestration
+- `src/lib/realtime-audio`、`src/lib/memory`、`src/lib/training`
+  是真正应该长期稳定沉淀的能力层
+
 ## 当前前端 contract
 
 - 运行时唯一事实源是 `Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`

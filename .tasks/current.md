@@ -1,17 +1,246 @@
 # 当前任务状态
 
-> 最后更新: 2026-04-12
+> 最后更新: 2026-04-16
 
 ## 当前主线
 
-- 主任务：把当前产品主线收成 `沟通成功率 -> typed memory -> 句子级准备资产 -> 数据录入/标注 -> 会后压缩写回` 的稳态闭环，不再新增大功能。
+- 主任务：把当前产品主线收成 `沟通成功率 -> typed memory -> 句子级准备资产 -> 数据录入/标注 -> 四块记忆系统后台维护` 的稳态闭环，不再新增大功能。
 - 当前执行面：`frontend -> backend -> self-hosted livekit-server -> livekit_agent`。
 - 当前最重要的产品/工程重点：
-  - 把 `session-local typed memory -> session-close compaction -> workspace snapshot` 的 owner 与写回边界做扎实
+  - 把 `session-local typed memory -> 四块记忆系统后台维护 -> workspace snapshot` 的 owner 与写回边界做扎实
   - 把 `prepared-expression / important-expression / 高频句` 的录入和复用入口统一起来
-  - 把 dataset review queue、annotation 流程和质量指标收成明确 contract，而不是只看“收了多少条”
+  - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-04-16 已清掉旧的 `session-close compaction` 长期写回链
+   - 前端 `memory-service` 不再生成 `session_compaction` memory payload
+   - backend `/api/memory/session-close` 不再新增 `session_compaction` 记录
+   - 当前会话结束后只会尝试更新 `用户个人画像`
+   - 更新字段也已收窄成最小集合：
+     - `summary`
+     - `common_scenarios`
+     - `risky_terms`
+     - `support_strategies`
+   - `workspace snapshot` 也已开始直接消费这层 `user_profile_memory`
+   - 沟通 loadout 的第四栏已改回 `训练总结`，不再展示 `recent_compaction`
+   - `training_summaries` 对象区也不再混入“最近一次会话复盘”
+   - `memory-growth` 已停止把 `session_compaction` 当成新的画像来源
+   - 已验证：
+     - `cd backend && npm run build`
+     - `cd frontend && npm run build`
+     - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types src/lib/memory/memory-service.test.ts`
+
+0. 2026-04-16 已把 PRD 继续压成真正可执行的短版主文档
+   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 现在只保留：
+     - 产品是什么
+     - 当前固定边界是什么
+     - 接下来只做什么
+   - 已删除大段“已经做掉的代码现状报告”和重复执行细节
+   - 当前 PRD 固定主轴：
+     - `沟通 loadout`
+     - `训练总结`
+     - `durable workspace`
+
+0. 2026-04-16 已按产品收敛重新压 PRD 里的训练页方向
+   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 已明确删掉“训练页重型沟通助手”主线
+   - 当前训练页只保留真正和上线相关的核心能力：
+     - 录音舒适度
+     - 每日目标
+     - 每日总结 / 7 天总结
+     - 训练计划
+     - 训练总结回写
+   - 当前不再把以下内容当作上线前主任务：
+     - 训练页 TTS 对话助手
+     - 主动提醒式陪练人格
+     - 重型 coach 体验
+   - 新增一条固定产品边界：
+     - 训练计划与总结都由同一个训练 room / 同一个模型顺手产出
+     - 重点放在前端 UI 自动化和简洁化，而不是再拆新的助手角色
+   - 新增固定边界：
+     - 训练页和沟通页的个性化准备资料分区管理
+     - 训练侧建议不自动共享到沟通侧
+     - 只有用户显式确认后，训练建议才可复制成沟通材料
+   - dataset 方向也已同步收窄：
+     - 不再继续做 review queue / export 审批流
+     - 只保留训练录音、目标句、识别句和最小对句判断
+
+0. 2026-04-16 已把训练总结链按新口径重写成 `daily_summary / weekly_summary / training_plan`
+   - backend `prepared-expression summary` 不再继续沿用：
+     - `50 句纠错总结`
+     - `rehearsal_summary`
+     - `correction_hints`
+     这些旧壳语义
+   - 当前正式收成：
+     - `training_reports.daily_summary`
+     - `training_reports.weekly_summary`
+     - `training_reports.training_plan`
+   - 模型输入也已收窄：
+     - 主要只看 `target_text / recognized_text` 差异
+     - 不再让训练总结链顺手改写 prepared document / section summary
+   - 前端训练页与记忆页也已同步改成：
+     - 今日总结
+     - 最近 7 天总结
+     - 下一轮计划
+   - 旧的“累计 50 句后自动更新纠错总结”文案和逻辑已删
+   - 已验证：
+     - `cd frontend && npm run build`
+     - `cd backend && npm run build`
+     - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types src/lib/training/prepared-expression-practice.test.ts`
+     - `bash scripts/check_ai_docs.sh`
+
+0. 2026-04-16 已继续完成“句子级准备资产 owner”收口
+   - backend / frontend snapshot 已把 `expression_kit.personalized_phrases` 改成 `recommended_phrases`
+   - 当前边界已明确：
+     - `prepared_expression` = 用户材料 owner
+     - `hotword_profiles` = 场景 / 热词模板 owner
+     - `quick_phrases` = 开口短句 owner
+     - `expression_kit.recommended_phrases` = 派生推荐，不是 owner
+   - 沟通页对应文案也已改成“推荐短句”，避免继续暗示这是新的记忆 owner
+   - `PRD / memory-tooling reference / founder collaboration loop` 已同步去除这块旧待办和旧架构口径
+   - 已验证：
+     - `cd backend && npm run build`
+     - `cd frontend && npm run build`
+     - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types src/lib/training/prepared-expression-practice.test.ts`
+     - `bash scripts/check_ai_docs.sh`
+     - `sudo docker compose build backend frontend`
+     - `sudo docker compose up -d --force-recreate backend frontend`
+     - Playwright smoke:
+       - `/chat`
+       - `/contribute`
+       - `/memory`
+
+0. 下一步主任务进一步收窄
+   - 句子级 owner 命名歧义这条已经不再是 blocker
+   - 当前真正剩下的上线前主任务，只保留：
+     - `livekit_agent` typed session memory
+     - server-side `assemble_context -> after_turn -> memory maintenance update`
+     - 训练页“舒服录音 + 明确目标 + 稳定总结”
+     - dataset 最小 `audio + target` 闭环
+
+0. 2026-04-16 已开始把 `livekit_agent` 的 typed session memory 落成正式结构
+   - `session_userdata.py` 已新增：
+     - `SessionTurnRecord`
+     - `SessionWorkingMemory`
+   - 当前 session-local working memory 已开始正式承接：
+     - 当前轮状态
+     - 当前 user / assistant 文本
+     - 最近 turn 记录
+     - `turn_count`
+     - `context_revision`
+     - `last_preparation_source`
+     - `interruption_count / barge_in_count`
+   - `assistant_runtime` 现在在回复完成后会写入 recent turns
+   - `session_userdata_ack` 也开始回发 `session_memory` 摘要
+   - 这一步的意义是：
+     - 后续 `after_turn`
+     - `session-close user profile update`
+     - runtime debug / observability
+     都终于有了明确 owner，而不是继续靠零散字段长
+   - 已验证：
+     - `python3 -m unittest livekit_agent.tests.test_session_userdata -v`
+     - `python3 -m unittest livekit_agent.tests.test_data_contract -v`
+     - `python3 -m unittest livekit_agent.tests.test_assistant_runtime -v`
+
+0. 这之后的下一刀已经更明确
+   - 不是再扩新的前端功能名词
+   - 而是继续把 `session_memory -> after_turn -> 4块记忆后台更新` 接成一条真正的 server-side contract
+
+0. 2026-04-16 已把 `compact candidate` 正式接进 `session_userdata_ack`
+   - `livekit_agent` 当前不再只回 `session_memory`
+   - 还会同时回一份很窄的 `compaction_candidate`
+   - 当前 candidate 只保留：
+     - 最近确认过的更稳表达
+     - 最近风险原句
+     - 支撑策略
+     - 最近用户意图 / 最近确认表达
+     - `loadout_mode / turn_count / interruption_count / barge_in_count`
+   - 前端 runtime 已开始把这层 server-side candidate 写进当前 session metadata
+   - 这一步的意义是：
+     - 会话结束时更新用户画像
+       不必继续完全依赖前端自己从零猜一份长期写回内容
+   - 已验证：
+     - `python3 -m unittest livekit_agent.tests.test_session_userdata -v`
+     - `python3 -m unittest livekit_agent.tests.test_data_contract -v`
+     - `python3 -m unittest livekit_agent.tests.test_assistant_runtime -v`
+     - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types src/lib/realtime-audio/session-runtime.test.ts`
+     - `cd frontend && npm run build`
+     - `cd backend && npm run build`
+
+0. 2026-04-16 已把“上线前最重要的 3 条 contract”正式写清并接入代码
+   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 已改成上线收口版，只保留：
+     - agent 上下文到底包含什么
+     - 三个模型怎么分层
+     - 哪些东西允许进入长期记忆
+   - 当前固定结论：
+     - 用户在沟通页手动 / 默认选中的 loadout 材料，会自动进入 agent 当前轮上下文
+     - durable memory 不能直接整库塞进 prompt，只能先经过 `workspace snapshot -> communication loadout -> selected preparation context`
+    - correction / memory maintenance / training summary 现在正式是 3 个不同模型层
+   - 代码也已同步：
+    - `DASHSCOPE_CORRECTION_MODEL` 已成为沟通页实时 correction 的独立 owner
+    - 训练页总结继续由 `DASHSCOPE_TRAINING_REPORT_MODEL` owner
+    - 当前过渡实现里的 runtime signal 会优先使用 agent 回来的 `serverCompaction*` 字段，而不是继续混合本地旧字段
+    - 当前仍未完成但已经明确 owner 的下一刀：
+     - `DASHSCOPE_MEMORY_MAINTENANCE_MODEL`
+       驱动的真正后端四块记忆后台更新
+   - 已验证：
+     - `python3 -m unittest discover livekit_agent/tests -v`
+     - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types src/lib/memory/memory-service.test.ts`
+     - `cd frontend && npm run build`
+     - `cd backend && npm run build`
+     - `bash scripts/check_ai_docs.sh`
+
+0. 2026-04-16 已把训练总结模型配置收窄到单一 owner
+   - backend 训练总结链现在只认：
+     - `DASHSCOPE_TRAINING_REPORT_MODEL`
+     - 无值时兜底 `qwen3.5-plus`
+   - 旧的 `DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_MODEL` 已从 compose / `.env.example` 移除，避免继续误导
+   - prompt 里残留的 `correction hints` 词也已删掉
+   - 当前结论固定：
+     - 手动刷新和 `periodic_auto` 都走同一个训练总结模型
+     - `periodic_auto` 目前仍是前端过期检查后触发，不是独立后端 cron
+   - 已验证：
+     - `cd backend && npm run build`
+     - `bash scripts/check_ai_docs.sh`
+
+0. 2026-04-16 `livekit-agent` 已完成一条不降级的快重建路径
+   - 直接全量 `docker compose build livekit-agent` 仍会因为外网 Python 依赖极慢而卡住
+   - 当前已确认可用的稳定重建路径是：
+     - 先复用当前稳定依赖层作为本地 base image
+     - 再用 `LIVEKIT_AGENT_BOOTSTRAP_DEPS=0` 只覆盖最新代码
+   - 当前实际已产出并启用新镜像：
+     - `voxflame-agent-livekit-agent:latest`
+     - image id: `86834b88b9e5`
+   - 这条路径满足：
+     - 包含最新代码
+     - 不降级当前运行依赖
+     - 后续仍可继续做全量 clean rebuild
+
+0. 2026-04-16 已把“最后两个目标”继续往上线态推进一刀
+   - backend 已新增：
+     - [memory-maintenance.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/memory-maintenance.service.ts)
+   - `/api/memory/session-close` 现在会先走：
+     - `existing user_profile_memory`
+     - `session metadata / runtime signal`
+     - `proposed profile_update`
+     - `DASHSCOPE_MEMORY_MAINTENANCE_MODEL`
+     再落库
+   - 如果 DashScope 不可用，也会回退到启发式维护，不会让会话结束写回直接失败
+   - 训练页已在代码里补上：
+     - `SessionReadinessPanel`
+     - `当前目标` 卡
+     - `重录这一句`
+     - `这句判断`
+   - 已验证：
+     - `cd backend && npm run build`
+     - `cd frontend && npm run build`
+     - `cd backend && npx ts-node src/services/memory-maintenance.service.test.ts`
+     - `sudo docker compose build backend frontend`
+     - `sudo docker compose up -d --force-recreate backend frontend`
+   - 当前新的 blocker 已经不是“还没写代码”，而是：
+     - Docker 前端现在实际吐出的 `/contribute` bundle 仍表现为旧页面
+     - 需要继续只在完整 Docker 环境里确认最新前端 bundle 真正生效
+     - 然后再做训练页 / 沟通页真实效果测试
 
 0. 2026-04-14 已开始按 PRD 落第一刀代码：`workspace document model + memory page object zones`
    - backend `workspace snapshot` 已新增 `object_zones`
@@ -26,6 +255,55 @@
      - `cd frontend && npm run build`
      - `cd backend && npm run build`
 
+0. 2026-04-15 已继续按 PRD 推进第二刀：`communication_loadout -> runtime assemble_context`
+   - backend `workspace snapshot` 已新增 `communication_loadout`
+   - 沟通页已开始展示“本次已加载”视图
+   - 当前用户已经能看到：
+     - 当前建议模式
+     - 默认加载项
+     - 辅助加载项
+   - `ChatInterface -> preparation_context_update -> session_userdata -> assistant_runtime prompt` 这一链现在已经正式接上
+   - 当前 runtime 已开始真正消费：
+     - `loadout_mode`
+     - `loadout_reason`
+     - `loadout_items`
+     - `reference_lines`
+   - 这一步的意义已经不再只是“把 loadout 做成 UI”，而是让本次沟通的上下文装配变成正式 contract
+   - 下一步已固定：
+     - 补“用户手动勾选哪些材料进入本次沟通”
+     - 把 server-side `flush -> compact -> durable write` 接进同一条 contract
+   - 已验证：
+     - `python3 -m unittest livekit_agent.tests.test_session_userdata -v`
+     - `python3 -m unittest livekit_agent.tests.test_data_contract -v`
+     - `python3 -m unittest livekit_agent.tests.test_assistant_runtime -v`
+     - `cd backend && npm run build`
+     - `cd frontend && npm run build`
+
+0. 2026-04-15 已把 durable memory / 上传边界继续收紧一层
+   - `session_compaction` 现在会按 `session_kind` 区分训练与沟通，训练页相关 durable keywords 明显收小，不再把太多训练关键词灌进长期 memory
+   - 当前产品边界已明确：
+     - 训练页录音进入 `dataset / voice_contributions / manifest`
+     - 沟通页默认不上传原始音频，只做实时理解、纠错和会后摘要
+     - 如果未来要采集沟通样本，必须走单独授权和单独数据路径，不能和训练样本混合
+   - 前端也已补清晰说明：
+     - 沟通页直接提示默认不上传原始沟通音频
+     - 数据采集说明页明确“当前只有训练页上传音频”
+   - 已验证：
+     - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types "src/lib/memory/memory-service.test.ts"`
+     - `cd frontend && npm run build`
+     - `bash scripts/check_ai_docs.sh`
+     - `sudo docker compose build frontend`
+     - `sudo docker compose up -d --force-recreate frontend`
+
+0. 2026-04-15 已完成一轮网页端真实 smoke，并按结果清理 PRD
+   - 登录态已验证进入沟通页与训练页
+   - 沟通页已确认显示：
+     - `本次已加载`
+     - `当前沟通页默认只做实时理解、纠错和会后摘要，不默认上传原始沟通音频`
+   - 数据采集说明页已确认显示：
+     - `当前只有训练页录音会进入上传链`
+   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 已删除这轮已完成步骤的重复待办，只保留未完成部分
+
 0. 2026-04-14 已把主文档口径重新压缩并对齐代码现状
    - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 已改成短版现状 PRD
    - [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) 已改成短版边界文档
@@ -34,7 +312,7 @@
      - 正式上线前最关键的 3 个 blocker 仍是：
        - `livekit_agent` 侧 typed session memory / context assembly
        - server-side `flush -> compact -> durable write`
-       - dataset review / annotation / export 的真实闭环
+       - dataset 最小对句校验与稳定回流
 
 0. `speech mode` 的 5 天专项执行计划已经完成阶段使命
    - 独立执行文档已从 `docs/` 删除
@@ -463,8 +741,8 @@
 ## 下一步
 
 1. 先把 `livekit_agent` 的 typed session memory 和 context assembly 制度化
-   - 明确 `session.userdata / PreparationContextPack / room runtime state` 的 owner 边界
-   - 明确哪些字段只活在 session，哪些字段允许进入 durable memory
+   - 这一步已经推进到 `PreparationContextPack` 正式承接 `loadout_mode / loadout_reason / loadout_items`
+   - 下一步要继续把 `after_turn / compact` 接到同一套 typed contract，而不是只在 preparation 阶段生效
 
 2. 把会后 compaction 稳定写回 `workspace snapshot`
    - 优先提炼高频误听 / 热词 / listener guidance / 当前最稳表达
@@ -472,7 +750,8 @@
 
 3. 把句子级准备资产的录入入口统一起来
    - 收口 `prepared-expression / important-expression / 高频句 / personalized phrase`
-   - 让沟通页、训练页、记忆页消费同一份句子级 owner，而不是各自维护
+   - 统一的是存储与 schema，不是 surface 资料默认共享
+   - 沟通页与训练页的个性化准备资料要分区消费，避免互相污染
 
 4. 把数据录入和标注流程收成可执行 contract
    - review queue、失败重试、人工修订、canonical label 边界要继续写清

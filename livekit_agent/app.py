@@ -337,7 +337,12 @@ async def entrypoint(ctx: JobContext) -> None:
     async def publish_init_ack() -> None:
         await publish_payload(build_session_init_ack(session_context))
         await publish_payload(
-            build_session_userdata_ack(session_context, session_userdata.preparation),
+            build_session_userdata_ack(
+                session_context,
+                session_userdata.preparation,
+                session_userdata.session_memory,
+                caption_mode_enabled=session_userdata.caption_mode_enabled,
+            ),
         )
 
     @ctx.room.on("data_received")
@@ -414,6 +419,8 @@ async def entrypoint(ctx: JobContext) -> None:
                     build_session_userdata_ack(
                         session_context,
                         session_userdata.preparation,
+                        session_userdata.session_memory,
+                        caption_mode_enabled=session_userdata.caption_mode_enabled,
                     )
                 )
             )

@@ -99,6 +99,30 @@ export interface RtcMessageEnvelope {
   hotword_count?: number
   confusion_patterns_count?: number
   last_training_category?: string
+  session_memory?: {
+    current_turn_state?: string
+    turn_count?: number
+    context_revision?: number
+    last_preparation_source?: string
+    interruption_count?: number
+    barge_in_count?: number
+    caption_mode_enabled?: boolean
+  }
+  compaction_candidate?: {
+    session_kind?: string
+    summary?: string
+    fallback_phrases?: string[]
+    risky_terms?: string[]
+    support_strategies?: string[]
+    hotwords?: string[]
+    recent_user_intents?: string[]
+    recent_confirmed_phrases?: string[]
+    loadout_mode?: string
+    context_revision?: number
+    turn_count?: number
+    interruption_count?: number
+    barge_in_count?: number
+  }
 }
 
 export interface RtmMessageEvent {
@@ -160,4 +184,12 @@ export interface RtcAgentState {
   sessionReadiness: RtcSessionReadiness | null
   grantedCapabilities: RtcCapabilityId[]
   lastVoiceProfileSync: VoiceProfileSyncEvent | null
+  lastSessionMemoryAck: {
+    currentTurnState: string | null
+    turnCount: number | null
+    contextRevision: number | null
+    preparationSource: string | null
+    interruptionCount: number | null
+    bargeInCount: number | null
+  } | null
 }

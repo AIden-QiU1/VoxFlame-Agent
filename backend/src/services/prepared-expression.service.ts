@@ -43,26 +43,33 @@ export interface PreparedExpressionCorrectionPair {
   occurrenceCount: number;
 }
 
-export interface PreparedExpressionRehearsalSummary {
+export interface PreparedExpressionTrainingSummaryWindow {
   summary: string;
-  hotwords: string[];
-  recurringErrors: string[];
+  sampleCount: number;
+  mismatchPairs: PreparedExpressionCorrectionPair[];
+  nextFocus: string[];
+  stableWins: string[];
   pronunciationPatterns: string[];
   supportStrategies: string[];
-  fallbackPhrases: string[];
-  nextFocus: string[];
-  asrHotwordEntries: PreparedExpressionAsrHotwordEntry[];
-  referenceLines: string[];
-  trainingPairs: PreparedExpressionCorrectionPair[];
-  basedOnTrainingCount: number;
-  model: string;
-  updated_at: string;
+  generated_at: string;
+}
+
+export interface PreparedExpressionTrainingPlan {
+  summary: string;
+  items: string[];
+  generated_at: string;
+}
+
+export interface PreparedExpressionTrainingReports {
+  dailySummary: PreparedExpressionTrainingSummaryWindow | null;
+  weeklySummary: PreparedExpressionTrainingSummaryWindow | null;
+  trainingPlan: PreparedExpressionTrainingPlan | null;
 }
 
 export interface PreparedExpressionAsset {
   draft: PreparedExpressionDraft;
   structured: PreparedExpressionTemplate;
-  rehearsal_summary: PreparedExpressionRehearsalSummary | null;
+  training_reports: PreparedExpressionTrainingReports | null;
 }
 
 const COMMON_STOPWORDS = new Set([
@@ -120,6 +127,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readString(record: Record<string, unknown> | undefined, key: string): string | null {
   const value = record?.[key];
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function readNumber(record: Record<string, unknown> | undefined, key: string): number | null {
+  const value = record?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function readStringList(value: unknown): string[] {
@@ -637,7 +649,7 @@ export function createPreparedExpressionAssetFromDraft(
   return {
     draft,
     structured: buildPreparedExpressionTemplateFromDraft(draft),
-    rehearsal_summary: null,
+    training_reports: null,
   };
 }
 
@@ -658,7 +670,7 @@ export function createPreparedExpressionAssetFromTemplate(
         .join('\n'),
     }),
     structured: template,
-    rehearsal_summary: null,
+    training_reports: null,
   };
 }
 
@@ -707,6 +719,86 @@ function normalizeCorrectionPair(value: unknown): PreparedExpressionCorrectionPa
     target,
     heard,
     occurrenceCount,
+  };
+}
+
+function normalizeTrainingSummaryWindow(
+  value: unknown,
+): PreparedExpressionTrainingSummaryWindow | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const summary = readString(value, 'summary');
+  if (!summary) {
+    return null;
+  }
+
+  const mismatchPairsSource = Array.isArray(value.mismatchPairs)
+    ? value.mismatchPairs
+    : Array.isArray(value.mismatch_pairs)
+      ? value.mismatch_pairs
+      : [];
+
+  const mismatchPairs = buildPreparedExpressionCorrectionPairs(
+    mismatchPairsSource
+      .map((pair) => normalizeCorrectionPair(pair))
+      .filter((pair): pair is PreparedExpressionCorrectionPair => Boolean(pair))
+      .map((pair) => ({
+        target: pair.target,
+        heard: pair.heard,
+      })),
+    {
+      maxPairs: 24,
+      maxChars: 1400,
+    },
+  );
+
+  return {
+    summary,
+    sampleCount:
+      readNumber(value, 'sampleCount')
+      ?? readNumber(value, 'sample_count')
+      ?? mismatchPairs.length,
+    mismatchPairs,
+    nextFocus: dedupeStrings(
+      readStringList(value.nextFocus).concat(readStringList(value.next_focus)),
+      4,
+    ),
+    stableWins: dedupeStrings(
+      readStringList(value.stableWins).concat(readStringList(value.stable_wins)),
+      4,
+    ),
+    pronunciationPatterns: dedupeStrings(
+      readStringList(value.pronunciationPatterns).concat(
+        readStringList(value.pronunciation_patterns),
+      ),
+      8,
+    ),
+    supportStrategies: dedupeStrings(
+      readStringList(value.supportStrategies).concat(
+        readStringList(value.support_strategies),
+      ),
+      4,
+    ),
+    generated_at: readString(value, 'generated_at') ?? new Date().toISOString(),
+  };
+}
+
+function normalizeTrainingPlan(value: unknown): PreparedExpressionTrainingPlan | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const summary = readString(value, 'summary');
+  if (!summary) {
+    return null;
+  }
+
+  return {
+    summary,
+    items: dedupeStrings(readStringList(value.items), 4),
+    generated_at: readString(value, 'generated_at') ?? new Date().toISOString(),
   };
 }
 
@@ -799,101 +891,81 @@ export function normalizePreparedExpressionAsset(value: unknown): PreparedExpres
         }
       : buildPreparedExpressionTemplateFromDraft(draft);
 
-  const rehearsalSummaryValue = isRecord(value.rehearsal_summary)
-    ? value.rehearsal_summary
+  const trainingReportsValue = isRecord(value.training_reports)
+    ? value.training_reports
     : undefined;
 
-  const rehearsalSummary =
-    rehearsalSummaryValue && readString(rehearsalSummaryValue, 'summary')
+  const trainingReports =
+    trainingReportsValue
       ? {
-          summary: readString(rehearsalSummaryValue, 'summary') ?? '',
-          hotwords: dedupeStrings(readStringList(rehearsalSummaryValue.hotwords), 12),
-          recurringErrors: dedupeStrings(
-            readStringList(rehearsalSummaryValue.recurringErrors).concat(
-              readStringList(rehearsalSummaryValue.recurring_errors),
-            ),
-            8,
+          dailySummary: normalizeTrainingSummaryWindow(
+            trainingReportsValue.dailySummary ?? trainingReportsValue.daily_summary,
           ),
-          pronunciationPatterns: dedupeStrings(
-            readStringList(rehearsalSummaryValue.pronunciationPatterns).concat(
-              readStringList(rehearsalSummaryValue.pronunciation_patterns),
-            ),
-            8,
+          weeklySummary: normalizeTrainingSummaryWindow(
+            trainingReportsValue.weeklySummary ?? trainingReportsValue.weekly_summary,
           ),
-          supportStrategies: dedupeStrings(
-            readStringList(rehearsalSummaryValue.supportStrategies).concat(
-              readStringList(rehearsalSummaryValue.support_strategies),
-            ),
-            6,
+          trainingPlan: normalizeTrainingPlan(
+            trainingReportsValue.trainingPlan ?? trainingReportsValue.training_plan,
           ),
-          fallbackPhrases: dedupeStrings(
-            readStringList(rehearsalSummaryValue.fallbackPhrases).concat(
-              readStringList(rehearsalSummaryValue.fallback_phrases),
-            ),
-            6,
-          ),
-          nextFocus: dedupeStrings(
-            readStringList(rehearsalSummaryValue.nextFocus).concat(
-              readStringList(rehearsalSummaryValue.next_focus),
-            ),
-            6,
-          ),
-          asrHotwordEntries: Array.isArray(rehearsalSummaryValue.asrHotwordEntries)
-            ? rehearsalSummaryValue.asrHotwordEntries
-                .map((entry) => normalizeAsrHotwordEntry(entry))
-                .filter((entry): entry is PreparedExpressionAsrHotwordEntry => Boolean(entry))
-            : Array.isArray(rehearsalSummaryValue.asr_hotword_entries)
-              ? rehearsalSummaryValue.asr_hotword_entries
-                  .map((entry) => normalizeAsrHotwordEntry(entry))
-                  .filter((entry): entry is PreparedExpressionAsrHotwordEntry => Boolean(entry))
-              : [],
-          referenceLines: dedupeStrings(
-            readStringList(rehearsalSummaryValue.referenceLines).concat(
-              readStringList(rehearsalSummaryValue.reference_lines),
-            ),
-            60,
-          ),
-          trainingPairs: Array.isArray(rehearsalSummaryValue.trainingPairs)
-            ? rehearsalSummaryValue.trainingPairs
-                .map((pair) => normalizeCorrectionPair(pair))
-                .filter((pair): pair is PreparedExpressionCorrectionPair => Boolean(pair))
-            : Array.isArray(rehearsalSummaryValue.training_pairs)
-              ? rehearsalSummaryValue.training_pairs
-                  .map((pair) => normalizeCorrectionPair(pair))
-                  .filter((pair): pair is PreparedExpressionCorrectionPair => Boolean(pair))
-              : [],
-          basedOnTrainingCount:
-            typeof rehearsalSummaryValue.basedOnTrainingCount === 'number'
-              ? rehearsalSummaryValue.basedOnTrainingCount
-              : typeof rehearsalSummaryValue.based_on_training_count === 'number'
-                ? rehearsalSummaryValue.based_on_training_count
-                : 0,
-          model: readString(rehearsalSummaryValue, 'model') ?? 'heuristic',
-          updated_at: readString(rehearsalSummaryValue, 'updated_at') ?? new Date().toISOString(),
         }
       : null;
 
-  const normalizedRehearsalSummary =
-    rehearsalSummary && rehearsalSummary.basedOnTrainingCount > 0
+  const normalizedTrainingReports =
+    trainingReports
       ? {
-          ...rehearsalSummary,
-          referenceLines:
-            rehearsalSummary.referenceLines.length > 0
-              ? rehearsalSummary.referenceLines
-              : buildPreparedExpressionReferenceLines(structured, {
-                  maxLines: 60,
-                  maxChars: 3200,
-                }),
-          trainingPairs: buildPreparedExpressionCorrectionPairs(
-            rehearsalSummary.trainingPairs.map((pair) => ({
-              target: pair.target,
-              heard: pair.heard,
-            })),
-            {
-              maxPairs: 60,
-              maxChars: 3200,
-            },
-          ),
+          ...trainingReports,
+          dailySummary: trainingReports.dailySummary
+            ? {
+                ...trainingReports.dailySummary,
+                mismatchPairs: buildPreparedExpressionCorrectionPairs(
+                  trainingReports.dailySummary.mismatchPairs.map((pair) => ({
+                    target: pair.target,
+                    heard: pair.heard,
+                  })),
+                  {
+                    maxPairs: 24,
+                    maxChars: 1400,
+                  },
+                ),
+                pronunciationPatterns: dedupeStrings(
+                  trainingReports.dailySummary.pronunciationPatterns,
+                  8,
+                ),
+                supportStrategies: dedupeStrings(
+                  trainingReports.dailySummary.supportStrategies,
+                  4,
+                ),
+              }
+            : null,
+          weeklySummary: trainingReports.weeklySummary
+            ? {
+                ...trainingReports.weeklySummary,
+                mismatchPairs: buildPreparedExpressionCorrectionPairs(
+                  trainingReports.weeklySummary.mismatchPairs.map((pair) => ({
+                    target: pair.target,
+                    heard: pair.heard,
+                  })),
+                  {
+                    maxPairs: 24,
+                    maxChars: 1400,
+                  },
+                ),
+                pronunciationPatterns: dedupeStrings(
+                  trainingReports.weeklySummary.pronunciationPatterns,
+                  8,
+                ),
+                supportStrategies: dedupeStrings(
+                  trainingReports.weeklySummary.supportStrategies,
+                  4,
+                ),
+              }
+            : null,
+          trainingPlan: trainingReports.trainingPlan
+            ? {
+                ...trainingReports.trainingPlan,
+                items: dedupeStrings(trainingReports.trainingPlan.items, 4),
+              }
+            : null,
         }
       : null;
 
@@ -923,6 +995,6 @@ export function normalizePreparedExpressionAsset(value: unknown): PreparedExpres
         6,
       ),
     },
-    rehearsal_summary: normalizedRehearsalSummary,
+    training_reports: normalizedTrainingReports,
   };
 }

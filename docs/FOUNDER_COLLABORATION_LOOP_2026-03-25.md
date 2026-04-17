@@ -96,13 +96,37 @@
 
 ### C. 执行面与 realtime
 
-- 你需要知道为什么现役还是 `TEN + Agora`
-- 重点是它当前解决什么、未来为什么要 vendor-neutral
+- 你需要知道为什么现役执行面已经收口成 `Frontend -> Backend -> self-hosted LiveKit -> livekit_agent`
+- 重点是：
+  - 前端负责产品交互、会话前准备和用户可见控制
+  - backend 负责 durable contract、workspace owner 和数据边界
+  - LiveKit 负责 realtime transport
+  - `livekit_agent` 负责 session-local intelligence，而不是长期 owner
 
 ### D. 记忆与 agent
 
 - 你需要知道为什么 `memory != dataset`
-- 重点是 `local cache / backend durable profile / TEN working memory`
+- 重点是 `frontend local fallback / backend durable workspace / livekit_agent working memory`
+
+## 5.1 当前更推荐的学习顺序
+
+如果你要真正把这套架构看懂，建议按这个顺序读和学：
+
+1. 先看产品主链路
+   - 为什么页面是 `首页 -> 沟通工作台 -> 训练工作台 -> 沟通档案`
+   - 先知道每个页面各自解决什么真实瞬间
+2. 再看 backend contract
+   - 为什么 `workspace` 是 durable owner
+   - 为什么 `dataset != memory`
+   - 为什么很多“产品真相”最后都要收进 backend snapshot
+3. 再看 realtime 执行面
+   - 为什么前端不能直接承担长期记忆
+   - 为什么 LiveKit 适合承载 transport / room / data channel
+   - 为什么 `assistant_runtime.py` 是 session / context / correction 的运行时核心
+4. 最后再看模型与 compaction
+   - 哪些模型负责低时延纠错
+   - 哪些模型负责总结 / 计划 / 压缩
+   - 为什么 durable write 必须晚于 realtime correctness
 
 ## 6. 文档沉淀规则
 

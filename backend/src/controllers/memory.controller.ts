@@ -5,8 +5,10 @@ import {
   Memory,
   Session,
   HotwordProfileRecord,
+  UserProfileMemoryRecord,
   normalizeCommunicationPreferences,
 } from '../services/supabase.service';
+import { MemoryMaintenanceService } from '../services/memory-maintenance.service';
 import { normalizeWorkspaceSceneId } from '../services/expression-kit.service';
 
 interface MemoryAddRequestBody {
@@ -22,6 +24,13 @@ interface MemorySessionSyncRequestBody {
   session_id?: string;
   metadata?: Record<string, unknown>;
   session?: Partial<Session>;
+}
+
+interface MemorySessionCloseRequestBody {
+  user_id?: string;
+  session_id?: string;
+  session?: Partial<Session>;
+  profile_update?: UserProfileMemoryRecord;
 }
 
 interface MemoryHotwordSyncRequestBody {
@@ -109,6 +118,8 @@ function buildSessionPayload(
 }
 
 export class MemoryController {
+  private readonly memoryMaintenanceService = new MemoryMaintenanceService();
+
   async getPreparedExpressionAsset(req: Request, res: Response): Promise<void> {
     try {
       const authenticatedUserId = req.user?.id;
@@ -409,6 +420,89 @@ export class MemoryController {
       res.status(201).json(created);
     } catch (error) {
       console.error('Error in addMemory:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // POST /api/memory/session-close - Persist session-close user profile update via backend durable owner
+  async persistSessionCloseProfileUpdate(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const {
+        user_id,
+        session_id,
+        session,
+        profile_update,
+      } = req.body as MemorySessionCloseRequestBody;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (user_id && user_id !== authenticatedUserId) {
+        console.warn(`[MemoryController] User ID mismatch: token=${authenticatedUserId}, body=${user_id}`);
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      const safeUserId = authenticatedUserId;
+      const resolvedSessionId = session?.id || session_id;
+      const updatedAt = profile_update?.updated_at || new Date().toISOString();
+
+      if (!resolvedSessionId) {
+        res.status(400).json({ error: 'Missing required field: session_id' });
+        return;
+      }
+
+      if (
+        !profile_update?.summary &&
+        !(profile_update?.common_scenarios && profile_update.common_scenarios.length > 0) &&
+        !(profile_update?.risky_terms && profile_update.risky_terms.length > 0) &&
+        !(profile_update?.support_strategies && profile_update.support_strategies.length > 0)
+      ) {
+        res.status(400).json({ error: 'Missing required field: profile_update' });
+        return;
+      }
+
+      const service = SupabaseService.getInstance();
+      const sessionPayload = buildSessionPayload(
+        safeUserId,
+        resolvedSessionId,
+        undefined,
+        session,
+        updatedAt,
+      );
+      const ensuredSession = await service.ensureSession(sessionPayload);
+
+      if (!ensuredSession?.id) {
+        res.status(500).json({ error: 'Failed to ensure session before updating user profile memory' });
+        return;
+      }
+
+      const existingProfileMemory = await service.getUserProfileMemory(safeUserId);
+      const maintainedProfileMemory = await this.memoryMaintenanceService.maintain({
+        existingProfile: existingProfileMemory,
+        proposedUpdate: {
+          ...profile_update,
+          updated_at: updatedAt,
+        },
+        session: {
+          ...sessionPayload,
+          id: ensuredSession.id,
+        },
+      });
+      const userProfileMemory = await service.updateUserProfileMemory(safeUserId, {
+        ...maintainedProfileMemory,
+        updated_at: updatedAt,
+      });
+
+      res.status(201).json({
+        session_id: ensuredSession.id,
+        user_profile_memory: userProfileMemory,
+      });
+    } catch (error) {
+      console.error('Error in persistSessionCloseProfileUpdate:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

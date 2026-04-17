@@ -9,9 +9,6 @@
     "test": "ts-node src/services/livekit-config.service.test.ts",
     "start": "node dist/index.js",
     "reconcile:artifacts": "ts-node scripts/reconcile_upload_artifacts.ts",
-    "review:queue": "ts-node scripts/list_dataset_review_queue.ts",
-    "review:mark": "ts-node scripts/mark_dataset_review_decision.ts",
-    "export:manifest": "ts-node scripts/export_dataset_manifest.ts",
     "export:audio-target": "ts-node scripts/export_audio_target_dataset.ts",
     "cleanup:prepared-expression": "ts-node scripts/cleanup_prepared_expression_data.ts"
   },

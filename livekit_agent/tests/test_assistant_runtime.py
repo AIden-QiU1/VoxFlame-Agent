@@ -33,6 +33,7 @@ def create_config() -> LiveKitAgentConfig:
         mode="communication_stub",
         dashscope_api_key=None,
         dashscope_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        dashscope_correction_model="qwen-flash",
         dashscope_llm_model="qwen3.6-plus",
         dashscope_timeout_seconds=15.0,
         dashscope_reply_timeout_seconds=4.5,
@@ -312,6 +313,14 @@ class TestAssistantRuntime(unittest.TestCase):
 
     def test_build_preparation_prompt_includes_document_and_pairs(self) -> None:
         userdata = build_session_userdata(create_context())
+        userdata.preparation.loadout_mode = "long_form"
+        userdata.preparation.loadout_reason = "当前已有完整准备稿，优先带材料进入长时间沟通。"
+        userdata.preparation.loadout_items = [
+            "默认 | 默认常驻 | 用户个人画像：围绕稳定表达规律继续装配。",
+            "辅助 | 最近沉淀 | 当前训练总结：优先减少专名误听。",
+        ]
+        userdata.preparation.hotwords = ["邱生峰", "挂号"]
+        userdata.preparation.risky_terms = ["邱文峰"]
         userdata.preparation.document_content = (
             "大家好，我叫邱生峰，在生声不息科技做 AI 智能体和 LLM 产品。"
         )
@@ -328,10 +337,20 @@ class TestAssistantRuntime(unittest.TestCase):
         self.assertIn("AI", prompt)
         self.assertIn("智能体", prompt)
         self.assertIn("LLM", prompt)
+        self.assertIn("本次上下文装配模式：长时间沟通", prompt)
+        self.assertIn("本次已加载上下文", prompt)
+        self.assertIn("当前高优先热词", prompt)
+        self.assertIn("当前容易被听偏的词", prompt)
         self.assertIn("系统常听成", prompt)
 
     def test_build_current_turn_prompt_prefers_prepared_content_and_pairs(self) -> None:
         userdata = build_session_userdata(create_context())
+        userdata.preparation.loadout_mode = "urgent"
+        userdata.preparation.loadout_items = [
+            "默认 | 默认常驻 | 固定补救句：请您慢一点，我再说一次。",
+        ]
+        userdata.preparation.hotwords = ["邱生峰", "挂号"]
+        userdata.preparation.risky_terms = ["邱文峰"]
         userdata.preparation.document_content = (
             "医生您好，我叫邱生峰，在生声不息科技做 AI 智能体和 LLM 产品。我想先挂号。"
         )
@@ -358,6 +377,10 @@ class TestAssistantRuntime(unittest.TestCase):
         self.assertIn("人名、地名、公司名、产品名、数字和术语必须优先以原文写法为准", prompt)
         self.assertIn("训练句对只是帮助你识别常见误听模式", prompt)
         self.assertIn("最终输出长度要尽量贴近本轮 ASR", prompt)
+        self.assertIn("当前这轮沟通按“紧急沟通”模式装配上下文", prompt)
+        self.assertIn("本轮默认已加载的上下文如下", prompt)
+        self.assertIn("本轮高优先热词如下", prompt)
+        self.assertIn("这些词在当前用户身上更容易被系统听偏", prompt)
 
     def test_generate_reply_sends_full_reference_article_to_model(self) -> None:
         fake_client = FakeDashScopeClient("请先帮我确认一下。")

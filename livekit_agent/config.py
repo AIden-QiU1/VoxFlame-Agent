@@ -14,6 +14,7 @@ class LiveKitAgentConfig:
     mode: str
     dashscope_api_key: str | None
     dashscope_base_url: str
+    dashscope_correction_model: str
     dashscope_llm_model: str
     dashscope_timeout_seconds: float
     dashscope_reply_timeout_seconds: float
@@ -71,6 +72,12 @@ def load_config() -> LiveKitAgentConfig:
             .strip()
             .rstrip("/")
         ),
+        dashscope_correction_model=(
+            os.getenv("DASHSCOPE_CORRECTION_MODEL")
+            or os.getenv("DASHSCOPE_LLM_MODEL")
+            or "qwen-flash"
+        ).strip()
+        or "qwen-flash",
         dashscope_llm_model=os.getenv("DASHSCOPE_LLM_MODEL", "qwen-flash").strip()
         or "qwen-flash",
         dashscope_timeout_seconds=float(os.getenv("DASHSCOPE_TIMEOUT_SECONDS", "15").strip() or "15"),

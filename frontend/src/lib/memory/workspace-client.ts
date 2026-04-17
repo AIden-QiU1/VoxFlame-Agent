@@ -51,26 +51,33 @@ export interface PreparedExpressionCorrectionPairAsset {
   occurrenceCount: number
 }
 
-export interface PreparedExpressionRehearsalSummaryAsset {
+export interface PreparedExpressionTrainingSummaryWindowAsset {
   summary: string
-  hotwords: string[]
-  recurringErrors: string[]
+  sampleCount: number
+  mismatchPairs: PreparedExpressionCorrectionPairAsset[]
+  nextFocus: string[]
+  stableWins: string[]
   pronunciationPatterns: string[]
   supportStrategies: string[]
-  fallbackPhrases: string[]
-  nextFocus: string[]
-  asrHotwordEntries: PreparedExpressionAsrHotwordEntryAsset[]
-  referenceLines: string[]
-  trainingPairs: PreparedExpressionCorrectionPairAsset[]
-  basedOnTrainingCount: number
-  model: string
-  updated_at: string
+  generated_at: string
+}
+
+export interface PreparedExpressionTrainingPlanAsset {
+  summary: string
+  items: string[]
+  generated_at: string
+}
+
+export interface PreparedExpressionTrainingReportsAsset {
+  daily_summary: PreparedExpressionTrainingSummaryWindowAsset | null
+  weekly_summary: PreparedExpressionTrainingSummaryWindowAsset | null
+  training_plan: PreparedExpressionTrainingPlanAsset | null
 }
 
 export interface PreparedExpressionAsset {
   draft: PreparedExpressionDraftAsset
   structured: PreparedExpressionStructuredAsset
-  rehearsal_summary: PreparedExpressionRehearsalSummaryAsset | null
+  training_reports: PreparedExpressionTrainingReportsAsset | null
 }
 
 function buildWorkspaceSnapshotUrl(

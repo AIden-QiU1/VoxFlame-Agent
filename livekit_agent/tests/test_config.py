@@ -20,6 +20,7 @@ class ConfigTests(unittest.TestCase):
             "VOXFLAME_LIVEKIT_AGENT_MODE": "communication_stub",
             "DASHSCOPE_API_KEY": "dashscope-test",
             "DASHSCOPE_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "DASHSCOPE_CORRECTION_MODEL": "qwen-flash",
             "DASHSCOPE_LLM_MODEL": "qwen-flash",
             "DASHSCOPE_TIMEOUT_SECONDS": "9.5",
             "DASHSCOPE_REPLY_TIMEOUT_SECONDS": "3.2",
@@ -70,6 +71,7 @@ class ConfigTests(unittest.TestCase):
             config.dashscope_base_url,
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
         )
+        self.assertEqual(config.dashscope_correction_model, "qwen-flash")
         self.assertEqual(config.dashscope_llm_model, "qwen-flash")
         self.assertEqual(config.dashscope_timeout_seconds, 9.5)
         self.assertEqual(config.dashscope_reply_timeout_seconds, 3.2)

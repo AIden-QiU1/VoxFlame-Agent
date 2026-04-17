@@ -39,12 +39,16 @@
    - 可读
    - 可写
    - 可 summarize
-4. dataset 录音链已经成立
+4. 沟通页句子级资产来源也已经更清楚
+   - `prepared_expression` 是用户材料 owner
+   - `hotword_profiles` 是场景 / 热词模板 owner
+   - `quick_phrases` 是开口短句 owner
+   - `expression_kit.recommended_phrases` 只是派生推荐，不再假装自己是 owner
+5. dataset 录音链已经成立
    - `recording envelope`
    - `recorder queue`
    - `upload receipt`
    - `manifest.jsonl`
-   - `review metadata`
 
 ### 2.2 还只是“过渡态”的部分
 
@@ -78,10 +82,8 @@
 1. 音频文件
 2. `recording_id / session_id`
 3. `target_text / recognized_text`
-4. sample quality
-5. review queue
-6. export decision
-7. manifest / upload receipt
+4. 最小对句判断
+5. manifest / upload receipt
 
 ### 3.2 应该进入 durable memory 的
 
@@ -128,7 +130,7 @@ backend 负责：
 1. `workspace` durable owner
 2. `prepared_expression` owner
 3. `session_review` / `profile_bundle` 聚合
-4. dataset artifact / review / export contract
+4. dataset artifact 与最小 `audio + target` contract
 
 ### 4.3 livekit_agent
 
@@ -180,16 +182,13 @@ backend 负责：
 
 ## 6. 上线前必须补齐的 dataset contract
 
-dataset 侧至少要稳定到：
+dataset 侧现在只需要稳定到：
 
-1. review queue 不是只存在于 metadata
-2. accepted / rejected / retry 的规则固定
-3. export 前字段边界固定
-4. 有最小运营指标：
-   - 覆盖率
-   - 复核命中率
-   - 退回复录率
-   - 样本从录入到可用的时延
+1. 音频上传稳定
+2. `target_text / recognized_text` 保存稳定
+3. 最小对句判断稳定
+4. 同一条录音重传不重复写 manifest
+5. `audio + target` 导出稳定
 
 ---
 

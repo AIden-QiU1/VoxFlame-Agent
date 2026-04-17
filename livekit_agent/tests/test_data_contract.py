@@ -22,7 +22,7 @@ from data_contract import (
     extract_user_text_input,
 )
 from session_context import VoxFlameSessionContext
-from session_userdata import PreparationContextPack
+from session_userdata import PreparationContextPack, SessionWorkingMemory
 
 
 def create_context() -> VoxFlameSessionContext:
@@ -91,19 +91,49 @@ class DataContractTests(unittest.TestCase):
                 profile_summary="用户当前就医场景下需要优先保真和少扩写。",
                 listener_guidance=["如果没听清，请直接复述确认。"],
                 support_strategies=["优先突出症状和诉求。"],
+                hotwords=["挂号", "邱生峰"],
+                risky_terms=["邱文峰"],
                 document_summary="准备稿已经围绕就医场景整理完成。",
                 document_content="医生您好，我叫邱生峰。我想先挂号，再说明症状。",
                 reference_lines=["医生您好，我叫邱生峰。"],
                 training_pairs=[{"target": "我叫邱生峰。", "heard": "我叫邱文峰。", "occurrence_count": 2}],
+                loadout_mode="urgent",
+                loadout_reason="当前更适合先用轻量 loadout 快速开口。",
+                loadout_items=["默认 | 默认常驻 | 固定补救句：请您慢一点，我再说一次。"],
             ),
+            SessionWorkingMemory(
+                current_turn_state="idle",
+                turn_count=3,
+                context_revision=2,
+                last_preparation_source="runtime_update",
+                interruption_count=1,
+                barge_in_count=1,
+            ),
+            caption_mode_enabled=True,
         )
 
         self.assertEqual(payload["type"], "session_userdata_ack")
         self.assertEqual(payload["metadata"]["source"], "metadata")
         self.assertIn("邱生峰", payload["preparation"]["document_content"])
+        self.assertEqual(payload["preparation"]["loadout_mode"], "urgent")
+        self.assertEqual(payload["preparation"]["hotwords"], ["挂号", "邱生峰"])
+        self.assertEqual(payload["preparation"]["risky_terms"], ["邱文峰"])
+        self.assertEqual(
+            payload["preparation"]["loadout_items"],
+            ["默认 | 默认常驻 | 固定补救句：请您慢一点，我再说一次。"],
+        )
         self.assertEqual(
             payload["preparation"]["training_pairs"],
             [{"target": "我叫邱生峰。", "heard": "我叫邱文峰。", "occurrence_count": 2}],
+        )
+        self.assertEqual(payload["session_memory"]["turn_count"], 3)
+        self.assertEqual(payload["session_memory"]["context_revision"], 2)
+        self.assertTrue(payload["session_memory"]["caption_mode_enabled"])
+        self.assertEqual(payload["compaction_candidate"]["session_kind"], "communication")
+        self.assertIn("最值得继续保持", payload["compaction_candidate"]["summary"])
+        self.assertEqual(
+            payload["compaction_candidate"]["support_strategies"],
+            ["优先突出症状和诉求。", "如果没听清，请直接复述确认。"],
         )
 
     def test_build_assistant_text_output_matches_frontend_reducer_shape(self) -> None:

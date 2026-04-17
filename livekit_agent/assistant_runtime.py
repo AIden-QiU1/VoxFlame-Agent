@@ -150,6 +150,9 @@ def extract_reference_terms(userdata: VoxFlameSessionUserData) -> list[str]:
             for match in pattern.finditer(target):
                 _append_reference_term(terms, match.group(1) if match.lastindex else match.group(0))
 
+    for term in userdata.preparation.hotwords:
+        _append_reference_term(terms, term)
+
     return terms[:24]
 
 
@@ -204,6 +207,21 @@ def build_preparation_prompt(userdata: VoxFlameSessionUserData) -> str:
         "- 这里的重点不是场景润色，而是参考原文对齐。",
         f"- 参考原文专名/地名/公司名/术语：{'；'.join(reference_terms)}",
     ]
+    if preparation.loadout_mode:
+        mode_label = "长时间沟通" if preparation.loadout_mode == "long_form" else "紧急沟通"
+        lines.append(f"- 本次上下文装配模式：{mode_label}")
+    if preparation.loadout_reason:
+        lines.append(f"- 装配原因：{_truncate_text(preparation.loadout_reason, 180)}")
+    if preparation.loadout_items:
+        lines.append("- 本次已加载上下文：")
+        lines.extend(
+            f"  - {_truncate_text(item, 120)}"
+            for item in preparation.loadout_items[:8]
+        )
+    if preparation.hotwords:
+        lines.append(f"- 当前高优先热词：{'；'.join(preparation.hotwords[:8])}")
+    if preparation.risky_terms:
+        lines.append(f"- 当前容易被听偏的词：{'；'.join(preparation.risky_terms[:6])}")
     if preparation.document_summary and not preparation.document_content:
         lines.append(f"- 参考原文摘要：{_truncate_text(preparation.document_summary, 220)}")
     if preparation.document_content:
@@ -230,6 +248,27 @@ def build_current_turn_prompt(
         f"参考原文专名/地名/公司名/术语优先按这些写法保留：{'；'.join(reference_terms)}",
         "最终输出长度要尽量贴近本轮 ASR，优先控制在前后不超过 2 个字；如果明显更长或更短，通常说明你改写过度，应回到更贴近 ASR 的版本。",
     ]
+    if userdata.preparation.loadout_mode:
+        mode_label = (
+            "长时间沟通"
+            if userdata.preparation.loadout_mode == "long_form"
+            else "紧急沟通"
+        )
+        lines.append(f"当前这轮沟通按“{mode_label}”模式装配上下文。")
+    if userdata.preparation.loadout_items:
+        lines.append("本轮默认已加载的上下文如下；优先利用这些线索，不要跳出这批已装配内容随意扩写：")
+        lines.extend(
+            f"  - {_truncate_text(item, 100)}"
+            for item in userdata.preparation.loadout_items[:8]
+        )
+    if userdata.preparation.hotwords:
+        lines.append(
+            f"本轮高优先热词如下；人名、地名、机构名、术语优先往这些词靠拢：{'；'.join(userdata.preparation.hotwords[:8])}"
+        )
+    if userdata.preparation.risky_terms:
+        lines.append(
+            f"这些词在当前用户身上更容易被系统听偏：{'；'.join(userdata.preparation.risky_terms[:6])}。遇到近音或漏字时优先结合材料判断。"
+        )
     if recent_correction_history:
         lines.append("最近几轮已确认的纠错结果如下；这些结果比旧 ASR 更可信，但只能用于理解语义承接和避免重复，不能直接复述：")
         lines.append("长度只有 1 到 2 个字的旧结果不算有效上下文，已经忽略。")
@@ -485,7 +524,7 @@ class CommunicationAssistantRuntime:
             self.client = DashScopeChatClient(
                 api_key=self.config.dashscope_api_key,
                 base_url=self.config.dashscope_base_url,
-                model=self.config.dashscope_llm_model,
+                model=self.config.dashscope_correction_model,
                 timeout_seconds=self.config.dashscope_timeout_seconds,
                 temperature=self.config.dashscope_llm_temperature,
                 max_tokens=self.config.dashscope_llm_max_tokens,
@@ -605,7 +644,7 @@ class CommunicationAssistantRuntime:
         )
         source = "dashscope_chat_completion"
         self._remember_turn(reply)
-        self.userdata.note_assistant_reply(reply)
+        self.userdata.note_assistant_reply(reply, source=source)
         return reply, source
 
     def _remember_turn(self, reply: str) -> None:

@@ -439,6 +439,8 @@ export function buildPreparedExpressionPracticeSummary(
     summary: preparedExpression.summary,
     rehearsalCount: preparedExpression.rehearsal_count,
     lowConfidenceSections: preparedExpression.low_confidence_sections,
-    nextFocus: preparedExpression.next_focus,
+    nextFocus: preparedExpression.training_reports?.weekly_summary?.next_focus
+      ?? preparedExpression.training_reports?.daily_summary?.next_focus
+      ?? [],
   }
 }

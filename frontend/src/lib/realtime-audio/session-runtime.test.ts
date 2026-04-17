@@ -207,6 +207,70 @@ test('session-runtime writes audio input telemetry into current session metadata
   assert.equal(metadataUpdates[0].audioClippingEventCount, 1)
 })
 
+test('session-runtime writes session userdata ack memory summary into current session metadata', () => {
+  const harness = createStateHarness()
+  const latestTranscriptRef = { current: '' }
+  const metadataUpdates: Array<Record<string, unknown>> = []
+  const originalUpdateCurrentSessionMetadata = memoryService.updateCurrentSessionMetadata
+  memoryService.updateCurrentSessionMetadata = ((metadata: Record<string, unknown>) => {
+    metadataUpdates.push(metadata)
+  }) as typeof memoryService.updateCurrentSessionMetadata
+
+  try {
+    const handleMessage = createDecodedRtcMessageHandler({
+      memoryOwnerId: 'user-1',
+      latestUserTranscriptRef: latestTranscriptRef,
+      setState: harness.setState,
+    })
+
+    handleMessage({
+      type: 'session_userdata_ack',
+      session_memory: {
+        current_turn_state: 'idle',
+        turn_count: 4,
+        context_revision: 3,
+        last_preparation_source: 'runtime_update',
+        interruption_count: 2,
+        barge_in_count: 1,
+        caption_mode_enabled: true,
+      },
+      compaction_candidate: {
+        session_kind: 'communication',
+        summary: '最近确认过的更稳表达是“请先帮我挂号”。',
+        fallback_phrases: ['请先帮我挂号。'],
+        risky_terms: ['请先帮我'],
+        support_strategies: ['优先保留用户原意。'],
+        hotwords: ['挂号'],
+        recent_user_intents: ['请先帮我'],
+        recent_confirmed_phrases: ['请先帮我挂号。'],
+      },
+    })
+  } finally {
+    memoryService.updateCurrentSessionMetadata = originalUpdateCurrentSessionMetadata
+  }
+
+  assert.equal(metadataUpdates.length, 1)
+  assert.equal(metadataUpdates[0].serverCurrentTurnState, 'idle')
+  assert.equal(metadataUpdates[0].serverTurnCount, 4)
+  assert.equal(metadataUpdates[0].serverContextRevision, 3)
+  assert.equal(metadataUpdates[0].serverPreparationSource, 'runtime_update')
+  assert.equal(metadataUpdates[0].serverInterruptionCount, 2)
+  assert.equal(metadataUpdates[0].serverBargeInCount, 1)
+  assert.equal(metadataUpdates[0].serverCaptionModeEnabled, true)
+  assert.equal(metadataUpdates[0].serverCompactionSessionKind, 'communication')
+  assert.equal(metadataUpdates[0].serverCompactionSummary, '最近确认过的更稳表达是“请先帮我挂号”。')
+  assert.deepEqual(metadataUpdates[0].serverCompactionFallbackPhrases, ['请先帮我挂号。'])
+  assert.deepEqual(metadataUpdates[0].serverCompactionRiskyTerms, ['请先帮我'])
+  assert.deepEqual(metadataUpdates[0].serverCompactionSupportStrategies, ['优先保留用户原意。'])
+  assert.deepEqual(metadataUpdates[0].serverCompactionHotwords, ['挂号'])
+  assert.deepEqual(metadataUpdates[0].serverCompactionRecentUserIntents, ['请先帮我'])
+  assert.deepEqual(metadataUpdates[0].serverCompactionRecentConfirmedPhrases, ['请先帮我挂号。'])
+  assert.equal(harness.getState().lastSessionMemoryAck?.currentTurnState, 'idle')
+  assert.equal(harness.getState().lastSessionMemoryAck?.turnCount, 4)
+  assert.equal(harness.getState().lastSessionMemoryAck?.contextRevision, 3)
+  assert.equal(harness.getState().lastSessionMemoryAck?.preparationSource, 'runtime_update')
+})
+
 test('session-runtime resolves the bootstrap gate after the matching session_init_ack arrives', async () => {
   const gate = createSessionInitAckGate('req_1', 100)
   gate.handleDecodedMessage({

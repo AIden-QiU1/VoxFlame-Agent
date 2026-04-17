@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  buildSessionCompactionMemoryInput,
+  buildSessionCloseUserProfileUpdate,
+  buildSessionCloseUserProfileUpdateRequestBody,
   type Session,
 } from './memory-service.ts'
 
@@ -26,58 +27,68 @@ function createSession(overrides: Partial<Session> = {}): Session {
       scene: 'medical',
       latestCorrectionOriginal: '请先听我说完',
       latestCorrectionText: '我说话会慢一点，请先听我说完。',
-      lastTrainingFeedbackNextStep: '先把开场白和补救句练稳。',
-      lastTrainingSpeechPatterns: ['请先', '说完'],
-      lastTrainingArticulationTips: ['先把关键词慢慢送出来。'],
-      lastTrainingPronunciationTargets: ['请先听我说完'],
-      clarity_score: 0.72,
-      interruptionCount: 2,
-      bargeInCount: 1,
-      lastInputTelemetryReason: 'clipping_detected',
-      lastInputNormalizedLevel: 0.03,
-      lastInputPeakLevel: 0.99,
-      lastInputClippingDetected: true,
-      lastInputApmEnabled: true,
-      audioClippingEventCount: 2,
+      currentPreparedExpressionTitle: '门诊沟通',
+      currentPreparedExpressionSectionTitle: '挂号开场',
     },
     ...overrides,
   }
 }
 
-test('buildSessionCompactionMemoryInput compresses session signals into a semantic memory', () => {
-  const input = buildSessionCompactionMemoryInput(createSession())
+test('buildSessionCloseUserProfileUpdate narrows communication session into user profile memory fields', () => {
+  const update = buildSessionCloseUserProfileUpdate(createSession())
 
-  assert.ok(input)
-  assert.equal(input?.type, 'semantic')
-  assert.match(input?.content ?? '', /更稳的表达是/)
-  assert.equal(input?.metadata.kind, 'session_compaction')
-  assert.deepEqual(input?.metadata.hotwords, ['请先听我说完'])
-  assert.deepEqual(input?.metadata.risky_terms, ['请先听我说完'])
-  assert.deepEqual(input?.metadata.fallback_phrases, ['我说话会慢一点，请先听我说完。'])
-  assert.deepEqual(input?.metadata.pronunciation_patterns, ['请先', '说完', '先把关键词慢慢送出来。'])
-  assert.equal(input?.metadata.interruption_count, 2)
-  assert.equal(input?.metadata.barge_in_count, 1)
-  assert.equal(input?.metadata.last_input_telemetry_reason, 'clipping_detected')
-  assert.equal(input?.metadata.last_input_normalized_level, 0.03)
-  assert.equal(input?.metadata.last_input_peak_level, 0.99)
-  assert.equal(input?.metadata.last_input_clipping_detected, true)
-  assert.equal(input?.metadata.last_input_apm_enabled, true)
-  assert.equal(input?.metadata.audio_clipping_event_count, 2)
-  assert.equal(input?.metadata.next_step, '先把开场白和补救句练稳。')
-  assert.match(input?.content ?? '', /更稳的表达是/)
+  assert.ok(update)
+  assert.match(update?.summary ?? '', /更稳的表达是/)
+  assert.deepEqual(update?.common_scenarios, ['medical'])
+  assert.deepEqual(update?.risky_terms, ['请先听我说完'])
   assert.ok(
-    (input?.metadata.support_strategies as string[]).some((item) => item.includes('麦克风')),
+    (update?.support_strategies ?? []).some((item) => item.includes('现场如果系统听偏')),
   )
 })
 
-test('buildSessionCompactionMemoryInput returns null when the session has no compressible signal', () => {
-  const input = buildSessionCompactionMemoryInput(createSession({
-    turns: [],
+test('buildSessionCloseUserProfileUpdate prefers server runtime candidate when available', () => {
+  const update = buildSessionCloseUserProfileUpdate(createSession({
     metadata: {
       kind: 'communication',
       source: 'rtc_agent',
+      communicationScene: 'medical',
+      latestCorrectionOriginal: '本地旧字段',
+      latestCorrectionText: '本地旧改写',
+      serverCompactionSessionKind: 'communication',
+      serverCompactionSummary: '最近确认过的更稳表达是“请先帮我挂号”。',
+      serverCompactionRiskyTerms: ['请先帮我'],
+      serverCompactionSupportStrategies: ['先保住挂号这个核心诉求。'],
+      serverCompactionRecentUserIntents: ['请先帮我'],
+      serverCompactionRecentConfirmedPhrases: ['请先帮我挂号。'],
     },
   }))
 
-  assert.equal(input, null)
+  assert.ok(update)
+  assert.equal(update?.summary, '最近确认过的更稳表达是“请先帮我挂号”。')
+  assert.deepEqual(update?.risky_terms, ['请先帮我'])
+  assert.deepEqual(update?.support_strategies, ['先保住挂号这个核心诉求。'])
+  assert.deepEqual(update?.common_scenarios, ['medical'])
+})
+
+test('buildSessionCloseUserProfileUpdate ignores training sessions', () => {
+  const update = buildSessionCloseUserProfileUpdate(createSession({
+    metadata: {
+      kind: 'training',
+      source: 'rtc_agent',
+      lastTrainingFeedbackSummary: '这一轮更适合先把开场白练稳。',
+    },
+  }))
+
+  assert.equal(update, null)
+})
+
+test('buildSessionCloseUserProfileUpdateRequestBody builds typed backend payload', () => {
+  const payload = buildSessionCloseUserProfileUpdateRequestBody('user-1', createSession())
+
+  assert.ok(payload)
+  assert.equal(payload?.user_id, 'user-1')
+  assert.equal(payload?.session_id, 'session-1')
+  assert.equal(payload?.session.id, 'session-1')
+  assert.match(payload?.profile_update.summary ?? '', /更稳的表达是/)
+  assert.deepEqual(payload?.profile_update.common_scenarios, ['medical'])
 })

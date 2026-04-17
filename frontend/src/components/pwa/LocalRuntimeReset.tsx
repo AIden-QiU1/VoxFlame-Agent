@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react'
 
-const LOCAL_RUNTIME_RESET_KEY = 'voxflame-local-runtime-reset-session-v1'
 const allowLocalhostPwa = process.env.NEXT_PUBLIC_PWA_ALLOW_LOCALHOST === '1'
 
 export function LocalRuntimeReset() {
@@ -20,7 +19,6 @@ export function LocalRuntimeReset() {
     }
 
     const resetRuntimeState = async () => {
-      const hasReset = window.sessionStorage.getItem(LOCAL_RUNTIME_RESET_KEY) === '1'
       const registrations =
         'serviceWorker' in navigator
           ? await navigator.serviceWorker.getRegistrations()
@@ -36,9 +34,7 @@ export function LocalRuntimeReset() {
         await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)))
       }
 
-      window.sessionStorage.setItem(LOCAL_RUNTIME_RESET_KEY, '1')
-
-      if (hadRuntimeState && !hasReset) {
+      if (hadRuntimeState) {
         window.location.reload()
       }
     }

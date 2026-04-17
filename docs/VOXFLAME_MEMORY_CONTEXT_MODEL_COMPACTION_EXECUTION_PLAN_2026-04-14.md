@@ -235,6 +235,8 @@
 2. workspace snapshot 新视图
 3. 记忆页列表 + 编辑器
 
+当前状态：第一切片已完成。
+
 ### Step 2：上下文装配 contract 收口
 
 目标：让沟通页和 runtime 之间不再自由拼装上下文。
@@ -250,6 +252,18 @@
 1. `communication_loadout`
 2. runtime assembly schema
 3. 页面到 runtime 的固定装配入口
+
+当前状态：第一步已完成一半。
+
+已完成：
+
+1. `workspace snapshot.communication_loadout`
+2. 沟通页“本次已加载”展示
+
+下一步：
+
+1. `assemble_context` 真正按 loadout 生成 runtime payload
+2. 再补用户手动选择材料进入本次会话
 
 ### Step 3：模型分层落地
 
@@ -340,30 +354,36 @@
 
 ## 13. First Slice To Build
 
-第一个可直接开工的切片固定为：
+当前可直接开工的切片更新为：
 
-### Slice 1：`workspace document model + memory page object zones`
+### Slice 2：`runtime assemble_context from communication_loadout`
 
-为什么先做这个：
+为什么现在先做这个：
 
-1. 这是记忆页和上下文系统的共同骨架
-2. 没有统一对象模型，后面的 loadout、模型分层、compaction 都会继续发散
+1. 记忆页对象区和 loadout 视图都已经立起来了
+2. 下一个最关键问题不再是“显示什么”，而是“这些对象如何真正影响实时沟通效果”
 
 这个切片只做：
 
-1. 设计 4 类对象的 backend shape
-2. 调整 `workspace snapshot` 返回结构
-3. 记忆页先显示 4 个对象区和列表
+1. 固定 loadout 到 runtime 的映射
+2. 把 `assemble_context` 明确成一条受控路径
+3. 继续保持实时模型低延迟
 
 这个切片先不做：
 
-1. TTS 助手
-2. 主动提醒
+1. 用户自定义 loadout 勾选器
+2. 语音化训练助手
 3. server-side compaction 全量迁移
 
 ---
 
 ## 14. Final Outcome
 
-- 当前状态：计划已建立，等待进入 `Slice 1`
-- 后续建议：下一步直接按 `workspace document model + memory page object zones` 开工
+- 当前状态：`Slice 1` 已完成，`Slice 2` 核心链路已完成
+- 当前已落地：
+  1. `workspace snapshot.communication_loadout`
+  2. 沟通页 loadout 只读视图
+  3. `preparation_context_update -> PreparationContextPack -> assistant_runtime prompt` 的固定装配路径
+- 后续建议：下一步直接做
+  1. 用户手动勾选 loadout
+  2. `after_turn / session-close compact / durable write`

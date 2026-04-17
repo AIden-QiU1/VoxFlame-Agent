@@ -45,6 +45,7 @@ export function createInitialRtcAgentState(): RtcAgentState {
     sessionReadiness: null,
     grantedCapabilities: [],
     lastVoiceProfileSync: null,
+    lastSessionMemoryAck: null,
   }
 }
 
@@ -154,6 +155,7 @@ export function applyDisconnectedState(prev: RtcAgentState): RtcAgentState {
     sessionReadiness: null,
     grantedCapabilities: [],
     lastVoiceProfileSync: null,
+    lastSessionMemoryAck: null,
   }
 }
 
@@ -215,5 +217,6 @@ export function applyClearedMessages(prev: RtcAgentState): RtcAgentState {
     currentResponseText: '',
     latestUserTranscript: '',
     lastVoiceProfileSync: null,
+    lastSessionMemoryAck: null,
   }
 }

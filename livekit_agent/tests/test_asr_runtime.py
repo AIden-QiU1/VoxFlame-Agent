@@ -31,6 +31,7 @@ def create_config() -> LiveKitAgentConfig:
         mode="communication_stub",
         dashscope_api_key="dashscope-test",
         dashscope_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        dashscope_correction_model="qwen-flash",
         dashscope_llm_model="qwen3.6-plus",
         dashscope_timeout_seconds=15.0,
         dashscope_reply_timeout_seconds=4.5,

@@ -26,6 +26,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: voxflame-agent-frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -65,6 +66,7 @@ services:
 
   # Backend API Server
   backend:
+    image: voxflame-agent-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -91,7 +93,10 @@ services:
       - LIVEKIT_AGENT_HEALTH_TIMEOUT_MS=${LIVEKIT_AGENT_HEALTH_TIMEOUT_MS:-2000}
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
       - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
-      - DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_MODEL=${DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_MODEL:-qwen3.5-plus}
+      - DASHSCOPE_MEMORY_MAINTENANCE_MODEL=${DASHSCOPE_MEMORY_MAINTENANCE_MODEL:-qwen3.5-plus}
+      - DASHSCOPE_MEMORY_MAINTENANCE_TIMEOUT_SECONDS=${DASHSCOPE_MEMORY_MAINTENANCE_TIMEOUT_SECONDS:-12}
+      - DASHSCOPE_TRAINING_REPORT_MODEL=${DASHSCOPE_TRAINING_REPORT_MODEL:-qwen3.5-plus}
+      - DASHSCOPE_TRAINING_REPORT_TIMEOUT_SECONDS=${DASHSCOPE_TRAINING_REPORT_TIMEOUT_SECONDS:-12}
       - DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_TIMEOUT_SECONDS=${DASHSCOPE_PREPARED_EXPRESSION_SUMMARY_TIMEOUT_SECONDS:-12}
     volumes:
       - ./logs:/app/logs
@@ -109,12 +114,16 @@ services:
       - voxflame-network
 
   livekit-agent:
+    image: voxflame-agent-livekit-agent:latest
     build:
       context: ./livekit_agent
       dockerfile: Dockerfile
+      cache_from:
+        - voxflame-agent-livekit-agent:latest
       args:
         LIVEKIT_AGENT_BASE_IMAGE: ${LIVEKIT_AGENT_BASE_IMAGE:-docker.m.daocloud.io/library/python:3.10-slim}
         LIVEKIT_AGENT_BOOTSTRAP_DEPS: ${LIVEKIT_AGENT_BOOTSTRAP_DEPS:-1}
+        LIVEKIT_AGENT_PIP_INDEX_URL: ${LIVEKIT_AGENT_PIP_INDEX_URL:-https://pypi.org/simple}
     env_file:
       - ./livekit_agent/.env
     container_name: voxflame-livekit-agent

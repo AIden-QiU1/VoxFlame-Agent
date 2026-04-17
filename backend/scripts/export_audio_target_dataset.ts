@@ -20,6 +20,14 @@ interface AudioTargetEntry {
   target: string
 }
 
+interface VoiceContributionExportRow {
+  id: string
+  contributor_id: string
+  audio_path: string
+  transcript: string
+  metadata: Record<string, unknown> | null
+}
+
 function parseArgs(argv: string[]): ScriptOptions {
   const options: ScriptOptions = {
     limit: 500,
@@ -111,7 +119,6 @@ async function resolveUserId(
 }
 
 async function main() {
-  const { datasetExportService } = require('../src/services/dataset-export.service') as typeof import('../src/services/dataset-export.service')
   const options = parseArgs(process.argv.slice(2))
   const supabaseUrl = requireEnv('SUPABASE_URL')
   const supabaseKey =
@@ -141,25 +148,53 @@ async function main() {
 
   await fs.mkdir(audioDir, { recursive: true })
 
-  const entries = await datasetExportService.buildExportManifest(batchId, {
-    contributorId: userId || undefined,
-    acceptedOnly: !options.includePending,
-    limit: options.limit,
+  let query = supabase
+    .from('voice_contributions')
+    .select('id, contributor_id, audio_path, transcript, metadata')
+    .order('created_at', { ascending: false })
+    .limit(options.limit)
+
+  if (userId) {
+    query = query.eq('contributor_id', userId)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    throw error
+  }
+
+  const entries = ((data || []) as VoiceContributionExportRow[]).map((row) => {
+    const metadata = row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+      ? row.metadata
+      : {}
+
+    const targetText = typeof metadata.target_text === 'string' && metadata.target_text.trim()
+      ? metadata.target_text.trim()
+      : row.transcript
+    const recordingId = typeof metadata.recording_id === 'string' && metadata.recording_id.trim()
+      ? metadata.recording_id.trim()
+      : row.audio_path.split('/').pop()?.replace(/\.[^/.]+$/, '') || row.id
+
+    return {
+      audioPath: row.audio_path,
+      targetText,
+      recordingId,
+    }
   })
 
   const ossClient = createOssClient()
   const rows: AudioTargetEntry[] = []
 
   for (const entry of entries) {
-    const objectPath = entry.audio.path
-    const localFilename = buildLocalAudioFilename(entry.recording_id, objectPath)
+    const objectPath = entry.audioPath
+    const localFilename = buildLocalAudioFilename(entry.recordingId, objectPath)
     const localAudioPath = path.join(audioDir, localFilename)
 
     await ossClient.get(objectPath, localAudioPath)
 
     rows.push({
       audio: path.posix.join('audio', localFilename),
-      target: entry.transcript.target_text,
+      target: entry.targetText,
     })
   }
 
@@ -167,7 +202,7 @@ async function main() {
   await fs.writeFile(manifestPath, content.length > 0 ? `${content}\n` : '', 'utf8')
 
   console.log(
-    `[export_audio_target_dataset] batch=${batchId} count=${rows.length} acceptedOnly=${!options.includePending} outputDir=${outputDir}${userId ? ` user=${userId}` : ''}`,
+    `[export_audio_target_dataset] batch=${batchId} count=${rows.length} outputDir=${outputDir}${userId ? ` user=${userId}` : ''}`,
   )
 }
 

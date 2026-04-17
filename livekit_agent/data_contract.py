@@ -4,7 +4,11 @@ import json
 from typing import Any
 
 from session_context import VoxFlameSessionContext
-from session_userdata import PreparationContextPack
+from session_userdata import (
+    PreparationContextPack,
+    SessionWorkingMemory,
+    build_session_compaction_candidate,
+)
 
 
 def decode_data_packet(payload: bytes | bytearray | memoryview | str) -> dict[str, Any] | None:
@@ -42,7 +46,18 @@ def build_session_init_ack(ctx: VoxFlameSessionContext) -> dict[str, Any]:
 def build_session_userdata_ack(
     ctx: VoxFlameSessionContext,
     preparation: PreparationContextPack,
+    session_memory: SessionWorkingMemory | None = None,
+    *,
+    caption_mode_enabled: bool = False,
 ) -> dict[str, Any]:
+    compaction_candidate = None
+    if session_memory is not None:
+        compaction_candidate = build_session_compaction_candidate(
+            preparation,
+            session_memory,
+            session_kind="training" if ctx.mode == "training" else "communication",
+        )
+
     return {
         "type": "session_userdata_ack",
         "metadata": {
@@ -57,11 +72,40 @@ def build_session_userdata_ack(
             "profile_summary": preparation.profile_summary,
             "listener_guidance": preparation.listener_guidance,
             "support_strategies": preparation.support_strategies,
+            "hotwords": preparation.hotwords,
+            "risky_terms": preparation.risky_terms,
             "document_summary": preparation.document_summary,
             "document_content": preparation.document_content,
             "reference_lines": preparation.reference_lines,
             "training_pairs": preparation.training_pairs,
+            "loadout_mode": preparation.loadout_mode,
+            "loadout_reason": preparation.loadout_reason,
+            "loadout_items": preparation.loadout_items,
         },
+        "session_memory": {
+            "current_turn_state": session_memory.current_turn_state,
+            "turn_count": session_memory.turn_count,
+            "context_revision": session_memory.context_revision,
+            "last_preparation_source": session_memory.last_preparation_source,
+            "interruption_count": session_memory.interruption_count,
+            "barge_in_count": session_memory.barge_in_count,
+            "caption_mode_enabled": caption_mode_enabled,
+        } if session_memory is not None else None,
+        "compaction_candidate": {
+            "session_kind": compaction_candidate.session_kind,
+            "summary": compaction_candidate.summary,
+            "fallback_phrases": compaction_candidate.fallback_phrases,
+            "risky_terms": compaction_candidate.risky_terms,
+            "support_strategies": compaction_candidate.support_strategies,
+            "hotwords": compaction_candidate.hotwords,
+            "recent_user_intents": compaction_candidate.recent_user_intents,
+            "recent_confirmed_phrases": compaction_candidate.recent_confirmed_phrases,
+            "loadout_mode": compaction_candidate.loadout_mode,
+            "context_revision": compaction_candidate.context_revision,
+            "turn_count": compaction_candidate.turn_count,
+            "interruption_count": compaction_candidate.interruption_count,
+            "barge_in_count": compaction_candidate.barge_in_count,
+        } if compaction_candidate is not None else None,
     }
 
 

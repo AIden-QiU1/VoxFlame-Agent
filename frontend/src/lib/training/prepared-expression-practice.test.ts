@@ -36,15 +36,26 @@ const PREPARED_EXPRESSION_FIXTURE: PreparedExpressionSnapshot = {
   fallback_phrases: ['燃言最核心做三件事。'],
   asr_hotword_entries: [],
   reference_lines: ['燃言最核心做三件事：实时辅助沟通、语句训练反馈、个人记忆管理。'],
-  training_pairs: [
-    {
-      target: '邱生峰',
-      heard: '邱文峰',
-      occurrenceCount: 2,
+  training_reports: {
+    daily_summary: null,
+    weekly_summary: {
+      summary: '最近 7 天重点继续收口产品定义和核心能力表达。',
+      sample_count: 4,
+      mismatch_pairs: [
+        {
+          target: '邱生峰',
+          heard: '邱文峰',
+          occurrenceCount: 2,
+        },
+      ],
+      next_focus: ['产品定义', '实时辅助沟通'],
+      stable_wins: ['开场'],
+      pronunciation_patterns: [],
+      support_strategies: [],
+      generated_at: '2026-04-07T10:00:00.000Z',
     },
-  ],
-  next_focus: ['产品定义', '实时辅助沟通'],
-  rehearsal_summary: null,
+    training_plan: null,
+  },
   sections: [
     {
       id: 'opening',

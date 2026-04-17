@@ -67,29 +67,6 @@ export interface TrainingProfileSummaryMetadata {
   generated_at?: number;
 }
 
-export interface SessionCompactionMetadata {
-  kind?: string;
-  scene?: string;
-  clarity_score?: number;
-  risky_terms?: string[];
-  fallback_phrases?: string[];
-  pronunciation_patterns?: string[];
-  support_strategies?: string[];
-  hotwords?: string[];
-  latest_correction_original?: string;
-  latest_correction_text?: string;
-  interruption_count?: number;
-  barge_in_count?: number;
-  last_input_telemetry_reason?: string;
-  last_input_normalized_level?: number;
-  last_input_peak_level?: number;
-  last_input_clipping_detected?: boolean;
-  last_input_apm_enabled?: boolean;
-  audio_clipping_event_count?: number;
-  next_step?: string;
-  summary?: string;
-}
-
 export interface GrowthMemoryRecord {
   id: string;
   userId: string;
@@ -302,10 +279,6 @@ function toTrainingMetadata(memory: GrowthMemoryRecord): TrainingMemoryMetadata 
 
 function toTrainingSummaryMetadata(memory: GrowthMemoryRecord): TrainingProfileSummaryMetadata {
   return isRecord(memory.metadata) ? (memory.metadata as TrainingProfileSummaryMetadata) : {};
-}
-
-function toSessionCompactionMetadata(memory: GrowthMemoryRecord): SessionCompactionMetadata {
-  return isRecord(memory.metadata) ? (memory.metadata as SessionCompactionMetadata) : {};
 }
 
 function getMemorySessionId(memory: GrowthMemoryRecord): string | null {
@@ -685,28 +658,17 @@ export function buildMemoryGrowthProfileSnapshot(params: {
   const granularTrainingMemories = memories.filter(
     (memory) => toTrainingMetadata(memory).kind === 'training_result',
   );
-  const sessionCompactionMemories = memories.filter(
-    (memory) => toTrainingMetadata(memory).kind === 'session_compaction',
-  );
   const trainingMemories =
     trainingSummaryMemories.length > 0 ? trainingSummaryMemories : granularTrainingMemories;
   const latestTrainingSummary = trainingSummaryMemories[0]
     ? toTrainingSummaryMetadata(trainingSummaryMemories[0])
-    : null;
-  const latestSessionCompaction = sessionCompactionMemories[0]
-    ? toSessionCompactionMetadata(sessionCompactionMemories[0])
     : null;
   const expressionMemories = memories.filter((memory) => {
     const kind = toTrainingMetadata(memory).kind;
     return kind !== 'training_result' && kind !== 'training_profile_summary' && kind !== 'session_compaction';
   });
   const frequentExpressions = countValues(
-    [
-      ...expressionMemories.map((memory) => memory.content),
-      ...sessionCompactionMemories.flatMap((memory) =>
-        readStringArray(toSessionCompactionMetadata(memory) as JsonRecord, 'fallback_phrases'),
-      ),
-    ],
+    expressionMemories.map((memory) => memory.content),
     5,
   );
   const frequentFocus = latestTrainingSummary
@@ -714,9 +676,6 @@ export function buildMemoryGrowthProfileSnapshot(params: {
     : countValues(
       [
         ...granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).focus_tags ?? []),
-        ...sessionCompactionMemories.flatMap((memory) =>
-          readStringArray(toSessionCompactionMetadata(memory) as JsonRecord, 'pronunciation_patterns'),
-        ),
       ],
       5,
     );
@@ -732,9 +691,6 @@ export function buildMemoryGrowthProfileSnapshot(params: {
             ...(metadata.pronunciation_targets ?? []),
           ];
         }),
-        ...sessionCompactionMemories.flatMap((memory) =>
-          readStringArray(toSessionCompactionMetadata(memory) as JsonRecord, 'pronunciation_patterns'),
-        ),
       ],
       8,
     );
@@ -749,9 +705,6 @@ export function buildMemoryGrowthProfileSnapshot(params: {
             ...(metadata.pronunciation_targets ?? []),
           ];
         }),
-        ...sessionCompactionMemories.flatMap((memory) =>
-          readStringArray(toSessionCompactionMetadata(memory) as JsonRecord, 'risky_terms'),
-        ),
       ],
       8,
     );
@@ -760,9 +713,6 @@ export function buildMemoryGrowthProfileSnapshot(params: {
     : countValues(
       [
         ...granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).articulation_tips ?? []),
-        ...sessionCompactionMemories.flatMap((memory) =>
-          readStringArray(toSessionCompactionMetadata(memory) as JsonRecord, 'support_strategies'),
-        ),
       ],
       4,
     );
@@ -773,9 +723,6 @@ export function buildMemoryGrowthProfileSnapshot(params: {
         ...countValues(
           granularTrainingMemories.flatMap((memory) => toTrainingMetadata(memory).keywords ?? []),
         ).map((item) => item.label),
-        ...sessionCompactionMemories.flatMap((memory) =>
-          readStringArray(toSessionCompactionMetadata(memory) as JsonRecord, 'hotwords'),
-        ),
       ]),
     );
   const hotwords = Array.from(new Set([...(params.hotwords ?? []), ...keywordHotwords])).slice(0, 12);
@@ -852,20 +799,12 @@ export function buildMemoryGrowthProfileSnapshot(params: {
       articulationTips,
       improvementDirection,
     )
-    : latestSessionCompaction
-      ? readString(latestSessionCompaction as JsonRecord, 'next_step') ??
-      buildNextStep(
-        frequentSpeechPatterns,
-        frequentFocus,
-        articulationTips,
-        improvementDirection,
-      )
-      : buildNextStep(
-        frequentSpeechPatterns,
-        frequentFocus,
-        articulationTips,
-        improvementDirection,
-      );
+    : buildNextStep(
+      frequentSpeechPatterns,
+      frequentFocus,
+      articulationTips,
+      improvementDirection,
+    );
 
   return {
     stats: {

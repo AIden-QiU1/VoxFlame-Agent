@@ -9,8 +9,9 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
-import { FileText, Loader2, Mic, Sparkles, UploadCloud } from 'lucide-react'
+import { FileText, Loader2, Mic, RotateCcw, Sparkles, UploadCloud } from 'lucide-react'
 import { MicrophoneInputFeedback } from '@/components/runtime/MicrophoneInputFeedback'
+import { SessionReadinessPanel } from '@/components/runtime/SessionReadinessPanel'
 import { useAuth } from '@/hooks/useAuth'
 import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
 import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
@@ -43,8 +44,6 @@ import {
 import {
   appendUploadedTrainingRecord,
   getUploadedTrainingExerciseIds,
-  markTrainingProfileSummarySynced,
-  TRAINING_PROFILE_SYNC_INTERVAL,
 } from '@/lib/training/training-profile'
 import {
   buildPreparedExpressionPracticeExercises,
@@ -54,7 +53,6 @@ import {
   assessTrainingSampleQuality,
   type TrainingSampleQuality,
 } from '@/lib/training/training-sample-quality'
-import { deriveTrainingSampleReviewDecision, type TrainingSampleReviewDecision } from '@/lib/training/training-sample-review'
 import { buildTrainingSampleLineage } from '@/lib/training/training-sample-lineage'
 import { selectTrainingExercises } from '@/lib/training/training-exercise-selection'
 
@@ -78,7 +76,6 @@ interface PracticeAttempt {
   transcriptLatencyMs: number
   feedback: MandarinTrainingFeedback
   sampleQuality: TrainingSampleQuality
-  sampleReview: TrainingSampleReviewDecision
   recording: VoxFlameRecordingEnvelope | null
   uploadStatus: AttemptUploadStatus
   uploadReceipt: UploadReceipt | null
@@ -89,17 +86,31 @@ interface NoticeState {
   message: string
 }
 
-interface PreparedCorrectionSummaryView {
+interface TrainingSummaryWindowView {
   summary: string
-  recurringErrors: string[]
-  nextFocus: string[]
-  trainingPairs: Array<{
+  sampleCount: number
+  mismatchPairs: Array<{
     target: string
     heard: string
     occurrenceCount: number
   }>
-  model: string
-  basedOnTrainingCount: number
+  nextFocus: string[]
+  stableWins: string[]
+  pronunciationPatterns: string[]
+  supportStrategies: string[]
+  generatedAt: string
+}
+
+interface TrainingPlanView {
+  summary: string
+  items: string[]
+  generatedAt: string
+}
+
+interface TrainingReportsView {
+  dailySummary: TrainingSummaryWindowView | null
+  weeklySummary: TrainingSummaryWindowView | null
+  trainingPlan: TrainingPlanView | null
 }
 
 const DEFAULT_VISIBLE_SENTENCES = 60
@@ -178,7 +189,6 @@ function buildUploadMetadata(
   transcriptLatencyMs: number,
   feedback: MandarinTrainingFeedback,
   sampleQuality: TrainingSampleQuality,
-  sampleReview: TrainingSampleReviewDecision,
   saveTrigger: AttemptSaveTrigger,
 ): Record<string, unknown> {
   const lineage = buildTrainingSampleLineage(exercise, recording)
@@ -201,18 +211,11 @@ function buildUploadMetadata(
     repeated_prompt_strategy: lineage.repeatedPromptStrategy,
     feedback_status: feedback.status,
     clarity_score: getClarityScore(feedback.status),
-    sample_quality_score: sampleQuality.score,
-    sample_quality_tier: sampleQuality.tier,
-    sample_quality_action: sampleQuality.action,
-    sample_quality_summary: sampleQuality.summary,
-    sample_quality_reasons: sampleQuality.reasons,
-    evaluation_status: sampleReview.evaluationStatus,
-    review_queue: sampleReview.reviewQueue,
-    review_priority: sampleReview.reviewPriority,
-    review_required: sampleReview.reviewRequired,
-    review_reason_tags: sampleReview.reasonTags,
-    review_summary: sampleReview.summary,
-    review_recommended_action: sampleQuality.action,
+    alignment_score: sampleQuality.score,
+    alignment_status: sampleQuality.action === 'retry' ? 'retry_recommended' : 'matched',
+    alignment_tier: sampleQuality.tier,
+    alignment_summary: sampleQuality.summary,
+    alignment_reasons: sampleQuality.reasons,
     transcript_coverage_ratio: sampleQuality.coverageRatio,
     missing_chars: feedback.missingChars,
     extra_chars: feedback.extraChars,
@@ -359,6 +362,9 @@ export default function ContributePage() {
     error: sessionError,
     isRecording,
     isProcessing,
+    sessionIntent,
+    sessionReadiness,
+    grantedCapabilities,
     analyser,
     startRecording,
     stopRecording,
@@ -406,6 +412,7 @@ export default function ContributePage() {
   const disconnectRef = useRef(disconnect)
   const preparedContentFileInputRef = useRef<HTMLInputElement | null>(null)
   const previousHasPreparedContentRef = useRef(false)
+  const hasAutoRefreshedTrainingReportsRef = useRef(false)
   disconnectRef.current = disconnect
 
   const canSaveTrainingSample = hasRequiredLegalConsent(user)
@@ -498,31 +505,64 @@ export default function ContributePage() {
     [currentExercise],
   )
 
-  const correctionSummary = useMemo<PreparedCorrectionSummaryView | null>(() => {
-    const assetSummary = preparedContentAsset?.rehearsal_summary
-    if (assetSummary) {
-      return {
-        summary: assetSummary.summary,
-        recurringErrors: assetSummary.recurringErrors,
-        nextFocus: assetSummary.nextFocus,
-        trainingPairs: assetSummary.trainingPairs,
-        model: assetSummary.model,
-        basedOnTrainingCount: assetSummary.basedOnTrainingCount,
-      }
-    }
+  const trainingReports = useMemo<TrainingReportsView | null>(() => {
+    const reports =
+      preparedContentAsset?.training_reports
+      ?? workspaceSnapshot?.prepared_expression?.training_reports
+      ?? null
 
-    const snapshotSummary = workspaceSnapshot?.prepared_expression?.rehearsal_summary
-    if (!snapshotSummary) {
+    if (!reports) {
       return null
     }
 
+    const mapWindow = (
+      windowSummary: {
+        summary: string
+        sampleCount?: number
+        sample_count?: number
+        mismatchPairs?: Array<{ target: string; heard: string; occurrenceCount: number }>
+        mismatch_pairs?: Array<{ target: string; heard: string; occurrenceCount: number }>
+        nextFocus?: string[]
+        next_focus?: string[]
+        stableWins?: string[]
+        stable_wins?: string[]
+        pronunciationPatterns?: string[]
+        pronunciation_patterns?: string[]
+        supportStrategies?: string[]
+        support_strategies?: string[]
+        generated_at: string
+      } | null,
+    ): TrainingSummaryWindowView | null => {
+      if (!windowSummary) {
+        return null
+      }
+
+      return {
+        summary: windowSummary.summary,
+        sampleCount: windowSummary.sampleCount ?? windowSummary.sample_count ?? 0,
+        mismatchPairs: windowSummary.mismatchPairs ?? windowSummary.mismatch_pairs ?? [],
+        nextFocus: windowSummary.nextFocus ?? windowSummary.next_focus ?? [],
+        stableWins: windowSummary.stableWins ?? windowSummary.stable_wins ?? [],
+        pronunciationPatterns:
+          windowSummary.pronunciationPatterns ?? windowSummary.pronunciation_patterns ?? [],
+        supportStrategies:
+          windowSummary.supportStrategies ?? windowSummary.support_strategies ?? [],
+        generatedAt: windowSummary.generated_at,
+      }
+    }
+
+    const plan = reports.training_plan
+      ? {
+          summary: reports.training_plan.summary,
+          items: reports.training_plan.items,
+          generatedAt: reports.training_plan.generated_at,
+        }
+      : null
+
     return {
-      summary: snapshotSummary.summary,
-      recurringErrors: snapshotSummary.recurring_errors,
-      nextFocus: snapshotSummary.next_focus,
-      trainingPairs: snapshotSummary.training_pairs,
-      model: snapshotSummary.model,
-      basedOnTrainingCount: snapshotSummary.based_on_training_count,
+      dailySummary: mapWindow(reports.daily_summary),
+      weeklySummary: mapWindow(reports.weekly_summary),
+      trainingPlan: plan,
     }
   }, [preparedContentAsset, workspaceSnapshot?.prepared_expression])
 
@@ -537,6 +577,54 @@ export default function ContributePage() {
 
     return '这一组这轮都练过了，现在允许回看前面的句子继续复练。'
   }, [selectableExerciseState])
+
+  const currentGoalHeadline = useMemo(() => {
+    if (trainingReports?.trainingPlan?.items[0]) {
+      return trainingReports.trainingPlan.items[0]
+    }
+
+    if (trainingReports?.dailySummary?.nextFocus[0]) {
+      return `这一轮先盯住“${trainingReports.dailySummary.nextFocus[0]}”`
+    }
+
+    return '这一轮先把当前这句录稳，再继续下一句。'
+  }, [trainingReports])
+
+  const currentGoalSupport = useMemo(() => {
+    if (attempt?.sampleQuality.summary) {
+      return attempt.sampleQuality.summary
+    }
+
+    if (trainingReports?.weeklySummary?.summary) {
+      return trainingReports.weeklySummary.summary
+    }
+
+    return '这里只保留最少反馈：准备状态、当前目标和这一句是否建议马上重录。'
+  }, [attempt?.sampleQuality.summary, trainingReports])
+
+  const currentProgressStats = useMemo(() => ([
+    {
+      label: '本轮已练',
+      value: `${sessionPracticedExerciseIds.length} 句`,
+      detail: '只算这一轮已经真正录过的句子。',
+    },
+    {
+      label: '待补登',
+      value: `${localQueueItems.length} 条`,
+      detail: localQueueItems.length > 0 ? '这些录音会在后台自动补登。' : '当前没有待补登录音。',
+    },
+    {
+      label: '准备句数',
+      value: hasPreparedContent ? `${preparedExpressionExercises.length} 句` : `${matchingExercises.length} 句`,
+      detail: hasPreparedContent ? '来自当前准备内容的拆句。' : '来自当前通用句库筛选结果。',
+    },
+  ]), [
+    hasPreparedContent,
+    localQueueItems.length,
+    matchingExercises.length,
+    preparedExpressionExercises.length,
+    sessionPracticedExerciseIds.length,
+  ])
 
   const applyPreparedContentAsset = useCallback((asset: PreparedExpressionAsset | null) => {
     setPreparedContentAsset(asset)
@@ -665,6 +753,55 @@ export default function ContributePage() {
     }
   }, [applyPreparedContentAsset, isAuthenticated, userId])
 
+  useEffect(() => {
+    if (
+      !userId
+      || !isAuthenticated
+      || !canRefreshCorrectionSummary
+      || isSummarizingPreparedContent
+      || hasAutoRefreshedTrainingReportsRef.current
+    ) {
+      return
+    }
+
+    const reports =
+      preparedContentAsset?.training_reports
+      ?? workspaceSnapshot?.prepared_expression?.training_reports
+      ?? null
+    const now = Date.now()
+    const dailyGeneratedAt = reports?.daily_summary?.generated_at
+    const weeklyGeneratedAt = reports?.weekly_summary?.generated_at
+    const dailyStale =
+      !dailyGeneratedAt
+      || now - new Date(dailyGeneratedAt).getTime() > 18 * 60 * 60 * 1000
+    const weeklyStale =
+      !weeklyGeneratedAt
+      || now - new Date(weeklyGeneratedAt).getTime() > 6 * 24 * 60 * 60 * 1000
+
+    if (!dailyStale && !weeklyStale) {
+      return
+    }
+
+    hasAutoRefreshedTrainingReportsRef.current = true
+    void summarizePreparedExpressionAsset(userId, 'periodic_auto')
+      .then(async (asset) => {
+        applyPreparedContentAsset(asset)
+        await refreshWorkspaceSnapshot()
+      })
+      .catch((error) => {
+        console.error('[contribute] auto refresh training reports failed:', error)
+      })
+  }, [
+    applyPreparedContentAsset,
+    canRefreshCorrectionSummary,
+    isAuthenticated,
+    isSummarizingPreparedContent,
+    preparedContentAsset,
+    refreshWorkspaceSnapshot,
+    userId,
+    workspaceSnapshot?.prepared_expression,
+  ])
+
   const handlePreparedContentFileChange = useCallback(async (
     event: ChangeEvent<HTMLInputElement>,
   ) => {
@@ -762,7 +899,7 @@ export default function ContributePage() {
       const summarized = await summarizePreparedExpressionAsset(userId, 'manual')
       applyPreparedContentAsset(summarized)
       await refreshWorkspaceSnapshot()
-      setPreparedContentStatus('最新训练总结已经写回记忆和纠错上下文。')
+      setPreparedContentStatus('最新今日总结、7 天总结和计划已经写回工作区。')
     } catch (error) {
       console.error('[contribute] failed to summarize prepared content:', error)
       setPreparedContentStatus('总结失败了，请稍后再试。')
@@ -815,6 +952,16 @@ export default function ContributePage() {
       })
     }
   }, [currentExercise, isProcessing, isUploading, startRecording])
+
+  const handleRetryCurrentExercise = useCallback(() => {
+    if (isRecording || isProcessing || isUploading) {
+      return
+    }
+
+    setAttempt(null)
+    setNotice(null)
+    void handleStartRecording()
+  }, [handleStartRecording, isProcessing, isRecording, isUploading])
 
   const persistTrainingAttempt = useCallback(async (
     attemptToPersist: PracticeAttempt,
@@ -872,7 +1019,6 @@ export default function ContributePage() {
         attemptToPersist.transcriptLatencyMs,
         attemptToPersist.feedback,
         attemptToPersist.sampleQuality,
-        attemptToPersist.sampleReview,
         saveTrigger,
       ),
     })
@@ -892,26 +1038,7 @@ export default function ContributePage() {
     if (result.status === 'uploaded' && userId) {
       const uploadedRecord = buildUploadedTrainingRecord(attemptToPersist)
       if (uploadedRecord) {
-        const syncCandidate = appendUploadedTrainingRecord(userId, uploadedRecord)
-
-        if (isPreparedExpressionExercise(attemptToPersist.exercise) && syncCandidate.shouldSyncSummary) {
-          void summarizePreparedExpressionAsset(userId, 'periodic_auto')
-            .then(async (asset) => {
-              applyPreparedContentAsset(asset)
-              markTrainingProfileSummarySynced(
-                userId,
-                syncCandidate.snapshot.totalUploadedRecordings,
-              )
-              await refreshWorkspaceSnapshot()
-              setNotice({
-                tone: 'success',
-                message: `已累计满 ${TRAINING_PROFILE_SYNC_INTERVAL} 条，训练总结已自动更新。`,
-              })
-            })
-            .catch((error) => {
-              console.error('[contribute] auto summarize prepared content failed:', error)
-            })
-        }
+        appendUploadedTrainingRecord(userId, uploadedRecord)
       }
 
       setNotice({
@@ -963,11 +1090,6 @@ export default function ContributePage() {
         recording: result.recording,
         transcriptLatencyMs: result.transcriptLatencyMs,
       })
-      const sampleReview = deriveTrainingSampleReviewDecision({
-        feedback,
-        sampleQuality,
-        recording: result.recording,
-      })
       const nextAttempt: PracticeAttempt = {
         createdAt: Date.now(),
         exercise: currentExercise,
@@ -975,7 +1097,6 @@ export default function ContributePage() {
         transcriptLatencyMs: result.transcriptLatencyMs,
         feedback,
         sampleQuality,
-        sampleReview,
         recording: result.recording,
         uploadStatus: result.recording
           ? canSaveTrainingSample
@@ -1032,7 +1153,7 @@ export default function ContributePage() {
             </Link>
             <h1 className="mt-1 text-2xl font-semibold text-gray-900">训练页</h1>
             <p className="mt-1 text-sm text-gray-600">
-              只做三件事：保存准备内容、拆句录音、累计 50 句后自动更新纠错总结。
+              只做三件事：保存准备内容、拆句录音、根据训练差异生成今日总结和 7 天计划。
             </p>
           </div>
           <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700">
@@ -1048,6 +1169,60 @@ export default function ContributePage() {
       ) : null}
 
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+        <SessionReadinessPanel
+          intent={sessionIntent}
+          readiness={sessionReadiness}
+          grantedCapabilities={grantedCapabilities}
+          plannedIntent={{
+            mode: 'training',
+            surface: 'training_workspace',
+            sessionStrategy: 'heavy_realtime',
+            requestedCapabilities: [
+              'transport_send_control',
+              'workspace_snapshot_read',
+              'voice_profile_update',
+              'upload_artifact_persist',
+            ],
+          }}
+          title="录音前准备状态"
+        />
+
+        <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+          <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-amber-800">当前目标</p>
+                <h2 className="mt-2 text-2xl font-semibold text-gray-900">{currentGoalHeadline}</h2>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">{currentGoalSupport}</p>
+              </div>
+              {attempt?.sampleQuality.action === 'retry' ? (
+                <button
+                  type="button"
+                  onClick={handleRetryCurrentExercise}
+                  disabled={isUploading || isProcessing || isRecording}
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  重录这一句
+                </button>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            {currentProgressStats.map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-[24px] border border-stone-200 bg-white px-5 py-5 shadow-sm"
+              >
+                <p className="text-sm font-medium text-stone-500">{stat.label}</p>
+                <p className="mt-3 text-2xl font-semibold text-gray-900">{stat.value}</p>
+                <p className="mt-2 text-sm leading-6 text-gray-600">{stat.detail}</p>
+              </div>
+            ))}
+          </section>
+        </section>
+
         <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -1057,13 +1232,15 @@ export default function ContributePage() {
               </div>
               <h2 className="mt-3 text-2xl font-semibold text-gray-900">用户自己管理准备内容，不做任何场景硬编码</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
-                把你后面要说的全文、提纲或说明贴进来。保存后，系统会按标点和拆句结果生成可练内容，训练满 50 句后自动总结训练句对和高频误听。
+                把你后面要说的全文、提纲或说明贴进来。保存后，系统会按标点和拆句结果生成可练内容，并基于目标句和转录句差异整理今日总结、7 天总结和下一轮计划。
               </p>
             </div>
             <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-              {correctionSummary
-                ? `最近一次总结基于 ${correctionSummary.basedOnTrainingCount} 条训练样本`
-                : `每满 ${TRAINING_PROFILE_SYNC_INTERVAL} 句自动更新一次`}
+              {trainingReports?.weeklySummary
+                ? `最近 7 天总结基于 ${trainingReports.weeklySummary.sampleCount} 条训练样本`
+                : trainingReports?.dailySummary
+                  ? `今日总结基于 ${trainingReports.dailySummary.sampleCount} 条训练样本`
+                  : '训练后会生成今日总结和 7 天总结'}
             </div>
           </div>
 
@@ -1148,7 +1325,7 @@ export default function ContributePage() {
               className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-900 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSummarizingPreparedContent ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              用训练记录刷新总结
+              刷新今日 / 7 天总结
             </button>
             {!canRefreshCorrectionSummary ? (
               <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
@@ -1457,6 +1634,26 @@ export default function ContributePage() {
                       </p>
                     ) : null}
                   </div>
+
+                  <div className="rounded-[20px] border border-stone-200 bg-white px-4 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">这句判断</p>
+                        <p className="mt-2 text-sm leading-6 text-gray-700">
+                          {attempt.sampleQuality.summary}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRetryCurrentExercise}
+                        disabled={isUploading || isProcessing || isRecording}
+                        className="inline-flex items-center gap-2 rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-gray-800 transition hover:border-stone-400 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        重录这一句
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="mt-4 rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
@@ -1470,32 +1667,32 @@ export default function ContributePage() {
         <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">纠错总结</h2>
+              <h2 className="text-xl font-semibold text-gray-900">训练总结与计划</h2>
               <p className="mt-1 text-sm text-gray-600">
-                这里只展示每 50 句更新一次的训练句对、高频误听和下一轮重点，用来服务 correction。
+                这里只看时间窗内最真实的训练差异：今天练了什么、最近 7 天稳定卡在哪里、下一轮只先做哪几件事。
               </p>
             </div>
             <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-              {correctionSummary
-                ? `${correctionSummary.model} · ${correctionSummary.basedOnTrainingCount} 条`
+              {trainingReports?.weeklySummary
+                ? `最近 7 天 ${trainingReports.weeklySummary.sampleCount} 条`
+                : trainingReports?.dailySummary
+                  ? `今天 ${trainingReports.dailySummary.sampleCount} 条`
                 : preparedExpressionTrainingCount > 0
                   ? `已有 ${preparedExpressionTrainingCount} 条训练样本`
-                  : `满 ${TRAINING_PROFILE_SYNC_INTERVAL} 句后自动更新`}
+                  : '录音后会自动生成'}
             </span>
           </div>
 
-          {correctionSummary ? (
+          {trainingReports ? (
             <div className="mt-5 grid gap-4 lg:grid-cols-3">
-              <div className="rounded-[20px] bg-stone-50 px-4 py-4 lg:col-span-3">
-                <p className="text-sm font-medium text-gray-900">总结</p>
-                <p className="mt-3 text-sm leading-7 text-gray-700">{correctionSummary.summary}</p>
-              </div>
-
               <div className="rounded-[20px] bg-amber-50 px-4 py-4">
-                <p className="text-sm font-medium text-gray-900">训练句对</p>
-                {correctionSummary.trainingPairs.length > 0 ? (
-                  <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                    {correctionSummary.trainingPairs.slice(0, 8).map((pair) => (
+                <p className="text-sm font-medium text-gray-900">今日总结</p>
+                <p className="mt-3 text-sm leading-7 text-gray-700">
+                  {trainingReports.dailySummary?.summary ?? '今天还没有新的训练总结，继续录音后这里会自动更新。'}
+                </p>
+                {trainingReports.dailySummary?.mismatchPairs.length ? (
+                  <div className="mt-4 space-y-2 text-sm leading-6 text-gray-700">
+                    {trainingReports.dailySummary.mismatchPairs.slice(0, 4).map((pair) => (
                       <p key={`${pair.target}-${pair.heard}`}>
                         {pair.target}{' <- '}{pair.heard}
                         {pair.occurrenceCount > 1 ? ` · ${pair.occurrenceCount}次` : ''}
@@ -1503,37 +1700,41 @@ export default function ContributePage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-gray-600">当前还没有稳定训练句对。</p>
+                  <p className="mt-4 text-sm text-gray-600">今天还没有稳定错配对。</p>
                 )}
               </div>
 
               <div className="rounded-[20px] bg-sky-50 px-4 py-4">
-                <p className="text-sm font-medium text-gray-900">高频误听</p>
-                {correctionSummary.recurringErrors.length > 0 ? (
-                  <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                    {correctionSummary.recurringErrors.map((item) => (
-                      <p key={item}>{item}</p>
-                    ))}
+                <p className="text-sm font-medium text-gray-900">最近 7 天总结</p>
+                <p className="mt-3 text-sm leading-7 text-gray-700">
+                  {trainingReports.weeklySummary?.summary ?? '最近 7 天总结会在累计出更稳定的训练差异后出现。'}
+                </p>
+                {trainingReports.weeklySummary?.stableWins.length ? (
+                  <div className="mt-4">
+                    {renderChips(trainingReports.weeklySummary.stableWins, 'sky')}
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-gray-600">当前还没有累计出稳定误听。</p>
+                  <p className="mt-4 text-sm text-gray-600">最近 7 天还没有浮出稳定亮点。</p>
                 )}
               </div>
 
               <div className="rounded-[20px] bg-emerald-50 px-4 py-4">
-                <p className="text-sm font-medium text-gray-900">下一轮重点</p>
+                <p className="text-sm font-medium text-gray-900">下一轮计划</p>
+                <p className="mt-3 text-sm leading-7 text-gray-700">
+                  {trainingReports.trainingPlan?.summary ?? '计划会跟着今日总结和 7 天总结一起出来。'}
+                </p>
                 <div className="mt-3">
-                  {correctionSummary.nextFocus.length > 0
-                    ? renderChips(correctionSummary.nextFocus, 'emerald')
-                    : <p className="text-sm text-gray-600">继续训练后会自动浮出下一轮重点。</p>}
+                  {trainingReports.trainingPlan?.items.length
+                    ? renderChips(trainingReports.trainingPlan.items, 'emerald')
+                    : <p className="text-sm text-gray-600">继续训练后会自动浮出下一轮计划。</p>}
                 </div>
               </div>
             </div>
           ) : (
               <div className="mt-5 rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
                 {preparedExpressionTrainingCount > 0
-                ? '现在还没有 50 句级别的训练总结。可以继续练，或者点“用训练记录刷新总结”先手动整理一版。'
-                : '现在还没有训练总结。先开始录音，系统会只根据真实训练结果回流训练句对和高频误听。'}
+                ? '现在还没有按时间窗整理出的训练总结。可以继续练，或者点“用训练记录刷新总结”马上重算一版。'
+                : '现在还没有训练总结。先开始录音，系统会只根据真实训练结果整理今日总结、7 天总结和计划。'}
               </div>
             )}
         </section>

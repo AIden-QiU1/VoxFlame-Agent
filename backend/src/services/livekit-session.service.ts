@@ -30,6 +30,8 @@ export interface LiveKitPreparationContext {
   profileSummary: string
   listenerGuidance: string[]
   supportStrategies: string[]
+  hotwords: string[]
+  riskyTerms: string[]
   documentSummary: string | null
   documentContent: string | null
   referenceLines: string[]
@@ -82,6 +84,8 @@ export class LiveKitSessionService {
               profile_summary: input.preparationContext.profileSummary,
               listener_guidance: input.preparationContext.listenerGuidance,
               support_strategies: input.preparationContext.supportStrategies,
+              hotwords: input.preparationContext.hotwords,
+              risky_terms: input.preparationContext.riskyTerms,
               document_summary: input.preparationContext.documentSummary,
               document_content: input.preparationContext.documentContent,
               reference_lines: input.preparationContext.referenceLines,
@@ -188,6 +192,8 @@ export class LiveKitSessionService {
                 profile_summary: input.preparationContext.profileSummary,
                 listener_guidance: input.preparationContext.listenerGuidance,
                 support_strategies: input.preparationContext.supportStrategies,
+                hotwords: input.preparationContext.hotwords,
+                risky_terms: input.preparationContext.riskyTerms,
                 document_summary: input.preparationContext.documentSummary,
                 document_content: input.preparationContext.documentContent,
                 reference_lines: input.preparationContext.referenceLines,

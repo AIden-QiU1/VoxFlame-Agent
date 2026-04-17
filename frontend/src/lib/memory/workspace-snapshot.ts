@@ -54,18 +54,27 @@ export interface PreparedExpressionCorrectionPair {
   occurrenceCount: number
 }
 
-export interface PreparedExpressionRehearsalSummarySnapshot {
+export interface PreparedExpressionTrainingSummaryWindowSnapshot {
   summary: string
-  hotwords: string[]
-  recurring_errors: string[]
+  sample_count: number
+  mismatch_pairs: PreparedExpressionCorrectionPair[]
+  next_focus: string[]
+  stable_wins: string[]
   pronunciation_patterns: string[]
   support_strategies: string[]
-  next_focus: string[]
-  reference_lines: string[]
-  training_pairs: PreparedExpressionCorrectionPair[]
-  based_on_training_count: number
-  model: string
-  updated_at: string
+  generated_at: string
+}
+
+export interface PreparedExpressionTrainingPlanSnapshot {
+  summary: string
+  items: string[]
+  generated_at: string
+}
+
+export interface PreparedExpressionTrainingReportsSnapshot {
+  daily_summary: PreparedExpressionTrainingSummaryWindowSnapshot | null
+  weekly_summary: PreparedExpressionTrainingSummaryWindowSnapshot | null
+  training_plan: PreparedExpressionTrainingPlanSnapshot | null
 }
 
 export interface PreparedExpressionSnapshot {
@@ -83,9 +92,7 @@ export interface PreparedExpressionSnapshot {
   fallback_phrases: string[]
   asr_hotword_entries: PreparedExpressionAsrHotwordEntry[]
   reference_lines: string[]
-  training_pairs: PreparedExpressionCorrectionPair[]
-  next_focus: string[]
-  rehearsal_summary: PreparedExpressionRehearsalSummarySnapshot | null
+  training_reports: PreparedExpressionTrainingReportsSnapshot | null
   sections: PreparedExpressionSectionSnapshot[]
   updated_at: string
 }
@@ -107,6 +114,23 @@ export interface WorkspaceMemorySnapshot {
       updated_at: string
     }>
   }>
+  communication_loadout: {
+    recommended_mode: 'urgent' | 'long_form'
+    reason: string
+    sections: Array<{
+      id: 'always_on' | 'scene_pack' | 'custom_materials' | 'training_summary'
+      title: string
+      description: string
+      items: Array<{
+        id: string
+        title: string
+        summary: string
+        source_type: 'custom_material' | 'scene_template' | 'user_profile' | 'training_summary'
+        required: boolean
+      }>
+    }>
+    updated_at: string
+  }
   profile_bundle: {
     static: ProfileBundleItem[]
     dynamic: ProfileBundleItem[]
@@ -145,7 +169,7 @@ export interface WorkspaceMemorySnapshot {
   prepared_expression: PreparedExpressionSnapshot | null
   expression_kit: {
     active_scene_id: StarterKitScene['id'] | null
-    personalized_phrases: ExpressionKitSuggestion[]
+    recommended_phrases: ExpressionKitSuggestion[]
     hotword_profiles: Array<{
       id: string
       phrase: string
