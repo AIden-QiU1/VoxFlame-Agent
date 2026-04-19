@@ -38,6 +38,11 @@ interface MemoryHotwordSyncRequestBody {
   profiles?: HotwordProfileRecord[];
 }
 
+interface MemorySceneTemplateSelectionRequestBody {
+  user_id?: string;
+  selected_template_ids?: string[];
+}
+
 interface MemoryCommunicationPreferencesRequestBody {
   user_id?: string;
   communication_preferences?: CommunicationPreferences;
@@ -192,6 +197,29 @@ export class MemoryController {
     }
   }
 
+  async deletePreparedExpressionAsset(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { userId } = req.params;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (!userId || userId !== authenticatedUserId) {
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      await SupabaseService.getInstance().deletePreparedExpressionAsset(authenticatedUserId);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error in deletePreparedExpressionAsset:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
   async summarizePreparedExpressionAsset(req: Request, res: Response): Promise<void> {
     try {
       const authenticatedUserId = req.user?.id;
@@ -264,6 +292,75 @@ export class MemoryController {
       });
     } catch (error) {
       console.error('Error in syncCommunicationPreferences:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  async getSceneTemplates(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { userId } = req.params;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (!userId || userId !== authenticatedUserId) {
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      const service = SupabaseService.getInstance();
+      const [selectedTemplateIds, library] = await Promise.all([
+        service.getSelectedSceneTemplateIds(authenticatedUserId),
+        Promise.resolve(service.getSceneTemplateCatalog()),
+      ]);
+
+      res.json({
+        selected_template_ids: selectedTemplateIds,
+        library,
+      });
+    } catch (error) {
+      console.error('Error in getSceneTemplates:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  async syncSceneTemplates(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { userId } = req.params;
+      const {
+        user_id,
+        selected_template_ids,
+      } = req.body as MemorySceneTemplateSelectionRequestBody;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (!userId || userId !== authenticatedUserId || (user_id && user_id !== authenticatedUserId)) {
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      if (!Array.isArray(selected_template_ids)) {
+        res.status(400).json({ error: 'Missing required field: selected_template_ids[]' });
+        return;
+      }
+
+      const savedIds = await SupabaseService.getInstance().saveSelectedSceneTemplateIds(
+        authenticatedUserId,
+        selected_template_ids,
+      );
+
+      res.json({
+        selected_template_ids: savedIds,
+      });
+    } catch (error) {
+      console.error('Error in syncSceneTemplates:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

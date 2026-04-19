@@ -12,6 +12,11 @@ interface CommunicationPreferenceCardProps {
   userId: string
   initialPreferences?: CommunicationPreferences
   onSaved?: (preferences: CommunicationPreferences) => void
+  eyebrow?: string
+  title?: string
+  description?: string
+  saveLabel?: string
+  clearLabel?: string
 }
 
 const FIELD_PRESETS = {
@@ -33,6 +38,11 @@ export function CommunicationPreferenceCard({
   userId,
   initialPreferences,
   onSaved,
+  eyebrow = '我的沟通偏好',
+  title = '把最重要的三句话固定下来',
+  description = '这样你不用每次都重新组织。首屏会优先把这些表达放到最容易点击的位置，减轻开口前的负担。',
+  saveLabel = '保存偏好',
+  clearLabel = '清空',
 }: CommunicationPreferenceCardProps) {
   const [openingPhrase, setOpeningPhrase] = useState(initialPreferences?.opening_phrase ?? '')
   const [paceHint, setPaceHint] = useState(initialPreferences?.pace_hint ?? '')
@@ -85,24 +95,59 @@ export function CommunicationPreferenceCard({
     }
   }
 
+  async function handleClear() {
+    setOpeningPhrase('')
+    setPaceHint('')
+    setRepairPhrase('')
+    setIsSaving(true)
+    setStatus(null)
+
+    try {
+      const savedPreferences = await saveWorkspaceCommunicationPreferences(userId, {})
+      if (!savedPreferences) {
+        setStatus('请先登录后再清空沟通偏好。')
+        return
+      }
+
+      onSaved?.(savedPreferences)
+      setStatus('这三句已经清空，你后面可以重新写。')
+    } catch (error) {
+      console.error('[CommunicationPreferenceCard] Failed to clear preferences:', error)
+      setStatus('清空失败了，请稍后再试。')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="text-sm font-medium text-stone-700">我的沟通偏好</div>
-          <h3 className="mt-1 text-xl font-semibold text-stone-950">把最重要的三句话固定下来</h3>
+          <div className="text-sm font-medium text-stone-700">{eyebrow}</div>
+          <h3 className="mt-1 text-xl font-semibold text-stone-950">{title}</h3>
           <p className="mt-2 text-sm leading-6 text-stone-600 text-pretty">
-            这样你不用每次都重新组织。首屏会优先把这些表达放到最容易点击的位置，减轻开口前的负担。
+            {description}
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={isSaving}
-          className="rounded-full bg-amber-500 px-5 text-white hover:bg-amber-600"
-        >
-          {isSaving ? '保存中...' : '保存偏好'}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            onClick={() => void handleClear()}
+            disabled={isSaving}
+            variant="outline"
+            className="rounded-full border-stone-200 bg-white px-5 text-stone-700 hover:bg-stone-50"
+          >
+            {clearLabel}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={isSaving}
+            className="rounded-full bg-amber-500 px-5 text-white hover:bg-amber-600"
+          >
+            {isSaving ? '保存中...' : saveLabel}
+          </Button>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-3">

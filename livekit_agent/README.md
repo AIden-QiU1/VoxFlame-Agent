@@ -16,7 +16,7 @@
 2. 记忆页 AI 功能完整等价
 3. 更深的 `voice profile / clarity score / memory context`
 4. 更完整的 `session review / memory tooling`
-5. 更强的 session-close compaction
+5. 更稳的 session-close 用户画像维护
 6. 训练页、记忆页相关 AI 能力的最终等价补齐
 
 当前最重要的状态纠偏是：
@@ -46,11 +46,10 @@
    - frontend 现在会把每次录音的 `标签 / 目标句 / 系统听到 / 保存状态` 写成现有 memory service 可识别的 `training_result`
    - 这让 workspace / session review / growth profile 开始真正吃到 LiveKit 训练结果
    - 记忆架构本身不需要重做，仍沿现有 `training_result -> training_profile_summary -> workspace snapshot` 语义继续长
-11. `session-close compaction` 第一片已落地：
-   - session 结束时现在会自动生成 `session_compaction`
-   - 当前会把 `fallback phrases / risky terms / pronunciation patterns / support strategies / hotwords / interruption telemetry`
-     压成结构化语义记忆
-   - backend `memory growth -> workspace snapshot` 已开始消费这层 compact memory
+11. `session-close user profile update` 第一片已落地：
+   - session 结束时不再新增 `session_compaction` 这类第五类长期记忆
+   - 当前只会把很窄的 runtime signal 用于小幅维护 `用户个人画像`
+   - backend `workspace snapshot` 已开始直接消费这层 `user_profile_memory`
 12. `LiveKit Python RTC AudioProcessingModule` 第一片已接上：
    - 当前会在 agent 订阅到的房间麦克风帧上先走 LiveKit 官方 `AudioProcessingModule`
    - 第一版默认是保守配置：
@@ -71,7 +70,7 @@
      - `apm_enabled`
      - `reason`
    - 前端会把这些信号写回当前 session metadata
-   - `session-close compaction` 也已开始吸收这层信号，后续可以更可靠地区分“发音问题”和“收音问题”
+   - `session-close user profile update` 也已开始吸收这层信号，后续可以更可靠地区分“发音问题”和“收音问题”
 
 ## Env 约定
 

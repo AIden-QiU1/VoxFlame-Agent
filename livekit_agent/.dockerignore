@@ -1,6 +1,4 @@
 .env
-.venv
-.venv/
 .venv_sys
 .venv_sys/
 __pycache__

@@ -23,6 +23,13 @@ import {
   type PreparedExpressionSummaryTrigger,
   type PreparedExpressionTrainingSample,
 } from './prepared-expression-summary.service';
+import {
+  buildHotwordProfilesFromSceneTemplateIds,
+  getSceneTemplateById,
+  listSceneTemplates,
+  normalizeSelectedSceneTemplateIds,
+  type SceneTemplateDefinition,
+} from './scene-template.service';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -124,6 +131,29 @@ export interface ExpressionKitSuggestion {
 }
 
 export interface WorkspaceMemorySnapshot {
+  scene_templates: {
+    selected_ids: string[];
+    library: Array<{
+      id: string;
+      title: string;
+      summary: string;
+      scenario: string;
+      severity_hint: string;
+      condition_hint: string;
+      communication_goal: string;
+      source_basis: string;
+      focus_priority: string[];
+      risky_terms: string[];
+      support_strategies: string[];
+      starter_phrases: string[];
+      hotwords: Array<{
+        phrase: string;
+        category: string;
+        note: string;
+      }>;
+      updated_at: string;
+    }>;
+  };
   object_zones: Array<{
     id: 'custom_materials' | 'scene_and_hotword_templates' | 'user_profile' | 'training_summaries';
     title: string;
@@ -433,6 +463,31 @@ function normalizeHotwordProfiles(value: unknown): HotwordProfileRecord[] {
   return profiles.sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
+function normalizeSceneTemplateCatalog(
+  templates: SceneTemplateDefinition[],
+): WorkspaceMemorySnapshot['scene_templates']['library'] {
+  return templates.map((template) => ({
+    id: template.id,
+    title: template.title,
+    summary: template.summary,
+    scenario: template.scenario,
+    severity_hint: template.severity_hint,
+    condition_hint: template.condition_hint,
+    communication_goal: template.communication_goal,
+    source_basis: template.source_basis,
+    focus_priority: [...template.focus_priority],
+    risky_terms: [...template.risky_terms],
+    support_strategies: [...template.support_strategies],
+    starter_phrases: [...template.starter_phrases],
+    hotwords: template.hotwords.map((entry) => ({
+      phrase: entry.phrase,
+      category: entry.category,
+      note: entry.note,
+    })),
+    updated_at: template.updated_at,
+  }));
+}
+
 export class SupabaseService {
   private client: SupabaseClient;
   private adminClient: SupabaseClient; // service_role client for system operations
@@ -530,8 +585,105 @@ export class SupabaseService {
 
   async getHotwordProfiles(userId: string): Promise<HotwordProfileRecord[]> {
     const userProfile = await this.getUserProfile(userId);
+    const selectedTemplateIds = this.getSelectedSceneTemplateIdsFromProfile(userProfile);
+    return buildHotwordProfilesFromSceneTemplateIds(selectedTemplateIds);
+  }
+
+  getSceneTemplateCatalog(): WorkspaceMemorySnapshot['scene_templates']['library'] {
+    return normalizeSceneTemplateCatalog(listSceneTemplates());
+  }
+
+  private getSelectedSceneTemplateIdsFromProfile(userProfile: UserProfile | null): string[] {
     const preferences = isRecord(userProfile?.preferences) ? userProfile?.preferences : undefined;
-    return normalizeHotwordProfiles(preferences?.hotword_profiles);
+    return normalizeSelectedSceneTemplateIds(preferences?.selected_scene_template_ids);
+  }
+
+  async getSelectedSceneTemplateIds(userId: string): Promise<string[]> {
+    const userProfile = await this.getUserProfile(userId);
+    return this.getSelectedSceneTemplateIdsFromProfile(userProfile);
+  }
+
+  async saveSelectedSceneTemplateIds(
+    userId: string,
+    selectedTemplateIds: string[],
+  ): Promise<string[]> {
+    await this.ensureUserProfile(userId);
+
+    const normalizedTemplateIds = normalizeSelectedSceneTemplateIds(selectedTemplateIds);
+    const userProfile = await this.getUserProfile(userId);
+    const existingPreferences = isRecord(userProfile?.preferences)
+      ? userProfile?.preferences
+      : {};
+    const nextPreferences: JsonRecord = {
+      ...existingPreferences,
+      selected_scene_template_ids: normalizedTemplateIds,
+    };
+    delete nextPreferences.hotword_profiles;
+
+    const templateHotwords = buildHotwordProfilesFromSceneTemplateIds(normalizedTemplateIds)
+      .map((profile) => profile.phrase);
+    const preparedExpressionAsset = this.readPreparedExpressionAssetFromProfile(userProfile);
+
+    await this.updateUserProfile(userId, {
+      preferences: nextPreferences,
+      hotwords: dedupeStrings(
+        [
+          ...templateHotwords,
+          ...(preparedExpressionAsset?.structured.hotwords ?? []),
+        ],
+        20,
+      ),
+    });
+
+    return normalizedTemplateIds;
+  }
+
+  async listPreparedExpressionSummaryRefreshCandidates(limit: number = 20): Promise<string[]> {
+    const fetchLimit = Math.max(limit * 5, 50);
+    const { data, error } = await this.adminClient
+      .from('user_profiles')
+      .select('id, preferences, updated_at')
+      .order('updated_at', { ascending: true })
+      .limit(fetchLimit);
+
+    if (error || !Array.isArray(data)) {
+      if (error) {
+        console.error('Error listing prepared expression summary refresh candidates:', error);
+      }
+      return [];
+    }
+
+    const now = Date.now();
+    const candidates = data
+      .map((row) => {
+        const userProfile = row as UserProfile;
+        const asset = this.readPreparedExpressionAssetFromProfile(userProfile);
+        if (!asset) {
+          return null;
+        }
+
+        const dailyGeneratedAt = asset.training_reports?.dailySummary?.generated_at ?? null;
+        const weeklyGeneratedAt = asset.training_reports?.weeklySummary?.generated_at ?? null;
+        const dailyStale =
+          !dailyGeneratedAt || now - new Date(dailyGeneratedAt).getTime() > 18 * 60 * 60 * 1000;
+        const weeklyStale =
+          !weeklyGeneratedAt || now - new Date(weeklyGeneratedAt).getTime() > 6 * 24 * 60 * 60 * 1000;
+
+        if (!dailyStale && !weeklyStale) {
+          return null;
+        }
+
+        const lastGeneratedAt = dailyGeneratedAt || weeklyGeneratedAt || '';
+
+        return {
+          userId: row.id as string,
+          lastGeneratedAt,
+        };
+      })
+      .filter((item): item is { userId: string; lastGeneratedAt: string } => item !== null)
+      .sort((left, right) => left.lastGeneratedAt.localeCompare(right.lastGeneratedAt));
+
+    return candidates.slice(0, limit).map((item) => item.userId);
   }
 
   async saveHotwordProfiles(
@@ -710,6 +862,24 @@ export class SupabaseService {
     }
 
     return this.readPreparedExpressionAssetFromProfile(updated);
+  }
+
+  async deletePreparedExpressionAsset(userId: string): Promise<void> {
+    await this.ensureUserProfile(userId);
+
+    const userProfile = await this.getUserProfile(userId);
+    const existingPreferences = isRecord(userProfile?.preferences)
+      ? userProfile.preferences
+      : {};
+    const nextPreferences: JsonRecord = {
+      ...existingPreferences,
+    };
+
+    delete nextPreferences.prepared_expression_asset;
+
+    await this.updateUserProfile(userId, {
+      preferences: nextPreferences,
+    });
   }
 
   async summarizePreparedExpressionAsset(
@@ -1070,13 +1240,19 @@ export class SupabaseService {
 
     const syncedAt = new Date().toISOString();
     const preparedExpression = this.buildPreparedExpressionSnapshot(profileSnapshot, userProfile, syncedAt);
+    const selectedSceneTemplateIds = this.getSelectedSceneTemplateIdsFromProfile(userProfile);
 
     return {
+      scene_templates: {
+        selected_ids: selectedSceneTemplateIds,
+        library: this.getSceneTemplateCatalog(),
+      },
       object_zones: this.buildObjectZones(
         profileSnapshot,
         userProfile,
         preparedExpression,
         syncedAt,
+        selectedSceneTemplateIds,
         options.sceneId,
       ),
       communication_loadout: this.buildCommunicationLoadout(
@@ -1084,6 +1260,7 @@ export class SupabaseService {
         userProfile,
         preparedExpression,
         syncedAt,
+        selectedSceneTemplateIds,
         options.sceneId,
       ),
       profile_bundle: this.buildProfileBundle(profileSnapshot, userProfile),
@@ -1111,6 +1288,7 @@ export class SupabaseService {
     userProfile: UserProfile | null,
     preparedExpression: WorkspaceMemorySnapshot['prepared_expression'],
     syncedAt: string,
+    selectedSceneTemplateIds: string[],
     sceneId?: WorkspaceSceneId,
   ): WorkspaceMemorySnapshot['object_zones'] {
     const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
@@ -1142,45 +1320,27 @@ export class SupabaseService {
       });
     }
 
-    const sceneTemplateItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
-    const sceneLabel = sceneId ?? preparedExpression?.scene ?? snapshot.hotword_profiles[0]?.scenario ?? null;
-    if (sceneLabel) {
-      sceneTemplateItems.push({
-        id: `scene-template-${sceneLabel}`,
-        type: 'scene_template',
-        title: `场景模板：${sceneLabel}`,
-        summary:
-          preparedExpression?.summary ||
-          growthProfile.nextStep ||
-          '系统会根据这个场景优先推荐常用模板、热词和沟通焦点。',
-        tags: dedupeStrings(
-          [
-            sceneLabel,
-            ...snapshot.hotword_profiles
-              .filter((profile) => profile.scenario === sceneLabel)
-              .slice(0, 3)
-              .map((profile) => profile.phrase),
-          ],
-          4,
-        ),
-        load_behavior: 'recommended',
-        editable: false,
-        updated_at: syncedAt,
-      });
-    }
-
-    snapshot.hotword_profiles.slice(0, 4).forEach((profile) => {
-      sceneTemplateItems.push({
-        id: `hotword-template-${profile.id}`,
-        type: 'scene_template',
-        title: profile.phrase,
-        summary: profile.note || profile.scenario || '用户当前重点保真的词。',
-        tags: dedupeStrings([profile.category, profile.scenario], 3),
-        load_behavior: 'recommended',
-        editable: true,
-        updated_at: new Date(profile.updatedAt).toISOString(),
-      });
-    });
+    const sceneTemplateItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] =
+      selectedSceneTemplateIds
+        .map((templateId) => getSceneTemplateById(templateId))
+        .filter((template): template is SceneTemplateDefinition => template !== null)
+        .map((template) => ({
+          id: `scene-template-${template.id}`,
+          type: 'scene_template' as const,
+          title: template.title,
+          summary: `${template.summary} 当前优先保护：${template.focus_priority.slice(0, 2).join('、')}。`,
+          tags: dedupeStrings(
+            [
+              template.scenario,
+              template.severity_hint,
+              ...template.hotwords.slice(0, 2).map((entry) => entry.phrase),
+            ],
+            4,
+          ),
+          load_behavior: 'recommended' as const,
+          editable: false,
+          updated_at: template.updated_at,
+        }));
 
     const userProfileItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
     if (
@@ -1285,8 +1445,8 @@ export class SupabaseService {
       {
         id: 'scene_and_hotword_templates',
         title: '场景 / 热词模板',
-        description: '按场景和重点词组织的推荐模板，会优先进入后续上下文装配。',
-        empty_state: '这里还没有可用模板，先补 3 到 5 个关键热词。',
+        description: '开发者维护的场景模板库。你只需要选适合自己的模板，系统会自动带上对应重点词和沟通策略。',
+        empty_state: '这里还没有选中的模板。先从下面勾选 1 到 3 套最贴近当前沟通场景的模板。',
         items: sceneTemplateItems,
       },
       {
@@ -1311,6 +1471,7 @@ export class SupabaseService {
     userProfile: UserProfile | null,
     preparedExpression: WorkspaceMemorySnapshot['prepared_expression'],
     syncedAt: string,
+    selectedSceneTemplateIds: string[],
     sceneId?: WorkspaceSceneId,
   ): WorkspaceMemorySnapshot['communication_loadout'] {
     const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
@@ -1344,22 +1505,26 @@ export class SupabaseService {
       } : null,
     ]);
 
-    const scenePackItems: WorkspaceMemorySnapshot['communication_loadout']['sections'][number]['items'] = dedupeLoadoutItems([
-      sceneId ? {
-        id: `loadout-scene-${sceneId}`,
-        title: `当前场景：${sceneId}`,
-        summary: '当前场景会决定模板、热词和表达优先级。',
-        source_type: 'scene_template',
-        required: recommendedMode === 'urgent',
-      } : null,
-      ...snapshot.hotword_profiles.slice(0, 3).map((profile) => ({
-        id: `loadout-hotword-${profile.id}`,
-        title: profile.phrase,
-        summary: profile.note || profile.scenario || '当前推荐优先保真的重点词。',
-        source_type: 'scene_template' as const,
-        required: false,
-      })),
-    ]);
+    const scenePackItems: WorkspaceMemorySnapshot['communication_loadout']['sections'][number]['items'] =
+      dedupeLoadoutItems([
+        ...selectedSceneTemplateIds
+          .map((templateId) => getSceneTemplateById(templateId))
+          .filter((template): template is SceneTemplateDefinition => template !== null)
+          .map((template) => ({
+            id: `loadout-template-${template.id}`,
+            title: template.title,
+            summary: `${template.communication_goal} 当前优先词：${template.hotwords.slice(0, 3).map((entry) => entry.phrase).join('、')}`,
+            source_type: 'scene_template' as const,
+            required: false,
+          })),
+        sceneId ? {
+          id: `loadout-scene-${sceneId}`,
+          title: `当前场景：${sceneId}`,
+          summary: '当前场景会决定模板、热词和表达优先级。',
+          source_type: 'scene_template' as const,
+          required: false,
+        } : null,
+      ]);
 
     const customMaterialItems: WorkspaceMemorySnapshot['communication_loadout']['sections'][number]['items'] = dedupeLoadoutItems([
       preparedExpression ? {
@@ -1367,7 +1532,7 @@ export class SupabaseService {
         title: preparedExpression.title,
         summary: preparedExpression.summary,
         source_type: 'custom_material',
-        required: recommendedMode === 'long_form',
+        required: false,
       } : null,
     ]);
 
@@ -1377,7 +1542,7 @@ export class SupabaseService {
         title: '当前训练总结',
         summary: this.getPreparedExpressionTrainingSummary(preparedExpression)?.summary ?? '',
         source_type: 'training_summary',
-        required: false,
+        required: true,
       } : null,
     ]);
 
@@ -1728,6 +1893,9 @@ export class SupabaseService {
       preferences?.communication_preferences,
     );
     const userProfileMemory = this.readUserProfileMemoryFromProfile(userProfile);
+    const selectedSceneTemplates = this.getSelectedSceneTemplateIdsFromProfile(userProfile)
+      .map((templateId) => getSceneTemplateById(templateId))
+      .filter((template): template is SceneTemplateDefinition => template !== null);
     const sceneBrief = sceneId
       ? ({
           interview: '这次重点是先稳住开场、节奏和结论，不求华丽，先求完整说完。',
@@ -1748,6 +1916,7 @@ export class SupabaseService {
       null;
     const supportStrategies = dedupeStrings(
       [
+        ...selectedSceneTemplates.flatMap((template) => template.support_strategies),
         preparedExpression?.fallback_phrases[0]
           ? `保底句先准备好：${preparedExpression.fallback_phrases[0]}`
           : '',
@@ -1770,6 +1939,7 @@ export class SupabaseService {
     );
     const listenerGuidance = dedupeStrings(
       [
+        ...selectedSceneTemplates.slice(0, 2).map((template) => `当前模板重点：${template.communication_goal}`),
         preparedExpression?.summary
           ? `这次重要表达的结构已经压缩好，先按段落和锚点往前走。`
           : '',
@@ -1813,6 +1983,7 @@ export class SupabaseService {
     );
     const riskyTerms = dedupeStrings(
       [
+        ...selectedSceneTemplates.flatMap((template) => template.risky_terms),
         ...(preparedExpression?.high_risk_phrases ?? []),
         ...(userProfileMemory.risky_terms ?? []),
         ...(preferredTrainingSummary?.mismatch_pairs ?? []).flatMap((pair) => [pair.target, pair.heard]),
@@ -1831,6 +2002,7 @@ export class SupabaseService {
     );
     const hotwords = dedupeStrings(
       [
+        ...selectedSceneTemplates.flatMap((template) => template.hotwords.map((entry) => entry.phrase)),
         ...(preparedExpression?.hotwords ?? []),
         ...snapshot.hotword_profiles.slice(0, 6).map((profile) => profile.phrase),
         ...snapshot.hotwords.slice(0, 6),
@@ -1860,7 +2032,7 @@ export class SupabaseService {
       }
 
       if (preparedExpression) {
-        return `你已经为“${preparedExpression.title}”建立了一层结构化准备：重点原句、训练错配对和保底句会继续从训练总结里收紧。`;
+        return `你已经为“${preparedExpression.title}”建立了一层结构化准备：重点原句、关键提示和保底句会继续从训练总结里收紧。`;
       }
 
       return '这里会逐步压缩出你的个人表达画像：你最常面对什么场景、系统最容易听偏什么、什么表达和补救方式最适合你。';

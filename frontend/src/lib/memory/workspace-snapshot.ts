@@ -98,6 +98,29 @@ export interface PreparedExpressionSnapshot {
 }
 
 export interface WorkspaceMemorySnapshot {
+  scene_templates: {
+    selected_ids: string[]
+    library: Array<{
+      id: string
+      title: string
+      summary: string
+      scenario: string
+      severity_hint: string
+      condition_hint: string
+      communication_goal: string
+      source_basis: string
+      focus_priority: string[]
+      risky_terms: string[]
+      support_strategies: string[]
+      starter_phrases: string[]
+      hotwords: Array<{
+        phrase: string
+        category: string
+        note: string
+      }>
+      updated_at: string
+    }>
+  }
   object_zones: Array<{
     id: 'custom_materials' | 'scene_and_hotword_templates' | 'user_profile' | 'training_summaries'
     title: string

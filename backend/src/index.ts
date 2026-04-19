@@ -20,12 +20,14 @@ import { uploadRouter } from './controllers/upload.controller'
 import { phrasesController } from './controllers/phrases.controller'
 import { errorHandler } from './middlewares/error.middleware'
 import { authMiddleware, validateUserId } from './middlewares/auth.middleware'
+import { TrainingReportMaintenanceService } from './services/training-report-maintenance.service'
 
 // 加载环境变量
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 3001
+const trainingReportMaintenanceService = new TrainingReportMaintenanceService()
 // 中间件
 app.use(cors())
 app.use(express.json())
@@ -55,13 +57,15 @@ app.use('/api/rtc', authMiddleware, rtcRouter)
 
 // Memory API 路由 (记忆系统) - 需要认证
 const memoryRouter = express.Router()
-memoryRouter.post('/hotwords', authMiddleware, memoryController.syncHotwords.bind(memoryController))
 memoryRouter.post('/session', authMiddleware, memoryController.syncSession.bind(memoryController))
 memoryRouter.post('/session-close', authMiddleware, memoryController.persistSessionCloseProfileUpdate.bind(memoryController))
 memoryRouter.post('/add', authMiddleware, memoryController.addMemory.bind(memoryController))
 memoryRouter.get('/workspace/:userId', authMiddleware, validateUserId, memoryController.getWorkspaceMemorySnapshot.bind(memoryController))
+memoryRouter.get('/workspace/:userId/scene-templates', authMiddleware, validateUserId, memoryController.getSceneTemplates.bind(memoryController))
+memoryRouter.put('/workspace/:userId/scene-templates', authMiddleware, validateUserId, memoryController.syncSceneTemplates.bind(memoryController))
 memoryRouter.get('/workspace/:userId/prepared-expression', authMiddleware, validateUserId, memoryController.getPreparedExpressionAsset.bind(memoryController))
 memoryRouter.put('/workspace/:userId/prepared-expression', authMiddleware, validateUserId, memoryController.syncPreparedExpressionAsset.bind(memoryController))
+memoryRouter.delete('/workspace/:userId/prepared-expression', authMiddleware, validateUserId, memoryController.deletePreparedExpressionAsset.bind(memoryController))
 memoryRouter.post('/workspace/:userId/prepared-expression/summarize', authMiddleware, validateUserId, memoryController.summarizePreparedExpressionAsset.bind(memoryController))
 memoryRouter.put('/workspace/:userId/preferences', authMiddleware, validateUserId, memoryController.syncCommunicationPreferences.bind(memoryController))
 memoryRouter.get('/profile/:userId', authMiddleware, validateUserId, memoryController.getUserMemoryProfile.bind(memoryController))
@@ -96,6 +100,7 @@ app.use(errorHandler)
 
 // 启动服务器
 app.listen(PORT, () => {
+  trainingReportMaintenanceService.start()
   console.log('')
   console.log('🔥 VoxFlame Backend v2.2 已启动')
   console.log('📡 HTTP 服务地址: http://localhost:' + PORT)
@@ -128,6 +133,8 @@ app.listen(PORT, () => {
   console.log('💾 Memory API 端点:')
   console.log('   - POST /api/memory/session')
   console.log('   - GET  /api/memory/workspace/:userId')
+  console.log('   - GET  /api/memory/workspace/:userId/scene-templates')
+  console.log('   - PUT  /api/memory/workspace/:userId/scene-templates')
   console.log('   - GET  /api/memory/workspace/:userId/prepared-expression')
   console.log('   - PUT  /api/memory/workspace/:userId/prepared-expression')
   console.log('   - POST /api/memory/workspace/:userId/prepared-expression/summarize')

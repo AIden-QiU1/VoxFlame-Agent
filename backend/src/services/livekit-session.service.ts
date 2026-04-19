@@ -40,6 +40,9 @@ export interface LiveKitPreparationContext {
     heard: string
     occurrenceCount: number
   }>
+  loadoutMode: 'urgent' | 'long_form'
+  loadoutReason: string
+  loadoutItems: string[]
 }
 
 export interface LiveKitSessionResult {
@@ -94,6 +97,9 @@ export class LiveKitSessionService {
                 heard: pair.heard,
                 occurrence_count: pair.occurrenceCount,
               })),
+              loadout_mode: input.preparationContext.loadoutMode,
+              loadout_reason: input.preparationContext.loadoutReason,
+              loadout_items: input.preparationContext.loadoutItems,
             },
           }
         : {}),
@@ -202,6 +208,9 @@ export class LiveKitSessionService {
                   heard: pair.heard,
                   occurrence_count: pair.occurrenceCount,
                 })),
+                loadout_mode: input.preparationContext.loadoutMode,
+                loadout_reason: input.preparationContext.loadoutReason,
+                loadout_items: input.preparationContext.loadoutItems,
               },
             }
           : {}),

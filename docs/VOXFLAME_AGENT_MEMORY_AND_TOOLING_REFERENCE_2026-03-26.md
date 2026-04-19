@@ -88,10 +88,9 @@
 ### 3.2 应该进入 durable memory 的
 
 1. 用户长期准备稿
-2. 高价值 hotword / phrase
-3. 会后压缩出的稳定表达规律
-4. session review
-5. 对下一次沟通真的有帮助的 profile summary
+2. 开发者维护、用户选择的场景 / 热词模板
+3. 后台维护出的用户画像稳定规律
+4. 训练总结模型定期覆盖后的 daily / weekly / plan
 
 ### 3.3 不该直接进入 durable memory 的
 
@@ -99,6 +98,7 @@
 2. 每一条训练录音原样
 3. 暂时不可信的 heuristic
 4. review 还没通过的 dataset 判断
+5. 单独再长出来的 `session_compaction` 文档
 
 一句话：
 
@@ -129,8 +129,9 @@ backend 负责：
 
 1. `workspace` durable owner
 2. `prepared_expression` owner
-3. `session_review` / `profile_bundle` 聚合
-4. dataset artifact 与最小 `audio + target` contract
+3. `user_profile_memory` 后台维护
+4. 训练总结写回与覆盖
+5. dataset artifact 与最小 `audio + target` contract
 
 ### 4.3 livekit_agent
 
@@ -159,7 +160,7 @@ backend 负责：
 4. interruption / audio telemetry
 5. 哪些字段只活在 session
 
-### 5.2 context assembly
+### 5.2 context assembly / maintenance
 
 至少明确三个阶段：
 
@@ -167,16 +168,17 @@ backend 负责：
    - 从 `workspace snapshot` 取最小必要上下文
 2. `after_turn`
    - 更新本轮 working memory
-3. `compact`
-   - 会后提炼可写回 durable memory 的最小结果
+3. `maintenance update`
+   - 会后只允许小幅更新 `用户个人画像`
+   - 训练链只允许覆盖 `训练总结`
 
 ### 5.3 session-close durable write
 
 正式链路应固定为：
 
-`flush -> compact -> durable write`
+`assemble_context -> after_turn -> memory maintenance update`
 
-在这条链真正进 agent server-side 之前，不能再把 compaction 写成“已完全稳定”。
+在这条链真正进 server-side 稳态之前，不能再把“后台维护已完全稳定”写得过满。
 
 ---
 

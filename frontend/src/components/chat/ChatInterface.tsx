@@ -40,8 +40,6 @@ interface ChatInterfaceProps {
   onReturnHome?: () => void
 }
 
-type LoadoutMode = 'urgent' | 'long_form'
-
 function mapStarterSceneToRuntimeScene(
   sceneId: StarterKitScene['id'] | undefined,
 ): RtcScene | undefined {
@@ -59,7 +57,6 @@ function mapStarterSceneToRuntimeScene(
 function buildPreparationContextUpdate(
   snapshot: WorkspaceMemorySnapshot | null,
   runtimeScene: RtcScene | undefined,
-  selectedMode: LoadoutMode | null,
   selectedItemIds: string[],
 ) {
   const preparation = snapshot?.preparation
@@ -69,7 +66,6 @@ function buildPreparationContextUpdate(
     return null
   }
 
-  const activeMode = selectedMode ?? communicationLoadout?.recommended_mode ?? 'urgent'
   const selectedItemIdSet = new Set(selectedItemIds)
   const selectedLoadoutEntries = communicationLoadout?.sections.flatMap((section) => (
     section.items
@@ -102,46 +98,29 @@ function buildPreparationContextUpdate(
       new Set(referenceLinesSource.map((line) => line.trim()).filter(Boolean)),
     ).slice(0, 16)
     : []
-  const trainingPairsSource = preparation?.training_pairs?.length
-    ? preparation.training_pairs
-    : (
-      preparedExpression?.training_reports?.weekly_summary?.mismatch_pairs
-      ?? preparedExpression?.training_reports?.daily_summary?.mismatch_pairs
-      ?? []
-    )
-  const trainingPairs = trainingPairsSource
-    .filter((pair) => pair.target.trim() && pair.heard.trim())
-    .map((pair) => ({
-      target: pair.target,
-      heard: pair.heard,
-      occurrence_count: Math.max(1, pair.occurrenceCount || 1),
-    }))
-    .slice(0, activeMode === 'long_form' ? 8 : 4)
-  const hotwords = Array.from(
-    new Set((preparation?.hotwords ?? []).map((item) => item.trim()).filter(Boolean)),
-  ).slice(0, activeMode === 'long_form' ? 10 : 6)
-  const riskyTerms = Array.from(
-    new Set((preparation?.risky_terms ?? []).map((item) => item.trim()).filter(Boolean)),
-  ).slice(0, activeMode === 'long_form' ? 6 : 4)
+  const hotwords = includesSceneTemplate
+    ? Array.from(
+      new Set((preparation?.hotwords ?? []).map((item) => item.trim()).filter(Boolean)),
+    ).slice(0, 8)
+    : []
+  const riskyTerms = includesSceneTemplate
+    ? Array.from(
+      new Set((preparation?.risky_terms ?? []).map((item) => item.trim()).filter(Boolean)),
+    ).slice(0, 6)
+    : []
   const loadoutItems = Array.from(
     new Set(
       selectedLoadoutEntries.map(({ sectionTitle, item }) => (
         `${item.required ? '默认' : '手动'} | ${sectionTitle} | ${item.title}${item.summary.trim() ? `：${item.summary.trim()}` : ''}`
       )),
     ),
-  ).slice(0, activeMode === 'long_form' ? 8 : 6)
-  const loadoutReason = activeMode === communicationLoadout?.recommended_mode
-    ? communicationLoadout?.reason?.trim() ?? ''
-    : activeMode === 'long_form'
-      ? '当前已切到长时间沟通模式，会优先按你手动选中的材料和当前主线稳定展开。'
-      : '当前已切到紧急沟通模式，会优先保住关键词、补救句和最关键的一句。'
+  ).slice(0, 6)
+  const loadoutReason = communicationLoadout?.reason?.trim() ?? ''
   const immediateGoal = preparation?.immediate_goal?.trim()
     || (
-      activeMode === 'long_form'
-        ? '优先沿着已准备材料稳定展开这次长时间沟通，不要临场丢掉主线。'
-        : runtimeScene
-          ? `优先在 ${runtimeScene} 场景下先说清最关键的一句。`
-          : '优先先把当前最关键的一句说清楚。'
+      runtimeScene
+        ? `优先在 ${runtimeScene} 场景下先说清最关键的一句。`
+        : '优先先把当前最关键的一句说清楚。'
     )
   const profileSummaryParts = [
     preparation?.profile_summary?.trim() ?? '',
@@ -154,19 +133,15 @@ function buildPreparationContextUpdate(
       includesSceneTemplate && preparation?.scene_brief
         ? `场景提醒：${preparation.scene_brief}`
         : '',
-      activeMode === 'urgent'
-        ? '紧急沟通时先保住诉求、关键词和补救句，不要为了完整度牺牲速度。'
-        : '',
+      '紧急沟通时先保住诉求、关键词和补救句，不要为了完整度牺牲速度。',
     ].filter(Boolean)),
   )
   const supportStrategies = Array.from(
     new Set([
       ...(preparation?.support_strategies ?? []),
-      activeMode === 'long_form'
-        ? '长时间沟通时优先沿着已准备材料、训练句对和最近总结稳定展开。'
-        : '优先先说关键词和关键诉求，再决定是否展开补充。',
+      '优先先说关键词和关键诉求，再决定是否展开补充。',
     ].filter(Boolean)),
-  ).slice(0, activeMode === 'long_form' ? 4 : 3)
+  ).slice(0, 4)
 
   return {
     scene: runtimeScene ?? null,
@@ -182,8 +157,8 @@ function buildPreparationContextUpdate(
         : '',
     document_content: documentContent,
     reference_lines: referenceLines,
-    training_pairs: trainingPairs,
-    loadout_mode: activeMode,
+    training_pairs: [],
+    loadout_mode: communicationLoadout?.recommended_mode ?? 'urgent',
     loadout_reason: loadoutReason,
     loadout_items: loadoutItems,
   }
@@ -191,36 +166,17 @@ function buildPreparationContextUpdate(
 
 function buildDefaultSelectedLoadoutItemIds(
   loadout: WorkspaceMemorySnapshot['communication_loadout'] | null,
-  mode: LoadoutMode,
 ): string[] {
   if (!loadout) {
     return []
   }
 
-  const requiredIds = loadout.sections.flatMap((section) => (
+  return loadout.sections.flatMap((section) => (
     section.items
       .filter((item) => item.required)
       .map((item) => item.id)
   ))
-  const recommendedOptionalIds = loadout.sections.flatMap((section) => (
-    section.items
-      .filter((item) => !item.required)
-      .filter((item) => (
-        mode === 'long_form'
-          ? item.source_type === 'custom_material' || item.source_type === 'training_summary'
-          : item.source_type === 'scene_template'
-      ))
-      .slice(0, mode === 'long_form' ? 2 : 1)
-      .map((item) => item.id)
-  ))
-
-  return Array.from(new Set([...requiredIds, ...recommendedOptionalIds]))
 }
-
-const LOADOUT_MODE_LABELS = {
-  urgent: '紧急沟通',
-  long_form: '长时间沟通',
-} as const
 
 export default function ChatInterface({
   userId,
@@ -270,7 +226,6 @@ export default function ChatInterface({
   const [isLaunchingStarter, setIsLaunchingStarter] = useState(false)
   const [microphoneEnvironmentWarning, setMicrophoneEnvironmentWarning] = useState<string | null>(null)
   const [activeStarterSceneId, setActiveStarterSceneId] = useState<StarterKitScene['id'] | undefined>(initialStarterSceneId)
-  const [selectedLoadoutMode, setSelectedLoadoutMode] = useState<LoadoutMode | null>(null)
   const [selectedLoadoutItemIds, setSelectedLoadoutItemIds] = useState<string[]>([])
   const {
     snapshot: workspaceSnapshot,
@@ -385,29 +340,11 @@ export default function ChatInterface({
         : isConnected
           ? '已经准备好沟通'
           : '还没连接助手'
-  const recommendedPhrases = useMemo(
-    () => workspaceSnapshot?.expression_kit.recommended_phrases ?? [],
-    [workspaceSnapshot],
-  )
-  const recommendedFocus = useMemo(
-    () => workspaceSnapshot?.expression_kit.recommended_focus ?? [],
-    [workspaceSnapshot],
-  )
-  const sessionReview = workspaceSnapshot?.session_review ?? null
   const communicationLoadout = workspaceSnapshot?.communication_loadout ?? null
   const effectiveSceneId = workspaceSnapshot?.expression_kit.active_scene_id ?? activeStarterSceneId
   const activeStarterScene = useMemo(
     () => STARTER_KIT_SCENES.find((scene) => scene.id === effectiveSceneId),
     [effectiveSceneId],
-  )
-  const hasWorkspaceGuidance = useMemo(
-    () => (
-      recommendedPhrases.length > 0
-      || recommendedFocus.length > 0
-      || Boolean(sessionReview)
-      || Boolean(communicationLoadout)
-    ),
-    [communicationLoadout, recommendedPhrases.length, recommendedFocus.length, sessionReview],
   )
   const runtimeScene = useMemo<RtcScene | undefined>(
     () => mapStarterSceneToRuntimeScene(effectiveSceneId),
@@ -416,16 +353,7 @@ export default function ChatInterface({
 
   useEffect(() => {
     if (!communicationLoadout) {
-      setSelectedLoadoutMode(null)
       setSelectedLoadoutItemIds([])
-      return
-    }
-
-    setSelectedLoadoutMode((currentMode) => currentMode ?? communicationLoadout.recommended_mode)
-  }, [communicationLoadout])
-
-  useEffect(() => {
-    if (!communicationLoadout || !selectedLoadoutMode) {
       return
     }
 
@@ -435,28 +363,21 @@ export default function ChatInterface({
       ))
       const nextIds = currentIds.length > 0
         ? Array.from(new Set([...requiredIds, ...currentIds]))
-        : buildDefaultSelectedLoadoutItemIds(communicationLoadout, selectedLoadoutMode)
+        : buildDefaultSelectedLoadoutItemIds(communicationLoadout)
 
       return nextIds
     })
-  }, [communicationLoadout, selectedLoadoutMode])
+  }, [communicationLoadout])
 
   const preparationContextUpdate = useMemo(
     () => buildPreparationContextUpdate(
       workspaceSnapshot,
       runtimeScene,
-      selectedLoadoutMode,
       selectedLoadoutItemIds,
     ),
-    [runtimeScene, selectedLoadoutItemIds, selectedLoadoutMode, workspaceSnapshot],
+    [runtimeScene, selectedLoadoutItemIds, workspaceSnapshot],
   )
 
-  const selectedLoadoutCount = useMemo(
-    () => communicationLoadout?.sections.reduce((count, section) => (
-      count + section.items.filter((item) => item.required || selectedLoadoutItemIds.includes(item.id)).length
-    ), 0) ?? 0,
-    [communicationLoadout, selectedLoadoutItemIds],
-  )
   const selectedLoadoutEntries = useMemo(
     () => communicationLoadout?.sections.flatMap((section) => (
       section.items
@@ -470,11 +391,41 @@ export default function ChatInterface({
     )) ?? [],
     [communicationLoadout, selectedLoadoutItemIds],
   )
+  const selectableLoadoutSections = useMemo(
+    () => communicationLoadout?.sections
+      .filter((section) => section.id === 'scene_pack' || section.id === 'custom_materials')
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => !item.id.startsWith('loadout-scene-')),
+      }))
+      .filter((section) => section.items.length > 0) ?? [],
+    [communicationLoadout],
+  )
+  const contextResultSummary = useMemo(() => {
+    const autoItems = ['用户画像']
+    if (selectedLoadoutEntries.some((entry) => entry.sourceType === 'training_summary')) {
+      autoItems.push('训练总结')
+    }
 
-  const handleLoadoutModeChange = (mode: LoadoutMode) => {
-    setSelectedLoadoutMode(mode)
-    setSelectedLoadoutItemIds(buildDefaultSelectedLoadoutItemIds(communicationLoadout, mode))
-  }
+    const selectedCustomMaterials = selectedLoadoutEntries
+      .filter((entry) => entry.sourceType === 'custom_material')
+      .map((entry) => entry.title)
+    const selectedSceneTemplates = selectedLoadoutEntries
+      .filter((entry) => entry.sourceType === 'scene_template' && !entry.title.startsWith('当前场景：'))
+      .map((entry) => entry.title)
+
+    const resultLines = [
+      `默认加入：${autoItems.join('、')}`,
+      selectedCustomMaterials.length > 0
+        ? `已加入自定义材料：${selectedCustomMaterials.join('、')}`
+        : '当前没有把自定义材料带进本次沟通。',
+      selectedSceneTemplates.length > 0
+        ? `已加入场景模板：${selectedSceneTemplates.join('、')}，系统会一起带上对应热词、风险词和沟通策略。`
+        : '当前没有额外加载场景模板。',
+    ]
+
+    return resultLines
+  }, [selectedLoadoutEntries])
 
   const handleLoadoutItemToggle = (itemId: string, required: boolean) => {
     if (required) {
@@ -489,12 +440,12 @@ export default function ChatInterface({
   }
 
   useEffect(() => {
-    if (!userId || !communicationLoadout || !selectedLoadoutMode) {
+    if (!userId || !communicationLoadout) {
       return
     }
 
     memoryService.updateCurrentSessionMetadata({
-      loadoutMode: selectedLoadoutMode,
+      loadoutMode: communicationLoadout.recommended_mode,
       loadoutRecommendedMode: communicationLoadout.recommended_mode,
       loadoutSelectedCount: selectedLoadoutEntries.length,
       loadoutItemIds: selectedLoadoutEntries.map((entry) => entry.id),
@@ -502,7 +453,7 @@ export default function ChatInterface({
       loadoutSections: selectedLoadoutEntries.map((entry) => entry.sectionTitle),
       loadoutSourceTypes: selectedLoadoutEntries.map((entry) => entry.sourceType),
     })
-  }, [communicationLoadout, selectedLoadoutEntries, selectedLoadoutMode, userId])
+  }, [communicationLoadout, selectedLoadoutEntries, userId])
 
   useEffect(() => {
     if (!isConnected || !preparationContextUpdate) {
@@ -747,210 +698,124 @@ export default function ChatInterface({
             <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <div className="text-sm font-medium text-amber-700">本次已加载</div>
+                  <div className="text-sm font-medium text-amber-700">本次沟通会用到的资料</div>
                   <h2 className="mt-1 text-xl font-semibold text-stone-950">
-                    当前按“{LOADOUT_MODE_LABELS[selectedLoadoutMode ?? communicationLoadout.recommended_mode]}”模式进入沟通
+                    {activeStarterScene
+                      ? `当前按“${activeStarterScene.title}”场景优先准备沟通`
+                      : '当前会按本次场景和资料自动准备沟通'}
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600 text-pretty">
-                    {selectedLoadoutMode && selectedLoadoutMode !== communicationLoadout.recommended_mode
-                      ? (
-                        selectedLoadoutMode === 'long_form'
-                          ? '你已切到长时间沟通模式，当前会优先带入更多材料和总结。'
-                          : '你已切到紧急沟通模式，当前会优先保住最关键的一句和补救线索。'
-                      )
-                      : communicationLoadout.reason}
+                    用户画像和训练总结会默认进入这次上下文。你这里只需要决定要不要再带上自定义材料和场景模板。
                   </p>
                 </div>
                 <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-stone-700">
-                  已选 {selectedLoadoutCount} 项上下文
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50 p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-stone-950">模式与装配控制</h3>
-                    <p className="mt-1 text-sm leading-6 text-stone-600">
-                      现在可以先决定这次更偏“紧急沟通”还是“长时间沟通”，再手动勾选辅助材料进入本次上下文。
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(['urgent', 'long_form'] as const).map((mode) => {
-                      const active = (selectedLoadoutMode ?? communicationLoadout.recommended_mode) === mode
-                      return (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() => handleLoadoutModeChange(mode)}
-                          className={cn(
-                            'rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                            active
-                              ? 'bg-stone-950 text-white'
-                              : 'border border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:text-stone-950',
-                          )}
-                        >
-                          {LOADOUT_MODE_LABELS[mode]}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  手动已选 {selectedLoadoutEntries.filter((entry) => !['user_profile', 'training_summary'].includes(entry.sourceType)).length} 份资料
                 </div>
               </div>
 
               <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                {communicationLoadout.sections.map((section) => (
+                {selectableLoadoutSections.map((section) => {
+                  return (
                   <article
                     key={section.id}
                     className="rounded-[24px] border border-stone-200 bg-stone-50 p-4"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <h3 className="text-sm font-semibold text-stone-950">{section.title}</h3>
-                        <p className="mt-1 text-sm leading-6 text-stone-600">{section.description}</p>
+                        <h3 className="text-sm font-semibold text-stone-950">
+                          {section.id === 'custom_materials' ? '自定义材料' : '场景模板'}
+                        </h3>
+                        <p className="mt-1 text-sm leading-6 text-stone-600">
+                          {section.id === 'custom_materials'
+                            ? '把你自己准备的稿件、提纲或说明带进这次沟通。'
+                            : '把模板里的热词、风险词和沟通策略带进这次沟通。'}
+                        </p>
                       </div>
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">
-                        {section.items.length} 项
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">
+                          {section.items.length} 项
+                        </span>
+                        <Link
+                          href="/memory"
+                          className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:text-stone-950"
+                        >
+                          去记忆页编辑
+                        </Link>
+                      </div>
                     </div>
-                    {section.items.length > 0 ? (
-                      <div className="mt-3 space-y-2">
-                        {section.items.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => handleLoadoutItemToggle(item.id, item.required)}
-                            disabled={item.required}
-                            className={cn(
-                              'w-full rounded-2xl border px-3 py-3 text-left transition-colors',
-                              item.required || selectedLoadoutItemIds.includes(item.id)
-                                ? 'border-amber-300 bg-amber-50'
-                                : 'border-stone-200 bg-white hover:border-stone-300',
-                              item.required ? 'cursor-not-allowed' : 'cursor-pointer',
+                    <div className="mt-3 space-y-2">
+                      {section.items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleLoadoutItemToggle(item.id, item.required)}
+                          className={cn(
+                            'w-full rounded-2xl border px-3 py-3 text-left transition-colors',
+                            selectedLoadoutItemIds.includes(item.id)
+                              ? 'border-amber-300 bg-amber-50'
+                              : 'border-stone-200 bg-white hover:border-stone-300',
+                          )}
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium text-stone-900">{item.title}</span>
+                            {selectedLoadoutItemIds.includes(item.id) ? (
+                              <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-medium text-white">
+                                已加入本次上下文
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
+                                点击加入
+                              </span>
                             )}
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-medium text-stone-900">{item.title}</span>
-                              {item.required ? (
-                                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-                                  默认加载
-                                </span>
-                              ) : selectedLoadoutItemIds.includes(item.id) ? (
-                                <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-medium text-white">
-                                  已勾选
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
-                                  点击加载
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-2 text-sm leading-6 text-stone-700">{item.summary}</p>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-3 rounded-2xl border border-dashed border-stone-300 bg-white px-3 py-4 text-sm text-stone-600">
-                        这一层当前还没有可加载内容，后面会继续从 workspace 和会后压缩里自动补齐。
-                      </div>
-                    )}
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-stone-700">{item.summary}</p>
+                        </button>
+                      ))}
+                    </div>
                   </article>
-                ))}
+                )})}
+              </div>
+
+              {selectableLoadoutSections.length === 0 ? (
+                <div className="mt-5 rounded-[24px] border border-dashed border-stone-300 bg-stone-50 px-4 py-5 text-sm text-stone-600">
+                  当前没有可手动加载的自定义材料或场景模板。去记忆页准备后，这里会直接出现可选标题。
+                </div>
+              ) : null}
+
+              <div className="mt-5 rounded-[24px] border border-amber-200 bg-amber-50 p-4">
+                <div className="text-sm font-semibold text-stone-950">当前会送进助手的上下文</div>
+                <div className="mt-3 space-y-2 text-sm leading-6 text-stone-700">
+                  {contextResultSummary.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
               </div>
             </section>
           ) : null}
 
-          {hasWorkspaceGuidance ? (
-            <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-              <div className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-stone-700">为你准备的表达</div>
-                      <h2 className="mt-1 text-xl font-semibold text-stone-950">推荐短句</h2>
-                      <p className="mt-2 text-sm leading-6 text-stone-600 text-pretty">
-                      这里不是说明文案。点一下下面任一句，助手就会直接帮你代播；紧张时先点一句，比临场组织更轻松。
-                      </p>
-                    {activeStarterScene ? (
-                      <div className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
-                        当前按 {activeStarterScene.title} 场景优先排序
-                      </div>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowPhrasesPanel(true)}
-                    className="rounded-full border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950"
-                  >
-                    编辑表达工具箱
-                  </button>
+          {communicationLoadout ? (
+            <section className="rounded-[28px] border border-stone-200 bg-stone-100 p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-stone-700">本次资料选择</div>
+                  <p className="mt-1 text-sm leading-6 text-stone-600">
+                    自定义材料和场景模板会直接决定这次沟通带进去的上下文。
+                  </p>
                 </div>
-
-                {isWorkspaceLoading ? (
-                  <div className="mt-4 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-4 text-sm text-stone-600">
-                    正在整理你的个体化表达建议...
-                  </div>
-                ) : null}
-
-                <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-950">
-                  这排句子可以直接点，不用先输入文字。
-                  {isConnected
-                    ? ' 现在点一下就会代播。'
-                    : ' 还没连接时，系统会先帮你连上，再把这句送出去。'}
-                </div>
-
-                {recommendedPhrases.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {recommendedPhrases.map((phrase) => (
-                      <button
-                        key={phrase.id}
-                        type="button"
-                        onClick={() => {
-                          void handlePhrasePlay(phrase.text)
-                        }}
-                        disabled={isLaunchingStarter}
-                        title={phrase.note}
-                        className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-left text-sm font-medium text-stone-800 transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {phrase.text}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-3xl border border-dashed border-stone-200 bg-stone-50 px-4 py-4 text-sm text-stone-600">
-                    你的常用句还在慢慢长出来。先用下面的场景句开口，后面这里会越来越像你自己。
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowPhrasesPanel(true)}
+                  className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950"
+                >
+                  编辑表达工具箱
+                </button>
               </div>
 
-              <div className="rounded-[28px] border border-stone-200 bg-stone-100 p-5 shadow-sm">
-                <div className="text-sm font-medium text-stone-700">
-                  {sessionReview?.headline ?? '这次对话后留给你的提醒'}
+              {isWorkspaceLoading ? (
+                <div className="mt-4 rounded-3xl border border-stone-200 bg-white px-4 py-4 text-sm text-stone-600">
+                  正在同步本次资料...
                 </div>
-                <p className="mt-3 text-sm leading-6 text-stone-700 text-pretty">
-                  {sessionReview?.summary ?? '这次沟通结束后，这里会留下下一次最该先准备的一件事。'}
-                </p>
-                {sessionReview?.recent_win ? (
-                  <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                    最近亮点：{sessionReview.recent_win}
-                  </div>
-                ) : null}
-                {recommendedFocus.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {recommendedFocus.map((item) => (
-                      <span
-                        key={item}
-                        className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-stone-700"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                {sessionReview?.next_step ? (
-                  <div className="mt-4 text-sm text-stone-600">
-                    下一步：{sessionReview.next_step}
-                  </div>
-                ) : null}
-              </div>
+              ) : null}
             </section>
           ) : null}
 

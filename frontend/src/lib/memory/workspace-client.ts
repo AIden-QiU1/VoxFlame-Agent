@@ -80,6 +80,27 @@ export interface PreparedExpressionAsset {
   training_reports: PreparedExpressionTrainingReportsAsset | null
 }
 
+export interface SceneTemplateLibraryItem {
+  id: string
+  title: string
+  summary: string
+  scenario: string
+  severity_hint: string
+  condition_hint: string
+  communication_goal: string
+  source_basis: string
+  focus_priority: string[]
+  risky_terms: string[]
+  support_strategies: string[]
+  starter_phrases: string[]
+  hotwords: Array<{
+    phrase: string
+    category: string
+    note: string
+  }>
+  updated_at: string
+}
+
 function buildWorkspaceSnapshotUrl(
   userId: string,
   sceneId?: StarterKitScene['id'],
@@ -112,6 +133,38 @@ export async function fetchWorkspaceSnapshot(
   }
 
   return await response.json() as WorkspaceMemorySnapshot
+}
+
+export async function saveWorkspaceSceneTemplates(
+  userId: string,
+  selectedTemplateIds: string[],
+): Promise<string[]> {
+  const token = await getValidToken()
+  if (!token) {
+    return []
+  }
+
+  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/scene-templates`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      selected_template_ids: selectedTemplateIds,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`workspace_scene_templates_${response.status}`)
+  }
+
+  const data = await response.json() as {
+    selected_template_ids?: string[]
+  }
+
+  return data.selected_template_ids ?? selectedTemplateIds
 }
 
 export async function saveWorkspaceCommunicationPreferences(
@@ -206,6 +259,26 @@ export async function savePreparedExpressionAsset(
   }
 
   return data.prepared_expression_asset ?? null
+}
+
+export async function deletePreparedExpressionAsset(
+  userId: string,
+): Promise<void> {
+  const token = await getValidToken()
+  if (!token) {
+    return
+  }
+
+  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expression`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`prepared_expression_delete_${response.status}`)
+  }
 }
 
 export async function summarizePreparedExpressionAsset(

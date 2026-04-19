@@ -430,17 +430,92 @@ export class RtcOrchestrationService {
           '当前准备上下文已载入，请优先帮助用户把关键表达说清楚。',
         listenerGuidance: snapshot.preparation.listener_guidance.slice(0, 4),
         supportStrategies: snapshot.preparation.support_strategies.slice(0, 4),
-        hotwords: snapshot.preparation.hotwords.slice(0, 8),
-        riskyTerms: snapshot.preparation.risky_terms.slice(0, 6),
-        documentSummary: snapshot.preparation.document_context_summary,
-        documentContent: snapshot.preparation.document_content,
-        referenceLines: snapshot.preparation.reference_lines.slice(0, 80),
-        trainingPairs: snapshot.preparation.training_pairs.slice(0, 80),
+        hotwords: this.collectInitialPreparationHotwords(snapshot),
+        riskyTerms: this.collectInitialPreparationRiskyTerms(snapshot),
+        documentSummary: this.collectInitialPreparationDocumentSummary(snapshot),
+        documentContent: this.collectInitialPreparationDocumentContent(snapshot),
+        referenceLines: this.collectInitialPreparationReferenceLines(snapshot),
+        trainingPairs: [],
+        loadoutMode: snapshot.communication_loadout.recommended_mode,
+        loadoutReason: snapshot.communication_loadout.reason,
+        loadoutItems: this.collectInitialPreparationLoadoutItems(snapshot),
       }
     } catch (error) {
       console.warn('[RTC] Failed to load workspace preparation context:', error)
       return null
     }
+  }
+
+  private collectInitialPreparationLoadoutItems(
+    snapshot: Awaited<ReturnType<SupabaseService['getWorkspaceMemorySnapshot']>>,
+  ): string[] {
+    return snapshot.communication_loadout.sections.flatMap((section) => (
+      section.items
+        .filter((item) => item.required)
+        .map((item) => (
+          `默认 | ${section.title} | ${item.title}${item.summary.trim() ? `：${item.summary.trim()}` : ''}`
+        ))
+    )).slice(0, 8)
+  }
+
+  private collectInitialPreparationDocumentSummary(
+    snapshot: Awaited<ReturnType<SupabaseService['getWorkspaceMemorySnapshot']>>,
+  ): string | null {
+    const customMaterialSelected = snapshot.communication_loadout.sections.some((section) => (
+      section.items.some((item) => item.required && item.source_type === 'custom_material')
+    ))
+
+    return customMaterialSelected
+      ? snapshot.preparation.document_context_summary
+      : null
+  }
+
+  private collectInitialPreparationDocumentContent(
+    snapshot: Awaited<ReturnType<SupabaseService['getWorkspaceMemorySnapshot']>>,
+  ): string | null {
+    const customMaterialSelected = snapshot.communication_loadout.sections.some((section) => (
+      section.items.some((item) => item.required && item.source_type === 'custom_material')
+    ))
+
+    return customMaterialSelected
+      ? snapshot.preparation.document_content
+      : null
+  }
+
+  private collectInitialPreparationReferenceLines(
+    snapshot: Awaited<ReturnType<SupabaseService['getWorkspaceMemorySnapshot']>>,
+  ): string[] {
+    const customMaterialSelected = snapshot.communication_loadout.sections.some((section) => (
+      section.items.some((item) => item.required && item.source_type === 'custom_material')
+    ))
+
+    return customMaterialSelected
+      ? snapshot.preparation.reference_lines.slice(0, 80)
+      : []
+  }
+
+  private collectInitialPreparationHotwords(
+    snapshot: Awaited<ReturnType<SupabaseService['getWorkspaceMemorySnapshot']>>,
+  ): string[] {
+    const sceneTemplateSelected = snapshot.communication_loadout.sections.some((section) => (
+      section.items.some((item) => item.required && item.source_type === 'scene_template')
+    ))
+
+    return sceneTemplateSelected
+      ? snapshot.preparation.hotwords.slice(0, 8)
+      : []
+  }
+
+  private collectInitialPreparationRiskyTerms(
+    snapshot: Awaited<ReturnType<SupabaseService['getWorkspaceMemorySnapshot']>>,
+  ): string[] {
+    const sceneTemplateSelected = snapshot.communication_loadout.sections.some((section) => (
+      section.items.some((item) => item.required && item.source_type === 'scene_template')
+    ))
+
+    return sceneTemplateSelected
+      ? snapshot.preparation.risky_terms.slice(0, 6)
+      : []
   }
 }
 

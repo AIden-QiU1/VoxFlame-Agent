@@ -1,0 +1,24 @@
+FROM docker.m.daocloud.io/library/python:3.10-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/opt/voxflame-site-packages
+
+WORKDIR /app
+
+COPY .venv/lib/python3.10/site-packages /opt/voxflame-site-packages
+
+RUN python -c "import livekit; import livekit.agents; import websockets; import dotenv"
+
+COPY agent_factory.py /app/
+COPY app.py /app/
+COPY asr_runtime.py /app/
+COPY assistant_runtime.py /app/
+COPY config.py /app/
+COPY data_contract.py /app/
+COPY session_context.py /app/
+COPY session_userdata.py /app/
+COPY tts_runtime.py /app/
+COPY scripts /app/scripts
+
+CMD ["python", "app.py", "start"]

@@ -134,8 +134,7 @@ QDRANT_URL=http://qdrant:6333  # Phase 3
 
 ## 开发说明
 
-- 新实时能力应接在 `/api/rtc/session/*` 或明确的业务 API 下。
-- 不要恢复 backend 运行时 websocket proxy。
+- 新实时能力应接在 `/api/rtc/session/*` 或明确的业务 API 下
 - 训练、沟通、记忆相关状态应分别落在 service/controller 分层里，不要堆进 `index.ts`。
 - 新的 durable user state 默认应落到 `workspace owner`：
   - 读：`/api/memory/workspace/:userId`

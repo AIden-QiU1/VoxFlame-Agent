@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  STARTER_KIT_QUICK_ACTIONS,
   STARTER_KIT_SCENES,
   type StarterKitPhrase,
+  type StarterKitPhraseGroup,
   type StarterKitScene,
 } from '@/lib/communication/starter-kit'
 
@@ -57,6 +57,21 @@ export function CommunicationStarterKit({
     </button>
   )
 
+  const renderPhraseGroup = (group: StarterKitPhraseGroup) => (
+    <section
+      key={group.id}
+      className="rounded-[24px] border border-stone-200 bg-white p-4 shadow-sm"
+    >
+      <div>
+        <div className="text-sm font-semibold text-gray-900">{group.title}</div>
+        <p className="mt-1 text-sm leading-6 text-gray-600 text-pretty">{group.description}</p>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {group.phrases.map(renderPhraseButton)}
+      </div>
+    </section>
+  )
+
   return (
     <section className="rounded-[28px] border border-amber-200 bg-white/90 p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -80,7 +95,7 @@ export function CommunicationStarterKit({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-4">
+      <div className="mt-5 flex flex-wrap gap-2">
         {STARTER_KIT_SCENES.map((scene) => {
           const isSelected = scene.id === selectedScene.id
 
@@ -89,15 +104,16 @@ export function CommunicationStarterKit({
               key={scene.id}
               type="button"
               onClick={() => setSelectedSceneId(scene.id)}
-              className={`rounded-3xl border p-4 text-left transition ${
+              className={`rounded-full border px-4 py-2.5 text-left transition ${
                 isSelected
                   ? 'border-amber-400 bg-amber-50 shadow-sm'
                   : 'border-gray-200 bg-white hover:border-amber-300 hover:bg-amber-50/60'
               }`}
             >
-              <div className="text-2xl">{scene.icon}</div>
-              <div className="mt-3 text-base font-semibold text-gray-900">{scene.title}</div>
-              <div className="mt-1 text-sm text-gray-600">{scene.description}</div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{scene.icon}</span>
+                <span className="text-sm font-semibold text-gray-900">{scene.title}</span>
+              </div>
             </button>
           )
         })}
@@ -111,21 +127,23 @@ export function CommunicationStarterKit({
           </div>
           <div className="text-xs text-gray-500">点一句，直接代播</div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {selectedScene.phrases.map(renderPhraseButton)}
+        <div className="mt-4">
+          <div className="text-sm font-semibold text-gray-900">这个场景先说这三类信息</div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedScene.focusPoints.map((point) => (
+              <span
+                key={point}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-amber-800 shadow-sm"
+              >
+                {point}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+          {selectedScene.sections.map(renderPhraseGroup)}
         </div>
       </div>
-
-      <div className="mt-5 rounded-3xl border border-gray-200 bg-gray-50 p-5">
-        <div className="text-sm font-semibold text-gray-900">没听清时先这样说</div>
-        <p className="mt-1 text-sm text-gray-600 text-pretty">
-          如果对方打断你、没听懂，先用这些短句把节奏稳住，不用急着一下子解释很多。
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {STARTER_KIT_QUICK_ACTIONS.map(renderPhraseButton)}
-        </div>
-      </div>
-
     </section>
   )
 }

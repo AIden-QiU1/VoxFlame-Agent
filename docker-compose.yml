@@ -117,13 +117,12 @@ services:
     image: voxflame-agent-livekit-agent:latest
     build:
       context: ./livekit_agent
-      dockerfile: Dockerfile
-      cache_from:
-        - voxflame-agent-livekit-agent:latest
+      dockerfile: ${LIVEKIT_AGENT_DOCKERFILE:-Dockerfile}
       args:
         LIVEKIT_AGENT_BASE_IMAGE: ${LIVEKIT_AGENT_BASE_IMAGE:-docker.m.daocloud.io/library/python:3.10-slim}
         LIVEKIT_AGENT_BOOTSTRAP_DEPS: ${LIVEKIT_AGENT_BOOTSTRAP_DEPS:-1}
-        LIVEKIT_AGENT_PIP_INDEX_URL: ${LIVEKIT_AGENT_PIP_INDEX_URL:-https://pypi.org/simple}
+        LIVEKIT_AGENT_PIP_INDEX_URL: ${LIVEKIT_AGENT_PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        LIVEKIT_AGENT_PIP_EXTRA_INDEX_URL: ${LIVEKIT_AGENT_PIP_EXTRA_INDEX_URL:-https://pypi.org/simple}
     env_file:
       - ./livekit_agent/.env
     container_name: voxflame-livekit-agent
