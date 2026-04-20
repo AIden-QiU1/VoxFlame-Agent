@@ -43,8 +43,8 @@ test('resolveBrowserLiveKitUrl keeps remote non-loopback origins unchanged', () 
 test('resolveBrowserLiveKitUrl aligns localhost loopback url to current page origin host', () => {
   withWindowOrigin('http://127.0.0.1:3000', () => {
     assert.equal(
-      resolveBrowserLiveKitUrl('ws://localhost:3000'),
-      'ws://127.0.0.1:3000',
+      resolveBrowserLiveKitUrl('ws://localhost:7880'),
+      'ws://127.0.0.1:7880',
     )
   })
 })
@@ -52,8 +52,17 @@ test('resolveBrowserLiveKitUrl aligns localhost loopback url to current page ori
 test('resolveBrowserLiveKitUrl upgrades to wss when page origin is https', () => {
   withWindowOrigin('https://localhost', () => {
     assert.equal(
-      resolveBrowserLiveKitUrl('ws://127.0.0.1:3000'),
-      'wss://localhost',
+      resolveBrowserLiveKitUrl('ws://127.0.0.1:7880'),
+      'wss://localhost:7880',
+    )
+  })
+})
+
+test('resolveBrowserLiveKitUrl rewrites docker-only livekit host to current browser host while keeping the port', () => {
+  withWindowOrigin('https://voxflame.example.com', () => {
+    assert.equal(
+      resolveBrowserLiveKitUrl('ws://livekit-server:7880'),
+      'wss://voxflame.example.com:7880',
     )
   })
 })

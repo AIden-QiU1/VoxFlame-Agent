@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { normalizeRecordingToWav } from '@/lib/audio/recording-to-wav'
 import {
   enqueueRecorderQueueItem,
   getRecorderQueueItem,
@@ -177,6 +178,7 @@ export function useVoiceUpload() {
     setUploadProgress(0)
     setLastError(null)
     setLastUploadReceipt(null)
+    let effectiveOptions: UploadOptions = options
 
     try {
       if (!isAuthenticated || !userId) {
@@ -200,19 +202,52 @@ export function useVoiceUpload() {
         }
       }
 
+      const recordingForNormalization = audioBlob === options.recording.audio.blob
+        ? options.recording
+        : {
+            ...options.recording,
+            audio: {
+              ...options.recording.audio,
+              blob: audioBlob,
+              format: audioBlob.type || options.recording.audio.format,
+              fileSizeBytes: audioBlob.size || options.recording.audio.fileSizeBytes,
+            },
+          }
+
+      let normalizedRecording: VoxFlameRecordingEnvelope
+      try {
+        normalizedRecording = await normalizeRecordingToWav(recordingForNormalization)
+      } catch (error) {
+        console.error('录音转 WAV 失败:', error)
+        const errorMessage = '这条录音暂时没能整理成标准 WAV，请再试一次；如果持续失败，就是当前浏览器的音频解码链还没接稳。'
+        setLastError(errorMessage)
+        return {
+          ok: false,
+          status: 'failed',
+          errorMessage,
+        }
+      }
+
+      const normalizedOptions: UploadOptions = {
+        ...options,
+        recording: normalizedRecording,
+      }
+      effectiveOptions = normalizedOptions
+      const normalizedAudioBlob = normalizedRecording.audio.blob
+
       // 1. 准备文件名与存储路径 (按 有标注/无标注 分类)
-      const ext = audioBlob.type.includes('wav')
+      const ext = normalizedAudioBlob.type.includes('wav')
         ? 'wav'
-        : audioBlob.type.includes('mp4')
+        : normalizedAudioBlob.type.includes('mp4')
           ? 'mp4'
           : 'webm'
-      const recordingId = options.recording.recordingId
-      const sessionId = toStorageSegment(options.recording.sessionId)
+      const recordingId = normalizedOptions.recording.recordingId
+      const sessionId = toStorageSegment(normalizedOptions.recording.sessionId)
 
       let storagePath = ''
 
-      if (options.source === 'guided_recording' && options.sentenceId) {
-        const categorySegment = toStorageSegment(options.metadata?.exercise_category)
+      if (normalizedOptions.source === 'guided_recording' && normalizedOptions.sentenceId) {
+        const categorySegment = toStorageSegment(normalizedOptions.metadata?.exercise_category)
         storagePath =
           `supervised/mandarin/${categorySegment}/${userId}/` +
           `${recordingId}.${ext}`
@@ -233,7 +268,7 @@ export function useVoiceUpload() {
           },
           body: JSON.stringify({
             filename: storagePath,
-            contentType: audioBlob.type || 'audio/wav'
+            contentType: normalizedAudioBlob.type || 'audio/wav'
           })
         })
 
@@ -243,15 +278,15 @@ export function useVoiceUpload() {
         // PUT 上传
         const uploadRes = await fetch(uploadUrl, {
           method: 'PUT',
-          headers: { 'Content-Type': audioBlob.type || 'audio/wav' },
-          body: audioBlob
+          headers: { 'Content-Type': normalizedAudioBlob.type || 'audio/wav' },
+          body: normalizedAudioBlob
         })
 
         if (!uploadRes.ok) throw new Error(`OSS上传失败: ${uploadRes.statusText}`)
       } catch (uploadError: any) {
         console.warn('Storage 上传失败，降级到本地:', uploadError.message)
         return await saveLocally(
-          options,
+          normalizedOptions,
           userId,
           uploadError instanceof Error ? uploadError.message : 'storage_upload_failed',
         )
@@ -268,29 +303,29 @@ export function useVoiceUpload() {
         },
         body: JSON.stringify({
           audioPath: storagePath,
-          text: options.text,
-          recognizedText: options.recognizedText || null,
-          sentenceId: options.sentenceId || null,
-          duration: options.recording.audio.durationSeconds,
-          source: options.source,
+          text: normalizedOptions.text,
+          recognizedText: normalizedOptions.recognizedText || null,
+          sentenceId: normalizedOptions.sentenceId || null,
+          duration: normalizedOptions.recording.audio.durationSeconds,
+          source: normalizedOptions.source,
           metadata: {
-            recording_id: options.recording.recordingId,
-            session_id: options.recording.sessionId,
-            mode: options.recording.mode,
-            source_surface: options.recording.sourceSurface,
-            collection_mode: options.recording.collectionMode,
-            consent_scope: options.consentScope ?? 'training_only',
-            source: options.source || 'unknown',
+            recording_id: normalizedOptions.recording.recordingId,
+            session_id: normalizedOptions.recording.sessionId,
+            mode: normalizedOptions.recording.mode,
+            source_surface: normalizedOptions.recording.sourceSurface,
+            collection_mode: normalizedOptions.recording.collectionMode,
+            consent_scope: normalizedOptions.consentScope ?? 'training_only',
+            source: normalizedOptions.source || 'unknown',
             user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-            timestamp: options.recording.createdAt,
+            timestamp: normalizedOptions.recording.createdAt,
             storage_type: 'oss',
-            audio_format: options.recording.audio.format,
-            sample_rate: options.recording.audio.sampleRate,
-            channel_count: options.recording.audio.channelCount,
-            duration_ms: options.recording.audio.durationMs,
-            file_size_bytes: options.recording.audio.fileSizeBytes,
-            capture_transport: options.recording.audio.captureTransport,
-            ...options.metadata,
+            audio_format: normalizedOptions.recording.audio.format,
+            sample_rate: normalizedOptions.recording.audio.sampleRate,
+            channel_count: normalizedOptions.recording.audio.channelCount,
+            duration_ms: normalizedOptions.recording.audio.durationMs,
+            file_size_bytes: normalizedOptions.recording.audio.fileSizeBytes,
+            capture_transport: normalizedOptions.recording.audio.captureTransport,
+            ...normalizedOptions.metadata,
           }
         })
       })
@@ -338,7 +373,7 @@ export function useVoiceUpload() {
       console.error('上传过程出错:', err)
       // 尝试本地保存
       return await saveLocally(
-        options,
+        effectiveOptions,
         userId || 'unknown-user',
         err instanceof Error ? err.message : 'upload_failed',
       )

@@ -150,7 +150,6 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 - [docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)：吸收 `TEN ceiling / 五层映射 / Agora 替换 / light voice surface` 后的统一 runtime 与 surface 参考文档。
 - [docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)：吸收 `memory mechanisms / voice-agent-tooling` 后的统一 agent、memory、tooling 参考文档。
 - [frontend/README.md](frontend/README.md)：当前前端页面系统、共享 `workspace` contract、训练资产链路与 PWA 边界。
-- [docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md](docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md)：纠错链路设计。
 - [docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)：统一后的记忆系统主参考（含历史统一报告合并结论）。
 - [docs/control-plane.md](docs/control-plane.md)：控制面的职责、边界、现有实现映射与后续收口方向。
 - [docs/capability-registry.md](docs/capability-registry.md)：产品运行时能力与工程协作能力的 registry，明确 owner、调用边界、副作用和 smoke。

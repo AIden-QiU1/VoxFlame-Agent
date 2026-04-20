@@ -48,12 +48,27 @@ interface MemoryCommunicationPreferencesRequestBody {
   communication_preferences?: CommunicationPreferences;
 }
 
+interface MemoryUserProfileMemoryRequestBody {
+  user_id?: string;
+  document?: string | null;
+  common_scenarios?: string[];
+  risky_terms?: string[];
+  support_strategies?: string[];
+}
+
 interface MemoryPreparedExpressionRequestBody {
   user_id?: string;
+  id?: string | null;
   title?: string;
   scene?: string | null;
   source?: string | null;
   content?: string;
+  make_active?: boolean;
+}
+
+interface MemoryPreparedExpressionActivationRequestBody {
+  user_id?: string;
+  asset_id?: string;
 }
 
 interface MemoryPreparedExpressionSummarizeRequestBody {
@@ -125,7 +140,7 @@ function buildSessionPayload(
 export class MemoryController {
   private readonly memoryMaintenanceService = new MemoryMaintenanceService();
 
-  async getPreparedExpressionAsset(req: Request, res: Response): Promise<void> {
+  async getPreparedExpressionLibrary(req: Request, res: Response): Promise<void> {
     try {
       const authenticatedUserId = req.user?.id;
       const { userId } = req.params;
@@ -140,10 +155,15 @@ export class MemoryController {
         return;
       }
 
-      const asset = await SupabaseService.getInstance().getPreparedExpressionAsset(authenticatedUserId);
-      res.json({ prepared_expression_asset: asset });
+      const library = await SupabaseService.getInstance().getPreparedExpressionLibrary(authenticatedUserId);
+      res.json({
+        prepared_expression_library: library,
+        active_prepared_expression_asset: library.active_asset_id
+          ? library.assets.find((asset) => asset.draft.id === library.active_asset_id) ?? null
+          : null,
+      });
     } catch (error) {
-      console.error('Error in getPreparedExpressionAsset:', error);
+      console.error('Error in getPreparedExpressionLibrary:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -154,10 +174,12 @@ export class MemoryController {
       const { userId } = req.params;
       const {
         user_id,
+        id,
         title,
         scene,
         source,
         content,
+        make_active,
       } = req.body as MemoryPreparedExpressionRequestBody;
 
       if (!authenticatedUserId) {
@@ -178,21 +200,60 @@ export class MemoryController {
       const asset = await SupabaseService.getInstance().savePreparedExpressionAsset(
         authenticatedUserId,
         {
+          id,
           title,
           scene,
           source,
           content,
+          make_active,
         },
       );
 
-      if (!asset) {
-        res.status(500).json({ error: 'Failed to save prepared expression asset' });
+      res.json({
+        prepared_expression_library: asset,
+        active_prepared_expression_asset: asset.active_asset_id
+          ? asset.assets.find((entry) => entry.draft.id === asset.active_asset_id) ?? null
+          : null,
+      });
+    } catch (error) {
+      console.error('Error in syncPreparedExpressionAsset:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  async setActivePreparedExpressionAsset(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { userId } = req.params;
+      const { user_id, asset_id } = req.body as MemoryPreparedExpressionActivationRequestBody;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
         return;
       }
 
-      res.json({ prepared_expression_asset: asset });
+      if (!userId || userId !== authenticatedUserId || (user_id && user_id !== authenticatedUserId)) {
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      if (!asset_id || !asset_id.trim()) {
+        res.status(400).json({ error: 'Missing required field: asset_id' });
+        return;
+      }
+
+      const library = await SupabaseService.getInstance().setActivePreparedExpressionAsset(
+        authenticatedUserId,
+        asset_id,
+      );
+      res.json({
+        prepared_expression_library: library,
+        active_prepared_expression_asset: library.active_asset_id
+          ? library.assets.find((asset) => asset.draft.id === library.active_asset_id) ?? null
+          : null,
+      });
     } catch (error) {
-      console.error('Error in syncPreparedExpressionAsset:', error);
+      console.error('Error in setActivePreparedExpressionAsset:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -200,7 +261,7 @@ export class MemoryController {
   async deletePreparedExpressionAsset(req: Request, res: Response): Promise<void> {
     try {
       const authenticatedUserId = req.user?.id;
-      const { userId } = req.params;
+      const { userId, assetId } = req.params;
 
       if (!authenticatedUserId) {
         res.status(401).json({ error: 'Unauthorized - No user context' });
@@ -212,8 +273,21 @@ export class MemoryController {
         return;
       }
 
-      await SupabaseService.getInstance().deletePreparedExpressionAsset(authenticatedUserId);
-      res.status(204).send();
+      if (!assetId || !assetId.trim()) {
+        res.status(400).json({ error: 'Missing required path parameter: assetId' });
+        return;
+      }
+
+      const library = await SupabaseService.getInstance().deletePreparedExpressionAsset(
+        authenticatedUserId,
+        assetId,
+      );
+      res.json({
+        prepared_expression_library: library,
+        active_prepared_expression_asset: library.active_asset_id
+          ? library.assets.find((asset) => asset.draft.id === library.active_asset_id) ?? null
+          : null,
+      });
     } catch (error) {
       console.error('Error in deletePreparedExpressionAsset:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -223,7 +297,7 @@ export class MemoryController {
   async summarizePreparedExpressionAsset(req: Request, res: Response): Promise<void> {
     try {
       const authenticatedUserId = req.user?.id;
-      const { userId } = req.params;
+      const { userId, assetId } = req.params;
       const {
         user_id,
         trigger,
@@ -239,17 +313,23 @@ export class MemoryController {
         return;
       }
 
-      const asset = await SupabaseService.getInstance().summarizePreparedExpressionAsset(
-        authenticatedUserId,
-        trigger === 'periodic_auto' ? 'periodic_auto' : 'manual',
-      );
-
-      if (!asset) {
-        res.status(400).json({ error: 'Missing prepared expression asset' });
+      if (!assetId || !assetId.trim()) {
+        res.status(400).json({ error: 'Missing required path parameter: assetId' });
         return;
       }
 
-      res.json({ prepared_expression_asset: asset });
+      const library = await SupabaseService.getInstance().summarizePreparedExpressionAsset(
+        authenticatedUserId,
+        trigger === 'periodic_auto' ? 'periodic_auto' : 'manual',
+        assetId,
+      );
+
+      res.json({
+        prepared_expression_library: library,
+        active_prepared_expression_asset: library.active_asset_id
+          ? library.assets.find((asset) => asset.draft.id === library.active_asset_id) ?? null
+          : null,
+      });
     } catch (error) {
       console.error('Error in summarizePreparedExpressionAsset:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -292,6 +372,54 @@ export class MemoryController {
       });
     } catch (error) {
       console.error('Error in syncCommunicationPreferences:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // PUT /api/memory/workspace/:userId/profile-memory - Persist the user-authored profile document
+  async syncUserProfileMemory(req: Request, res: Response): Promise<void> {
+    try {
+      const authenticatedUserId = req.user?.id;
+      const { userId } = req.params;
+      const {
+        user_id,
+        document,
+        common_scenarios,
+        risky_terms,
+        support_strategies,
+      } = req.body as MemoryUserProfileMemoryRequestBody;
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized - No user context' });
+        return;
+      }
+
+      if (!userId) {
+        res.status(400).json({ error: 'Missing userId parameter' });
+        return;
+      }
+
+      if (userId !== authenticatedUserId || (user_id && user_id !== authenticatedUserId)) {
+        console.warn(`[MemoryController] User ID mismatch: token=${authenticatedUserId}, param=${userId}, body=${user_id}`);
+        res.status(403).json({ error: 'Forbidden - User ID mismatch' });
+        return;
+      }
+
+      const savedProfileMemory = await SupabaseService.getInstance().updateUserProfileMemory(
+        authenticatedUserId,
+        {
+          document: typeof document === 'string' && document.trim() ? document.trim() : undefined,
+          common_scenarios: Array.isArray(common_scenarios) ? common_scenarios : undefined,
+          risky_terms: Array.isArray(risky_terms) ? risky_terms : undefined,
+          support_strategies: Array.isArray(support_strategies) ? support_strategies : undefined,
+        },
+      );
+
+      res.json({
+        user_profile_memory: savedProfileMemory,
+      });
+    } catch (error) {
+      console.error('Error in syncUserProfileMemory:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

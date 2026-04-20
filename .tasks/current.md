@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-04-17
+> 最后更新: 2026-04-20
 
 ## 当前主线
 
@@ -12,6 +12,218 @@
   - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-04-20 已按“高质量普通话短句”重写四个训练主题，并清空该账号旧训练数据
+   - 账号 `2307294809@qq.com` 对应用户 `64758dee-5026-4b53-a063-1d02d0834f67` 的旧训练样本已清空：
+     - `voice_contributions: 51 -> 0`
+     - OSS 相关训练对象和 `dataset/{userId}` 导出对象共删掉 `53` 个
+   - frontend 新增 [curated-topics.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/corpus/mandarin-training-data/curated-topics.ts)
+   - [mandarin-training-data/index.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/corpus/mandarin-training-data/index.ts) 现在优先使用四组精选语料，替换掉现役低质量旧句：
+     - `日常与出行`: `88` 条
+     - `看病与求助`: `67` 条
+     - `人群与角色`: `89` 条
+     - `设备与数字`: `160` 条
+   - 全部句子限制在 `6-15` 字，并在代码层直接校验长度和重复
+   - `发音与朗读` 保持原状，没有替换
+   - 当前旧 [mandarin-training-real.json](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/corpus/generated/mandarin-training-real.json) 已把四组旧生成语料物理删除，只保留 `发音与朗读`
+   - frontend [types.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/corpus/mandarin-training-data/types.ts) 新增显式 `MANDARIN_TRAINING_CATEGORY_ORDER`
+   - 训练页分类卡、计数与录音页选择不再依赖旧 JSON key，删除旧库四类后前端 UI 仍保持一致
+   - 选材依据参考了：
+     - `12306` 重点旅客/出行服务说明
+     - `120` 急救求助电话官方指引
+     - 政务热线 / 公共服务普通话与文明用语规范
+     - 常见手机操作与数字表达的高频场景
+   - 已验证：
+   - `cd frontend && npm run build`
+
+0. 2026-04-20 已把训练录音上传链收成 `wav only`
+   - frontend 新增 [recording-to-wav.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/audio/recording-to-wav.ts)
+   - 当前训练录音在真正上传到 OSS 或进入本地补传队列前，会先统一解码并转成 `16k / mono / PCM16 WAV`
+   - frontend [useVoiceUpload.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useVoiceUpload.ts) 现在不会再直接保存新的 `webm` 训练资产
+   - 这样后续新录样本的 `audio_format` 会稳定收敛到 `audio/wav`
+   - 已验证：
+   - `cd frontend && npm run build`
+
+0. 2026-04-20 已把沟通页画像更新和训练页定期总结的触发边界继续收口
+   - 沟通页当前不再只依赖 `disconnect/endSession` 触发 durable 用户画像维护
+   - frontend [memory-service.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/memory-service.ts) 已新增去重后的 `persistCurrentSessionProfileUpdate()`
+   - frontend [session-runtime.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/session-runtime.ts) 现在在收到有效 `compaction_candidate` 时会自动增量写回用户画像
+   - 这样同一条 RTC 连接里持续完成多轮沟通时，也会逐步更新 `user_profile_memory`
+   - `disconnect/endSession` 仍保留最终兜底，不再是唯一触发点
+   - 训练页 backend [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 的 `listPreparedExpressionSummaryRefreshCandidates(...)` 也已收紧成：
+     - 仍按 `daily/weekly` 窗口定期检查
+     - 只有对应窗口内、且自上次 summary 生成后出现了新的训练样本，才会进入自动补刷
+   - 这让训练总结更符合“每天/每周更新，并且有内容才更新”的当前口径
+   - 已验证：
+   - `cd frontend && npm test -- --test-name-pattern="session-runtime writes session userdata ack memory summary into current session metadata|buildSessionCloseUserProfileUpdate"`
+   - `cd backend && npm run build`
+
+0. 2026-04-20 已把训练数据导出收成“真正可用的数据集视图”
+   - backend [export_audio_target_dataset.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/export_audio_target_dataset.ts) 现在导出的是：
+     - `audio/`
+     - `samples.jsonl` 中的 `audio + target + 可选 speaker_profile`
+   - 不再把 `raw_transcript / recognized_text` 暴露成训练数据集字段；这些字段仍保留在线上训练总结和错配统计链路里
+   - frontend [contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 也已开始把本地 `training_guidance_profile` 写入样本 metadata，给未来 `etiology / severity / priority` 标签预留入口
+   - 现场验证用户 `2307294809@qq.com` 当前状态：
+     - `voice_contributions = 51`
+     - 宿主机导出目录：[tmp/dataset_2307294809_20260420](/home/ubuntu/VoxFlame-Agent/tmp/dataset_2307294809_20260420)
+     - `samples.jsonl = 51` 行
+     - `audio/ = 51` 个文件
+     - 当前没有结构化 `speaker_profile` 标签，因为该用户在 durable profile 里还没有 `etiology / severity`
+   - 已验证：
+     - `cd frontend && npm run build`
+     - `cd backend && npm run build`
+     - `sudo docker exec voxflame-backend sh -lc "cd /app && npx tsx scripts/export_audio_target_dataset.ts --email 2307294809@qq.com --limit 100 --output-dir /app/tmp/dataset_2307294809_20260420"`
+     - `mkdir -p /home/ubuntu/VoxFlame-Agent/tmp && sudo docker exec voxflame-backend sh -lc "cd /app/tmp && tar -cf - dataset_2307294809_20260420" | tar -xf - -C /home/ubuntu/VoxFlame-Agent/tmp`
+
+0. 2026-04-20 已删除两份会误导当前实现判断的过时计划文档
+   - 已删除：
+     - `docs/LLM_CORRECTION_DEVELOPMENT_PLAN.md`
+     - `docs/VOXFLAME_MEMORY_CONTEXT_MODEL_COMPACTION_EXECUTION_PLAN_2026-04-14.md`
+   - 删除原因：
+     - 前者仍以 `TEN extension / websocket / 独立纠错扩展` 为主线，和现役 LiveKit 主链冲突
+     - 后者仍把前端 compaction / server-side compaction 当主推进项，已被新版 PRD 和当前代码吸收并改写
+   - [docs/README.md](/home/ubuntu/VoxFlame-Agent/docs/README.md) 与 [AGENTS.md](/home/ubuntu/VoxFlame-Agent/AGENTS.md) 的入口引用已同步清理
+   - 已验证：
+     - `bash scripts/check_ai_docs.sh`
+
+0. 2026-04-19 已把首页从“导航页”收成更产品化的主页面
+   - [frontend/src/components/home/HomeDashboard.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/home/HomeDashboard.tsx) 已重写首页主体结构
+   - 当前首页不再主打：
+     - 资源链接区
+     - 大量“怎么先开口”的重复说明卡
+     - 只是把 3 个入口平铺出来
+   - 现在首页主线改成：
+     - `3 个核心功能`：沟通 / 练习 / 记忆
+     - `怎样用出效果`：录真实句子、愿意时再上传授权、沟通前只带本次需要的上下文
+     - `三页如何配合`：练习页产出真实信号，记忆页整理材料模板，沟通页按场景勾选后直接开口
+   - 首页口径也更产品化：
+     - 明确说明“录好数据，模型效果才会越来越懂你”
+     - 明确说明沟通页 / 练习页 / 记忆页分别解决什么问题
+     - 明确说明三页不是孤立页面，而是一条闭环主线
+   - 已验证：
+     - `cd frontend && npm run build`
+
+0. 2026-04-19 已继续把首页从“讲页面”收成“讲产品价值”
+   - 用户指出的问题是对的：首页不能主要解释页面结构，而要先回答：
+     - 这个产品好在哪
+     - 为什么会越来越有用
+     - 用户怎么开始用
+   - 当前首页已进一步改成：
+     - hero 先讲产品价值：`更好沟通、持续变准、提前准备`
+     - `这个产品好在哪`：三条用户可感知价值
+     - `三个核心功能`：沟通 / 练习 / 记忆，分别说明“解决什么问题、怎么用更好”
+     - `怎么用`：明确 `练真实句子 -> 记忆页收材料模板 -> 沟通页勾选后开口`
+   - 当前首页比上一版更偏产品首页，而不是工作流说明页
+   - 已验证：
+     - `cd frontend && npm run build`
+
+0. 2026-04-19 已继续把首页和训练录音页往“更少字、更像工作台”收
+   - 首页 [frontend/src/components/home/HomeDashboard.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/home/HomeDashboard.tsx) 这轮又继续压掉了解释型层级：
+     - hero 更短
+     - 只保留 3 个核心能力卡：沟通 / 练习 / 记忆
+     - 只保留 3 个简短补充块：为什么会越来越准、什么时候去记忆页、最简单的开始方式
+   - 当前首页更像产品首页，而不是产品说明页
+   - 训练录音页 [frontend/src/app/contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 的 `TrainingRecorderPage` 也已改成真正的左右双栏：
+     - 左栏：准备内容 + 句子序列
+     - 右栏：当前句 + 录音 + 实时识别 + 本次结果
+   - 当前录音页不再要求用户上下长距离滚动来回切换“挑句”和“录音”
+   - 已验证：
+     - `cd frontend && npm run build`
+
+0. 2026-04-19 已收掉“旧单材料字段导致参考材料消失”和“沟通页只认已预选模板”的两条真实链路问题
+   - 真实用户 `2307294809@qq.com` 的参考材料并没有丢，而是留在旧 `preferences.prepared_expression_asset`
+   - 当前 backend [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 已新增迁移逻辑：
+     - 读取 workspace snapshot / prepared-expression library 时
+     - 若发现只有旧字段、没有新材料库
+     - 直接迁入 `prepared_expression_assets.active_asset_id + assets[]`
+     - 并删除旧 `prepared_expression_asset`
+   - 该用户数据库已现场迁移验证：
+     - `has_legacy = false`
+     - `has_library = true`
+     - `library_count = 1`
+     - `active_asset_id = 演讲-manual-input`
+   - 沟通页 `communication loadout` 也已改成直接消费：
+     - 整个场景模板库
+     - 整个参考材料库
+     而不是只显示 memory 页已选对象
+   - frontend [ChatInterface.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx) 现在会：
+     - 默认勾选 memory 页已选模板和当前激活材料
+     - 允许在沟通页直接勾选模板 / 材料
+     - 按所选对象真实拼出 `document_content / reference_lines / hotwords / risky_terms / support_strategies`
+   - 已验证：
+     - `cd backend && npm run build`
+     - `cd frontend && npm run build`
+     - Supabase 现场校验该用户已完成旧字段删除
+
+0. 2026-04-19 已把记忆页“自定义材料”改成真正的多份材料库
+   - backend durable storage 已从单份 `prepared_expression_asset` 收成纯粹的：
+     - `prepared_expression_assets.active_asset_id`
+     - `prepared_expression_assets.assets[]`
+   - 不再走旧单文档兼容设计，当前 owner 就是“材料列表 + 当前激活材料”
+   - 新的 memory API 已切到复数资源：
+     - `GET /api/memory/workspace/:userId/prepared-expressions`
+     - `PUT /api/memory/workspace/:userId/prepared-expressions`
+     - `PUT /api/memory/workspace/:userId/prepared-expressions/active`
+     - `DELETE /api/memory/workspace/:userId/prepared-expressions/:assetId`
+     - `POST /api/memory/workspace/:userId/prepared-expressions/:assetId/summarize`
+   - workspace snapshot 也已新增：
+     - `prepared_expression_library`
+     - `object_zones.custom_materials` 现在会列出整份材料库，而不是只剩当前一份
+   - 记忆页 [frontend/src/app/memory/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/memory/page.tsx) 现在已支持：
+     - 新增材料
+     - 选择某一份材料
+     - 设为当前加载
+     - 展开全文
+     - 编辑当前选中材料
+     - 删除某一份材料
+   - 这次顺手把一个未接入主路由、会干扰构建的训练页拆页半成品删掉了，不再让未完成组件停在 `src/` 里
+   - 已验证：
+     - `cd backend && npm run build`
+     - `cd frontend && npm run build`
+
+0. 2026-04-19 已把训练页真正拆成“主题选择页 -> 录音页”
+   - [frontend/src/app/contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 现在只负责：
+     - 展示训练摘要
+     - 选择训练主题
+     - 跳转到对应录音页
+   - 新增路由：
+     - [frontend/src/app/contribute/topic/[topicId]/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/topic/[topicId]/page.tsx)
+     - [frontend/src/lib/training/training-topic-route.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/training-topic-route.ts)
+   - 录音页现在只保留：
+     - 当前主题说明
+     - 当前主题句序列
+     - 录音 / 自动切下一句 / 本次结果 / 训练总结
+   - 不再把“主题选择”和“录音工作区”混在同一路由
+   - 沟通页 [frontend/src/components/chat/ChatInterface.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx) 也顺手删掉了一块重复的 `本次资料选择` 摘要卡，避免和上面的真正资料选择区并跑
+   - 当前检查结果：
+     - 训练页之前确实存在一套主页面内嵌录音工作区的旧逻辑，现已收口
+     - 沟通页之前有一块重复展示 `communicationLoadout` 的旧摘要，现已删掉
+     - 记忆页当前没有再发现前台并跑的第二套“单文档 / 多文档”UI
+   - 已验证：
+     - `cd frontend && npm run build`
+
+0. 2026-04-19 已继续把记忆页 / 训练页 / LiveKit 录音链收成更贴近产品对象的交互
+   - [frontend/src/app/memory/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/memory/page.tsx) 已彻底移除前台可见的“三句话 / 固定句”卡片
+   - 当前用户画像前台只保留：
+     - 一份用户自己维护的画像文档
+     - 系统观察到的稳定信号
+   - 训练页 [frontend/src/app/contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 已从“材料编辑 + 句子列表双栏”改成：
+     - 主题选择优先
+     - 自定义训练直接同步记忆区材料
+     - 选主题后自动滚到录音区
+     - 每录完一条默认自动切到同主题下一句
+     - 句子列表降级成“需要时再手动换句”的辅助区
+   - LiveKit 录音不可用的根因也已收敛并修复：
+     - backend [rtc-orchestration.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/rtc-orchestration.service.ts)
+     - frontend [livekit-transport.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/realtime-audio/livekit-transport.ts)
+     - 现在只在目标是 loopback / `livekit-server` 时改写主机名
+     - 不再把浏览器 origin 端口错误覆盖到 LiveKit `:7880`
+   - 已验证：
+     - `cd backend && npm test`
+     - `cd frontend && npm run test:runtime`
+     - `cd backend && npm run build`
+     - `cd frontend && npm run build`
 
 0. 2026-04-19 已把沟通页旧壳和“沟通材料训练化”表达继续收干净
    - [frontend/src/components/chat/CommunicationStarterKit.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/CommunicationStarterKit.tsx) 已删除：
@@ -33,8 +245,26 @@
      - `准备内容与拆句训练 -> 准备内容与句子练习`
      - “保存后按拆句训练”改成“右侧直接列出可练句子”
    - 已验证：
-     - `cd frontend && npm run build`
+   - `cd frontend && npm run build`
+   - `cd backend && npm run build`
+
+0. 2026-04-19 已把记忆页里还偏离产品对象的 3 处结构继续收口
+   - [frontend/src/app/memory/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/memory/page.tsx) 已把：
+     - `用户画像` 改成单文档编辑，不再把画像本体做成三句话卡片
+     - `自定义材料` 改成“当前参考文档”标题卡，默认不再直接摊开全文
+     - `场景 / 热词模板` 改成标题切换 + 单模板详情面板，默认只展示当前选中的一套
+   - backend 已新增：
+     - `PUT /api/memory/workspace/:userId/profile-memory`
+   - [backend/src/services/supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 现在也已让 `user_profile_memory` 支持：
+     - `document`
+     - 并让 `preparation.profile_summary / communication loadout / object_zones` 优先消费用户自己维护的画像文档
+   - 当前产品 owner 重新明确：
+     - `用户画像文档` = 用户维护的一份长期背景文档
+     - `固定开场 / 配合方式 / 补救句` = 从画像里提炼的快捷表达
+     - `后台维护链` = 在文档基础上做轻量稳定信号补充，而不是替代画像文档本体
+   - 已验证：
      - `cd backend && npm run build`
+     - `cd frontend && npm run build`
 
 0. 2026-04-17 已把“模板库 + 后端训练总结维护”这两条 gap 真正收口
    - [frontend/src/app/memory/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/memory/page.tsx) 已不再让用户自由增删“自定义重点词”

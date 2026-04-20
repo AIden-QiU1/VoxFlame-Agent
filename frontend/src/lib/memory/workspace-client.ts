@@ -80,6 +80,12 @@ export interface PreparedExpressionAsset {
   training_reports: PreparedExpressionTrainingReportsAsset | null
 }
 
+export interface PreparedExpressionLibraryAsset {
+  active_asset_id: string | null
+  assets: PreparedExpressionAsset[]
+  updated_at: string
+}
+
 export interface SceneTemplateLibraryItem {
   id: string
   title: string
@@ -99,6 +105,15 @@ export interface SceneTemplateLibraryItem {
     note: string
   }>
   updated_at: string
+}
+
+export interface UserProfileMemoryAsset {
+  document?: string
+  summary?: string
+  common_scenarios?: string[]
+  risky_terms?: string[]
+  support_strategies?: string[]
+  updated_at?: string
 }
 
 function buildWorkspaceSnapshotUrl(
@@ -199,46 +214,80 @@ export async function saveWorkspaceCommunicationPreferences(
   return data.communication_preferences ?? communicationPreferences
 }
 
-export async function fetchPreparedExpressionAsset(
+export async function saveWorkspaceUserProfileMemory(
   userId: string,
-): Promise<PreparedExpressionAsset | null> {
+  input: UserProfileMemoryAsset,
+): Promise<UserProfileMemoryAsset | null> {
   const token = await getValidToken()
   if (!token) {
     return null
   }
 
-  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expression`, {
+  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/profile-memory`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      ...input,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`workspace_profile_memory_${response.status}`)
+  }
+
+  const data = await response.json() as {
+    user_profile_memory?: UserProfileMemoryAsset
+  }
+
+  return data.user_profile_memory ?? input
+}
+
+export async function fetchPreparedExpressionLibrary(
+  userId: string,
+): Promise<PreparedExpressionLibraryAsset | null> {
+  const token = await getValidToken()
+  if (!token) {
+    return null
+  }
+
+  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expressions`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   })
 
   if (!response.ok) {
-    throw new Error(`prepared_expression_${response.status}`)
+    throw new Error(`prepared_expression_library_${response.status}`)
   }
 
   const data = await response.json() as {
-    prepared_expression_asset?: PreparedExpressionAsset | null
+    prepared_expression_library?: PreparedExpressionLibraryAsset | null
   }
 
-  return data.prepared_expression_asset ?? null
+  return data.prepared_expression_library ?? null
 }
 
 export async function savePreparedExpressionAsset(
   userId: string,
   input: {
+    id?: string | null
     title?: string | null
     scene?: string | null
     source?: string | null
     content: string
+    make_active?: boolean
   },
-): Promise<PreparedExpressionAsset | null> {
+): Promise<PreparedExpressionLibraryAsset | null> {
   const token = await getValidToken()
   if (!token) {
     return null
   }
 
-  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expression`, {
+  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expressions`, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -255,21 +304,22 @@ export async function savePreparedExpressionAsset(
   }
 
   const data = await response.json() as {
-    prepared_expression_asset?: PreparedExpressionAsset | null
+    prepared_expression_library?: PreparedExpressionLibraryAsset | null
   }
 
-  return data.prepared_expression_asset ?? null
+  return data.prepared_expression_library ?? null
 }
 
 export async function deletePreparedExpressionAsset(
   userId: string,
-): Promise<void> {
+  assetId: string,
+): Promise<PreparedExpressionLibraryAsset | null> {
   const token = await getValidToken()
   if (!token) {
-    return
+    return null
   }
 
-  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expression`, {
+  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expressions/${assetId}`, {
     method: 'DELETE',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -279,18 +329,57 @@ export async function deletePreparedExpressionAsset(
   if (!response.ok) {
     throw new Error(`prepared_expression_delete_${response.status}`)
   }
+
+  const data = await response.json() as {
+    prepared_expression_library?: PreparedExpressionLibraryAsset | null
+  }
+
+  return data.prepared_expression_library ?? null
 }
 
-export async function summarizePreparedExpressionAsset(
+export async function activatePreparedExpressionAsset(
   userId: string,
-  trigger: 'manual' | 'periodic_auto' = 'manual',
-): Promise<PreparedExpressionAsset | null> {
+  assetId: string,
+): Promise<PreparedExpressionLibraryAsset | null> {
   const token = await getValidToken()
   if (!token) {
     return null
   }
 
-  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expression/summarize`, {
+  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expressions/active`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      asset_id: assetId,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`prepared_expression_activate_${response.status}`)
+  }
+
+  const data = await response.json() as {
+    prepared_expression_library?: PreparedExpressionLibraryAsset | null
+  }
+
+  return data.prepared_expression_library ?? null
+}
+
+export async function summarizePreparedExpressionAsset(
+  userId: string,
+  assetId: string,
+  trigger: 'manual' | 'periodic_auto' = 'manual',
+): Promise<PreparedExpressionLibraryAsset | null> {
+  const token = await getValidToken()
+  if (!token) {
+    return null
+  }
+
+  const response = await fetch(`${config.api.baseUrl}/memory/workspace/${userId}/prepared-expressions/${assetId}/summarize`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -307,8 +396,8 @@ export async function summarizePreparedExpressionAsset(
   }
 
   const data = await response.json() as {
-    prepared_expression_asset?: PreparedExpressionAsset | null
+    prepared_expression_library?: PreparedExpressionLibraryAsset | null
   }
 
-  return data.prepared_expression_asset ?? null
+  return data.prepared_expression_library ?? null
 }

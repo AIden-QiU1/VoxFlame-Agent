@@ -233,6 +233,15 @@ export interface SessionCloseUserProfileUpdateRequestBody {
   profile_update: SessionCloseUserProfileUpdate
 }
 
+function getSessionCloseProfileUpdateSignature(update: SessionCloseUserProfileUpdate): string {
+  return JSON.stringify({
+    summary: update.summary ?? null,
+    common_scenarios: update.common_scenarios,
+    risky_terms: update.risky_terms,
+    support_strategies: update.support_strategies,
+  })
+}
+
 export function buildSessionCloseUserProfileUpdate(session: Session): SessionCloseUserProfileUpdate | null {
   const metadata = isRecord(session.metadata) ? session.metadata : undefined
   const serverCompactionSessionKind = readString(metadata, 'serverCompactionSessionKind')
@@ -350,12 +359,16 @@ class MemoryService {
   private userId: string | null = null
   private queue: Memory[] = []
   private sessionQueue: Session[] = []
+  private lastProfileUpdateSignature: string | null = null
+  private profileUpdatePromise: Promise<boolean> | null = null
 
   init(userId: string) {
     if (this.userId && this.userId !== userId) {
       this.session = null
       this.queue = []
       this.sessionQueue = []
+      this.lastProfileUpdateSignature = null
+      this.profileUpdatePromise = null
     }
     this.userId = userId
     this.loadSession()
@@ -376,6 +389,8 @@ class MemoryService {
   }
 
   startSession(options: { metadata?: Record<string, unknown> } = {}): Session {
+    this.lastProfileUpdateSignature = null
+    this.profileUpdatePromise = null
     this.session = {
       id: genId(),
       userId: this.userId || 'anon',
@@ -403,7 +418,7 @@ class MemoryService {
   async endSession() {
     if (!this.session) return
     this.session.endTime = Date.now()
-    await this.persistSessionCloseProfileUpdate(this.session)
+    await this.persistCurrentSessionProfileUpdate()
     const shouldPersistSession =
       this.session.turns.length > 0 || this.hasStoredMemoriesForSession(this.session.id)
     if (shouldPersistSession) {
@@ -413,7 +428,46 @@ class MemoryService {
     await this.extractMemories(this.session)
     await this.syncBackend()
     this.session = null
+    this.lastProfileUpdateSignature = null
+    this.profileUpdatePromise = null
     localStorage.removeItem(userKey(this.userId!, KEYS.CURRENT))
+  }
+
+  async persistCurrentSessionProfileUpdate(): Promise<boolean> {
+    if (!this.session || !this.userId) {
+      return false
+    }
+
+    const payload = buildSessionCloseUserProfileUpdateRequestBody(this.userId, this.session)
+    if (!payload) {
+      return true
+    }
+
+    const signature = getSessionCloseProfileUpdateSignature(payload.profile_update)
+    if (signature === this.lastProfileUpdateSignature) {
+      return true
+    }
+
+    if (this.profileUpdatePromise) {
+      return this.profileUpdatePromise
+    }
+
+    const request = this.persistSessionCloseProfileUpdatePayload(payload)
+      .then((persisted) => {
+        if (persisted) {
+          this.lastProfileUpdateSignature = signature
+        }
+
+        return persisted
+      })
+      .finally(() => {
+        if (this.profileUpdatePromise === request) {
+          this.profileUpdatePromise = null
+        }
+      })
+
+    this.profileUpdatePromise = request
+    return request
   }
 
   addTurn(role: 'user' | 'assistant', content: string, opts?: { originalText?: string }): ConversationTurn {
@@ -710,14 +764,11 @@ class MemoryService {
     }
   }
 
-  private async persistSessionCloseProfileUpdate(session: Session): Promise<boolean> {
+  private async persistSessionCloseProfileUpdatePayload(
+    payload: SessionCloseUserProfileUpdateRequestBody,
+  ): Promise<boolean> {
     if (!this.userId) {
       return false
-    }
-
-    const payload = buildSessionCloseUserProfileUpdateRequestBody(this.userId, session)
-    if (!payload) {
-      return true
     }
 
     const token = await getValidToken()

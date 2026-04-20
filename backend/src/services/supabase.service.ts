@@ -66,12 +66,47 @@ export interface UserProfile {
 }
 
 export interface UserProfileMemoryRecord {
+  etiology?: string;
+  severity?: string;
+  document?: string;
   summary?: string;
   common_scenarios?: string[];
   risky_terms?: string[];
   support_strategies?: string[];
   updated_at?: string;
 }
+
+const USER_PROFILE_ETIOLOGY_VALUES = [
+  'unknown',
+  'stroke',
+  'parkinsons',
+  'cerebral_palsy',
+  'brain_injury',
+  'other',
+] as const;
+
+const USER_PROFILE_SEVERITY_VALUES = [
+  'unsure',
+  'mild',
+  'moderate',
+  'severe',
+] as const;
+
+const USER_PROFILE_ETIOLOGY_LABELS: Record<string, string> = {
+  unknown: '病因暂不确定',
+  stroke: '脑卒中相关',
+  parkinsons: '帕金森相关',
+  cerebral_palsy: '脑瘫相关',
+  brain_injury: '脑损伤相关',
+  other: '其他或混合原因',
+};
+
+const USER_PROFILE_SEVERITY_LABELS: Record<string, string> = {
+  unsure: '严重程度待确认',
+  mild: '轻度',
+  moderate: '中度',
+  severe: '重度',
+};
 
 export interface QuickPhrase {
   id?: string;
@@ -131,6 +166,7 @@ export interface ExpressionKitSuggestion {
 }
 
 export interface WorkspaceMemorySnapshot {
+  user_profile_memory: UserProfileMemoryRecord;
   scene_templates: {
     selected_ids: string[];
     library: Array<{
@@ -183,6 +219,12 @@ export interface WorkspaceMemorySnapshot {
         summary: string;
         source_type: 'custom_material' | 'scene_template' | 'user_profile' | 'training_summary';
         required: boolean;
+        default_selected?: boolean;
+        document_content?: string | null;
+        reference_lines?: string[];
+        hotwords?: string[];
+        risky_terms?: string[];
+        support_strategies?: string[];
       }>;
     }>;
     updated_at: string;
@@ -209,6 +251,20 @@ export interface WorkspaceMemorySnapshot {
     training_pairs: PreparedExpressionCorrectionPair[];
     next_step: string | null;
     updated_at: string;
+  };
+  prepared_expression_library: {
+    active_id: string | null;
+    items: Array<{
+      id: string;
+      title: string;
+      summary: string;
+      scene: string | null;
+      source: string;
+      updated_at: string;
+      rehearsal_count: number;
+      last_rehearsed_at: string | null;
+      is_active: boolean;
+    }>;
   };
   prepared_expression: {
     id: string;
@@ -280,6 +336,12 @@ export interface WorkspaceMemorySnapshot {
   synced_at: string;
 }
 
+export interface PreparedExpressionLibraryRecord {
+  active_asset_id: string | null;
+  assets: PreparedExpressionAsset[];
+  updated_at: string;
+}
+
 export interface CommunicationPreferences {
   opening_phrase?: string;
   pace_hint?: string;
@@ -332,6 +394,7 @@ export function normalizeUserProfileMemory(value: unknown): UserProfileMemoryRec
   }
 
   return {
+    document: readString(value, 'document') ?? undefined,
     summary: readString(value, 'summary') ?? undefined,
     common_scenarios: readStringList(value.common_scenarios),
     risky_terms: readStringList(value.risky_terms),
@@ -366,6 +429,17 @@ function dedupeLoadoutItems<T extends { id: string }>(items: Array<T | null | un
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function summarizeLongText(value: string | null | undefined, maxLength = 220): string | null {
+  if (!value || !value.trim()) {
+    return null;
+  }
+
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength).trim()}...`
+    : normalized;
 }
 
 function readStringList(value: unknown): string[] {
@@ -654,7 +728,7 @@ export class SupabaseService {
     }
 
     const now = Date.now();
-    const candidates = data
+    const staleCandidates = data
       .map((row) => {
         const userProfile = row as UserProfile;
         const asset = this.readPreparedExpressionAssetFromProfile(userProfile);
@@ -673,17 +747,90 @@ export class SupabaseService {
           return null;
         }
 
-        const lastGeneratedAt = dailyGeneratedAt || weeklyGeneratedAt || '';
+        const lastGeneratedAt = [dailyGeneratedAt, weeklyGeneratedAt]
+          .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+          .sort()[0] ?? '';
 
         return {
           userId: row.id as string,
+          preparedExpressionId: asset.structured.id,
+          dailyGeneratedAt,
+          weeklyGeneratedAt,
+          dailyStale,
+          weeklyStale,
           lastGeneratedAt,
         };
       })
-      .filter((item): item is { userId: string; lastGeneratedAt: string } => item !== null)
-      .sort((left, right) => left.lastGeneratedAt.localeCompare(right.lastGeneratedAt));
+      .filter((item): item is {
+        userId: string;
+        preparedExpressionId: string;
+        dailyGeneratedAt: string | null;
+        weeklyGeneratedAt: string | null;
+        dailyStale: boolean;
+        weeklyStale: boolean;
+        lastGeneratedAt: string;
+      } => item !== null);
 
-    return candidates.slice(0, limit).map((item) => item.userId);
+    const candidates: Array<{ userId: string; lastGeneratedAt: string }> = [];
+
+    for (const candidate of staleCandidates) {
+      const samples = await this.getPreparedExpressionTrainingSamples(
+        candidate.userId,
+        candidate.preparedExpressionId,
+      );
+      const shouldRefreshDaily =
+        candidate.dailyStale &&
+        this.hasPendingPreparedExpressionSamples(
+          samples,
+          candidate.dailyGeneratedAt,
+          24 * 60 * 60 * 1000,
+          now,
+        );
+      const shouldRefreshWeekly =
+        candidate.weeklyStale &&
+        this.hasPendingPreparedExpressionSamples(
+          samples,
+          candidate.weeklyGeneratedAt,
+          7 * 24 * 60 * 60 * 1000,
+          now,
+        );
+
+      if (!shouldRefreshDaily && !shouldRefreshWeekly) {
+        continue;
+      }
+
+      candidates.push({
+        userId: candidate.userId,
+        lastGeneratedAt: candidate.lastGeneratedAt,
+      });
+    }
+
+    return candidates
+      .sort((left, right) => left.lastGeneratedAt.localeCompare(right.lastGeneratedAt))
+      .slice(0, limit)
+      .map((item) => item.userId);
+  }
+
+  private hasPendingPreparedExpressionSamples(
+    samples: PreparedExpressionTrainingSample[],
+    generatedAt: string | null,
+    windowMs: number,
+    now: number,
+  ): boolean {
+    const generatedAtTime = generatedAt ? new Date(generatedAt).getTime() : null;
+
+    return samples.some((sample) => {
+      const createdAtTime = sample.created_at ? new Date(sample.created_at).getTime() : Number.NaN;
+      if (!Number.isFinite(createdAtTime)) {
+        return false;
+      }
+
+      if (now - createdAtTime > windowMs) {
+        return false;
+      }
+
+      return generatedAtTime === null || createdAtTime > generatedAtTime;
+    });
   }
 
   async saveHotwordProfiles(
@@ -764,6 +911,7 @@ export class SupabaseService {
     const normalizedInput = normalizeUserProfileMemory(input);
     const updatedAt = normalizedInput.updated_at ?? new Date().toISOString();
     const nextProfileMemory: UserProfileMemoryRecord = {
+      document: normalizedInput.document ?? existingProfileMemory.document,
       summary: normalizedInput.summary ?? existingProfileMemory.summary,
       common_scenarios: dedupeStrings(
         [
@@ -811,40 +959,78 @@ export class SupabaseService {
     return this.readUserProfileMemoryFromProfile(userProfile);
   }
 
-  async getPreparedExpressionAsset(userId: string): Promise<PreparedExpressionAsset | null> {
-    const userProfile = await this.getUserProfile(userId);
-    return this.readPreparedExpressionAssetFromProfile(userProfile);
+  async getPreparedExpressionLibrary(userId: string): Promise<PreparedExpressionLibraryRecord> {
+    const userProfile = await this.migratePreparedExpressionLibraryIfNeeded(
+      userId,
+      await this.getUserProfile(userId),
+    );
+    return this.readPreparedExpressionLibraryFromProfile(userProfile);
+  }
+
+  async getPreparedExpressionAsset(
+    userId: string,
+    assetId?: string | null,
+  ): Promise<PreparedExpressionAsset | null> {
+    const userProfile = await this.migratePreparedExpressionLibraryIfNeeded(
+      userId,
+      await this.getUserProfile(userId),
+    );
+    const library = this.readPreparedExpressionLibraryFromProfile(userProfile);
+
+    if (assetId?.trim()) {
+      return library.assets.find((asset) => asset.draft.id === assetId.trim()) ?? null;
+    }
+
+    return this.getActivePreparedExpressionAsset(library);
   }
 
   async savePreparedExpressionAsset(
     userId: string,
     input: {
+      id?: string | null;
       title?: string | null;
       scene?: string | null;
       source?: string | null;
       content: string;
+      make_active?: boolean;
     },
-  ): Promise<PreparedExpressionAsset | null> {
+  ): Promise<PreparedExpressionLibraryRecord> {
     await this.ensureUserProfile(userId);
 
     const userProfile = await this.getUserProfile(userId);
     const existingPreferences = isRecord(userProfile?.preferences)
       ? userProfile.preferences
       : {};
-    const existingAsset = this.readPreparedExpressionAssetFromProfile(userProfile);
+    const existingLibrary = this.readPreparedExpressionLibraryFromProfile(userProfile);
+    const targetAssetId = input.id?.trim() || null;
+    const existingAsset = targetAssetId
+      ? existingLibrary.assets.find((asset) => asset.draft.id === targetAssetId) ?? null
+      : null;
     const nextAsset = createPreparedExpressionAssetFromDraft({
-      id: existingAsset?.draft.id ?? null,
+      id: existingAsset?.draft.id ?? targetAssetId ?? null,
       title: input.title ?? existingAsset?.draft.title ?? null,
       scene: input.scene ?? existingAsset?.draft.scene ?? null,
       source: input.source ?? existingAsset?.draft.source ?? null,
       content: input.content,
       updatedAt: new Date().toISOString(),
     });
-
-    const nextPreferences: JsonRecord = {
-      ...existingPreferences,
-      prepared_expression_asset: nextAsset,
+    const nextAssets = existingAsset
+      ? existingLibrary.assets.map((asset) => (
+          asset.draft.id === nextAsset.draft.id ? nextAsset : asset
+        ))
+      : [nextAsset, ...existingLibrary.assets];
+    const nextLibrary: PreparedExpressionLibraryRecord = {
+      active_asset_id:
+        input.make_active === false
+          ? existingLibrary.active_asset_id
+          : nextAsset.draft.id,
+      assets: nextAssets,
+      updated_at: new Date().toISOString(),
     };
+    const nextPreferences = this.buildPreparedExpressionPreferences(
+      existingPreferences,
+      nextLibrary,
+    );
 
     const updated = await this.updateUserProfile(userId, {
       preferences: nextPreferences,
@@ -857,44 +1043,98 @@ export class SupabaseService {
       ),
     });
 
-    if (!updated) {
-      return null;
-    }
-
-    return this.readPreparedExpressionAssetFromProfile(updated);
+    return updated
+      ? this.readPreparedExpressionLibraryFromProfile(updated)
+      : nextLibrary;
   }
 
-  async deletePreparedExpressionAsset(userId: string): Promise<void> {
+  async setActivePreparedExpressionAsset(
+    userId: string,
+    assetId: string,
+  ): Promise<PreparedExpressionLibraryRecord> {
     await this.ensureUserProfile(userId);
 
     const userProfile = await this.getUserProfile(userId);
     const existingPreferences = isRecord(userProfile?.preferences)
       ? userProfile.preferences
       : {};
-    const nextPreferences: JsonRecord = {
-      ...existingPreferences,
-    };
+    const existingLibrary = this.readPreparedExpressionLibraryFromProfile(userProfile);
+    const normalizedAssetId = assetId.trim();
+    const assetExists = existingLibrary.assets.some((asset) => asset.draft.id === normalizedAssetId);
 
-    delete nextPreferences.prepared_expression_asset;
+    if (!assetExists) {
+      return existingLibrary;
+    }
+
+    const nextLibrary: PreparedExpressionLibraryRecord = {
+      active_asset_id: normalizedAssetId,
+      assets: existingLibrary.assets,
+      updated_at: new Date().toISOString(),
+    };
+    const nextPreferences = this.buildPreparedExpressionPreferences(
+      existingPreferences,
+      nextLibrary,
+    );
+
+    const updated = await this.updateUserProfile(userId, {
+      preferences: nextPreferences,
+    });
+
+    return updated
+      ? this.readPreparedExpressionLibraryFromProfile(updated)
+      : nextLibrary;
+  }
+
+  async deletePreparedExpressionAsset(
+    userId: string,
+    assetId?: string | null,
+  ): Promise<PreparedExpressionLibraryRecord> {
+    await this.ensureUserProfile(userId);
+
+    const userProfile = await this.getUserProfile(userId);
+    const existingPreferences = isRecord(userProfile?.preferences)
+      ? userProfile.preferences
+      : {};
+    const existingLibrary = this.readPreparedExpressionLibraryFromProfile(userProfile);
+    const targetAssetId = assetId?.trim() || existingLibrary.active_asset_id;
+    const remainingAssets = targetAssetId
+      ? existingLibrary.assets.filter((asset) => asset.draft.id !== targetAssetId)
+      : [];
+    const nextLibrary: PreparedExpressionLibraryRecord = {
+      active_asset_id: remainingAssets[0]?.draft.id ?? null,
+      assets: remainingAssets,
+      updated_at: new Date().toISOString(),
+    };
+    const nextPreferences = this.buildPreparedExpressionPreferences(
+      existingPreferences,
+      nextLibrary,
+    );
 
     await this.updateUserProfile(userId, {
       preferences: nextPreferences,
     });
+
+    return nextLibrary;
   }
 
   async summarizePreparedExpressionAsset(
     userId: string,
     trigger: PreparedExpressionSummaryTrigger = 'manual',
-  ): Promise<PreparedExpressionAsset | null> {
+    assetId?: string | null,
+  ): Promise<PreparedExpressionLibraryRecord> {
     await this.ensureUserProfile(userId);
 
     const userProfile = await this.getUserProfile(userId);
     const existingPreferences = isRecord(userProfile?.preferences)
       ? userProfile.preferences
       : {};
-    const existingAsset = this.readPreparedExpressionAssetFromProfile(userProfile);
+    const existingLibrary = this.readPreparedExpressionLibraryFromProfile(userProfile);
+    const targetAsset = assetId?.trim()
+      ? existingLibrary.assets.find((asset) => asset.draft.id === assetId.trim()) ?? null
+      : this.getActivePreparedExpressionAsset(existingLibrary);
+    const existingAsset = targetAsset;
     if (!existingAsset) {
-      return null;
+      return existingLibrary;
     }
     const samples = await this.getPreparedExpressionTrainingSamples(
       userId,
@@ -906,10 +1146,17 @@ export class SupabaseService {
       trigger,
     );
 
-    const nextPreferences: JsonRecord = {
-      ...existingPreferences,
-      prepared_expression_asset: summarized,
+    const nextLibrary: PreparedExpressionLibraryRecord = {
+      active_asset_id: existingLibrary.active_asset_id,
+      assets: existingLibrary.assets.map((asset) => (
+        asset.draft.id === summarized.draft.id ? summarized : asset
+      )),
+      updated_at: new Date().toISOString(),
     };
+    const nextPreferences = this.buildPreparedExpressionPreferences(
+      existingPreferences,
+      nextLibrary,
+    );
 
     const updated = await this.updateUserProfile(userId, {
       preferences: nextPreferences,
@@ -922,11 +1169,9 @@ export class SupabaseService {
       ),
     });
 
-    if (!updated) {
-      return null;
-    }
-
-    return this.readPreparedExpressionAssetFromProfile(updated);
+    return updated
+      ? this.readPreparedExpressionLibraryFromProfile(updated)
+      : nextLibrary;
   }
 
   // === Sessions ===
@@ -1146,8 +1391,105 @@ export class SupabaseService {
   private readPreparedExpressionAssetFromProfile(
     userProfile: UserProfile | null,
   ): PreparedExpressionAsset | null {
+    return this.getActivePreparedExpressionAsset(
+      this.readPreparedExpressionLibraryFromProfile(userProfile),
+    );
+  }
+
+  private readLegacyPreparedExpressionAssetFromProfile(
+    userProfile: UserProfile | null,
+  ): PreparedExpressionAsset | null {
     const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
     return normalizePreparedExpressionAsset(preferences?.prepared_expression_asset);
+  }
+
+  private readPreparedExpressionLibraryFromProfile(
+    userProfile: UserProfile | null,
+  ): PreparedExpressionLibraryRecord {
+    const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
+    const libraryValue = isRecord(preferences?.prepared_expression_assets)
+      ? preferences.prepared_expression_assets
+      : undefined;
+    const assetsSource = Array.isArray(libraryValue?.assets)
+      ? libraryValue.assets
+      : [];
+    const assets = assetsSource
+      .map((asset) => normalizePreparedExpressionAsset(asset))
+      .filter((asset): asset is PreparedExpressionAsset => Boolean(asset));
+    const legacyAsset = assets.length > 0
+      ? null
+      : this.readLegacyPreparedExpressionAssetFromProfile(userProfile);
+    const normalizedAssets = legacyAsset ? [legacyAsset] : assets;
+    const activeAssetId = readString(libraryValue, 'active_asset_id');
+    const normalizedActiveAssetId =
+      activeAssetId && normalizedAssets.some((asset) => asset.draft.id === activeAssetId)
+        ? activeAssetId
+        : normalizedAssets[0]?.draft.id ?? null;
+
+    return {
+      active_asset_id: normalizedActiveAssetId,
+      assets: normalizedAssets,
+      updated_at:
+        readString(libraryValue, 'updated_at')
+        ?? normalizedAssets[0]?.draft.updated_at
+        ?? new Date().toISOString(),
+    };
+  }
+
+  private async migratePreparedExpressionLibraryIfNeeded(
+    userId: string,
+    userProfile: UserProfile | null,
+  ): Promise<UserProfile | null> {
+    const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
+    const libraryValue = isRecord(preferences?.prepared_expression_assets)
+      ? preferences.prepared_expression_assets
+      : undefined;
+    const hasNewLibrary = Array.isArray(libraryValue?.assets) && libraryValue.assets.length > 0;
+    const legacyAsset = this.readLegacyPreparedExpressionAssetFromProfile(userProfile);
+
+    if (hasNewLibrary || !legacyAsset) {
+      return userProfile;
+    }
+
+    const nextPreferences = this.buildPreparedExpressionPreferences(
+      preferences ?? {},
+      {
+        active_asset_id: legacyAsset.draft.id,
+        assets: [legacyAsset],
+        updated_at: legacyAsset.draft.updated_at ?? new Date().toISOString(),
+      },
+    );
+
+    return this.updateUserProfile(userId, {
+      preferences: nextPreferences,
+    });
+  }
+
+  private getActivePreparedExpressionAsset(
+    library: PreparedExpressionLibraryRecord,
+  ): PreparedExpressionAsset | null {
+    if (!library.active_asset_id) {
+      return library.assets[0] ?? null;
+    }
+
+    return library.assets.find((asset) => asset.draft.id === library.active_asset_id) ?? library.assets[0] ?? null;
+  }
+
+  private buildPreparedExpressionPreferences(
+    existingPreferences: JsonRecord,
+    library: PreparedExpressionLibraryRecord,
+  ): JsonRecord {
+    const nextPreferences: JsonRecord = {
+      ...existingPreferences,
+      prepared_expression_assets: {
+        active_asset_id: library.active_asset_id,
+        assets: library.assets,
+        updated_at: library.updated_at,
+      },
+    };
+
+    delete nextPreferences.prepared_expression_asset;
+    return nextPreferences;
   }
 
   private readUserProfileMemoryFromProfile(
@@ -1232,17 +1574,26 @@ export class SupabaseService {
     userId: string,
     options: { sceneId?: WorkspaceSceneId } = {},
   ): Promise<WorkspaceMemorySnapshot> {
-    const [profileSnapshot, userProfile, quickPhrases] = await Promise.all([
+    const [profileSnapshot, rawUserProfile, quickPhrases] = await Promise.all([
       this.getUserMemoryProfile(userId, 400, 120),
       this.getUserProfile(userId),
       this.getUserPhrases(userId, undefined, 40),
     ]);
+    const userProfile = await this.migratePreparedExpressionLibraryIfNeeded(
+      userId,
+      rawUserProfile,
+    );
 
     const syncedAt = new Date().toISOString();
     const preparedExpression = this.buildPreparedExpressionSnapshot(profileSnapshot, userProfile, syncedAt);
+    const preparedExpressionLibrary = this.buildPreparedExpressionLibrarySnapshot(
+      profileSnapshot,
+      userProfile,
+    );
     const selectedSceneTemplateIds = this.getSelectedSceneTemplateIdsFromProfile(userProfile);
 
     return {
+      user_profile_memory: this.readUserProfileMemoryFromProfile(userProfile),
       scene_templates: {
         selected_ids: selectedSceneTemplateIds,
         library: this.getSceneTemplateCatalog(),
@@ -1272,6 +1623,7 @@ export class SupabaseService {
         syncedAt,
         preparedExpression,
       ),
+      prepared_expression_library: preparedExpressionLibrary,
       prepared_expression: preparedExpression,
       expression_kit: this.buildExpressionKit(
         profileSnapshot,
@@ -1298,27 +1650,30 @@ export class SupabaseService {
     const userProfileMemory = this.readUserProfileMemoryFromProfile(userProfile);
     const growthProfile = snapshot.growth_profile;
 
-    const customMaterialsItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
-    if (preparedExpression) {
-      const preferredTrainingSummary = this.getPreparedExpressionTrainingSummary(preparedExpression);
-      customMaterialsItems.push({
-        id: preparedExpression.id,
-        type: 'custom_material',
-        title: preparedExpression.title,
-        summary: preparedExpression.summary,
-        tags: dedupeStrings(
-          [
-            preparedExpression.scene,
-            preferredTrainingSummary?.next_focus[0],
-            preparedExpression.high_risk_phrases[0],
-          ].filter((value): value is string => typeof value === 'string' && value.length > 0),
-          4,
-        ),
-        load_behavior: 'manual',
-        editable: true,
-        updated_at: preparedExpression.updated_at,
+    const preparedExpressionLibrary = this.readPreparedExpressionLibraryFromProfile(userProfile);
+    const customMaterialsItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] =
+      preparedExpressionLibrary.assets.map((asset) => {
+        const preferredTrainingSummary = this.getPreferredTrainingSummary(asset);
+        const isActive = preparedExpressionLibrary.active_asset_id === asset.draft.id;
+        return {
+          id: asset.draft.id,
+          type: 'custom_material' as const,
+          title: asset.draft.title,
+          summary: preferredTrainingSummary?.summary ?? asset.structured.summary,
+          tags: dedupeStrings(
+            [
+              isActive ? '当前加载' : null,
+              asset.draft.scene,
+              preferredTrainingSummary?.nextFocus[0],
+              asset.structured.highRiskPhrases[0],
+            ].filter((value): value is string => typeof value === 'string' && value.length > 0),
+            4,
+          ),
+          load_behavior: isActive ? 'manual' : 'recommended',
+          editable: true,
+          updated_at: asset.draft.updated_at,
+        };
       });
-    }
 
     const sceneTemplateItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] =
       selectedSceneTemplateIds
@@ -1344,6 +1699,7 @@ export class SupabaseService {
 
     const userProfileItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
     if (
+      userProfileMemory.document ||
       userProfileMemory.summary ||
       userProfileMemory.common_scenarios?.length ||
       userProfileMemory.risky_terms?.length ||
@@ -1355,6 +1711,7 @@ export class SupabaseService {
         type: 'user_profile',
         title: '用户个人画像',
         summary:
+          summarizeLongText(userProfileMemory.document) ||
           userProfileMemory.summary ||
           growthProfile.nextStep ||
           `当前最值得继续盯住的是：${growthProfile.frequentFocus[0]?.label ?? '稳定表达'}`,
@@ -1438,8 +1795,8 @@ export class SupabaseService {
       {
         id: 'custom_materials',
         title: '自定义材料区',
-        description: '用户自己维护的稿件、提纲和本次表达材料。',
-        empty_state: '这里还没有自定义材料，先保存第一份准备稿。',
+        description: '用户自己维护的材料库。选择一份作为当前加载材料，其余文档继续保留在库里。',
+        empty_state: '这里还没有自定义材料，先新建第一份参考文档。',
         items: customMaterialsItems,
       },
       {
@@ -1479,6 +1836,8 @@ export class SupabaseService {
       preferences?.communication_preferences,
     );
     const userProfileMemory = this.readUserProfileMemoryFromProfile(userProfile);
+    const preparedExpressionLibrary = this.readPreparedExpressionLibraryFromProfile(userProfile);
+    const sceneTemplateLibrary = this.getSceneTemplateCatalog();
     const recommendedMode: 'urgent' | 'long_form' =
       preparedExpression?.document_content && preparedExpression.document_content.length > 120
         ? 'long_form'
@@ -1489,6 +1848,7 @@ export class SupabaseService {
         id: 'loadout-profile-summary',
         title: '用户个人画像',
         summary:
+          summarizeLongText(userProfileMemory.document) ||
           userProfileMemory.summary ||
           snapshot.growth_profile.nextStep ||
           snapshot.growth_profile.frequentFocus[0]?.label ||
@@ -1507,33 +1867,43 @@ export class SupabaseService {
 
     const scenePackItems: WorkspaceMemorySnapshot['communication_loadout']['sections'][number]['items'] =
       dedupeLoadoutItems([
-        ...selectedSceneTemplateIds
-          .map((templateId) => getSceneTemplateById(templateId))
-          .filter((template): template is SceneTemplateDefinition => template !== null)
-          .map((template) => ({
-            id: `loadout-template-${template.id}`,
-            title: template.title,
-            summary: `${template.communication_goal} 当前优先词：${template.hotwords.slice(0, 3).map((entry) => entry.phrase).join('、')}`,
-            source_type: 'scene_template' as const,
-            required: false,
-          })),
-        sceneId ? {
-          id: `loadout-scene-${sceneId}`,
-          title: `当前场景：${sceneId}`,
-          summary: '当前场景会决定模板、热词和表达优先级。',
+        ...sceneTemplateLibrary.map((template) => ({
+          id: `loadout-template-${template.id}`,
+          title: template.title,
+          summary: `${template.communication_goal} 当前优先词：${template.hotwords.slice(0, 3).map((entry) => entry.phrase).join('、')}`,
           source_type: 'scene_template' as const,
           required: false,
-        } : null,
+          default_selected: selectedSceneTemplateIds.includes(template.id),
+          hotwords: template.hotwords.map((entry) => entry.phrase),
+          risky_terms: template.risky_terms,
+          support_strategies: template.support_strategies,
+        })),
       ]);
 
     const customMaterialItems: WorkspaceMemorySnapshot['communication_loadout']['sections'][number]['items'] = dedupeLoadoutItems([
-      preparedExpression ? {
-        id: `loadout-material-${preparedExpression.id}`,
-        title: preparedExpression.title,
-        summary: preparedExpression.summary,
-        source_type: 'custom_material',
+      ...preparedExpressionLibrary.assets.map((asset) => ({
+        id: `loadout-material-${asset.draft.id}`,
+        title: asset.draft.title,
+        summary: asset.structured.summary,
+        source_type: 'custom_material' as const,
         required: false,
-      } : null,
+        default_selected: preparedExpressionLibrary.active_asset_id === asset.draft.id,
+        document_content: asset.draft.content,
+        reference_lines: dedupeStrings(
+          buildPreparedExpressionReferenceLines(asset.structured, {
+            maxLines: 40,
+            maxChars: 1800,
+          }),
+          40,
+        ),
+        hotwords: dedupeStrings(
+          [
+            ...asset.structured.hotwords,
+            ...asset.structured.sections.flatMap((section) => section.hotwords),
+          ],
+          10,
+        ),
+      })),
     ]);
 
     const trainingSummaryItems: WorkspaceMemorySnapshot['communication_loadout']['sections'][number]['items'] = dedupeLoadoutItems([
@@ -2015,6 +2385,14 @@ export class SupabaseService {
       const trainingVolume = growthProfile.stats.totalTrainingAttempts;
       const clarity = growthProfile.stats.rollingClarityAverage;
 
+      if (userProfileMemory.document) {
+        return summarizeLongText(userProfileMemory.document, 260) ?? userProfileMemory.document;
+      }
+
+      if (userProfileMemory.summary) {
+        return userProfileMemory.summary;
+      }
+
       if (focus && confusion) {
         return `你现在已经有比较稳定的个人表达规律：常见重点会落在“${focus}”，系统最容易听偏的是“${confusion}”。${
           trainingVolume > 0
@@ -2025,10 +2403,6 @@ export class SupabaseService {
 
       if (communicationPreferences.opening_phrase || communicationPreferences.pace_hint) {
         return '你已经开始形成自己的沟通方式：先用固定开场白稳住节奏，再告诉对方怎样配合你，这会比临场硬撑更有效。';
-      }
-
-      if (userProfileMemory.summary) {
-        return userProfileMemory.summary;
       }
 
       if (preparedExpression) {
@@ -2251,6 +2625,45 @@ export class SupabaseService {
         : null,
       sections,
       updated_at: syncedAt,
+    };
+  }
+
+  private buildPreparedExpressionLibrarySnapshot(
+    snapshot: MemoryProfileSnapshot,
+    userProfile: UserProfile | null,
+  ): WorkspaceMemorySnapshot['prepared_expression_library'] {
+    const library = this.readPreparedExpressionLibraryFromProfile(userProfile);
+
+    return {
+      active_id: library.active_asset_id,
+      items: library.assets.map((asset) => {
+        const relatedTrainingMemories = snapshot.memories
+          .filter((memory) => {
+            const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+            return (
+              readString(metadata, 'kind') === 'training_result' &&
+              readString(metadata, 'prepared_expression_id') === asset.structured.id
+            );
+          })
+          .sort((left, right) => {
+            const leftTime = new Date(left.created_at ?? 0).getTime();
+            const rightTime = new Date(right.created_at ?? 0).getTime();
+            return rightTime - leftTime;
+          });
+        const preferredTrainingSummary = this.getPreferredTrainingSummary(asset);
+
+        return {
+          id: asset.draft.id,
+          title: asset.draft.title,
+          summary: preferredTrainingSummary?.summary ?? asset.structured.summary,
+          scene: asset.draft.scene,
+          source: asset.draft.source,
+          updated_at: asset.draft.updated_at,
+          rehearsal_count: relatedTrainingMemories.length,
+          last_rehearsed_at: relatedTrainingMemories[0]?.created_at ?? null,
+          is_active: library.active_asset_id === asset.draft.id,
+        };
+      }),
     };
   }
 

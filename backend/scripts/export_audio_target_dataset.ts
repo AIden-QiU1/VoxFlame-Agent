@@ -15,9 +15,17 @@ interface ScriptOptions {
   batchId?: string
 }
 
+interface SpeakerProfileLabels {
+  condition?: string
+  etiology?: string
+  severity?: string
+  priority?: string
+}
+
 interface AudioTargetEntry {
   audio: string
   target: string
+  speaker_profile?: SpeakerProfileLabels
 }
 
 interface VoiceContributionExportRow {
@@ -26,6 +34,11 @@ interface VoiceContributionExportRow {
   audio_path: string
   transcript: string
   metadata: Record<string, unknown> | null
+}
+
+interface UserProfileExportRow {
+  condition: string | null
+  preferences: Record<string, unknown> | null
 }
 
 function parseArgs(argv: string[]): ScriptOptions {
@@ -101,6 +114,64 @@ function buildLocalAudioFilename(recordingId: string, objectPath: string): strin
   return `${recordingId}${ext}`
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function readString(record: Record<string, unknown> | null | undefined, key: string): string | null {
+  const value = record?.[key]
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function normalizeSpeakerProfileLabels(
+  labels: SpeakerProfileLabels,
+): SpeakerProfileLabels | undefined {
+  const normalized = Object.fromEntries(
+    Object.entries(labels).filter(([, value]) => typeof value === 'string' && value.trim().length > 0),
+  ) as SpeakerProfileLabels
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined
+}
+
+function readSpeakerProfileFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): SpeakerProfileLabels | undefined {
+  const guidanceProfile = isRecord(metadata?.training_guidance_profile)
+    ? metadata?.training_guidance_profile as Record<string, unknown>
+    : null
+
+  return normalizeSpeakerProfileLabels({
+    etiology: readString(guidanceProfile, 'etiology') ?? undefined,
+    severity: readString(guidanceProfile, 'severity') ?? undefined,
+    priority: readString(guidanceProfile, 'priority') ?? undefined,
+  })
+}
+
+function readSpeakerProfileFromUserProfile(
+  userProfile: UserProfileExportRow | null,
+): SpeakerProfileLabels | undefined {
+  const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : null
+  const profileMemory = isRecord(preferences?.user_profile_memory)
+    ? preferences?.user_profile_memory as Record<string, unknown>
+    : null
+  const guidanceProfile = isRecord(preferences?.training_guidance_profile)
+    ? preferences?.training_guidance_profile as Record<string, unknown>
+    : null
+
+  return normalizeSpeakerProfileLabels({
+    condition: userProfile?.condition?.trim() || undefined,
+    etiology:
+      readString(profileMemory, 'etiology')
+      ?? readString(guidanceProfile, 'etiology')
+      ?? undefined,
+    severity:
+      readString(profileMemory, 'severity')
+      ?? readString(guidanceProfile, 'severity')
+      ?? undefined,
+    priority: readString(guidanceProfile, 'priority') ?? undefined,
+  })
+}
+
 async function resolveUserId(
   supabase: any,
   email: string,
@@ -139,6 +210,14 @@ async function main() {
     }
   }
 
+  const userProfile = userId
+    ? (() => supabase
+      .from('user_profiles')
+      .select('condition, preferences')
+      .eq('id', userId)
+      .maybeSingle())()
+    : null
+
   const batchId = options.batchId || `audio_target_export_${new Date().toISOString().replace(/[:.]/g, '-')}`
   const outputDir = options.outputDir
     ? path.resolve(options.outputDir)
@@ -163,6 +242,14 @@ async function main() {
     throw error
   }
 
+  const userProfileResult = userProfile ? await userProfile : null
+  if (userProfileResult?.error) {
+    throw userProfileResult.error
+  }
+  const defaultSpeakerProfile = readSpeakerProfileFromUserProfile(
+    (userProfileResult?.data ?? null) as UserProfileExportRow | null,
+  )
+
   const entries = ((data || []) as VoiceContributionExportRow[]).map((row) => {
     const metadata = row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
       ? row.metadata
@@ -179,6 +266,7 @@ async function main() {
       audioPath: row.audio_path,
       targetText,
       recordingId,
+      speakerProfile: readSpeakerProfileFromMetadata(metadata) ?? defaultSpeakerProfile,
     }
   })
 
@@ -195,6 +283,7 @@ async function main() {
     rows.push({
       audio: path.posix.join('audio', localFilename),
       target: entry.targetText,
+      ...(entry.speakerProfile ? { speaker_profile: entry.speakerProfile } : {}),
     })
   }
 

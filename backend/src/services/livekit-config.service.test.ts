@@ -37,18 +37,25 @@ function withEnv(
 
 async function runLiveKitConfigTests(): Promise<void> {
   assert.equal(
-    deriveRtcBrowserWebSocketUrl('http://localhost:3000'),
-    'ws://localhost:3000',
+    deriveRtcBrowserWebSocketUrl('ws://localhost:7880', 'http://localhost:3000'),
+    'ws://localhost:7880',
   )
   assert.equal(
-    deriveRtcBrowserWebSocketUrl('https://111.230.35.89'),
-    'wss://111.230.35.89',
+    deriveRtcBrowserWebSocketUrl('ws://livekit-server:7880', 'https://111.230.35.89'),
+    'wss://111.230.35.89:7880',
   )
   assert.equal(
-    deriveRtcBrowserWebSocketUrl('https://111.230.35.89/?mode=communicate'),
-    'wss://111.230.35.89',
+    deriveRtcBrowserWebSocketUrl(
+      'ws://127.0.0.1:7880',
+      'https://111.230.35.89/?mode=communicate',
+    ),
+    'wss://111.230.35.89:7880',
   )
-  assert.equal(deriveRtcBrowserWebSocketUrl('ws://localhost:3000'), null)
+  assert.equal(
+    deriveRtcBrowserWebSocketUrl('wss://livekit.example.com', 'https://111.230.35.89'),
+    null,
+  )
+  assert.equal(deriveRtcBrowserWebSocketUrl('ws://localhost:7880', undefined), null)
 
   withEnv(
     {

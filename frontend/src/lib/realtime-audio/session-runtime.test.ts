@@ -211,10 +211,16 @@ test('session-runtime writes session userdata ack memory summary into current se
   const harness = createStateHarness()
   const latestTranscriptRef = { current: '' }
   const metadataUpdates: Array<Record<string, unknown>> = []
+  let persistCalls = 0
   const originalUpdateCurrentSessionMetadata = memoryService.updateCurrentSessionMetadata
+  const originalPersistCurrentSessionProfileUpdate = memoryService.persistCurrentSessionProfileUpdate
   memoryService.updateCurrentSessionMetadata = ((metadata: Record<string, unknown>) => {
     metadataUpdates.push(metadata)
   }) as typeof memoryService.updateCurrentSessionMetadata
+  memoryService.persistCurrentSessionProfileUpdate = (async () => {
+    persistCalls += 1
+    return true
+  }) as typeof memoryService.persistCurrentSessionProfileUpdate
 
   try {
     const handleMessage = createDecodedRtcMessageHandler({
@@ -247,9 +253,11 @@ test('session-runtime writes session userdata ack memory summary into current se
     })
   } finally {
     memoryService.updateCurrentSessionMetadata = originalUpdateCurrentSessionMetadata
+    memoryService.persistCurrentSessionProfileUpdate = originalPersistCurrentSessionProfileUpdate
   }
 
   assert.equal(metadataUpdates.length, 1)
+  assert.equal(persistCalls, 1)
   assert.equal(metadataUpdates[0].serverCurrentTurnState, 'idle')
   assert.equal(metadataUpdates[0].serverTurnCount, 4)
   assert.equal(metadataUpdates[0].serverContextRevision, 3)

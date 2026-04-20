@@ -123,16 +123,23 @@ function resolveBrowserLiveKitUrl(serverUrl: string): string {
   try {
     const target = new URL(serverUrl)
     const page = new URL(window.location.origin)
+    const normalizedTargetHost = target.hostname.toLowerCase()
     const isLoopbackTarget =
-      target.hostname === 'localhost' || target.hostname === '127.0.0.1'
-    const isLoopbackPage =
-      page.hostname === 'localhost' || page.hostname === '127.0.0.1'
+      normalizedTargetHost === 'localhost' ||
+      normalizedTargetHost === '127.0.0.1' ||
+      normalizedTargetHost === '::1'
+    const isDockerOnlyHost = normalizedTargetHost === 'livekit-server'
 
-    if (!isLoopbackTarget || !isLoopbackPage) {
+    if (!isLoopbackTarget && !isDockerOnlyHost) {
       return serverUrl
     }
 
-    return `${page.protocol === 'https:' ? 'wss:' : 'ws:'}//${page.host}`
+    target.protocol = page.protocol === 'https:' ? 'wss:' : 'ws:'
+    target.hostname = page.hostname
+    target.pathname = ''
+    target.search = ''
+    target.hash = ''
+    return target.toString().replace(/\/$/, '')
   } catch {
     return serverUrl
   }

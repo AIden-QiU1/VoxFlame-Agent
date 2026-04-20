@@ -341,6 +341,13 @@ export function createDecodedRtcMessageHandler({
         const compactionCandidate = isRecord(message.compaction_candidate)
           ? message.compaction_candidate
           : undefined
+        const hasCompactionCandidate = Boolean(
+          (typeof compactionCandidate?.summary === 'string' && compactionCandidate.summary.trim().length > 0)
+          || (Array.isArray(compactionCandidate?.risky_terms) && compactionCandidate.risky_terms.length > 0)
+          || (Array.isArray(compactionCandidate?.support_strategies) && compactionCandidate.support_strategies.length > 0)
+          || (Array.isArray(compactionCandidate?.recent_user_intents) && compactionCandidate.recent_user_intents.length > 0)
+          || (Array.isArray(compactionCandidate?.recent_confirmed_phrases) && compactionCandidate.recent_confirmed_phrases.length > 0),
+        )
 
         memoryService.updateCurrentSessionMetadata({
           serverCurrentTurnState:
@@ -404,6 +411,9 @@ export function createDecodedRtcMessageHandler({
               ? compactionCandidate.recent_confirmed_phrases.filter((item): item is string => typeof item === 'string')
               : undefined,
         })
+        if (hasCompactionCandidate) {
+          void memoryService.persistCurrentSessionProfileUpdate()
+        }
 
         setState((prev) => ({
           ...prev,

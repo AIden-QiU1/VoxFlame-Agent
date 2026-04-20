@@ -98,6 +98,14 @@ export interface PreparedExpressionSnapshot {
 }
 
 export interface WorkspaceMemorySnapshot {
+  user_profile_memory: {
+    document?: string
+    summary?: string
+    common_scenarios: string[]
+    risky_terms: string[]
+    support_strategies: string[]
+    updated_at?: string
+  }
   scene_templates: {
     selected_ids: string[]
     library: Array<{
@@ -150,6 +158,12 @@ export interface WorkspaceMemorySnapshot {
         summary: string
         source_type: 'custom_material' | 'scene_template' | 'user_profile' | 'training_summary'
         required: boolean
+        default_selected?: boolean
+        document_content?: string | null
+        reference_lines?: string[]
+        hotwords?: string[]
+        risky_terms?: string[]
+        support_strategies?: string[]
       }>
     }>
     updated_at: string
@@ -188,6 +202,20 @@ export interface WorkspaceMemorySnapshot {
     training_pairs: PreparedExpressionCorrectionPair[]
     next_step: string | null
     updated_at: string
+  }
+  prepared_expression_library: {
+    active_id: string | null
+    items: Array<{
+      id: string
+      title: string
+      summary: string
+      scene: string | null
+      source: string
+      updated_at: string
+      rehearsal_count: number
+      last_rehearsed_at: string | null
+      is_active: boolean
+    }>
   }
   prepared_expression: PreparedExpressionSnapshot | null
   expression_kit: {

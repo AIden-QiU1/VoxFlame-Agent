@@ -82,30 +82,61 @@ function buildPreparationContextUpdate(
     (entry) => entry.item.source_type === 'scene_template',
   )
 
+  const selectedCustomMaterials = selectedLoadoutEntries
+    .filter((entry) => entry.item.source_type === 'custom_material')
+    .map((entry) => entry.item)
+  const selectedSceneTemplates = selectedLoadoutEntries
+    .filter((entry) => entry.item.source_type === 'scene_template')
+    .map((entry) => entry.item)
+
   const documentContent =
     includesCustomMaterial
-      ? (
-        preparation?.document_content?.trim()
+      ? Array.from(
+        new Set(
+          selectedCustomMaterials
+            .map((item) => item.document_content?.trim() || '')
+            .filter(Boolean),
+        ),
+      ).join('\n\n')
+        || preparation?.document_content?.trim()
         || preparedExpression?.document_content?.trim()
         || ''
-      )
       : ''
-  const referenceLinesSource = preparation?.reference_lines?.length
-    ? preparation.reference_lines
-    : (preparedExpression?.reference_lines ?? [])
   const referenceLines = includesCustomMaterial
     ? Array.from(
-      new Set(referenceLinesSource.map((line) => line.trim()).filter(Boolean)),
+      new Set(
+        [
+          ...selectedCustomMaterials.flatMap((item) => item.reference_lines ?? []),
+          ...(preparation?.reference_lines ?? []),
+          ...(preparedExpression?.reference_lines ?? []),
+        ]
+          .map((line) => line.trim())
+          .filter(Boolean),
+      ),
     ).slice(0, 16)
     : []
   const hotwords = includesSceneTemplate
     ? Array.from(
-      new Set((preparation?.hotwords ?? []).map((item) => item.trim()).filter(Boolean)),
+      new Set(
+        [
+          ...selectedSceneTemplates.flatMap((item) => item.hotwords ?? []),
+          ...(preparation?.hotwords ?? []),
+        ]
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
     ).slice(0, 8)
     : []
   const riskyTerms = includesSceneTemplate
     ? Array.from(
-      new Set((preparation?.risky_terms ?? []).map((item) => item.trim()).filter(Boolean)),
+      new Set(
+        [
+          ...selectedSceneTemplates.flatMap((item) => item.risky_terms ?? []),
+          ...(preparation?.risky_terms ?? []),
+        ]
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
     ).slice(0, 6)
     : []
   const loadoutItems = Array.from(
@@ -138,6 +169,7 @@ function buildPreparationContextUpdate(
   )
   const supportStrategies = Array.from(
     new Set([
+      ...selectedSceneTemplates.flatMap((item) => item.support_strategies ?? []),
       ...(preparation?.support_strategies ?? []),
       '优先先说关键词和关键诉求，再决定是否展开补充。',
     ].filter(Boolean)),
@@ -173,7 +205,7 @@ function buildDefaultSelectedLoadoutItemIds(
 
   return loadout.sections.flatMap((section) => (
     section.items
-      .filter((item) => item.required)
+      .filter((item) => item.required || item.default_selected)
       .map((item) => item.id)
   ))
 }
@@ -229,7 +261,6 @@ export default function ChatInterface({
   const [selectedLoadoutItemIds, setSelectedLoadoutItemIds] = useState<string[]>([])
   const {
     snapshot: workspaceSnapshot,
-    isLoading: isWorkspaceLoading,
   } = useWorkspaceMemorySnapshot({
     userId,
     isAuthenticated,
@@ -394,10 +425,6 @@ export default function ChatInterface({
   const selectableLoadoutSections = useMemo(
     () => communicationLoadout?.sections
       .filter((section) => section.id === 'scene_pack' || section.id === 'custom_materials')
-      .map((section) => ({
-        ...section,
-        items: section.items.filter((item) => !item.id.startsWith('loadout-scene-')),
-      }))
       .filter((section) => section.items.length > 0) ?? [],
     [communicationLoadout],
   )
@@ -411,7 +438,7 @@ export default function ChatInterface({
       .filter((entry) => entry.sourceType === 'custom_material')
       .map((entry) => entry.title)
     const selectedSceneTemplates = selectedLoadoutEntries
-      .filter((entry) => entry.sourceType === 'scene_template' && !entry.title.startsWith('当前场景：'))
+      .filter((entry) => entry.sourceType === 'scene_template')
       .map((entry) => entry.title)
 
     const resultLines = [
@@ -790,32 +817,6 @@ export default function ChatInterface({
                   ))}
                 </div>
               </div>
-            </section>
-          ) : null}
-
-          {communicationLoadout ? (
-            <section className="rounded-[28px] border border-stone-200 bg-stone-100 p-5 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-medium text-stone-700">本次资料选择</div>
-                  <p className="mt-1 text-sm leading-6 text-stone-600">
-                    自定义材料和场景模板会直接决定这次沟通带进去的上下文。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowPhrasesPanel(true)}
-                  className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950"
-                >
-                  编辑表达工具箱
-                </button>
-              </div>
-
-              {isWorkspaceLoading ? (
-                <div className="mt-4 rounded-3xl border border-stone-200 bg-white px-4 py-4 text-sm text-stone-600">
-                  正在同步本次资料...
-                </div>
-              ) : null}
             </section>
           ) : null}
 

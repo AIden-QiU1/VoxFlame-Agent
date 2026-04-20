@@ -10,15 +10,17 @@ import {
   type ReactNode,
 } from 'react'
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Loader2, Sparkles, Trash2, UploadCloud } from 'lucide-react'
-import { CommunicationPreferenceCard } from '@/components/chat/CommunicationPreferenceCard'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
 import {
+  activatePreparedExpressionAsset,
   deletePreparedExpressionAsset,
-  fetchPreparedExpressionAsset,
+  fetchPreparedExpressionLibrary,
   savePreparedExpressionAsset,
   saveWorkspaceSceneTemplates,
+  saveWorkspaceUserProfileMemory,
   type PreparedExpressionAsset,
+  type PreparedExpressionLibraryAsset,
   type SceneTemplateLibraryItem,
 } from '@/lib/memory/workspace-client'
 
@@ -50,6 +52,14 @@ interface TrainingReportsView {
 }
 
 type MemorySectionId = 'profile' | 'custom_material' | 'training_summary' | 'scene_templates'
+
+const PROFILE_DOCUMENT_OUTLINE = [
+  '我是谁：姓名、身份、平时最常见的沟通对象。',
+  '我的说话背景：疾病/构音情况、严重程度、别人通常会在哪些地方听不清。',
+  '高频沟通场景：例如就医、工作汇报、陌生人问路、家人沟通。',
+  '沟通习惯：我习惯先怎么开场、哪里容易卡住、说不顺时怎么补救。',
+  '希望别人怎么配合：例如请等我说完、没听清请复述、可以让我用文字补充。',
+] as const
 
 function stripFileExtension(filename: string): string {
   return filename.replace(/\.[^/.]+$/, '')
@@ -91,7 +101,7 @@ function summarizeText(value: string | null | undefined, fallback: string, maxLe
 
 interface MemorySectionShellProps {
   id: MemorySectionId
-  expandedSectionId: MemorySectionId
+  expandedSectionId: MemorySectionId | null
   onToggle: (id: MemorySectionId) => void
   eyebrow: string
   eyebrowTone: 'amber' | 'sky' | 'stone'
@@ -99,6 +109,7 @@ interface MemorySectionShellProps {
   description: string
   preview: string
   badge?: string
+  actions?: ReactNode
   children: ReactNode
 }
 
@@ -112,6 +123,7 @@ function MemorySectionShell({
   description,
   preview,
   badge,
+  actions,
   children,
 }: MemorySectionShellProps) {
   const isExpanded = expandedSectionId === id
@@ -123,12 +135,12 @@ function MemorySectionShell({
 
   return (
     <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
-      <button
-        type="button"
-        onClick={() => onToggle(id)}
-        className="flex w-full flex-wrap items-start justify-between gap-4 text-left"
-      >
-        <div className="min-w-0 flex-1">
+      <div className="flex w-full flex-wrap items-start justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => onToggle(id)}
+          className="min-w-0 flex-1 text-left"
+        >
           <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${eyebrowClasses[eyebrowTone]}`}>
             <Sparkles className="h-4 w-4" />
             {eyebrow}
@@ -140,19 +152,24 @@ function MemorySectionShell({
           <div className="mt-4 rounded-[20px] border border-stone-200 bg-stone-50 px-4 py-4 text-sm leading-6 text-gray-700">
             {preview}
           </div>
-        </div>
+        </button>
         <div className="flex flex-wrap items-center gap-2">
+          {actions}
           {badge ? (
             <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
               {badge}
             </span>
           ) : null}
-          <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700">
+          <button
+            type="button"
+            onClick={() => onToggle(id)}
+            className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700"
+          >
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             {isExpanded ? '收起内容' : '展开内容'}
-          </span>
+          </button>
         </div>
-      </button>
+      </div>
 
       {isExpanded ? (
         <div className="mt-5">
@@ -171,9 +188,14 @@ export default function MemoryPage() {
   const [selectedSceneTemplateIds, setSelectedSceneTemplateIds] = useState<string[]>([])
   const [sceneTemplateStatus, setSceneTemplateStatus] = useState<string | null>(null)
   const [isSavingSceneTemplates, setIsSavingSceneTemplates] = useState(false)
-  const [expandedSceneTemplateId, setExpandedSceneTemplateId] = useState<string | null>(null)
-  const [expandedSectionId, setExpandedSectionId] = useState<MemorySectionId>('profile')
-  const [preparedExpressionAsset, setPreparedExpressionAsset] = useState<PreparedExpressionAsset | null>(null)
+  const [activeSceneTemplateId, setActiveSceneTemplateId] = useState<string | null>(null)
+  const [expandedSectionId, setExpandedSectionId] = useState<MemorySectionId | null>(null)
+  const [userProfileDocument, setUserProfileDocument] = useState('')
+  const [userProfileStatus, setUserProfileStatus] = useState<string | null>(null)
+  const [isSavingUserProfile, setIsSavingUserProfile] = useState(false)
+  const [isUserProfileEditorOpen, setIsUserProfileEditorOpen] = useState(false)
+  const [preparedExpressionLibrary, setPreparedExpressionLibrary] = useState<PreparedExpressionLibraryAsset | null>(null)
+  const [selectedPreparedExpressionId, setSelectedPreparedExpressionId] = useState<string | null>(null)
   const [preparedExpressionTitle, setPreparedExpressionTitle] = useState('')
   const [preparedExpressionScene, setPreparedExpressionScene] = useState('')
   const [preparedExpressionSource, setPreparedExpressionSource] = useState('manual_input')
@@ -181,6 +203,8 @@ export default function MemoryPage() {
   const [preparedExpressionStatus, setPreparedExpressionStatus] = useState<string | null>(null)
   const [isPreparedExpressionLoading, setIsPreparedExpressionLoading] = useState(false)
   const [isSavingPreparedExpression, setIsSavingPreparedExpression] = useState(false)
+  const [isPreparedExpressionContentOpen, setIsPreparedExpressionContentOpen] = useState(false)
+  const [isPreparedExpressionEditorOpen, setIsPreparedExpressionEditorOpen] = useState(false)
   const preparedExpressionFileInputRef = useRef<HTMLInputElement | null>(null)
   const {
     snapshot: workspaceSnapshot,
@@ -205,6 +229,20 @@ export default function MemoryPage() {
   }, [sceneTemplateStatus])
 
   useEffect(() => {
+    if (!userProfileStatus) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setUserProfileStatus(null)
+    }, 3600)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [userProfileStatus])
+
+  useEffect(() => {
     if (!preparedExpressionStatus) {
       return
     }
@@ -220,7 +258,8 @@ export default function MemoryPage() {
 
   useEffect(() => {
     if (!isAuthenticated || !userId) {
-      setPreparedExpressionAsset(null)
+      setPreparedExpressionLibrary(null)
+      setSelectedPreparedExpressionId(null)
       return
     }
 
@@ -231,14 +270,14 @@ export default function MemoryPage() {
       setIsPreparedExpressionLoading(true)
 
       try {
-        const asset = await fetchPreparedExpressionAsset(activeUserId)
+        const library = await fetchPreparedExpressionLibrary(activeUserId)
         if (!cancelled) {
-          applyPreparedExpressionAsset(asset)
+          applyPreparedExpressionLibrary(library)
         }
       } catch (error) {
         if (!cancelled) {
-          console.error('[MemoryPage] Failed to load prepared expression asset:', error)
-          setPreparedExpressionStatus('准备内容读取失败了，稍后再试一次。')
+          console.error('[MemoryPage] Failed to load prepared expression library:', error)
+          setPreparedExpressionStatus('参考材料读取失败了，稍后再试一次。')
         }
       } finally {
         if (!cancelled) {
@@ -258,12 +297,102 @@ export default function MemoryPage() {
     setSelectedSceneTemplateIds(workspaceSnapshot?.scene_templates.selected_ids ?? [])
   }, [workspaceSnapshot?.scene_templates.selected_ids])
 
-  function applyPreparedExpressionAsset(asset: PreparedExpressionAsset | null) {
-    setPreparedExpressionAsset(asset)
-    setPreparedExpressionTitle(asset?.draft.title ?? '')
-    setPreparedExpressionScene(asset?.draft.scene ?? '')
-    setPreparedExpressionSource(asset?.draft.source ?? 'manual_input')
-    setPreparedExpressionContent(asset?.draft.content ?? '')
+  useEffect(() => {
+    const profileDocument = workspaceSnapshot?.user_profile_memory.document?.trim() ?? ''
+    setUserProfileDocument(profileDocument)
+    setIsUserProfileEditorOpen(!profileDocument)
+  }, [workspaceSnapshot?.user_profile_memory.document])
+
+  const preparedExpressionAssets = preparedExpressionLibrary?.assets ?? []
+  const activePreparedExpressionId = preparedExpressionLibrary?.active_asset_id ?? null
+  const preparedExpressionAsset = useMemo(
+    () => preparedExpressionAssets.find((asset) => asset.draft.id === selectedPreparedExpressionId)
+      ?? preparedExpressionAssets.find((asset) => asset.draft.id === activePreparedExpressionId)
+      ?? preparedExpressionAssets[0]
+      ?? null,
+    [activePreparedExpressionId, preparedExpressionAssets, selectedPreparedExpressionId],
+  )
+  const activePreparedExpressionAsset = useMemo(
+    () => preparedExpressionAssets.find((asset) => asset.draft.id === activePreparedExpressionId) ?? null,
+    [activePreparedExpressionId, preparedExpressionAssets],
+  )
+
+  function applyPreparedExpressionSelection(
+    library: PreparedExpressionLibraryAsset | null,
+    assetId: string | null,
+    options?: {
+      openEditor?: boolean
+      openContent?: boolean
+    },
+  ) {
+    const selectedAsset = assetId
+      ? library?.assets.find((asset) => asset.draft.id === assetId) ?? null
+      : null
+
+    setSelectedPreparedExpressionId(assetId)
+    setPreparedExpressionTitle(selectedAsset?.draft.title ?? '')
+    setPreparedExpressionScene(selectedAsset?.draft.scene ?? '')
+    setPreparedExpressionSource(selectedAsset?.draft.source ?? 'manual_input')
+    setPreparedExpressionContent(selectedAsset?.draft.content ?? '')
+    setIsPreparedExpressionEditorOpen(options?.openEditor ?? !selectedAsset)
+    setIsPreparedExpressionContentOpen(options?.openContent ?? false)
+  }
+
+  function applyPreparedExpressionLibrary(
+    library: PreparedExpressionLibraryAsset | null,
+    preferredSelectedId?: string | null,
+    options?: {
+      openEditor?: boolean
+      openContent?: boolean
+    },
+  ) {
+    setPreparedExpressionLibrary(library)
+    const nextSelectedId =
+      preferredSelectedId && library?.assets.some((asset) => asset.draft.id === preferredSelectedId)
+        ? preferredSelectedId
+        : library?.active_asset_id
+          ?? library?.assets[0]?.draft.id
+          ?? null
+
+    applyPreparedExpressionSelection(library, nextSelectedId, options)
+  }
+
+  function startNewPreparedExpressionDraft() {
+    applyPreparedExpressionSelection(preparedExpressionLibrary, null, {
+      openEditor: true,
+      openContent: false,
+    })
+  }
+
+  function handleSelectPreparedExpression(asset: PreparedExpressionAsset) {
+    applyPreparedExpressionSelection(preparedExpressionLibrary, asset.draft.id)
+  }
+
+  async function handleSaveUserProfileDocument() {
+    if (!userId || !isAuthenticated) {
+      setUserProfileStatus('先登录后才能保存用户画像。')
+      return
+    }
+
+    const document = userProfileDocument.trim()
+    if (!document) {
+      setUserProfileStatus('先写一版用户画像文档，再保存。')
+      return
+    }
+
+    setIsSavingUserProfile(true)
+
+    try {
+      await saveWorkspaceUserProfileMemory(userId, { document })
+      await refreshWorkspaceSnapshot()
+      setUserProfileStatus('用户画像已经保存。后面系统只会在这个基础上做小幅维护，不会把它拆成别的记忆类型。')
+      setIsUserProfileEditorOpen(false)
+    } catch (error) {
+      console.error('[MemoryPage] Failed to save user profile memory:', error)
+      setUserProfileStatus('用户画像保存失败了，请稍后再试。')
+    } finally {
+      setIsSavingUserProfile(false)
+    }
   }
 
   async function handleToggleSceneTemplate(templateId: string) {
@@ -316,7 +445,7 @@ export default function MemoryPage() {
 
   async function handleSavePreparedExpression() {
     if (!userId || !isAuthenticated) {
-      setPreparedExpressionStatus('先登录后才能把准备内容保存到记忆页。')
+      setPreparedExpressionStatus('先登录后才能把参考材料保存到记忆页。')
       return
     }
 
@@ -329,39 +458,63 @@ export default function MemoryPage() {
     setIsSavingPreparedExpression(true)
 
     try {
-      const asset = await savePreparedExpressionAsset(userId, {
+      const library = await savePreparedExpressionAsset(userId, {
+        id: preparedExpressionAsset?.draft.id ?? null,
         title: preparedExpressionTitle.trim() || null,
         scene: preparedExpressionScene.trim() || null,
         source: preparedExpressionSource.trim() || 'manual_input',
         content,
+        make_active: true,
       })
 
-      applyPreparedExpressionAsset(asset)
+      applyPreparedExpressionLibrary(library, library?.active_asset_id ?? null)
       await refreshWorkspaceSnapshot()
-      setPreparedExpressionStatus('准备内容已经保存。训练页后续会围着这份稿子继续收紧今日总结、7 天总结和计划。')
+      setPreparedExpressionStatus(
+        preparedExpressionAsset
+          ? '这份参考材料已经更新，并设为当前加载文档。'
+          : '新材料已经保存，并设为当前加载文档。',
+      )
+      setIsPreparedExpressionEditorOpen(false)
     } catch (error) {
       console.error('[MemoryPage] Failed to save prepared expression asset:', error)
-      setPreparedExpressionStatus('准备内容保存失败了，请稍后再试一次。')
+      setPreparedExpressionStatus('参考材料保存失败了，请稍后再试一次。')
     } finally {
       setIsSavingPreparedExpression(false)
     }
   }
 
-  async function handleDeletePreparedExpression() {
-    if (!userId || !isAuthenticated) {
-      setPreparedExpressionStatus('先登录后才能删除这份材料。')
+  async function handleActivatePreparedExpression() {
+    if (!userId || !isAuthenticated || !preparedExpressionAsset) {
+      setPreparedExpressionStatus('先选中一份材料，再设为当前加载。')
       return
     }
 
     try {
-      await deletePreparedExpressionAsset(userId)
-      setPreparedExpressionAsset(null)
-      setPreparedExpressionTitle('')
-      setPreparedExpressionScene('')
-      setPreparedExpressionSource('manual_input')
-      setPreparedExpressionContent('')
+      const library = await activatePreparedExpressionAsset(userId, preparedExpressionAsset.draft.id)
+      applyPreparedExpressionLibrary(library, preparedExpressionAsset.draft.id, {
+        openEditor: isPreparedExpressionEditorOpen,
+        openContent: isPreparedExpressionContentOpen,
+      })
       await refreshWorkspaceSnapshot()
-      setPreparedExpressionStatus('这份材料已经删除。你之后可以重新创建新的材料。')
+      setPreparedExpressionStatus(`“${preparedExpressionAsset.draft.title}”已经设为当前加载文档。`)
+    } catch (error) {
+      console.error('[MemoryPage] Failed to activate prepared expression asset:', error)
+      setPreparedExpressionStatus('切换当前材料失败了，请稍后再试。')
+    }
+  }
+
+  async function handleDeletePreparedExpression() {
+    if (!userId || !isAuthenticated || !preparedExpressionAsset) {
+      setPreparedExpressionStatus('先选中一份材料，再删除。')
+      return
+    }
+
+    try {
+      const deletedTitle = preparedExpressionAsset.draft.title
+      const library = await deletePreparedExpressionAsset(userId, preparedExpressionAsset.draft.id)
+      applyPreparedExpressionLibrary(library)
+      await refreshWorkspaceSnapshot()
+      setPreparedExpressionStatus(`“${deletedTitle}”已经从材料库移除。`)
     } catch (error) {
       console.error('[MemoryPage] Failed to delete prepared expression asset:', error)
       setPreparedExpressionStatus('删除失败了，请稍后再试。')
@@ -376,13 +529,53 @@ export default function MemoryPage() {
     () => sceneTemplateLibrary.filter((template) => selectedSceneTemplateIds.includes(template.id)),
     [sceneTemplateLibrary, selectedSceneTemplateIds],
   )
-  const userProfileSummary = workspaceSnapshot?.preparation.profile_summary?.trim() ?? ''
+  const activeSceneTemplate = useMemo(
+    () => sceneTemplateLibrary.find((template) => template.id === activeSceneTemplateId) ?? null,
+    [activeSceneTemplateId, sceneTemplateLibrary],
+  )
+
+  useEffect(() => {
+    const preferredTemplateId = selectedSceneTemplateIds[0] ?? sceneTemplateLibrary[0]?.id ?? null
+    setActiveSceneTemplateId((current) => {
+      if (current && sceneTemplateLibrary.some((template) => template.id === current)) {
+        return current
+      }
+
+      return preferredTemplateId
+    })
+  }, [sceneTemplateLibrary, selectedSceneTemplateIds])
+
+  const userProfileSummary = (
+    workspaceSnapshot?.user_profile_memory.document?.trim()
+    || workspaceSnapshot?.user_profile_memory.summary?.trim()
+    || workspaceSnapshot?.preparation.profile_summary?.trim()
+    || ''
+  )
   const selectedSceneTemplateSummary = summarizeText(
     selectedSceneTemplates.map((template) => template.title).join(' / '),
     '还没有加载模板。选中后再展开细看具体热词、风险词和开口句。',
   )
 
+  const hasSavedUserProfileDocument = Boolean(workspaceSnapshot?.user_profile_memory.document?.trim())
+  const userProfileDocumentDirty = userProfileDocument.trim() !== (workspaceSnapshot?.user_profile_memory.document?.trim() ?? '')
+  const userProfileSignals = useMemo(
+    () => [
+      ...(workspaceSnapshot?.user_profile_memory.common_scenarios ?? []),
+      ...(workspaceSnapshot?.user_profile_memory.risky_terms ?? []),
+      ...(workspaceSnapshot?.user_profile_memory.support_strategies ?? []),
+    ],
+    [
+      workspaceSnapshot?.user_profile_memory.common_scenarios,
+      workspaceSnapshot?.user_profile_memory.risky_terms,
+      workspaceSnapshot?.user_profile_memory.support_strategies,
+    ],
+  )
+
   const hasSavedPreparedExpression = Boolean(preparedExpressionAsset?.draft.id)
+  const preparedExpressionCount = preparedExpressionAssets.length
+  const isSelectedPreparedExpressionActive = Boolean(
+    preparedExpressionAsset && preparedExpressionAsset.draft.id === activePreparedExpressionId,
+  )
   const preparedExpressionDirty = useMemo(() => {
     if (!preparedExpressionAsset) {
       return Boolean(
@@ -411,7 +604,7 @@ export default function MemoryPage() {
   )
 
   function handleSectionToggle(sectionId: MemorySectionId) {
-    setExpandedSectionId((current) => (current === sectionId ? current : sectionId))
+    setExpandedSectionId((current) => (current === sectionId ? null : sectionId))
   }
 
   const trainingReports = useMemo<TrainingReportsView | null>(() => {
@@ -473,10 +666,11 @@ export default function MemoryPage() {
     }
   }, [preparedExpressionAsset, workspaceSnapshot?.prepared_expression])
   const preparedExpressionPreview = summarizeText(
-    preparedExpressionTitle.trim()
-      || preparedExpressionAsset?.draft.title
-      || preparedExpressionContent.trim(),
-    '还没有保存材料。这里建议只保留最重要的一份当前材料。',
+    activePreparedExpressionAsset
+      ? `${activePreparedExpressionAsset.draft.title}：${activePreparedExpressionAsset.structured.summary}`
+      : null,
+    '还没有参考材料。这里会按材料库管理多份文档，并明确哪一份是当前加载材料。',
+    140,
   )
   const trainingSummaryPreview = summarizeText(
     trainingReports?.weeklySummary?.summary
@@ -521,24 +715,98 @@ export default function MemoryPage() {
             eyebrow="用户画像"
             eyebrowTone="sky"
             title="用户画像"
-            description="这里就是用户画像。后台会在沟通 session 结束后小幅更新稳定规律；你可以手动固定开场、配合方式和补救方式。"
+            description="这里应该是一份持续维护的用户画像文档，不是三句模板。系统只会在这份文档和稳定规律的基础上做轻量维护。"
             preview={summarizeText(
               userProfileSummary,
-              '还没有固定画像摘要。展开后可以直接编辑开场、配合方式和补救方式。',
+              '还没有用户画像文档。展开后先写一版背景、病情、场景和沟通习惯。',
             )}
           >
-            <CommunicationPreferenceCard
-              userId={userId}
-              initialPreferences={workspaceSnapshot?.expression_kit.communication_preferences}
-              eyebrow="用户画像"
-              title="固定你的开场和补救方式"
-              description="这里不是新的记忆类型，而是用户画像里可编辑的一部分。首屏会优先使用这些稳定表达。"
-              saveLabel="保存画像"
-              clearLabel="清空这三句"
-              onSaved={() => {
-                void refreshWorkspaceSnapshot()
-              }}
-            />
+            {userProfileStatus ? (
+              <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                {userProfileStatus}
+              </div>
+            ) : null}
+
+            <div className="mt-4 rounded-[24px] border border-stone-200 bg-stone-50 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-gray-900">当前画像文档</div>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">
+                    建议把它当成一份长期说明文档来维护：谁是这个用户、常见沟通场景是什么、别人最容易哪里听不清、希望别人怎样配合。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsUserProfileEditorOpen((current) => !current)}
+                  className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-sky-300 hover:text-stone-950"
+                >
+                  {isUserProfileEditorOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {hasSavedUserProfileDocument
+                    ? isUserProfileEditorOpen ? '收起文档' : '编辑画像'
+                    : '开始写画像'}
+                </button>
+              </div>
+
+              {hasSavedUserProfileDocument ? (
+                <div className="mt-4 rounded-[20px] border border-stone-200 bg-white px-4 py-4 text-sm leading-7 text-gray-700 whitespace-pre-wrap">
+                  {isUserProfileEditorOpen
+                    ? userProfileDocument
+                    : summarizeText(userProfileDocument, userProfileSummary, 220)}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-[20px] border border-dashed border-stone-300 bg-white px-4 py-5 text-sm leading-6 text-gray-600">
+                  还没有第一版画像文档。建议先用一段到两段话把背景、病情/说话特点、常见场景和沟通习惯写出来。
+                </div>
+              )}
+            </div>
+
+            {isUserProfileEditorOpen || !hasSavedUserProfileDocument ? (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5">
+                  <div className="text-sm font-semibold text-gray-900">第一版用户画像可以按这个顺序写</div>
+                  <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+                    {PROFILE_DOCUMENT_OUTLINE.map((item) => (
+                      <p key={item}>{item}</p>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-gray-900">画像文档</span>
+                  <textarea
+                    value={userProfileDocument}
+                    onChange={(event) => setUserProfileDocument(event.target.value)}
+                    placeholder="例如：我叫...，平时在工作汇报和就医说明时最容易被听不清。我的构音障碍主要体现在... 我通常希望对方先听我说完，如果没听清请复述关键词。"
+                    className="min-h-[260px] w-full rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-4 text-sm leading-7 text-gray-900 outline-none transition focus:border-sky-300 focus:bg-white"
+                  />
+                </label>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveUserProfileDocument()}
+                    disabled={isSavingUserProfile || !userProfileDocument.trim() || !userProfileDocumentDirty}
+                    className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSavingUserProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {hasSavedUserProfileDocument ? '更新画像文档' : '保存第一版画像'}
+                  </button>
+                  <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
+                    后台维护链后续只会轻量补充稳定规律，不会把这份画像拆成别的对象
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            {userProfileSignals.length > 0 ? (
+              <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50 p-5">
+                <div className="text-sm font-semibold text-gray-900">系统已经观察到的稳定信号</div>
+                <div className="mt-3">
+                  {renderChips(userProfileSignals.slice(0, 8), 'sky')}
+                </div>
+              </div>
+            ) : null}
+
           </MemorySectionShell>
         </div>
 
@@ -549,14 +817,25 @@ export default function MemoryPage() {
             onToggle={handleSectionToggle}
             eyebrow="自定义材料"
             eyebrowTone="amber"
-            title="你自己维护要说的材料"
-            description="把后面要说的全文、提纲或说明放在这里。它的作用是给沟通页提供最关键的参考内容，你可以随时打开、改写、覆盖保存。"
+            title="参考材料库"
+            description="这里管理多份参考材料。先选一份，再决定要不要设为当前加载、展开全文或继续编辑。"
             preview={preparedExpressionPreview}
-            badge={trainingReports?.weeklySummary
-              ? `最近 7 天 ${trainingReports.weeklySummary.sampleCount} 条`
-              : trainingReports?.dailySummary
-                ? `今天 ${trainingReports.dailySummary.sampleCount} 条`
-                : '先保存材料'}
+            badge={preparedExpressionCount > 0 ? `${preparedExpressionCount} 份材料` : '还没有材料'}
+            actions={(
+              <button
+                type="button"
+                onClick={() => {
+                  if (expandedSectionId !== 'custom_material') {
+                    handleSectionToggle('custom_material')
+                  }
+                  startNewPreparedExpressionDraft()
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+              >
+                <Sparkles className="h-4 w-4" />
+                新增材料
+              </button>
+            )}
           >
             {preparedExpressionStatus ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -564,96 +843,251 @@ export default function MemoryPage() {
               </div>
             ) : null}
 
-            <div className="mt-4 rounded-[24px] border border-stone-200 bg-stone-50 px-4 py-4">
-              <p className="text-sm leading-6 text-gray-600">
-                {hasSavedPreparedExpression
-                  ? '这里就是当前参考文档的编辑区。直接改内容后点“更新参考文档”就会覆盖保存到原位置，不需要删掉旧稿再重传。'
-                  : '这里还没有保存过参考文档。先贴入或上传第一份，后面都可以直接在这里改并更新。'}
-              </p>
+            <div className="mt-4 rounded-[24px] border border-stone-200 bg-stone-50 p-5">
+              {preparedExpressionCount > 0 ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">材料列表</div>
+                      <p className="mt-1 text-sm leading-6 text-gray-600">
+                        点击一份材料后，再展开全文、编辑，或把它设为当前加载文档。
+                      </p>
+                    </div>
+                    {activePreparedExpressionAsset ? (
+                      <span className="rounded-full bg-white px-4 py-2 text-sm text-gray-700">
+                        当前加载：{activePreparedExpressionAsset.draft.title}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    {preparedExpressionAssets.map((asset) => {
+                      const isSelected = preparedExpressionAsset?.draft.id === asset.draft.id
+                      const isActive = activePreparedExpressionId === asset.draft.id
+
+                      return (
+                        <button
+                          key={asset.draft.id}
+                          type="button"
+                          onClick={() => handleSelectPreparedExpression(asset)}
+                          className={`rounded-[20px] border px-4 py-4 text-left transition ${
+                            isSelected
+                              ? 'border-amber-300 bg-amber-50'
+                              : 'border-stone-200 bg-white hover:border-amber-200'
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="text-sm font-semibold text-gray-900">{asset.draft.title || '未命名材料'}</div>
+                            {isActive ? (
+                              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                                当前加载
+                              </span>
+                            ) : null}
+                            {isSelected ? (
+                              <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
+                                已选中
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-gray-600">
+                            {summarizeText(asset.draft.content, asset.structured.summary, 160)}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {asset.draft.scene ? (
+                              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
+                                场景：{asset.draft.scene}
+                              </span>
+                            ) : null}
+                            <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
+                              来源：{asset.draft.source || 'manual_input'}
+                            </span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm leading-6 text-gray-600">
+                    这里还没有参考材料。先新增第一份文档，后面沟通页和训练页会围着“当前加载材料”继续收紧。
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => startNewPreparedExpressionDraft()}
+                    className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    新增材料
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-gray-900">标题</span>
-              <input
-                value={preparedExpressionTitle}
-                onChange={(event) => setPreparedExpressionTitle(event.target.value)}
-                placeholder="例如：公开分享 / 面试自我介绍 / 就医说明"
-                className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-gray-900">场景标签</span>
-              <input
-                value={preparedExpressionScene}
-                onChange={(event) => setPreparedExpressionScene(event.target.value)}
-                placeholder="例如：interview / work / medical"
-                className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
-              />
-            </label>
-          </div>
+            {preparedExpressionAsset ? (
+              <div className="mt-4 rounded-[24px] border border-stone-200 bg-stone-50 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsPreparedExpressionContentOpen((current) => !current)}
+                    className="min-w-0 flex-1 rounded-[20px] border border-transparent px-1 py-1 text-left transition hover:border-amber-200"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-semibold text-gray-900">{preparedExpressionTitle || '未命名材料'}</div>
+                      {isSelectedPreparedExpressionActive ? (
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                          当前加载
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
+                          已选中，尚未加载
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">
+                      {summarizeText(
+                        preparedExpressionContent,
+                        '这份参考文档会作为沟通和训练的重要上下文。',
+                        180,
+                      )}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {preparedExpressionScene ? (
+                        <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
+                          场景：{preparedExpressionScene}
+                        </span>
+                      ) : null}
+                      <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
+                        来源：{preparedExpressionSource || 'manual_input'}
+                      </span>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs text-amber-800">
+                        {isPreparedExpressionContentOpen ? '点击收起全文' : '点击展开全文'}
+                      </span>
+                    </div>
+                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {!isSelectedPreparedExpressionActive ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleActivatePreparedExpression()}
+                        className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600"
+                      >
+                        设为当前加载
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setIsPreparedExpressionContentOpen((current) => !current)}
+                      className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-amber-300 hover:text-stone-950"
+                    >
+                      {isPreparedExpressionContentOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      {isPreparedExpressionContentOpen ? '收起全文' : '展开全文'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsPreparedExpressionEditorOpen((current) => !current)}
+                      className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-amber-300 hover:text-stone-950"
+                    >
+                      {isPreparedExpressionEditorOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      {isPreparedExpressionEditorOpen ? '收起编辑' : '编辑材料'}
+                    </button>
+                  </div>
+                </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => preparedExpressionFileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-gray-800 transition hover:border-amber-300 hover:bg-amber-50"
-            >
-              <UploadCloud className="h-4 w-4" />
-              上传 `.md` / `.txt`
-            </button>
-            <input
-              ref={preparedExpressionFileInputRef}
-              type="file"
-              accept=".md,.txt,.text"
-              onChange={handlePreparedExpressionFileChange}
-              className="hidden"
-            />
-            <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
-              来源：{preparedExpressionSource || 'manual_input'}
-            </span>
-            {isPreparedExpressionLoading ? (
-              <span className="inline-flex items-center gap-2 text-sm text-gray-600">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                正在读取已有内容
-              </span>
+                {isPreparedExpressionContentOpen ? (
+                  <div className="mt-4 rounded-[20px] border border-stone-200 bg-white px-4 py-4 text-sm leading-7 text-gray-700 whitespace-pre-wrap">
+                    {preparedExpressionContent}
+                  </div>
+                ) : null}
+              </div>
             ) : null}
-          </div>
 
-          <label className="mt-4 block space-y-2">
-            <span className="text-sm font-medium text-gray-900">全文内容</span>
-            <textarea
-              value={preparedExpressionContent}
-              onChange={(event) => setPreparedExpressionContent(event.target.value)}
-              placeholder="把你后面要说的全文、提纲或说明贴在这里。"
-              className="min-h-[240px] w-full rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-4 text-sm leading-7 text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
-            />
-          </label>
+            {isPreparedExpressionEditorOpen || !hasSavedPreparedExpression ? (
+              <div className="mt-5 space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-gray-900">标题</span>
+                    <input
+                      value={preparedExpressionTitle}
+                      onChange={(event) => setPreparedExpressionTitle(event.target.value)}
+                      placeholder="例如：公开分享 / 面试自我介绍 / 就医说明"
+                      className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-gray-900">场景标签</span>
+                    <input
+                      value={preparedExpressionScene}
+                      onChange={(event) => setPreparedExpressionScene(event.target.value)}
+                      placeholder="例如：interview / work / medical"
+                      className="h-11 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
+                    />
+                  </label>
+                </div>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => void handleSavePreparedExpression()}
-              disabled={isSavingPreparedExpression || !canSavePreparedExpression}
-              className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSavingPreparedExpression ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {hasSavedPreparedExpression ? '更新参考文档' : '保存第一份参考文档'}
-            </button>
-            <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
-              训练总结只会根据训练页真实录音结果自动更新
-            </span>
-            {hasSavedPreparedExpression ? (
-              <button
-                type="button"
-                onClick={() => void handleDeletePreparedExpression()}
-                className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-300"
-              >
-                <Trash2 className="h-4 w-4" />
-                从当前页移除
-              </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => preparedExpressionFileInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-gray-800 transition hover:border-amber-300 hover:bg-amber-50"
+                  >
+                    <UploadCloud className="h-4 w-4" />
+                    上传 `.md` / `.txt`
+                  </button>
+                  <input
+                    ref={preparedExpressionFileInputRef}
+                    type="file"
+                    accept=".md,.txt,.text"
+                    onChange={handlePreparedExpressionFileChange}
+                    className="hidden"
+                  />
+                  <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
+                    来源：{preparedExpressionSource || 'manual_input'}
+                  </span>
+                  {isPreparedExpressionLoading ? (
+                    <span className="inline-flex items-center gap-2 text-sm text-gray-600">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      正在读取已有内容
+                    </span>
+                  ) : null}
+                </div>
+
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-gray-900">全文内容</span>
+                  <textarea
+                    value={preparedExpressionContent}
+                    onChange={(event) => setPreparedExpressionContent(event.target.value)}
+                    placeholder="把你后面要说的全文、提纲或说明贴在这里。"
+                    className="min-h-[240px] w-full rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-4 text-sm leading-7 text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
+                  />
+                </label>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleSavePreparedExpression()}
+                    disabled={isSavingPreparedExpression || !canSavePreparedExpression}
+                    className="inline-flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSavingPreparedExpression ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {hasSavedPreparedExpression ? '保存并更新这份材料' : '保存新材料'}
+                  </button>
+                  <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
+                    保存后会自动设为当前加载文档，训练总结只根据真实录音结果更新
+                  </span>
+                  {hasSavedPreparedExpression ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeletePreparedExpression()}
+                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-300"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      删除这份材料
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             ) : null}
-            </div>
           </MemorySectionShell>
         </div>
 
@@ -733,7 +1167,7 @@ export default function MemoryPage() {
               eyebrow="场景 / 热词模板"
               eyebrowTone="stone"
               title="场景 / 热词模板"
-              description="这里不再让你自己造一堆重点词。你只需要选最贴近当前场景的模板，系统会自动带上对应热词、风险词和沟通策略。"
+              description="这里按模板标题切换查看，不是一展开就把整库细节全部摊开。默认先看第一套，再决定要不要加载。"
               preview={selectedSceneTemplateSummary}
               badge={`已选 ${selectedSceneTemplateIds.length} 套`}
             >
@@ -768,111 +1202,112 @@ export default function MemoryPage() {
                 </div>
               ) : null}
 
-              <div className="mt-5 grid gap-4">
+              <div className="mt-5">
                 {sceneTemplateLibrary.length > 0 ? (
-                  sceneTemplateLibrary.map((template) => {
-                    const isSelected = selectedSceneTemplateIds.includes(template.id)
-                    const isExpanded = expandedSceneTemplateId === template.id
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {sceneTemplateLibrary.map((template) => {
+                        const isActive = template.id === activeSceneTemplate?.id
+                        const isSelected = selectedSceneTemplateIds.includes(template.id)
 
-                    return (
-                      <article
-                        key={template.id}
-                        className={`rounded-[24px] border p-5 transition ${
-                          isSelected
-                            ? 'border-amber-300 bg-amber-50'
-                            : 'border-stone-200 bg-stone-50'
-                        }`}
-                      >
+                        return (
+                          <button
+                            key={template.id}
+                            type="button"
+                            onClick={() => setActiveSceneTemplateId(template.id)}
+                            className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                              isActive
+                                ? 'border-amber-400 bg-amber-50 text-stone-950'
+                                : 'border-stone-200 bg-white text-stone-700 hover:border-amber-300 hover:bg-amber-50/60'
+                            }`}
+                          >
+                            <span>{template.title}</span>
+                            {isSelected ? (
+                              <span className="ml-2 rounded-full bg-white px-2 py-0.5 text-[11px] text-amber-800">
+                                已加载
+                              </span>
+                            ) : null}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {activeSceneTemplate ? (
+                      <article className="mt-4 rounded-[24px] border border-stone-200 bg-stone-50 p-5">
                         <div className="flex flex-wrap items-start justify-between gap-4">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-base font-semibold text-gray-900">{template.title}</h3>
+                              <h3 className="text-base font-semibold text-gray-900">{activeSceneTemplate.title}</h3>
                               <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
-                                {template.severity_hint}
+                                {activeSceneTemplate.severity_hint}
                               </span>
                               <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
-                                {template.scenario}
+                                {activeSceneTemplate.scenario}
                               </span>
                             </div>
                             <p className="mt-2 text-sm leading-6 text-gray-600">
-                              {isExpanded ? template.summary : summarizeText(template.summary, '展开后看详情。', 52)}
+                              {activeSceneTemplate.summary}
                             </p>
+                            <div className="mt-3 space-y-2 text-sm leading-6 text-gray-600">
+                              <p>适用情况：{activeSceneTemplate.condition_hint}</p>
+                              <p>这套模板主要帮你：{activeSceneTemplate.communication_goal}</p>
+                            </div>
                           </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void handleToggleSceneTemplate(template.id)
-                              }}
-                              disabled={isSavingSceneTemplates}
-                              className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                                isSelected
-                                  ? 'bg-gray-900 text-white'
-                                  : 'border border-stone-300 bg-white text-stone-700 hover:border-amber-300 hover:text-stone-950'
-                              } disabled:cursor-not-allowed disabled:opacity-60`}
-                            >
-                              {isSelected ? <Check className="h-4 w-4" /> : null}
-                              {isSelected ? '已加载' : '加载这套模板'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setExpandedSceneTemplateId((current) => current === template.id ? null : template.id)
-                              }}
-                              className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm text-stone-700 transition hover:border-stone-400"
-                            >
-                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                              {isExpanded ? '收起详情' : '查看详情'}
-                            </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleToggleSceneTemplate(activeSceneTemplate.id)
+                            }}
+                            disabled={isSavingSceneTemplates}
+                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                              selectedSceneTemplateIds.includes(activeSceneTemplate.id)
+                                ? 'bg-gray-900 text-white'
+                                : 'border border-stone-300 bg-white text-stone-700 hover:border-amber-300 hover:text-stone-950'
+                            } disabled:cursor-not-allowed disabled:opacity-60`}
+                          >
+                            {selectedSceneTemplateIds.includes(activeSceneTemplate.id) ? <Check className="h-4 w-4" /> : null}
+                            {selectedSceneTemplateIds.includes(activeSceneTemplate.id) ? '已加载这套模板' : '加载这套模板'}
+                          </button>
+                        </div>
+
+                        <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                          <div className="rounded-[20px] bg-white px-4 py-4">
+                            <div className="text-sm font-semibold text-gray-900">优先顺序</div>
+                            <div className="mt-3">
+                              {renderChips(activeSceneTemplate.focus_priority, 'stone')}
+                            </div>
+                          </div>
+                          <div className="rounded-[20px] bg-white px-4 py-4">
+                            <div className="text-sm font-semibold text-gray-900">重点热词</div>
+                            <div className="mt-3">
+                              {renderChips(activeSceneTemplate.hotwords.map((item) => item.phrase), 'amber')}
+                            </div>
+                          </div>
+                          <div className="rounded-[20px] bg-white px-4 py-4">
+                            <div className="text-sm font-semibold text-gray-900">容易听偏的词</div>
+                            <div className="mt-3">
+                              {renderChips(activeSceneTemplate.risky_terms, 'sky')}
+                            </div>
+                          </div>
+                          <div className="rounded-[20px] bg-white px-4 py-4">
+                            <div className="text-sm font-semibold text-gray-900">希望对方这样配合</div>
+                            <div className="mt-3">
+                              {renderChips(activeSceneTemplate.support_strategies, 'emerald')}
+                            </div>
                           </div>
                         </div>
 
-                        {isExpanded ? (
-                          <>
-                            <div className="mt-4 space-y-2 text-sm leading-6 text-gray-600">
-                              <p>适用情况：{template.condition_hint}</p>
-                              <p>这套模板主要帮你：{template.communication_goal}</p>
-                            </div>
-                            <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                              <div className="rounded-[20px] bg-white px-4 py-4">
-                                <div className="text-sm font-semibold text-gray-900">优先顺序</div>
-                                <div className="mt-3">
-                                  {renderChips(template.focus_priority, 'stone')}
-                                </div>
-                              </div>
-                              <div className="rounded-[20px] bg-white px-4 py-4">
-                                <div className="text-sm font-semibold text-gray-900">重点热词</div>
-                                <div className="mt-3">
-                                  {renderChips(template.hotwords.map((item) => item.phrase), 'amber')}
-                                </div>
-                              </div>
-                              <div className="rounded-[20px] bg-white px-4 py-4">
-                                <div className="text-sm font-semibold text-gray-900">容易听偏的词</div>
-                                <div className="mt-3">
-                                  {renderChips(template.risky_terms, 'sky')}
-                                </div>
-                              </div>
-                              <div className="rounded-[20px] bg-white px-4 py-4">
-                                <div className="text-sm font-semibold text-gray-900">希望对方这样配合</div>
-                                <div className="mt-3">
-                                  {renderChips(template.support_strategies, 'emerald')}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 rounded-[20px] bg-white px-4 py-4">
-                              <div className="text-sm font-semibold text-gray-900">这套模板里的开口句</div>
-                              <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                                {template.starter_phrases.map((phrase) => (
-                                  <p key={phrase}>{phrase}</p>
-                                ))}
-                              </div>
-                            </div>
-                          </>
-                        ) : null}
+                        <div className="mt-4 rounded-[20px] bg-white px-4 py-4">
+                          <div className="text-sm font-semibold text-gray-900">这套模板里的开口句</div>
+                          <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+                            {activeSceneTemplate.starter_phrases.map((phrase) => (
+                              <p key={phrase}>{phrase}</p>
+                            ))}
+                          </div>
+                        </div>
                       </article>
-                    )
-                  })
+                    ) : null}
+                  </>
                 ) : (
                   <div className="rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
                     模板库还没加载出来，稍后刷新再试。

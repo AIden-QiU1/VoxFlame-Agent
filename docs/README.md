@@ -57,7 +57,7 @@
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
 | [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md) | `recording schema / recorder queue / manifest / upload` 的权威 contract | ⭐⭐⭐ |
-| [LLM 纠错开发计划](LLM_CORRECTION_DEVELOPMENT_PLAN.md) | 纠错扩展实现计划与评估指标 | ⭐⭐⭐ |
+| [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前纠错链、记忆维护模型与训练总结模型的分层与上线边界 | ⭐⭐⭐ |
 
 ### Memory
 
@@ -71,6 +71,7 @@
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
 | [前端 README](../frontend/README.md) | 当前页面系统、训练资产链路与 PWA 边界 | ⭐⭐⭐ |
+| [UI / 前端页面设计与实践报告（2026-04-19）](UI_FRONTEND_PAGE_DESIGN_REPORT_VIBE_CODING_2026-04-19.md) | 从经典设计原则出发，重写成 vibe coding 时代依然能落地的页面方法论、实践路径与检查清单 | ⭐⭐ |
 
 ### ideas / 长期讨论
 

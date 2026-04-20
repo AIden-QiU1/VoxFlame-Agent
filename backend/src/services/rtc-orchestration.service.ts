@@ -292,8 +292,11 @@ export class RtcOrchestrationService {
     const liveKitStatus = this.assertLiveKitCanStart()
     await this.assertLiveKitAgentCanAcceptJobs()
     const browserServerUrl =
-      deriveRtcBrowserWebSocketUrl(input.browserOrigin) ??
       liveKitStatus.browserUrl ??
+      deriveRtcBrowserWebSocketUrl(
+        liveKitStatus.serverUrl!,
+        input.browserOrigin,
+      ) ??
       liveKitStatus.serverUrl!
     const preparationContext = await this.loadPreparationContext(
       input.authenticatedUserId,
@@ -568,24 +571,42 @@ function buildChannelName(mode: RtcSessionMode | undefined): string {
 }
 
 export function deriveRtcBrowserWebSocketUrl(
+  serverUrl: string,
   browserOrigin: string | null | undefined,
 ): string | null {
+  const trimmedServerUrl = serverUrl.trim()
   const trimmed = browserOrigin?.trim()
-  if (!trimmed) {
+  if (!trimmedServerUrl || !trimmed) {
     return null
   }
 
   try {
-    const url = new URL(trimmed)
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    const targetUrl = new URL(trimmedServerUrl)
+    const pageUrl = new URL(trimmed)
+    if (
+      (targetUrl.protocol !== 'ws:' && targetUrl.protocol !== 'wss:') ||
+      (pageUrl.protocol !== 'http:' && pageUrl.protocol !== 'https:')
+    ) {
       return null
     }
 
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-    url.pathname = ''
-    url.search = ''
-    url.hash = ''
-    return url.toString().replace(/\/$/, '')
+    const normalizedTargetHost = targetUrl.hostname.toLowerCase()
+    const isTargetLoopback =
+      normalizedTargetHost === 'localhost' ||
+      normalizedTargetHost === '127.0.0.1' ||
+      normalizedTargetHost === '::1'
+    const isDockerOnlyHost = normalizedTargetHost === 'livekit-server'
+
+    if (!isTargetLoopback && !isDockerOnlyHost) {
+      return null
+    }
+
+    targetUrl.protocol = pageUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+    targetUrl.hostname = pageUrl.hostname
+    targetUrl.pathname = ''
+    targetUrl.search = ''
+    targetUrl.hash = ''
+    return targetUrl.toString().replace(/\/$/, '')
   } catch {
     return null
   }
