@@ -13,6 +13,23 @@
 
 ## 最新收口
 
+0. 2026-04-20 已把腾讯云中国大陆部署文档改写成正式上线步骤
+   - [docs/TENCENT_CLOUD_MAINLAND_DEPLOY_CHECKLIST_2026-04-07.md](/home/ubuntu/VoxFlame-Agent/docs/TENCENT_CLOUD_MAINLAND_DEPLOY_CHECKLIST_2026-04-07.md) 不再以“当前开了哪些端口、IP 预览怎么跑”为主线
+   - 当前文档已改成一条可以顺序执行的 runbook：
+     - 买域名
+     - 域名实名认证
+     - 等满备案要求时间
+     - 腾讯云首次备案
+     - 备案后正式 DNS 解析
+     - 使用 `Caddy` 自动 HTTPS 切到正式域名
+     - 做公网 RTC smoke
+   - 文档也已明确当前仓库边界：
+     - 第一阶段正式上线推荐 `app.<domain>` 单域名
+     - 当前不把独立 `turn` 域名 + TURN/TLS 写成现成步骤
+   - [docs/README.md](/home/ubuntu/VoxFlame-Agent/docs/README.md) 已新增导航入口
+   - 已验证：
+   - `bash scripts/check_ai_docs.sh`
+
 0. 2026-04-20 已按“高质量普通话短句”重写四个训练主题，并清空该账号旧训练数据
    - 账号 `2307294809@qq.com` 对应用户 `64758dee-5026-4b53-a063-1d02d0834f67` 的旧训练样本已清空：
      - `voice_contributions: 51 -> 0`
