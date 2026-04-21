@@ -1,4 +1,5 @@
 import GENERATED_REAL_CORPUS from '../generated/mandarin-training-real.json'
+import { ASSESSMENT_SCREENING_EXERCISES } from './assessment-screening'
 import { CURATED_TOPIC_EXERCISES } from './curated-topics'
 import {
   MANDARIN_TRAINING_CATEGORY_ORDER,
@@ -30,6 +31,9 @@ export const MANDARIN_TRAINING_CATEGORIES = [...MANDARIN_TRAINING_CATEGORY_ORDER
 const CATEGORY_EXERCISE_MAP = MANDARIN_TRAINING_CATEGORIES.reduce(
   (accumulator, category) => {
     accumulator[category] =
+      category === '评估筛查'
+        ? ASSESSMENT_SCREENING_EXERCISES
+        :
       CURATED_TOPIC_EXERCISES[category]
       ?? REAL_CORPUS.categories[category]?.items
       ?? []
@@ -45,6 +49,15 @@ export const MANDARIN_TRAINING_CATEGORY_META: Record<
   MandarinTrainingCategory,
   MandarinTrainingCategoryMeta
 > = {
+  '评估筛查': {
+    label: '评估主题区',
+    shortLabel: '20 词筛查',
+    description: '用 20 条高频双字词做一次轻量普通话筛查，先看正确字数 / 总字数，给出训练用的初步严重程度分层。',
+    examples: ['爸爸', '刷牙', '蓝牙'],
+    helper: '这组不是普通训练句，而是筛查词表。先完整录完，再看字符准确率和初步等级。',
+    trainingTips: ['先把每个字说完整，不用刻意求快。', '这一组先看字准率，结果只作为训练筛查，不替代医学评估。'],
+    corpusCount: CATEGORY_EXERCISE_MAP['评估筛查'].length,
+  },
   '日常与出行': {
     label: '日常与出行',
     shortLabel: '常说常用',
@@ -85,7 +98,7 @@ export const MANDARIN_TRAINING_CATEGORY_META: Record<
     label: '发音与朗读',
     shortLabel: '朗读音韵',
     description: '用经典文章打散句补声母、韵母、声调和整句节奏，让训练页不只练场景，也能补音韵音调覆盖。',
-    examples: ['不宜妄自菲薄', '不知老之将至', '仰觀宇宙之大'],
+    examples: ['不宜妄自菲薄', '不知老之将至', '仰观宇宙之大'],
     helper: '这组句子主要服务音韵、节奏和整句朗读能力。',
     trainingTips: ['先把整句节奏读顺，再抠单个字。', '这一组重点看声调、停顿和朗读起伏。'],
     corpusCount: CATEGORY_EXERCISE_MAP['发音与朗读'].length,

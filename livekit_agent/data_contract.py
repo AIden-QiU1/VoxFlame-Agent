@@ -256,6 +256,25 @@ def extract_end_audio_reason(message: dict[str, Any]) -> str | None:
     return reason.strip() if isinstance(reason, str) and reason.strip() else "unknown"
 
 
+def extract_client_speech_activity(
+    message: dict[str, Any],
+) -> tuple[str, bool, bool] | None:
+    if message.get("type") != "speech_activity":
+        return None
+
+    state = message.get("state")
+    if not isinstance(state, str) or not state.strip():
+        return None
+
+    auto_finalize = message.get("auto_finalize")
+    short_utterance_expected = message.get("short_utterance_expected")
+    return (
+        state.strip(),
+        auto_finalize if isinstance(auto_finalize, bool) else False,
+        short_utterance_expected if isinstance(short_utterance_expected, bool) else False,
+    )
+
+
 def extract_caption_mode_update(message: dict[str, Any]) -> bool | None:
     if message.get("type") != "caption_mode_update":
         return None

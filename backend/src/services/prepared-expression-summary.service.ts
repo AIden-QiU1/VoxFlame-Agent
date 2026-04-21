@@ -13,6 +13,7 @@ export interface PreparedExpressionTrainingSample {
   created_at: string | null;
   target_text: string;
   recognized_text: string;
+  exercise_category: string | null;
   feedback_status: string | null;
   prepared_expression_section_id: string | null;
   prepared_expression_section_title: string | null;
@@ -144,22 +145,37 @@ function buildStableWins(samples: PreparedExpressionTrainingSample[], limit: num
 
 function buildNextFocus(
   samples: PreparedExpressionTrainingSample[],
-  asset: PreparedExpressionAsset,
+  asset: PreparedExpressionAsset | null,
   limit: number,
 ): string[] {
   return dedupeStrings(
     [
       ...samples.flatMap((sample) => [
+        sample.exercise_category,
         sample.prepared_expression_section_title,
         ...sample.high_risk_phrases,
         ...sample.speech_patterns,
         ...sample.articulation_tips,
       ]),
-      ...asset.structured.highRiskPhrases,
-      ...asset.structured.sections.slice(0, 4).map((section) => section.title),
+      ...(asset?.structured.highRiskPhrases ?? []),
+      ...(asset?.structured.sections.slice(0, 4).map((section) => section.title) ?? []),
     ],
     limit,
   );
+}
+
+function buildCategoryFocus(samples: PreparedExpressionTrainingSample[]): string | null {
+  const counts = new Map<string, number>();
+  samples.forEach((sample) => {
+    const category = sample.exercise_category?.trim();
+    if (!category) {
+      return;
+    }
+    counts.set(category, (counts.get(category) ?? 0) + 1);
+  });
+
+  const top = [...counts.entries()].sort((left, right) => right[1] - left[1])[0];
+  return top?.[0] ?? null;
 }
 
 function buildPronunciationPatterns(
@@ -181,7 +197,7 @@ function buildPronunciationPatterns(
 function summarizeWindowHeuristically(
   label: 'daily' | 'weekly',
   samples: PreparedExpressionTrainingSample[],
-  asset: PreparedExpressionAsset,
+  asset: PreparedExpressionAsset | null,
 ): PreparedExpressionTrainingSummaryWindow | null {
   if (samples.length === 0) {
     return null;
@@ -190,6 +206,7 @@ function summarizeWindowHeuristically(
   const mismatchPairs = buildMismatchPairs(samples, 6, 1200);
   const stableWins = buildStableWins(samples, 3);
   const nextFocus = buildNextFocus(samples, asset, 4);
+  const categoryFocus = buildCategoryFocus(samples);
   const summaryLead = label === 'daily' ? '今天' : '最近 7 天';
   const mismatchLead = mismatchPairs[0]
     ? `最值得先收口的是“${truncateText(mismatchPairs[0].target, 14)} -> ${truncateText(mismatchPairs[0].heard, 14)}”`
@@ -197,9 +214,13 @@ function summarizeWindowHeuristically(
       ? `优先继续盯住“${truncateText(nextFocus[0], 16)}”`
       : '继续把今天最常练的句子说稳';
   const stableLead = stableWins[0] ? `已经较稳的是“${stableWins[0]}”` : null;
+  const categoryLead = categoryFocus ? `当前最有代表性的训练区是“${categoryFocus}”` : null;
 
   return {
-    summary: `${summaryLead}共练了 ${samples.length} 句，${mismatchLead}${stableLead ? `；${stableLead}` : ''}。`,
+    summary:
+      `${summaryLead}共练了 ${samples.length} 句，${mismatchLead}` +
+      `${categoryLead ? `；${categoryLead}` : ''}` +
+      `${stableLead ? `；${stableLead}` : ''}。`,
     sampleCount: samples.length,
     mismatchPairs,
     nextFocus,
@@ -210,9 +231,10 @@ function summarizeWindowHeuristically(
         mismatchPairs[0]
           ? `先单独练“${truncateText(mismatchPairs[0].target, 16)}”，避免再被听成“${truncateText(mismatchPairs[0].heard, 16)}”。`
           : null,
-        asset.structured.fallbackPhrases[0]
+        asset?.structured.fallbackPhrases[0]
           ? `卡住时先回保底句：${asset.structured.fallbackPhrases[0]}`
           : null,
+        categoryFocus ? `下一轮继续保留“${categoryFocus}”这组句子，先把同类高频差异收小。` : null,
       ],
       4,
     ),
@@ -350,13 +372,14 @@ async function requestDashScopeTrainingReport(
 }
 
 function buildModelPrompt(
-  asset: PreparedExpressionAsset,
+  asset: PreparedExpressionAsset | null,
   dailySamples: PreparedExpressionTrainingSample[],
   weeklySamples: PreparedExpressionTrainingSample[],
   trigger: PreparedExpressionSummaryTrigger,
 ): string {
   const compactDaily = dailySamples.slice(0, DAILY_MODEL_SAMPLE_LIMIT).map((sample) => ({
     created_at: sample.created_at,
+    category: sample.exercise_category,
     section: sample.prepared_expression_section_title,
     target_text: sample.target_text,
     recognized_text: sample.recognized_text,
@@ -368,6 +391,7 @@ function buildModelPrompt(
 
   const compactWeekly = weeklySamples.slice(0, WEEKLY_MODEL_SAMPLE_LIMIT).map((sample) => ({
     created_at: sample.created_at,
+    category: sample.exercise_category,
     section: sample.prepared_expression_section_title,
     target_text: sample.target_text,
     recognized_text: sample.recognized_text,
@@ -385,10 +409,12 @@ function buildModelPrompt(
         focus: [
           'daily_summary 只根据 last_24h_samples 生成。',
           'weekly_summary 只根据 last_7d_samples 生成。',
-          '只总结 target_text 和 recognized_text 的稳定差异，不要把准备材料本身改写成训练结论。',
+          '只总结 target_text 和 recognized_text 的稳定差异，不要把材料说明、场景标题或系统提示改写成训练结论。',
+          'summary 先写一般性规律，再补 1 到 2 个最有代表性的例子。',
           'mismatch_pairs 只保留真实稳定出现的“目标 -> 系统听到”错配。',
           'training_plan 只给 2 到 3 条最具体、最窄的下一步动作。',
           'weekly_summary 会同时服务训练页和纠错链路，所以要精确、短、可复用。',
+          '不管样本来自哪个训练专区，都按同一训练视角总结。',
         ],
         limits: {
           daily_mismatch_pairs: 4,
@@ -434,12 +460,30 @@ function buildModelPrompt(
           },
         },
       },
-      prepared_expression_context: {
-        title: asset.draft.title,
-        scene: asset.draft.scene,
-        source: asset.draft.source,
-        high_risk_phrases: asset.structured.highRiskPhrases.slice(0, 6),
-        section_titles: asset.structured.sections.slice(0, 8).map((section) => section.title),
+      training_context: {
+        active_prepared_expression: asset
+          ? {
+              title: asset.draft.title,
+              scene: asset.draft.scene,
+              source: asset.draft.source,
+              high_risk_phrases: asset.structured.highRiskPhrases.slice(0, 6),
+              section_titles: asset.structured.sections.slice(0, 8).map((section) => section.title),
+            }
+          : null,
+        last_24h_category_counts: dailySamples.reduce<Record<string, number>>((acc, sample) => {
+          const category = sample.exercise_category?.trim();
+          if (category) {
+            acc[category] = (acc[category] ?? 0) + 1;
+          }
+          return acc;
+        }, {}),
+        last_7d_category_counts: weeklySamples.reduce<Record<string, number>>((acc, sample) => {
+          const category = sample.exercise_category?.trim();
+          if (category) {
+            acc[category] = (acc[category] ?? 0) + 1;
+          }
+          return acc;
+        }, {}),
       },
       last_24h_samples: compactDaily,
       last_7d_samples: compactWeekly,

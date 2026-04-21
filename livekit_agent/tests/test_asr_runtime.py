@@ -85,6 +85,14 @@ class FakeMonoFrame:
         self.num_channels = 1
 
 
+class FakeASRClient:
+    def __init__(self) -> None:
+        self.commit_calls = 0
+
+    async def commit_audio(self) -> None:
+        self.commit_calls += 1
+
+
 class TestASRRuntime(unittest.TestCase):
     def test_with_model_query_appends_model_when_missing(self) -> None:
         url = with_model_query(
@@ -243,6 +251,99 @@ class TestASRRuntime(unittest.TestCase):
         self.assertEqual(len(published_payloads), 1)
         self.assertEqual(final_transcripts, ["我想挂号。"])
         self.assertEqual(published_payloads[0]["text"], "我想挂号。")
+        self.assertEqual(runtime._ignore_short_transcripts_until, 0.0)
+
+    def test_handle_server_event_keeps_two_char_transcript_for_short_utterance_capture(self) -> None:
+        published_payloads: list[dict[str, object]] = []
+        final_transcripts: list[str] = []
+
+        async def publish_payload(payload: dict[str, object]) -> None:
+            published_payloads.append(payload)
+
+        async def on_final_transcript(text: str) -> None:
+            final_transcripts.append(text)
+
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type(
+                "Ctx",
+                (),
+                {"room_name": "room", "participant_identity": "user", "request_id": "req-1"},
+            )(),
+            participant=None,
+            publish_payload=publish_payload,
+            on_final_transcript=on_final_transcript,
+        )
+        runtime._ignore_short_transcripts_until = float("inf")
+        runtime._short_utterance_capture_expected = True
+
+        asyncio.run(
+            runtime._handle_server_event(
+                {
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "transcript": "喝水",
+                }
+            )
+        )
+
+        self.assertEqual(len(published_payloads), 1)
+        self.assertEqual(final_transcripts, ["喝水"])
+        self.assertEqual(published_payloads[0]["text"], "喝水")
+        self.assertFalse(runtime._short_utterance_capture_expected)
+
+    def test_commit_audio_ignores_duplicate_commit_for_same_client_capture(self) -> None:
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type("Ctx", (), {"room_name": "room", "participant_identity": "user"})(),
+            participant=None,
+            publish_payload=None,
+            on_final_transcript=None,
+        )
+        runtime.client = FakeASRClient()
+        runtime._started = True
+        runtime.note_client_recording_event("speech_started", False)
+
+        asyncio.run(runtime.commit_audio("manual_stop"))
+        asyncio.run(runtime.commit_audio("vad_auto_finalize"))
+
+        self.assertEqual(runtime.client.commit_calls, 1)
+
+    def test_commit_audio_allows_new_client_capture_after_restart(self) -> None:
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type("Ctx", (), {"room_name": "room", "participant_identity": "user"})(),
+            participant=None,
+            publish_payload=None,
+            on_final_transcript=None,
+        )
+        runtime.client = FakeASRClient()
+        runtime._started = True
+        runtime.note_client_recording_event("speech_started", False)
+        asyncio.run(runtime.commit_audio("manual_stop"))
+
+        runtime.note_client_recording_event("speech_started", False)
+        asyncio.run(runtime.commit_audio("manual_stop"))
+
+        self.assertEqual(runtime.client.commit_calls, 2)
+
+    def test_manual_stop_does_not_enable_short_tail_ignore_for_short_utterance_capture(self) -> None:
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type("Ctx", (), {"room_name": "room", "participant_identity": "user"})(),
+            participant=None,
+            publish_payload=None,
+            on_final_transcript=None,
+        )
+        runtime.client = FakeASRClient()
+        runtime._started = True
+        runtime.note_client_recording_event(
+            "speech_started",
+            False,
+            short_utterance_expected=True,
+        )
+
+        asyncio.run(runtime.commit_audio("manual_stop"))
+
         self.assertEqual(runtime._ignore_short_transcripts_until, 0.0)
 
 

@@ -6,6 +6,8 @@ export type TrainingEtiology =
   | 'parkinsons'
   | 'cerebral_palsy'
   | 'brain_injury'
+  | 'hearing_loss'
+  | 'neuromuscular'
   | 'other'
 
 export type TrainingSeverity = 'unsure' | 'mild' | 'moderate' | 'severe'
@@ -27,6 +29,11 @@ export interface TrainingGuidanceContext {
   coachingPlan: string[]
 }
 
+export interface PersistedTrainingGuidanceProfileLike {
+  etiology?: unknown
+  severity?: unknown
+}
+
 export const DEFAULT_TRAINING_GUIDANCE_PROFILE: TrainingGuidanceProfile = {
   etiology: 'unknown',
   severity: 'unsure',
@@ -42,6 +49,8 @@ export const TRAINING_ETIOLOGY_OPTIONS: Array<{
   { value: 'parkinsons', label: '帕金森或运动障碍相关' },
   { value: 'cerebral_palsy', label: '脑瘫或儿童期运动障碍延续' },
   { value: 'brain_injury', label: '脑外伤 / 术后 / 其他神经损伤' },
+  { value: 'hearing_loss', label: '听力相关' },
+  { value: 'neuromuscular', label: '肌肉退化 / 神经肌肉相关' },
   { value: 'other', label: '其他或混合原因' },
 ]
 
@@ -55,6 +64,14 @@ export const TRAINING_SEVERITY_OPTIONS: Array<{
   { value: 'severe', label: '重度：短句也常需要重复或辅助' },
 ]
 
+const TRAINING_ETIOLOGY_LABEL_MAP = Object.fromEntries(
+  TRAINING_ETIOLOGY_OPTIONS.map((option) => [option.value, option.label]),
+) as Record<TrainingEtiology, string>
+
+const TRAINING_SEVERITY_LABEL_MAP = Object.fromEntries(
+  TRAINING_SEVERITY_OPTIONS.map((option) => [option.value, option.label]),
+) as Record<TrainingSeverity, string>
+
 export const TRAINING_PRIORITY_OPTIONS: Array<{
   value: TrainingPriority
   label: string
@@ -64,7 +81,7 @@ export const TRAINING_PRIORITY_OPTIONS: Array<{
   { value: 'rate_prosody', label: '语速、停顿、节奏' },
 ]
 
-const STORAGE_PREFIX = 'voxflame_training_guidance_profile_'
+const STORAGE_PREFIX = 'voxflame_training_labels_'
 
 function getStorageKey(userId: string): string {
   return `${STORAGE_PREFIX}${userId}`
@@ -90,6 +107,35 @@ function readPriority(value: unknown): TrainingPriority {
   return TRAINING_PRIORITY_OPTIONS.some((option) => option.value === value)
     ? (value as TrainingPriority)
     : DEFAULT_TRAINING_GUIDANCE_PROFILE.priority
+}
+
+
+export function getTrainingEtiologyLabel(value: TrainingEtiology): string {
+  return TRAINING_ETIOLOGY_LABEL_MAP[value]
+}
+
+export function getTrainingSeverityLabel(value: TrainingSeverity): string {
+  return TRAINING_SEVERITY_LABEL_MAP[value]
+}
+
+export function applyPersistedTrainingGuidanceProfile(
+  baseProfile: TrainingGuidanceProfile,
+  persistedProfile?: PersistedTrainingGuidanceProfileLike | null,
+): TrainingGuidanceProfile {
+  const nextEtiology = readEtiology(persistedProfile?.etiology)
+  const nextSeverity = readSeverity(persistedProfile?.severity)
+
+  return {
+    etiology:
+      baseProfile.etiology !== DEFAULT_TRAINING_GUIDANCE_PROFILE.etiology
+        ? baseProfile.etiology
+        : nextEtiology,
+    severity:
+      baseProfile.severity !== DEFAULT_TRAINING_GUIDANCE_PROFILE.severity
+        ? baseProfile.severity
+        : nextSeverity,
+    priority: readPriority(baseProfile.priority),
+  }
 }
 
 export function getTrainingGuidanceProfile(userId: string): TrainingGuidanceProfile {
@@ -180,15 +226,5 @@ export function buildTrainingGuidanceContext(
       '嘴巴动作做大一点，把嘴唇或舌尖的位置摆清楚。',
       severityHint,
     ],
-  }
-}
-
-export function buildTrainingGuidanceProfileMetadata(
-  profile: TrainingGuidanceProfile,
-): Record<string, string> {
-  return {
-    etiology: profile.etiology,
-    severity: profile.severity,
-    priority: profile.priority,
   }
 }

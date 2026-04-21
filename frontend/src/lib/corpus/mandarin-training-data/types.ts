@@ -1,4 +1,5 @@
 export const MANDARIN_TRAINING_CATEGORY_ORDER = [
+  '评估筛查',
   '日常与出行',
   '看病与求助',
   '人群与角色',

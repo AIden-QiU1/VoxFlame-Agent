@@ -521,7 +521,7 @@ export default function ChatInterface({
   }), [runtimeScene])
 
   return (
-    <div className="flex h-dvh bg-stone-50">
+    <div className="flex h-dvh bg-[linear-gradient(180deg,_#fcf7ee_0%,_#fffdf9_42%,_#f4efe6_100%)]">
       <WaveformVisualizer analyser={analyser} isRecording={isRecording} />
       {showPhrasesPanel ? (
         <button
@@ -649,12 +649,13 @@ export default function ChatInterface({
             <div className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-amber-700">先点一句，再继续说</div>
+                  <div className="text-sm font-medium text-amber-700">先说关键一句</div>
                   <h1 className="max-w-3xl text-3xl font-semibold text-stone-950 text-balance">
-                    先把关键一句送出去，后面再慢慢补充
+                    先让对方听懂重点，
+                    <span className="block text-amber-600">后面再慢慢补充</span>
                   </h1>
                   <p className="max-w-3xl text-sm leading-6 text-stone-600 text-pretty">
-                    如果现在不想从零开始，先点一句场景句。对方听清后，再说第二句、第三句会轻松很多。
+                    如果现在不想从零开始，先点一句场景句。对方停下来后，再继续补第二句、第三句。
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -687,12 +688,12 @@ export default function ChatInterface({
             </div>
 
             <div className="rounded-[28px] border border-stone-200 bg-stone-100 p-5 shadow-sm">
-              <div className="text-sm font-medium text-stone-700">如果你这会儿有点紧张</div>
+              <div className="text-sm font-medium text-stone-700">当前状态</div>
               <div className="mt-3 text-2xl font-semibold text-stone-950">{statusText}</div>
               <div className="mt-2 space-y-2 text-sm text-stone-600">
-                <p>先选一个最接近的场景，再点一句开口句。</p>
-                <p>对方停下来后，再用语音、文字或短语继续补充。</p>
-                <p>如果被打断，就打开表达工具箱先补一句。</p>
+                <p>先选场景，再点一句开口句。</p>
+                <p>对方停下来后，再继续补充。</p>
+                <p>如果被打断，就先用短语补一句。</p>
               </div>
               <MicrophoneInputFeedback
                 analyser={analyser}
@@ -715,8 +716,8 @@ export default function ChatInterface({
               <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">
                 隐私边界
               </span>
-              <p className="text-sm leading-6 text-stone-700">
-                当前沟通页默认只做实时理解、纠错，并在会话结束后小幅更新用户个人画像，不默认上传原始沟通音频。训练样本上传仍只发生在训练页。
+              <p className="text-sm text-stone-700 text-pretty">
+                沟通页默认只做实时理解和纠错，不默认上传原始沟通音频。训练样本上传只发生在训练页。
               </p>
             </div>
           </section>

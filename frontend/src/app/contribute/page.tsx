@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
 import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
 import { type UploadReceipt, useVoiceUpload } from '@/hooks/useVoiceUpload'
+import { saveWorkspaceUserProfileMemory } from '@/lib/memory/workspace-client'
 import {
   LEGAL_CONSENT_VERSION,
   hasRequiredLegalConsent,
@@ -50,11 +51,12 @@ import {
   assessTrainingSampleQuality,
   type TrainingSampleQuality,
 } from '@/lib/training/training-sample-quality'
+import { summarizeAssessmentAttempts } from '@/lib/training/training-assessment'
 import {
   DEFAULT_TRAINING_GUIDANCE_PROFILE,
-  buildTrainingGuidanceProfileMetadata,
-  getTrainingGuidanceProfile,
-  type TrainingGuidanceProfile,
+  TRAINING_ETIOLOGY_OPTIONS,
+  type TrainingEtiology,
+  type TrainingSeverity,
 } from '@/lib/training/training-guidance-profile'
 import { buildTrainingSampleLineage } from '@/lib/training/training-sample-lineage'
 import { selectTrainingExercises } from '@/lib/training/training-exercise-selection'
@@ -71,6 +73,11 @@ type AttemptSaveTrigger = 'auto' | 'manual'
 
 type PracticeSourceMode = 'prepared_content' | 'sentence_corpus'
 type PracticeExercise = MandarinTrainingExercise | PreparedExpressionPracticeExercise
+
+interface TrainingUploadLabels {
+  etiology?: TrainingEtiology
+  severity?: TrainingSeverity
+}
 
 interface PracticeAttempt {
   createdAt: number
@@ -181,6 +188,28 @@ function formatRecordingTime(totalSeconds: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`
+}
+
+function mapAssessmentSeverityToProfileSeverity(
+  severityBand: ReturnType<typeof summarizeAssessmentAttempts>['severityBand'],
+): TrainingSeverity {
+  if (severityBand === 'severe') {
+    return 'severe'
+  }
+
+  if (severityBand === 'moderate') {
+    return 'moderate'
+  }
+
+  if (severityBand === 'mild') {
+    return 'mild'
+  }
+
+  return 'unsure'
+}
+
 function buildUploadMetadata(
   exercise: PracticeExercise,
   recording: VoxFlameRecordingEnvelope,
@@ -189,17 +218,10 @@ function buildUploadMetadata(
   feedback: MandarinTrainingFeedback,
   sampleQuality: TrainingSampleQuality,
   saveTrigger: AttemptSaveTrigger,
-  guidanceProfile?: TrainingGuidanceProfile | null,
+  uploadLabels?: TrainingUploadLabels | null,
 ): Record<string, unknown> {
   const lineage = buildTrainingSampleLineage(exercise, recording)
-  const hasExplicitGuidanceProfile = Boolean(
-    guidanceProfile
-    && (
-      guidanceProfile.etiology !== DEFAULT_TRAINING_GUIDANCE_PROFILE.etiology
-      || guidanceProfile.severity !== DEFAULT_TRAINING_GUIDANCE_PROFILE.severity
-      || guidanceProfile.priority !== DEFAULT_TRAINING_GUIDANCE_PROFILE.priority
-    ),
-  )
+  const isAssessmentExercise = exercise.category === '评估筛查'
   const metadata: Record<string, unknown> = {
     kind: 'training_result',
     exercise_id: exercise.id,
@@ -237,8 +259,18 @@ function buildUploadMetadata(
     auto_saved: saveTrigger === 'auto',
   }
 
-  if (hasExplicitGuidanceProfile && guidanceProfile) {
-    metadata.training_guidance_profile = buildTrainingGuidanceProfileMetadata(guidanceProfile)
+  if (uploadLabels?.etiology && uploadLabels.etiology !== DEFAULT_TRAINING_GUIDANCE_PROFILE.etiology) {
+    metadata.etiology = uploadLabels.etiology
+  }
+
+  if (uploadLabels?.severity && uploadLabels.severity !== DEFAULT_TRAINING_GUIDANCE_PROFILE.severity) {
+    metadata.severity = uploadLabels.severity
+  }
+
+  if (isAssessmentExercise) {
+    metadata.assessment_mode = 'screening'
+    metadata.assessment_scheme = 'character_accuracy_v1'
+    metadata.assessment_prompt_count = 20
   }
 
   if (isPreparedExpressionExercise(exercise)) {
@@ -296,11 +328,14 @@ function buildUploadedTrainingRecord(attempt: PracticeAttempt) {
 function getRecorderStatusCopy(
   status: ReturnType<typeof useMandarinTrainingSession>['status'],
   sessionError: string | null,
+  isAssessmentTopic: boolean = false,
 ): { label: string; description: string } {
   if (status === 'recording') {
     return {
       label: '正在录音',
-      description: '按正常节奏读完这句，然后点击停止。',
+      description: isAssessmentTopic
+        ? '把当前词说完整，尾音稍微留半拍。'
+        : '按正常节奏读完这句，然后点击停止。',
     }
   }
 
@@ -314,7 +349,7 @@ function getRecorderStatusCopy(
   if (status === 'ready') {
     return {
       label: '可以开始',
-      description: '选好主题后，点一次录音就行。',
+      description: isAssessmentTopic ? '点一次录音，读完当前词就停。' : '选好主题后，点一次录音就行。',
     }
   }
 
@@ -334,7 +369,40 @@ function getRecorderStatusCopy(
 
   return {
     label: '等待开始',
-    description: '先选一个训练主题，系统会给出当前要练的句子。',
+    description: isAssessmentTopic
+      ? '准备好后直接从当前筛查词开始。'
+      : '先选一个训练主题，系统会给出当前要练的句子。',
+  }
+}
+
+function getAssessmentTranscriptNotice(
+  transcript: string,
+  hasRecording: boolean,
+): {
+  heardText: string
+  helperText: string
+  tone: 'sky' | 'amber'
+} {
+  if (transcript.trim()) {
+    return {
+      heardText: transcript,
+      helperText: '这条已经拿到 transcript，可以继续看这一词的字准率。',
+      tone: 'sky',
+    }
+  }
+
+  if (hasRecording) {
+    return {
+      heardText: '这次录到了音频，但短词 transcript 还没收稳。',
+      helperText: '这不等于没录到声音。把词说慢一点，尾音留完整，再录一次更稳。',
+      tone: 'amber',
+    }
+  }
+
+  return {
+    heardText: '这次还没有拿到可用录音。',
+    helperText: '先确认浏览器麦克风权限，再重新录一遍。',
+    tone: 'amber',
   }
 }
 
@@ -662,6 +730,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   } = useMandarinTrainingSession({
     userId: userId ?? undefined,
     accessToken: session?.access_token,
+    shortUtteranceMode: topicSelection.category === '评估筛查',
   })
   const {
     uploadRecording,
@@ -684,6 +753,11 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [sessionPracticedExerciseIds, setSessionPracticedExerciseIds] = useState<string[]>([])
   const [attempt, setAttempt] = useState<PracticeAttempt | null>(null)
+  const [assessmentAttemptsByExercise, setAssessmentAttemptsByExercise] = useState<
+    Record<string, PracticeAttempt>
+  >({})
+  const [trainingEtiology, setTrainingEtiology] = useState<TrainingEtiology>('unknown')
+  const [isSavingTrainingLabels, setIsSavingTrainingLabels] = useState(false)
   const [notice, setNotice] = useState<NoticeState | null>(null)
   const [isPreparedPreviewOpen, setIsPreparedPreviewOpen] = useState(false)
 
@@ -691,7 +765,6 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   disconnectRef.current = disconnect
 
   const canSaveTrainingSample = hasRequiredLegalConsent(user)
-  const recorderStatus = getRecorderStatusCopy(status, sessionError)
   const preparedExpression = workspaceSnapshot?.prepared_expression ?? null
   const preparedExpressionExercises = useMemo(
     () => buildPreparedExpressionPracticeExercises(preparedExpression),
@@ -715,6 +788,8 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   }, [preparedExpression?.summary, preparedExpressionDocument])
   const selectedCategory = topicSelection.category ?? MANDARIN_TRAINING_CATEGORIES[0]
   const practiceMode: PracticeSourceMode = topicSelection.practiceMode
+  const isAssessmentTopic =
+    practiceMode === 'sentence_corpus' && selectedCategory === '评估筛查'
 
   const categoryExercises = useMemo(
     () => (
@@ -788,18 +863,76 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
             ...currentExercise.preparedExpressionKeywords,
             ...currentExercise.preparedExpressionHighRiskPhrases,
           ]
-        : [currentExercise?.category ?? null],
+        : isAssessmentTopic
+          ? [currentExercise?.category ?? null, '筛查词表']
+          : [currentExercise?.category ?? null],
       8,
     ),
-    [currentExercise],
+    [currentExercise, isAssessmentTopic],
   )
 
   const trainingReports = useMemo(
     () => mapTrainingReports(workspaceSnapshot?.prepared_expression?.training_reports),
     [workspaceSnapshot?.prepared_expression?.training_reports],
   )
+  const assessmentSummary = useMemo(
+    () => (
+      isAssessmentTopic
+        ? summarizeAssessmentAttempts(
+            Object.values(assessmentAttemptsByExercise).map((savedAttempt) => ({
+              exerciseId: savedAttempt.exercise.id,
+              targetText: savedAttempt.exercise.text,
+              heardText: savedAttempt.transcript,
+              normalizedTarget: savedAttempt.feedback.normalizedTarget,
+              missingChars: savedAttempt.feedback.missingChars,
+            })),
+            categoryExercises.length,
+          )
+        : null
+    ),
+    [assessmentAttemptsByExercise, categoryExercises.length, isAssessmentTopic],
+  )
+  const assessedSeverity = useMemo(
+    () => (
+      assessmentSummary
+        ? mapAssessmentSeverityToProfileSeverity(assessmentSummary.severityBand)
+        : 'unsure'
+    ),
+    [assessmentSummary],
+  )
+  const trainingUploadLabels = useMemo<TrainingUploadLabels>(() => ({
+    etiology: trainingEtiology,
+    severity:
+      assessedSeverity !== DEFAULT_TRAINING_GUIDANCE_PROFILE.severity
+        ? assessedSeverity
+        : workspaceSnapshot?.user_profile_memory?.severity as TrainingSeverity | undefined,
+  }), [assessedSeverity, trainingEtiology, workspaceSnapshot?.user_profile_memory?.severity])
+  const recorderStatus = getRecorderStatusCopy(status, sessionError, isAssessmentTopic)
+  const currentAttemptCharacterAccuracy = useMemo(() => {
+    if (!attempt || !isAssessmentTopic || attempt.feedback.normalizedTarget.length === 0) {
+      return null
+    }
+
+    return Math.max(
+      0,
+      (attempt.feedback.normalizedTarget.length - attempt.feedback.missingChars.length)
+      / attempt.feedback.normalizedTarget.length,
+    )
+  }, [attempt, isAssessmentTopic])
+  const assessmentTranscriptNotice = useMemo(
+    () => (
+      isAssessmentTopic && attempt
+        ? getAssessmentTranscriptNotice(attempt.transcript, Boolean(attempt.recording))
+        : null
+    ),
+    [attempt, isAssessmentTopic],
+  )
 
   const exerciseSelectionHint = useMemo(() => {
+    if (isAssessmentTopic) {
+      return '固定 20 条筛查词，按顺序录就行。'
+    }
+
     if (selectableExerciseState.stage === 'unrecorded') {
       return `当前优先展示还没录过的句子，还剩 ${selectableExerciseState.unrecordedCount} 句。`
     }
@@ -809,9 +942,15 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     }
 
     return '这一组这轮都练过了，现在允许回看前面的句子继续复练。'
-  }, [selectableExerciseState])
+  }, [isAssessmentTopic, selectableExerciseState])
 
   const currentGoalHeadline = useMemo(() => {
+    if (isAssessmentTopic && assessmentSummary) {
+      return assessmentSummary.completedCount > 0
+        ? `当前初步等级：${assessmentSummary.severityLabel}`
+        : '先把 20 条筛查词录完一遍'
+    }
+
     if (trainingReports?.trainingPlan?.items[0]) {
       return trainingReports.trainingPlan.items[0]
     }
@@ -821,9 +960,13 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     }
 
     return '这一轮先把当前这句录稳，再继续下一句。'
-  }, [trainingReports])
+  }, [assessmentSummary, isAssessmentTopic, trainingReports])
 
   const currentGoalSupport = useMemo(() => {
+    if (isAssessmentTopic && assessmentSummary) {
+      return assessmentSummary.severitySummary
+    }
+
     if (attempt?.sampleQuality.summary) {
       return attempt.sampleQuality.summary
     }
@@ -833,27 +976,54 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     }
 
     return '这里只保留最少反馈：准备状态、当前目标和这一句是否建议马上重录。'
-  }, [attempt?.sampleQuality.summary, trainingReports])
+  }, [assessmentSummary, attempt?.sampleQuality.summary, isAssessmentTopic, trainingReports])
 
-  const currentProgressStats = useMemo(() => ([
-    {
-      label: '本轮已练',
-      value: `${sessionPracticedExerciseIds.length} 句`,
-      detail: '只算这一轮已经真正录过的句子。',
-    },
-    {
-      label: '待补登',
-      value: `${localQueueItems.length} 条`,
-      detail: localQueueItems.length > 0 ? '这些录音会在后台自动补登。' : '当前没有待补登录音。',
-    },
-    {
-      label: '可练句数',
-      value: practiceMode === 'prepared_content'
-        ? `${preparedExpressionExercises.length} 句`
-        : `${matchingExercises.length} 句`,
-      detail: practiceMode === 'prepared_content' ? '从当前准备内容里提取。' : '来自当前通用句库筛选结果。',
-    },
-  ]), [
+  const currentProgressStats = useMemo(() => {
+    if (isAssessmentTopic) {
+      return [
+        {
+          label: '已测词条',
+          value: assessmentSummary
+            ? `${assessmentSummary.completedCount}/${assessmentSummary.totalExerciseCount}`
+            : `0/${categoryExercises.length}`,
+          detail: '先整组录完。',
+        },
+        {
+          label: '当前字准率',
+          value: assessmentSummary ? formatPercent(assessmentSummary.accuracyRatio) : '--',
+          detail: '按正确字数算。',
+        },
+        {
+          label: '初步等级',
+          value: assessmentSummary?.severityLabel ?? '待开始',
+          detail: '训练分层用。',
+        },
+      ]
+    }
+
+    return [
+      {
+        label: '本轮已练',
+        value: `${sessionPracticedExerciseIds.length} 句`,
+        detail: '只算这一轮已经真正录过的句子。',
+      },
+      {
+        label: '待补登',
+        value: `${localQueueItems.length} 条`,
+        detail: localQueueItems.length > 0 ? '这些录音会在后台自动补登。' : '当前没有待补登录音。',
+      },
+      {
+        label: '可练句数',
+        value: practiceMode === 'prepared_content'
+          ? `${preparedExpressionExercises.length} 句`
+          : `${matchingExercises.length} 句`,
+        detail: practiceMode === 'prepared_content' ? '从当前准备内容里提取。' : '来自当前通用句库筛选结果。',
+      },
+    ]
+  }, [
+    assessmentSummary,
+    categoryExercises.length,
+    isAssessmentTopic,
     localQueueItems.length,
     matchingExercises.length,
     practiceMode,
@@ -867,8 +1037,18 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     }
 
     setSessionPracticedExerciseIds([])
+    setAssessmentAttemptsByExercise({})
     void refreshLocalQueueCount()
-  }, [refreshLocalQueueCount, userId])
+  }, [refreshLocalQueueCount, topicId, userId])
+
+  useEffect(() => {
+    const etiology = workspaceSnapshot?.user_profile_memory?.etiology
+    setTrainingEtiology(
+      TRAINING_ETIOLOGY_OPTIONS.some((option) => option.value === etiology)
+        ? (etiology as TrainingEtiology)
+        : 'unknown',
+    )
+  }, [workspaceSnapshot?.user_profile_memory?.etiology])
 
   useEffect(() => {
     return () => {
@@ -965,6 +1145,54 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     void handleStartRecording()
   }, [handleStartRecording, isProcessing, isRecording, isUploading])
 
+  const handleSaveTrainingLabels = useCallback(async () => {
+    if (!userId || !isAuthenticated) {
+      setNotice({
+        tone: 'error',
+        message: '先登录后才能保存训练资料标签。',
+      })
+      return
+    }
+
+    if (trainingEtiology === 'unknown') {
+      setNotice({
+        tone: 'error',
+        message: '请先选择一个疾病种类，再保存训练资料标签。',
+      })
+      return
+    }
+
+    setIsSavingTrainingLabels(true)
+
+    try {
+      await saveWorkspaceUserProfileMemory(userId, {
+        document: workspaceSnapshot?.user_profile_memory.document ?? undefined,
+        etiology: trainingEtiology,
+        severity: assessedSeverity,
+      })
+      await refreshWorkspaceSnapshot()
+      setNotice({
+        tone: 'success',
+        message: '训练资料标签已保存，后续上传样本会自动带上疾病种类和评测严重程度。',
+      })
+    } catch (error) {
+      console.error('[contribute] save training labels failed:', error)
+      setNotice({
+        tone: 'error',
+        message: '训练资料标签保存失败了，请稍后再试。',
+      })
+    } finally {
+      setIsSavingTrainingLabels(false)
+    }
+  }, [
+    assessedSeverity,
+    isAuthenticated,
+    refreshWorkspaceSnapshot,
+    trainingEtiology,
+    userId,
+    workspaceSnapshot?.user_profile_memory.document,
+  ])
+
   const persistTrainingAttempt = useCallback(async (
     attemptToPersist: PracticeAttempt,
     saveTrigger: AttemptSaveTrigger,
@@ -1007,9 +1235,6 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     })
 
     const consentScope: VoxFlameConsentScope = 'training_only'
-    const guidanceProfile = userId
-      ? getTrainingGuidanceProfile(userId)
-      : null
     const result = await uploadRecording(attemptToPersist.recording.audio.blob, {
       text: attemptToPersist.exercise.text,
       recognizedText: attemptToPersist.transcript,
@@ -1025,7 +1250,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         attemptToPersist.feedback,
         attemptToPersist.sampleQuality,
         saveTrigger,
-        guidanceProfile,
+        trainingUploadLabels,
       ),
     })
 
@@ -1076,6 +1301,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     })
   }, [
     canSaveTrainingSample,
+    trainingUploadLabels,
     uploadRecording,
     userId,
   ])
@@ -1109,18 +1335,30 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
           : 'idle',
         uploadReceipt: null,
       }
+      const hasUsableAssessmentTranscript = !(isAssessmentTopic && transcript.length === 0)
 
-      setSessionPracticedExerciseIds((currentIds) => (
-        currentIds.includes(currentExercise.id)
-          ? currentIds
-          : [...currentIds, currentExercise.id]
-      ))
+      if (hasUsableAssessmentTranscript) {
+        setSessionPracticedExerciseIds((currentIds) => (
+          currentIds.includes(currentExercise.id)
+            ? currentIds
+            : [...currentIds, currentExercise.id]
+        ))
+      }
       setAttempt(nextAttempt)
+      if (isAssessmentTopic && hasUsableAssessmentTranscript) {
+        setAssessmentAttemptsByExercise((current) => ({
+          ...current,
+          [currentExercise.id]: nextAttempt,
+        }))
+      }
       const currentIndex = visibleExercises.findIndex((exercise) => exercise.id === currentExercise.id)
-      const shouldAutoAdvance =
-        sampleQuality.action !== 'retry' &&
-        visibleExercises.length > 1 &&
-        currentIndex >= 0
+      const shouldAutoAdvance = isAssessmentTopic
+        ? hasUsableAssessmentTranscript && visibleExercises.length > 1 && currentIndex >= 0
+        : (
+            sampleQuality.action !== 'retry'
+            && visibleExercises.length > 1
+            && currentIndex >= 0
+          )
       const nextExercise = shouldAutoAdvance
         ? visibleExercises[(currentIndex + 1) % visibleExercises.length]
         : null
@@ -1130,8 +1368,14 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       }
 
       setNotice({
-        tone: canSaveTrainingSample && result.recording ? 'info' : 'success',
-        message: canSaveTrainingSample && result.recording
+        tone: isAssessmentTopic && !hasUsableAssessmentTranscript
+          ? 'error'
+          : canSaveTrainingSample && result.recording
+            ? 'info'
+            : 'success',
+        message: isAssessmentTopic && !hasUsableAssessmentTranscript
+          ? '这次录到了音频，但短词 transcript 还没收稳；先把词说慢一点、尾音留完整，再录一次。'
+          : canSaveTrainingSample && result.recording
           ? nextExercise
             ? '录音已经收下，正在自动保存这条样本，并且已经切到下一句。'
             : '录音已经收下，正在自动保存这条样本。'
@@ -1140,7 +1384,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
             : '录音已经收下，可以直接看系统听到的结果。',
       })
 
-      if (nextAttempt.recording && canSaveTrainingSample) {
+      if (nextAttempt.recording && canSaveTrainingSample && hasUsableAssessmentTranscript) {
         void persistTrainingAttempt(nextAttempt, 'auto')
       }
     } catch (error) {
@@ -1153,6 +1397,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   }, [
     canSaveTrainingSample,
     currentExercise,
+    isAssessmentTopic,
     persistTrainingAttempt,
     stopRecording,
     visibleExercises,
@@ -1250,11 +1495,105 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
               className="rounded-[24px] border border-stone-200 bg-white px-5 py-5 shadow-sm"
             >
               <p className="text-sm font-medium text-stone-500">{stat.label}</p>
-              <p className="mt-3 text-2xl font-semibold text-gray-900">{stat.value}</p>
-              <p className="mt-2 text-sm leading-6 text-gray-600">{stat.detail}</p>
+              <p className="mt-3 text-2xl font-semibold text-gray-900 tabular-nums">{stat.value}</p>
+              <p className="mt-2 text-sm text-gray-600">{stat.detail}</p>
             </div>
           ))}
         </section>
+
+        {isAssessmentTopic && assessmentSummary ? (
+          <section className="rounded-[28px] border border-amber-200 bg-amber-50 p-6 shadow-sm">
+            <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-amber-800 w-fit">
+              <Sparkles className="h-4 w-4" />
+              评估主题区
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-[22px] border border-amber-200 bg-white px-5 py-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-900 text-balance">先选病种，再录筛查词</h2>
+                    <p className="mt-2 text-sm text-gray-600 text-pretty">
+                      疾病种类只选一次。严重程度会按这一组筛查词自动更新。
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveTrainingLabels()}
+                    disabled={isSavingTrainingLabels || trainingEtiology === 'unknown'}
+                    className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSavingTrainingLabels ? '保存中...' : '保存标签'}
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-gray-900">疾病种类</span>
+                    <select
+                      value={trainingEtiology}
+                      onChange={(event) => setTrainingEtiology(event.target.value as TrainingEtiology)}
+                      className="h-12 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
+                    >
+                      {TRAINING_ETIOLOGY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
+                    <p className="text-sm font-medium text-gray-900">评测严重程度</p>
+                    <p className="mt-2 text-lg font-semibold text-gray-900">
+                      {assessmentSummary.completedCount > 0
+                        ? assessmentSummary.severityLabel
+                        : '先录评估词'}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      训练分层用，可重测覆盖。
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[22px] border border-stone-200 bg-white px-5 py-5">
+                <p className="text-sm font-medium text-gray-900">当前结果</p>
+                <p className="mt-3 text-3xl font-semibold text-gray-900 tabular-nums">
+                  {formatPercent(assessmentSummary.accuracyRatio)}
+                </p>
+                <p className="mt-2 text-sm text-gray-600 text-pretty">
+                  {assessmentSummary.severitySummary}
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-stone-200 bg-white px-5 py-5 lg:col-span-2">
+                <p className="text-sm font-medium text-gray-900">最值得回看的词</p>
+                {assessmentSummary.weakestExercises.length > 0 ? (
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    {assessmentSummary.weakestExercises.map((exercise) => (
+                      <div
+                        key={exercise.exerciseId}
+                        className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3"
+                      >
+                        <p className="text-sm font-medium text-gray-900">
+                          {exercise.targetText} · {formatPercent(exercise.accuracyRatio)}
+                        </p>
+                        <p className="mt-1 text-sm text-gray-600">
+                          系统听到：{exercise.heardText || '这次还没有稳定结果'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-gray-600">
+                    先录完几条筛查词，这里才会浮出最容易卡住的例子。
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-6 xl:grid-cols-[0.88fr_1.12fr]">
           <aside className="space-y-6">
@@ -1266,7 +1605,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                     当前训练主题
                   </div>
                   <h2 className="mt-3 text-2xl font-semibold text-gray-900">{topicSelection.label}</h2>
-                  <p className="mt-2 text-sm leading-6 text-gray-600">{topicSelection.description}</p>
+                  <p className="mt-2 text-sm text-gray-600 text-pretty">{topicSelection.description}</p>
                 </div>
                 <Link
                   href="/contribute"
@@ -1333,16 +1672,18 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                     <h3 className="mt-2 text-xl font-semibold text-gray-900">
                       {MANDARIN_TRAINING_CATEGORY_META[selectedCategory].label}
                     </h3>
-                    <p className="mt-2 text-sm leading-6 text-gray-600">
-                      {MANDARIN_TRAINING_CATEGORY_META[selectedCategory].description}
-                    </p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
                         {MANDARIN_TRAINING_CATEGORY_META[selectedCategory].corpusCount} 条可练
                       </span>
                       <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
-                        当前模式：通用句库
+                        {isAssessmentTopic ? '当前模式：筛查词表' : '当前模式：通用句库'}
                       </span>
+                      {isAssessmentTopic ? (
+                        <span className="rounded-full bg-white px-3 py-1 text-xs text-stone-700">
+                          建议先整组录完
+                        </span>
+                      ) : null}
                     </div>
                   </>
                 )}
@@ -1353,9 +1694,13 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-amber-800">句子准备</p>
-                  <h3 className="mt-2 text-xl font-semibold text-gray-900">左边挑句，右边直接录音</h3>
-                  <p className="mt-2 text-sm leading-6 text-gray-600">
-                    这里保留当前主题的句子序列，需要时再换句，不再上下反复来回滚动。
+                  <h3 className="mt-2 text-xl font-semibold text-gray-900">
+                    {isAssessmentTopic ? '固定筛查词表' : '左边挑句，右边直接录音'}
+                  </h3>
+                  <p className="mt-2 text-sm text-gray-600">
+                    {isAssessmentTopic
+                      ? '按顺序录就行，不需要搜索。'
+                      : '这里保留当前主题的句子序列，需要时再换句。'}
                   </p>
                 </div>
                 <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
@@ -1363,19 +1708,25 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 </span>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <input
-                  value={exerciseQuery}
-                  onChange={(event) => setExerciseQuery(event.target.value)}
-                  placeholder={practiceMode === 'prepared_content' ? '搜索当前材料里的句子' : '搜索当前训练主题'}
-                  className="h-11 flex-1 rounded-2xl border border-stone-200 bg-white px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300"
-                />
-                <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-                  {practiceMode === 'prepared_content' ? '自定义训练' : '通用句库'}
-                </span>
-              </div>
+              {isAssessmentTopic ? (
+                <p className="mt-4 text-sm text-gray-600">{exerciseSelectionHint}</p>
+              ) : (
+                <>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <input
+                      value={exerciseQuery}
+                      onChange={(event) => setExerciseQuery(event.target.value)}
+                      placeholder={practiceMode === 'prepared_content' ? '搜索当前材料里的句子' : '搜索当前训练主题'}
+                      className="h-11 flex-1 rounded-2xl border border-stone-200 bg-white px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300"
+                    />
+                    <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
+                      {practiceMode === 'prepared_content' ? '自定义训练' : '通用句库'}
+                    </span>
+                  </div>
 
-              <p className="mt-3 text-sm text-gray-600">{exerciseSelectionHint}</p>
+                  <p className="mt-3 text-sm text-gray-600">{exerciseSelectionHint}</p>
+                </>
+              )}
 
               <div className="mt-4 max-h-[720px] overflow-y-auto rounded-[24px] border border-stone-200 bg-stone-50 p-3">
                 <div className="space-y-3">
@@ -1403,7 +1754,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                               ? 'bg-white text-amber-800'
                               : 'bg-stone-100 text-stone-600'
                           }`}>
-                            {isActive ? '当前句' : '点这句开练'}
+                            {isActive ? (isAssessmentTopic ? '当前词' : '当前句') : (isAssessmentTopic ? '点这词开测' : '点这句开练')}
                           </span>
                         </div>
                         <p className="mt-3 text-base font-semibold leading-7 text-gray-900">{exercise.text}</p>
@@ -1424,46 +1775,52 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
           </aside>
 
           <section className="space-y-6">
-            <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-amber-800">每日目标</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-gray-900">{currentGoalHeadline}</h2>
-                  <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">{currentGoalSupport}</p>
+            {!isAssessmentTopic ? (
+              <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">每日目标</p>
+                    <h2 className="mt-2 text-2xl font-semibold text-gray-900">{currentGoalHeadline}</h2>
+                    <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600 text-pretty">{currentGoalSupport}</p>
+                  </div>
+                  {attempt?.sampleQuality.action === 'retry' ? (
+                    <button
+                      type="button"
+                      onClick={handleRetryCurrentExercise}
+                      disabled={isUploading || isProcessing || isRecording}
+                      className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      重录这一句
+                    </button>
+                  ) : null}
                 </div>
-                {attempt?.sampleQuality.action === 'retry' ? (
-                  <button
-                    type="button"
-                    onClick={handleRetryCurrentExercise}
-                    disabled={isUploading || isProcessing || isRecording}
-                    className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    重录这一句
-                  </button>
-                ) : null}
-              </div>
 
-              <div className="mt-5">
-                <p className="text-sm font-medium text-gray-900">今日计划</p>
-                <div className="mt-3">
-                  {trainingReports?.trainingPlan?.items.length
-                    ? renderChips(trainingReports.trainingPlan.items.slice(0, 3), 'emerald')
-                    : (
-                      <p className="text-sm leading-6 text-gray-600">
-                        先录 1 句，系统会自动整理今天的简短计划。
-                      </p>
-                    )}
+                <div className="mt-5">
+                  <p className="text-sm font-medium text-gray-900">今日计划</p>
+                  <div className="mt-3">
+                    {trainingReports?.trainingPlan?.items.length
+                      ? renderChips(trainingReports.trainingPlan.items.slice(0, 3), 'emerald')
+                      : (
+                        <p className="text-sm leading-6 text-gray-600">
+                          先录 1 句，系统会自动整理今天的简短计划。
+                        </p>
+                      )}
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            ) : null}
 
             <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">当前句</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    {isAssessmentTopic ? '当前词' : '当前句'}
+                  </h2>
                   <p className="mt-1 text-sm text-gray-600">
-                    句子准备在左边，录音和结果固定在右边；一条录稳后会默认自动切到下一句。
+                    {isAssessmentTopic
+                      ? '录稳再切下一条。空 transcript 会停在当前词，不会误跳。'
+                      : '句子准备在左边，录音和结果固定在右边；一条录稳后会默认自动切到下一句。'}
                   </p>
                 </div>
                 <span className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-gray-700">
@@ -1530,11 +1887,13 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 </button>
                 <div>
                   <p className="text-lg font-semibold text-gray-900">
-                    {isRecording ? '正在录这一句' : '点一次，直接开始练'}
+                    {isRecording
+                      ? (isAssessmentTopic ? '正在录这一词' : '正在录这一句')
+                      : '点一次，直接开始练'}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-gray-600">
                     {recorderStatus.description}
-                    {!isRecording && visibleExercises.length > 1
+                    {!isRecording && visibleExercises.length > 1 && !isAssessmentTopic
                       ? ' 录完后会自动进入当前主题的下一句。'
                       : ''}
                   </p>
@@ -1544,14 +1903,20 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
               <MicrophoneInputFeedback
                 analyser={analyser}
                 active={isRecording}
-                title="录音输入质量"
+                title={isAssessmentTopic ? '收音状态' : '录音输入质量'}
                 className="mt-6"
               />
 
               <div className="mt-6 rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-5">
-                <p className="text-sm font-medium text-gray-900">实时识别</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {isAssessmentTopic ? '实时 transcript' : '实时识别'}
+                </p>
                 <p className="mt-3 min-h-16 text-base leading-7 text-gray-700">
-                  {interimText || '开始录音后，这里会出现系统当前听到的内容。'}
+                  {interimText || (
+                    isAssessmentTopic
+                      ? '开始录音后，这里会先出现系统临时听到的词。'
+                      : '开始录音后，这里会出现系统当前听到的内容。'
+                  )}
                 </p>
               </div>
 
@@ -1565,9 +1930,13 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
             <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">本次结果</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    {isAssessmentTopic ? '这次结果' : '本次结果'}
+                  </h2>
                   <p className="mt-1 text-sm text-gray-600">
-                    不做逐句 AI 点评，只看标签和系统听到的结果。
+                    {isAssessmentTopic
+                      ? '主要看目标词、系统听到和这一词的字准率。'
+                      : '不做逐句 AI 点评，只看标签和系统听到的结果。'}
                   </p>
                 </div>
                 {attempt ? (
@@ -1602,12 +1971,42 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                     <p className="mt-3 text-base leading-7 text-gray-900">{attempt.exercise.text}</p>
                   </div>
 
-                  <div className="rounded-[20px] bg-sky-50 px-4 py-4">
-                    <p className="text-sm font-medium text-gray-900">系统听到</p>
-                    <p className="mt-3 text-base leading-7 text-gray-900">
-                      {attempt.transcript || '这次还没有稳定拿到最终结果。'}
-                    </p>
-                  </div>
+                  {isAssessmentTopic ? (
+                    <div
+                      className={`rounded-[20px] px-4 py-4 ${
+                        assessmentTranscriptNotice?.tone === 'sky'
+                          ? 'bg-sky-50'
+                          : 'bg-amber-50'
+                      }`}
+                    >
+                      <p className="text-sm font-medium text-gray-900">系统听到</p>
+                      <p className="mt-3 text-base leading-7 text-gray-900">
+                        {assessmentTranscriptNotice?.heardText}
+                      </p>
+                      <p className="mt-2 text-sm text-gray-600">
+                        {assessmentTranscriptNotice?.helperText}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-[20px] bg-sky-50 px-4 py-4">
+                      <p className="text-sm font-medium text-gray-900">系统听到</p>
+                      <p className="mt-3 text-base leading-7 text-gray-900">
+                        {attempt.transcript || '这次还没有稳定拿到最终结果。'}
+                      </p>
+                    </div>
+                  )}
+
+                  {isAssessmentTopic && currentAttemptCharacterAccuracy !== null ? (
+                    <div className="rounded-[20px] bg-white px-4 py-4 ring-1 ring-amber-200">
+                      <p className="text-sm font-medium text-gray-900">这一词筛查分</p>
+                      <p className="mt-3 text-2xl font-semibold text-gray-900">
+                        {formatPercent(currentAttemptCharacterAccuracy)}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-gray-700">
+                        当前按正确字数 / 目标词总字数计算。整组录完后，再看更稳定的初步等级。
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div className="rounded-[20px] bg-emerald-50 px-4 py-4">
                     <p className="text-sm font-medium text-gray-900">保存状态</p>
@@ -1624,9 +2023,13 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                   <div className="rounded-[20px] border border-stone-200 bg-white px-4 py-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">这句判断</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {isAssessmentTopic ? '这次建议' : '这句判断'}
+                        </p>
                         <p className="mt-2 text-sm leading-6 text-gray-700">
-                          {attempt.sampleQuality.summary}
+                          {isAssessmentTopic && !attempt.transcript
+                            ? '先留在当前词重录，不把这次空 transcript 算进评估结果。'
+                            : attempt.sampleQuality.summary}
                         </p>
                       </div>
                       <button
@@ -1636,21 +2039,24 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                         className="inline-flex items-center gap-2 rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-gray-800 transition hover:border-stone-400 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <RotateCcw className="h-4 w-4" />
-                        重录这一句
+                        {isAssessmentTopic ? '重录当前词' : '重录这一句'}
                       </button>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="mt-4 rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
-                  录完这一句后，这里只会出现标签、目标句、系统听到和保存状态。
+                  {isAssessmentTopic
+                    ? '录完后，这里会显示目标词、系统听到和这一词的字准率。'
+                    : '录完这一句后，这里只会出现标签、目标句、系统听到和保存状态。'}
                 </div>
               )}
             </section>
           </section>
         </section>
 
-        <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+        {!isAssessmentTopic ? (
+          <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">详细训练总结</h2>
@@ -1723,7 +2129,8 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 : '现在还没有训练总结。先开始录音，系统会只根据真实训练结果整理今日总结、7 天总结和计划。'}
               </div>
             )}
-        </section>
+          </section>
+        ) : null}
       </main>
     </div>
   )

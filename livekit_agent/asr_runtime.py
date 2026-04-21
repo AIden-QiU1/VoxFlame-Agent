@@ -28,6 +28,7 @@ TRANSCRIPT_EDGE_PUNCTUATION_PATTERN = re.compile(
     r"^[\s，。！？!?；;：:、,.…~～-]+|[\s，。！？!?；;：:、,.…~～-]+$"
 )
 MANUAL_STOP_SHORT_TRANSCRIPT_GRACE_SECONDS = 2.0
+SHORT_UTTERANCE_EXTRA_FINALIZE_GRACE_SECONDS = 1.1
 
 
 class VADState(Enum):
@@ -320,6 +321,12 @@ class LiveKitASRRuntime:
     _clipping_reported_since_commit: bool = False
     _apm_remainder: bytes = b""
     _ignore_short_transcripts_until: float = 0.0
+    _client_recording_active: bool = False
+    _client_capture_tracking_enabled: bool = False
+    _client_capture_id: int = 0
+    _last_committed_client_capture_id: int | None = None
+    _suppress_vad_auto_finalize_until: float = 0.0
+    _short_utterance_capture_expected: bool = False
 
     async def start(self) -> None:
         if self._stream_task is not None:
@@ -362,15 +369,65 @@ class LiveKitASRRuntime:
         )
         self._stream_task = asyncio.create_task(self._consume_stream(stream))
 
+    def note_client_recording_event(
+        self,
+        state: str,
+        auto_finalize: bool,
+        *,
+        short_utterance_expected: bool = False,
+    ) -> None:
+        normalized_state = state.strip()
+        if not normalized_state:
+            return
+
+        if normalized_state == "speech_started":
+            self._client_recording_active = True
+            self._client_capture_tracking_enabled = True
+            self._client_capture_id += 1
+            self._last_committed_client_capture_id = None
+            self._suppress_vad_auto_finalize_until = 0.0
+            self._short_utterance_capture_expected = short_utterance_expected
+            return
+
+        if normalized_state == "speech_stopped":
+            self._client_recording_active = False
+            if auto_finalize:
+                suppression_seconds = self.config.dashscope_asr_vad_silence_duration_ms / 1000.0
+                if self._short_utterance_capture_expected:
+                    suppression_seconds = max(
+                        suppression_seconds,
+                        SHORT_UTTERANCE_EXTRA_FINALIZE_GRACE_SECONDS,
+                    )
+                self._suppress_vad_auto_finalize_until = time.monotonic() + (
+                    suppression_seconds
+                )
+
+    def _is_duplicate_client_capture_commit(self) -> bool:
+        return (
+            self._client_capture_tracking_enabled
+            and self._client_capture_id > 0
+            and self._last_committed_client_capture_id == self._client_capture_id
+        )
+
     async def commit_audio(self, reason: str | None = None) -> None:
         if self.client is None or not self._started:
             return
 
-        self._ignore_short_transcripts_until = (
-            time.monotonic() + MANUAL_STOP_SHORT_TRANSCRIPT_GRACE_SECONDS
-            if reason == "manual_stop"
-            else 0.0
-        )
+        if self._is_duplicate_client_capture_commit():
+            logger.info(
+                "LiveKit ASR duplicate commit ignored room=%s participant=%s reason=%s capture_id=%s",
+                self.ctx.room_name,
+                self.ctx.participant_identity,
+                reason or "unknown",
+                self._client_capture_id,
+            )
+            return
+
+        self._ignore_short_transcripts_until = 0.0
+        if reason == "manual_stop" and not self._short_utterance_capture_expected:
+            self._ignore_short_transcripts_until = (
+                time.monotonic() + MANUAL_STOP_SHORT_TRANSCRIPT_GRACE_SECONDS
+            )
         await self._emit_audio_telemetry(reason or "unknown")
 
         logger.info(
@@ -389,6 +446,8 @@ class LiveKitASRRuntime:
         self._clipping_detected_since_commit = False
         self._clipping_reported_since_commit = False
         self._apm_remainder = b""
+        if self._client_capture_tracking_enabled and self._client_capture_id > 0:
+            self._last_committed_client_capture_id = self._client_capture_id
 
     async def stop(self) -> None:
         logger.info(
@@ -586,6 +645,20 @@ class LiveKitASRRuntime:
                     await self.on_speech_activity("barge_in_triggered", False)
 
         if speech_stopped and self._received_voice_since_commit:
+            if (
+                not self._client_recording_active
+                and time.monotonic() < self._suppress_vad_auto_finalize_until
+            ):
+                logger.info(
+                    "LiveKit ASR auto finalize suppressed after client stop room=%s participant=%s speech_ms=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    round(self._speech_ms_since_commit),
+                )
+                self._received_voice_since_commit = False
+                self._speech_ms_since_commit = 0.0
+                self._barge_in_triggered_since_commit = False
+                return
             await self._emit_audio_telemetry("speech_stopped")
             logger.info(
                 "LiveKit VAD speech_stopped room=%s participant=%s silence_ms=%s speech_ms=%s -> auto_finalize",
@@ -677,7 +750,10 @@ class LiveKitASRRuntime:
 
             if ignore_short_transcript:
                 self._ignore_short_transcripts_until = 0.0
-                if semantic_transcript_length(transcript) <= 2:
+                if (
+                    semantic_transcript_length(transcript) <= 2
+                    and not self._short_utterance_capture_expected
+                ):
                     logger.info(
                         "LiveKit ASR ignored short manual_stop tail room=%s participant=%s chars=%s transcript=%s",
                         self.ctx.room_name,
@@ -704,6 +780,7 @@ class LiveKitASRRuntime:
                 )
             )
             await self.on_final_transcript(transcript)
+            self._short_utterance_capture_expected = False
             return
 
         if message_type in {"error", "client.error"}:

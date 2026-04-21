@@ -50,6 +50,8 @@ interface MemoryCommunicationPreferencesRequestBody {
 
 interface MemoryUserProfileMemoryRequestBody {
   user_id?: string;
+  etiology?: string | null;
+  severity?: string | null;
   document?: string | null;
   common_scenarios?: string[];
   risky_terms?: string[];
@@ -383,6 +385,8 @@ export class MemoryController {
       const { userId } = req.params;
       const {
         user_id,
+        etiology,
+        severity,
         document,
         common_scenarios,
         risky_terms,
@@ -408,6 +412,8 @@ export class MemoryController {
       const savedProfileMemory = await SupabaseService.getInstance().updateUserProfileMemory(
         authenticatedUserId,
         {
+          etiology: typeof etiology === 'string' && etiology.trim() ? etiology.trim() : undefined,
+          severity: typeof severity === 'string' && severity.trim() ? severity.trim() : undefined,
           document: typeof document === 'string' && document.trim() ? document.trim() : undefined,
           common_scenarios: Array.isArray(common_scenarios) ? common_scenarios : undefined,
           risky_terms: Array.isArray(risky_terms) ? risky_terms : undefined,

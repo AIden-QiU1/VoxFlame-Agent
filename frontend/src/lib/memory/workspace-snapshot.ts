@@ -99,6 +99,8 @@ export interface PreparedExpressionSnapshot {
 
 export interface WorkspaceMemorySnapshot {
   user_profile_memory: {
+    etiology?: string
+    severity?: string
     document?: string
     summary?: string
     common_scenarios: string[]

@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export class OssService {
-    private client: OSS;
+    private client: OSS | null = null;
     private isConfigured: boolean = false;
 
     constructor() {
@@ -24,14 +24,15 @@ export class OssService {
             console.log(`[OSS] Service initialized (Bucket: ${bucket}, Region: ${region})`);
         } else {
             console.warn('[OSS] Credentials missing. Service Disabled. Please set OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, and OSS_BUCKET in .env');
-            // Create a dummy client to avoid startup crash, but methods will throw or fail
-            this.client = new OSS({
-                accessKeyId: 'dummy',
-                accessKeySecret: 'dummy',
-                bucket: 'dummy',
-                region: 'oss-cn-hangzhou'
-            });
         }
+    }
+
+    private getConfiguredClient(): OSS {
+        if (!this.isConfigured || !this.client) {
+            throw new Error('OSS not configured');
+        }
+
+        return this.client;
     }
 
     /**
@@ -41,15 +42,13 @@ export class OssService {
      * @param expiresSeconds Expiration time in seconds (default 300)
      */
     async generateUploadUrl(filename: string, contentType: string, expiresSeconds: number = 300): Promise<string | null> {
-        if (!this.isConfigured) {
-            throw new Error('OSS not configured');
-        }
+        const client = this.getConfiguredClient();
 
         try {
             // signatureUrl returns a string synchronously if using v1 signatures, 
             // but the type definition or newer versions might be async or return Promise in some contexts.
             // Safe to await.
-            const url = this.client.signatureUrl(filename, {
+            const url = client.signatureUrl(filename, {
                 method: 'PUT',
                 expires: expiresSeconds,
                 'Content-Type': contentType
@@ -66,8 +65,9 @@ export class OssService {
      * This is efficient and suitable for logs/transcripts.
      */
     async appendTextLog(name: string, line: string): Promise<void> {
-        if (!this.isConfigured) return;
+        if (!this.isConfigured || !this.client) return;
 
+        const client = this.client;
         const content = line + '\n';
         const buf = Buffer.from(content);
 
@@ -77,25 +77,30 @@ export class OssService {
                 // 1. Get current position
                 let position = '0';
                 try {
-                    const head = await this.client.head(name);
-                    const headers = head.res.headers as any;
+                    const head = await client.head(name);
+                    const headers = (head as {
+                        res?: {
+                            headers?: Record<string, string | number | string[] | undefined>;
+                        };
+                    }).res?.headers ?? {};
                     const type = headers['x-oss-object-type'];
                     if (type === 'Normal') {
                         console.warn(`[OSS] ${name} is Normal type, cannot append. Skipping.`);
                         return;
                     }
-                    position = headers['x-oss-next-append-position'];
-                } catch (e: any) {
-                    if (e.status !== 404) throw e;
+                    const nextPosition = headers['x-oss-next-append-position'];
+                    position = typeof nextPosition === 'string' ? nextPosition : String(nextPosition ?? '0');
+                } catch (e: unknown) {
+                    if (!isOssNotFoundError(e)) throw e;
                     // File not found, position 0
                 }
 
                 // 2. Append
-                await this.client.append(name, buf, { position });
+                await client.append(name, buf, { position });
                 // Success
                 return;
-            } catch (e: any) {
-                if (e.code === 'PositionNotEqualToLength' || e.status === 409) {
+            } catch (e: unknown) {
+                if (isOssPositionConflictError(e)) {
                     // Concurrent append happened, retry
                     console.log(`[OSS] Append position mismatch for ${name}, retrying...`);
                     continue;
@@ -111,12 +116,13 @@ export class OssService {
      * Returns null when the object does not exist or OSS is not configured.
      */
     async getTextObject(name: string): Promise<string | null> {
-        if (!this.isConfigured) {
+        if (!this.isConfigured || !this.client) {
             return null;
         }
 
+        const client = this.client;
         try {
-            const result = await this.client.get(name);
+            const result = await client.get(name);
             const content = result.content;
 
             if (typeof content === 'string') {
@@ -132,8 +138,8 @@ export class OssService {
             }
 
             return null;
-        } catch (error: any) {
-            if (error?.status === 404 || error?.code === 'NoSuchKey') {
+        } catch (error: unknown) {
+            if (isOssNotFoundError(error)) {
                 return null;
             }
 
@@ -144,3 +150,29 @@ export class OssService {
 }
 
 export const ossService = new OssService();
+
+function readOssErrorCode(error: unknown): string | undefined {
+    if (typeof error !== 'object' || error === null) {
+        return undefined;
+    }
+
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : undefined;
+}
+
+function readOssErrorStatus(error: unknown): number | undefined {
+    if (typeof error !== 'object' || error === null) {
+        return undefined;
+    }
+
+    const status = (error as { status?: unknown }).status;
+    return typeof status === 'number' ? status : undefined;
+}
+
+function isOssNotFoundError(error: unknown): boolean {
+    return readOssErrorStatus(error) === 404 || readOssErrorCode(error) === 'NoSuchKey';
+}
+
+function isOssPositionConflictError(error: unknown): boolean {
+    return readOssErrorCode(error) === 'PositionNotEqualToLength' || readOssErrorStatus(error) === 409;
+}

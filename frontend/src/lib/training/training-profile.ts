@@ -1,7 +1,9 @@
 'use client'
 
-import { buildTrainingGuidanceProfileMetadata } from '@/lib/training/training-guidance-profile'
-import type { TrainingGuidanceProfile } from '@/lib/training/training-guidance-profile'
+import {
+  DEFAULT_TRAINING_GUIDANCE_PROFILE,
+  type TrainingGuidanceProfile,
+} from '@/lib/training/training-guidance-profile'
 
 export type TrainingFeedbackStatus = 'excellent' | 'close' | 'retry' | 'unclear'
 export type ImprovementDirection = 'improving' | 'stable' | 'declining'
@@ -469,6 +471,15 @@ export function buildTrainingVoiceProfilePayload(
   snapshot: TrainingProfileSnapshot,
   guidanceProfile?: TrainingGuidanceProfile | null,
 ): Record<string, unknown> {
+  const etiology =
+    guidanceProfile?.etiology !== DEFAULT_TRAINING_GUIDANCE_PROFILE.etiology
+      ? guidanceProfile?.etiology
+      : undefined
+  const severity =
+    guidanceProfile?.severity !== DEFAULT_TRAINING_GUIDANCE_PROFILE.severity
+      ? guidanceProfile?.severity
+      : undefined
+
   return {
     hotwords: snapshot.hotwords.slice(0, 8).map((word) => ({
       word,
@@ -487,9 +498,14 @@ export function buildTrainingVoiceProfilePayload(
         duration_seconds: snapshot.totalDurationSeconds,
       },
       next_training_step: snapshot.nextStep,
-      ...(guidanceProfile
+      ...(etiology
         ? {
-            training_guidance_profile: buildTrainingGuidanceProfileMetadata(guidanceProfile),
+            etiology,
+          }
+        : {}),
+      ...(severity
+        ? {
+            severity,
           }
         : {}),
     },

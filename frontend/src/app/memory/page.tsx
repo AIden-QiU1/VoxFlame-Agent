@@ -55,11 +55,26 @@ type MemorySectionId = 'profile' | 'custom_material' | 'training_summary' | 'sce
 
 const PROFILE_DOCUMENT_OUTLINE = [
   '我是谁：姓名、身份、平时最常见的沟通对象。',
-  '我的说话背景：疾病/构音情况、严重程度、别人通常会在哪些地方听不清。',
+  '我的说话背景：别人通常在哪些地方听不清，我最想改善哪类沟通场景。',
   '高频沟通场景：例如就医、工作汇报、陌生人问路、家人沟通。',
   '沟通习惯：我习惯先怎么开场、哪里容易卡住、说不顺时怎么补救。',
   '希望别人怎么配合：例如请等我说完、没听清请复述、可以让我用文字补充。',
 ] as const
+
+const USER_PROFILE_DOCUMENT_TEMPLATE = [
+  '我是谁：',
+  '常见沟通对象：',
+  '',
+  '疾病 / 构音背景：',
+  '别人最容易听不清的地方：',
+  '',
+  '高频沟通场景：',
+  '',
+  '我通常怎么开场：',
+  '说不顺时我会怎么补救：',
+  '',
+  '我希望别人怎么配合我：',
+].join('\n')
 
 function stripFileExtension(filename: string): string {
   return filename.replace(/\.[^/.]+$/, '')
@@ -145,11 +160,11 @@ function MemorySectionShell({
             <Sparkles className="h-4 w-4" />
             {eyebrow}
           </div>
-          <h2 className="mt-3 text-2xl font-semibold text-gray-900">{title}</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
+          <h2 className="mt-3 text-2xl font-semibold text-gray-900 text-balance">{title}</h2>
+          <p className="mt-2 max-w-3xl text-sm text-gray-600 text-pretty">
             {description}
           </p>
-          <div className="mt-4 rounded-[20px] border border-stone-200 bg-stone-50 px-4 py-4 text-sm leading-6 text-gray-700">
+          <div className="mt-4 rounded-[20px] border border-stone-200 bg-stone-50 px-4 py-4 text-sm text-gray-700 text-pretty">
             {preview}
           </div>
         </button>
@@ -163,7 +178,7 @@ function MemorySectionShell({
           <button
             type="button"
             onClick={() => onToggle(id)}
-            className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700"
+            className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-amber-300 hover:bg-amber-50"
           >
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             {isExpanded ? '收起内容' : '展开内容'}
@@ -299,7 +314,7 @@ export default function MemoryPage() {
 
   useEffect(() => {
     const profileDocument = workspaceSnapshot?.user_profile_memory.document?.trim() ?? ''
-    setUserProfileDocument(profileDocument)
+    setUserProfileDocument(profileDocument || USER_PROFILE_DOCUMENT_TEMPLATE)
     setIsUserProfileEditorOpen(!profileDocument)
   }, [workspaceSnapshot?.user_profile_memory.document])
 
@@ -376,16 +391,18 @@ export default function MemoryPage() {
 
     const document = userProfileDocument.trim()
     if (!document) {
-      setUserProfileStatus('先写一版用户画像文档，再保存。')
+      setUserProfileStatus('先确认这份模板，再保存用户画像。')
       return
     }
 
     setIsSavingUserProfile(true)
 
     try {
-      await saveWorkspaceUserProfileMemory(userId, { document })
+      await saveWorkspaceUserProfileMemory(userId, {
+        document,
+      })
       await refreshWorkspaceSnapshot()
-      setUserProfileStatus('用户画像已经保存。后面系统只会在这个基础上做小幅维护，不会把它拆成别的记忆类型。')
+      setUserProfileStatus('用户画像已经保存。后面系统会在这份文档基础上做轻量维护。')
       setIsUserProfileEditorOpen(false)
     } catch (error) {
       console.error('[MemoryPage] Failed to save user profile memory:', error)
@@ -687,7 +704,7 @@ export default function MemoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-[linear-gradient(180deg,_#fcf7ee_0%,_#fffdf9_42%,_#f4efe6_100%)]">
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
           <div>
@@ -695,13 +712,13 @@ export default function MemoryPage() {
               <ArrowLeft className="h-4 w-4" />
               返回首页
             </Link>
-            <h1 className="mt-2 text-2xl font-semibold text-gray-900">记忆页</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              这里只保留自定义材料、场景模板、用户画像，以及训练页回流的今日总结、7 天总结和计划。
+            <h1 className="mt-2 text-3xl font-semibold text-gray-900 text-balance">记忆与准备</h1>
+            <p className="mt-1 max-w-2xl text-sm text-gray-600 text-pretty">
+              把用户画像、参考材料、场景模板和训练回流集中放在这里，下一次就不用从空白开始。
             </p>
           </div>
           <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700">
-            资料会在这里集中管理
+            先整理，再带入沟通
           </div>
         </div>
       </header>
@@ -715,10 +732,10 @@ export default function MemoryPage() {
             eyebrow="用户画像"
             eyebrowTone="sky"
             title="用户画像"
-            description="这里应该是一份持续维护的用户画像文档，不是三句模板。系统只会在这份文档和稳定规律的基础上做轻量维护。"
+            description="把背景、常见场景和沟通习惯写成一份长期文档。系统只做轻量补充，不替你改写。"
             preview={summarizeText(
               userProfileSummary,
-              '还没有用户画像文档。展开后先写一版背景、病情、场景和沟通习惯。',
+              '还没有用户画像文档。展开后先写一版背景、场景和沟通习惯。',
             )}
           >
             {userProfileStatus ? (
@@ -731,8 +748,8 @@ export default function MemoryPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold text-gray-900">当前画像文档</div>
-                  <p className="mt-2 text-sm leading-6 text-gray-600">
-                    建议把它当成一份长期说明文档来维护：谁是这个用户、常见沟通场景是什么、别人最容易哪里听不清、希望别人怎样配合。
+                  <p className="mt-2 text-sm text-gray-600 text-pretty">
+                    写成别人一看就能理解你的长期说明，不用追求全面，只要真实。
                   </p>
                 </div>
                 <button
@@ -761,12 +778,18 @@ export default function MemoryPage() {
             </div>
 
             {isUserProfileEditorOpen || !hasSavedUserProfileDocument ? (
-              <div className="mt-5 space-y-4">
-                <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5">
-                  <div className="text-sm font-semibold text-gray-900">第一版用户画像可以按这个顺序写</div>
-                  <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                    {PROFILE_DOCUMENT_OUTLINE.map((item) => (
-                      <p key={item}>{item}</p>
+                <div className="mt-5 space-y-4">
+                  <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5">
+                  <div className="text-sm font-semibold text-gray-900">第一版先写这 5 点</div>
+                  <div className="mt-3 grid gap-2">
+                    {PROFILE_DOCUMENT_OUTLINE.map((item, index) => (
+                      <div
+                        key={item}
+                        className="rounded-[18px] bg-white px-4 py-3 text-sm text-gray-700"
+                      >
+                        <span className="mr-2 font-semibold text-sky-800">{index + 1}.</span>
+                        {item}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -776,7 +799,7 @@ export default function MemoryPage() {
                   <textarea
                     value={userProfileDocument}
                     onChange={(event) => setUserProfileDocument(event.target.value)}
-                    placeholder="例如：我叫...，平时在工作汇报和就医说明时最容易被听不清。我的构音障碍主要体现在... 我通常希望对方先听我说完，如果没听清请复述关键词。"
+                    placeholder=""
                     className="min-h-[260px] w-full rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-4 text-sm leading-7 text-gray-900 outline-none transition focus:border-sky-300 focus:bg-white"
                   />
                 </label>
@@ -792,7 +815,7 @@ export default function MemoryPage() {
                     {hasSavedUserProfileDocument ? '更新画像文档' : '保存第一版画像'}
                   </button>
                   <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
-                    后台维护链后续只会轻量补充稳定规律，不会把这份画像拆成别的对象
+                    后台维护链后续只会轻量补充稳定规律，不会再额外加一层填写负担
                   </span>
                 </div>
               </div>
@@ -818,7 +841,7 @@ export default function MemoryPage() {
             eyebrow="自定义材料"
             eyebrowTone="amber"
             title="参考材料库"
-            description="这里管理多份参考材料。先选一份，再决定要不要设为当前加载、展开全文或继续编辑。"
+            description="把演讲稿、就医说明、工作汇报这类真实材料收在这里，再决定哪一份作为当前加载。"
             preview={preparedExpressionPreview}
             badge={preparedExpressionCount > 0 ? `${preparedExpressionCount} 份材料` : '还没有材料'}
             actions={(
@@ -1100,7 +1123,7 @@ export default function MemoryPage() {
               eyebrow="训练总结"
               eyebrowTone="stone"
               title="训练总结"
-              description="这里沉淀训练页回流的今日总结、7 天总结和下一轮计划，不再混成旧的“纠错总结”口径。"
+              description="这里看训练页回流的今日总结、7 天总结和下一轮计划。"
               preview={trainingSummaryPreview}
               badge={trainingReports?.weeklySummary
                 ? `最近 7 天 ${trainingReports.weeklySummary.sampleCount} 条`
@@ -1167,7 +1190,7 @@ export default function MemoryPage() {
               eyebrow="场景 / 热词模板"
               eyebrowTone="stone"
               title="场景 / 热词模板"
-              description="这里按模板标题切换查看，不是一展开就把整库细节全部摊开。默认先看第一套，再决定要不要加载。"
+              description="先看模板标题，再决定要不要加载，不把整库细节一次性摊开。"
               preview={selectedSceneTemplateSummary}
               badge={`已选 ${selectedSceneTemplateIds.length} 套`}
             >

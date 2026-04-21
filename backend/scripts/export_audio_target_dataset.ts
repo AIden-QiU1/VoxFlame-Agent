@@ -15,17 +15,17 @@ interface ScriptOptions {
   batchId?: string
 }
 
-interface SpeakerProfileLabels {
+interface TrainingLabels {
   condition?: string
   etiology?: string
   severity?: string
-  priority?: string
 }
 
 interface AudioTargetEntry {
   audio: string
   target: string
-  speaker_profile?: SpeakerProfileLabels
+  etiology?: string
+  severity?: string
 }
 
 interface VoiceContributionExportRow {
@@ -123,52 +123,37 @@ function readString(record: Record<string, unknown> | null | undefined, key: str
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
-function normalizeSpeakerProfileLabels(
-  labels: SpeakerProfileLabels,
-): SpeakerProfileLabels | undefined {
+function normalizeTrainingLabels(
+  labels: TrainingLabels,
+): TrainingLabels | undefined {
   const normalized = Object.fromEntries(
     Object.entries(labels).filter(([, value]) => typeof value === 'string' && value.trim().length > 0),
-  ) as SpeakerProfileLabels
+  ) as TrainingLabels
 
   return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 
-function readSpeakerProfileFromMetadata(
+function readTrainingLabelsFromMetadata(
   metadata: Record<string, unknown> | null | undefined,
-): SpeakerProfileLabels | undefined {
-  const guidanceProfile = isRecord(metadata?.training_guidance_profile)
-    ? metadata?.training_guidance_profile as Record<string, unknown>
-    : null
-
-  return normalizeSpeakerProfileLabels({
-    etiology: readString(guidanceProfile, 'etiology') ?? undefined,
-    severity: readString(guidanceProfile, 'severity') ?? undefined,
-    priority: readString(guidanceProfile, 'priority') ?? undefined,
+): TrainingLabels | undefined {
+  return normalizeTrainingLabels({
+    etiology: readString(metadata, 'etiology') ?? undefined,
+    severity: readString(metadata, 'severity') ?? undefined,
   })
 }
 
-function readSpeakerProfileFromUserProfile(
+function readTrainingLabelsFromUserProfile(
   userProfile: UserProfileExportRow | null,
-): SpeakerProfileLabels | undefined {
+): TrainingLabels | undefined {
   const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : null
   const profileMemory = isRecord(preferences?.user_profile_memory)
     ? preferences?.user_profile_memory as Record<string, unknown>
     : null
-  const guidanceProfile = isRecord(preferences?.training_guidance_profile)
-    ? preferences?.training_guidance_profile as Record<string, unknown>
-    : null
 
-  return normalizeSpeakerProfileLabels({
+  return normalizeTrainingLabels({
     condition: userProfile?.condition?.trim() || undefined,
-    etiology:
-      readString(profileMemory, 'etiology')
-      ?? readString(guidanceProfile, 'etiology')
-      ?? undefined,
-    severity:
-      readString(profileMemory, 'severity')
-      ?? readString(guidanceProfile, 'severity')
-      ?? undefined,
-    priority: readString(guidanceProfile, 'priority') ?? undefined,
+    etiology: readString(profileMemory, 'etiology') ?? undefined,
+    severity: readString(profileMemory, 'severity') ?? undefined,
   })
 }
 
@@ -246,7 +231,7 @@ async function main() {
   if (userProfileResult?.error) {
     throw userProfileResult.error
   }
-  const defaultSpeakerProfile = readSpeakerProfileFromUserProfile(
+  const defaultTrainingLabels = readTrainingLabelsFromUserProfile(
     (userProfileResult?.data ?? null) as UserProfileExportRow | null,
   )
 
@@ -262,11 +247,14 @@ async function main() {
       ? metadata.recording_id.trim()
       : row.audio_path.split('/').pop()?.replace(/\.[^/.]+$/, '') || row.id
 
+    const trainingLabels = readTrainingLabelsFromMetadata(metadata) ?? defaultTrainingLabels
+
     return {
       audioPath: row.audio_path,
       targetText,
       recordingId,
-      speakerProfile: readSpeakerProfileFromMetadata(metadata) ?? defaultSpeakerProfile,
+      etiology: trainingLabels?.etiology,
+      severity: trainingLabels?.severity,
     }
   })
 
@@ -283,7 +271,8 @@ async function main() {
     rows.push({
       audio: path.posix.join('audio', localFilename),
       target: entry.targetText,
-      ...(entry.speakerProfile ? { speaker_profile: entry.speakerProfile } : {}),
+      ...(entry.etiology ? { etiology: entry.etiology } : {}),
+      ...(entry.severity ? { severity: entry.severity } : {}),
     })
   }
 

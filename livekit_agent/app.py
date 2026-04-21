@@ -26,6 +26,7 @@ from data_contract import (
     build_speech_activity_output,
     build_voice_profile_updated_output,
     extract_caption_mode_update,
+    extract_client_speech_activity,
     decode_data_packet,
     extract_end_audio_reason,
     extract_preparation_context_update,
@@ -140,6 +141,10 @@ async def entrypoint(ctx: JobContext) -> None:
         userdata=session_userdata,
     )
     audio_runtime = LiveKitAudioReplyRuntime(config=config, room=ctx.room)
+    use_training_transcript_tts = (
+        session_context.mode == "training"
+        or session_context.surface == "training_workspace"
+    )
     reply_queue: asyncio.Queue[tuple[str, str | None]] = asyncio.Queue(
         maxsize=REPLY_QUEUE_MAXSIZE,
     )
@@ -250,6 +255,44 @@ async def entrypoint(ctx: JobContext) -> None:
 
         await audio_runtime.speak(reply_text)
 
+    async def handle_training_transcript_tts(transcript: str) -> None:
+        normalized = transcript.strip()
+        if not normalized:
+            return
+
+        session_userdata.note_user_transcript(normalized)
+        session_userdata.note_assistant_reply(
+            normalized,
+            source="training_asr_echo",
+        )
+        await publish_payload(
+            build_assistant_text_output(
+                session_context,
+                normalized,
+                source="training_asr_echo",
+                metadata_type="training_transcript_echo",
+                original_text=normalized,
+            ),
+        )
+
+        if session_userdata.should_skip_tts():
+            logger.info(
+                "LiveKit training transcript echo skipping TTS room=%s participant=%s surface=%s caption_mode=%s",
+                session_context.room_name,
+                session_context.participant_identity,
+                session_context.surface,
+                session_userdata.caption_mode_enabled,
+            )
+            return
+
+        logger.info(
+            "LiveKit training transcript echo speaking raw ASR room=%s participant=%s chars=%s",
+            session_context.room_name,
+            session_context.participant_identity,
+            len(normalized),
+        )
+        await audio_runtime.speak(normalized)
+
     async def reply_worker() -> None:
         while True:
             user_text, correction_original = await reply_queue.get()
@@ -324,9 +367,13 @@ async def entrypoint(ctx: JobContext) -> None:
         ctx=session_context,
         participant=participant,
         publish_payload=publish_payload,
-        on_final_transcript=lambda transcript: enqueue_user_text_async(
-            transcript,
-            correction_original=transcript,
+        on_final_transcript=(
+            handle_training_transcript_tts
+            if use_training_transcript_tts
+            else lambda transcript: enqueue_user_text_async(
+                transcript,
+                correction_original=transcript,
+            )
         ),
         on_speech_activity=handle_speech_activity,
         on_audio_telemetry=handle_audio_input_telemetry,
@@ -375,6 +422,24 @@ async def entrypoint(ctx: JobContext) -> None:
                 user_text[:80],
             )
             enqueue_user_text(user_text)
+            return
+
+        client_speech_activity = extract_client_speech_activity(message)
+        if client_speech_activity is not None:
+            state, auto_finalize, short_utterance_expected = client_speech_activity
+            asr_runtime.note_client_recording_event(
+                state,
+                auto_finalize,
+                short_utterance_expected=short_utterance_expected,
+            )
+            logger.info(
+                "LiveKit client speech activity room=%s participant=%s state=%s auto_finalize=%s short_utterance_expected=%s",
+                session_context.room_name,
+                session_context.participant_identity,
+                state,
+                auto_finalize,
+                short_utterance_expected,
+            )
             return
 
         caption_mode_enabled = extract_caption_mode_update(message)

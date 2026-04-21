@@ -33,15 +33,15 @@ const CAPABILITY_CARDS: CapabilityCard[] = [
     id: 'communicate',
     title: '沟通',
     summary: '现在就要说话时，先把最重要的一句说出去。',
-    note: '按场景进入，再勾这次要带的材料和模板。',
+    note: '按场景进入，再勾这次真要带的材料。',
     actionLabel: '进入沟通',
     icon: MessageSquareText,
   },
   {
     id: 'practice',
-    title: '练习',
+    title: '训练',
     summary: '练这周真会说出口的句子，不练空泛样本。',
-    note: '先录真实句子，录够 100 句后才会开始微调你的个人模型。',
+    note: '先做评估，再录真实句子。至少录够 100 句，再开始训练模型。',
     actionLabel: '进入练习',
     href: '/contribute',
     icon: AudioLines,
@@ -109,6 +109,18 @@ function CapabilityCardView({
   )
 }
 
+const START_GUIDE = [
+  '先选病种，再做评估主题区。',
+  '评估后再练真实高频句，先累计到 100 句。',
+  '沟通前去记忆页带上材料。',
+] as const
+
+const RECORDING_GUIDE = [
+  '一句只说一次，慢一点。',
+  '麦克风离嘴一拳左右。',
+  '卡住就停，不要硬冲。',
+] as const
+
 export default function HomeDashboard({
   isAuthenticated,
   onStartCommunicate,
@@ -152,8 +164,8 @@ export default function HomeDashboard({
                 先把最重要的话说出去，
                 <span className="block text-amber-600">再让效果一轮轮变好</span>
               </h1>
-              <p className="mt-6 max-w-3xl text-base leading-8 text-stone-700 sm:text-lg">
-                燃言把实时沟通、句子练习和个人记忆放在同一条主线上。你现在能开口，这周能练准，下次也能提前准备。
+              <p className="mt-6 max-w-3xl text-base leading-8 text-stone-700 text-pretty sm:text-lg">
+                燃言把沟通、评估、训练和准备放在同一条主线上。现在能开口，这周能练准，下次也能提前准备。
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -173,6 +185,14 @@ export default function HomeDashboard({
                 >
                   <Link href={practiceHref}>先练一句真实的话</Link>
                 </Button>
+                <Button
+                  asChild
+                  type="button"
+                  variant="outline"
+                  className="h-12 rounded-full border-amber-300 bg-amber-50 px-6 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+                >
+                  <Link href="/manual">查看使用手册</Link>
+                </Button>
               </div>
             </div>
 
@@ -190,24 +210,45 @@ export default function HomeDashboard({
         </section>
 
         <section className="px-5 pb-16 pt-2 sm:px-8 sm:pb-20">
-          <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-3">
+          <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="rounded-[26px] border border-stone-200 bg-white px-5 py-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
-              <div className="text-sm font-medium text-amber-700">为什么会越来越准</div>
-              <p className="mt-3 text-sm leading-7 text-stone-700">
-                因为你练的是这周真会说出口的句子，不是脱离场景的标准样本。
-              </p>
+              <div className="text-sm font-medium text-amber-700">新用户先这样开始</div>
+              <div className="mt-4 space-y-3">
+                {START_GUIDE.map((item, index) => (
+                  <div
+                    key={item}
+                    className="rounded-[18px] bg-stone-50 px-4 py-4 text-sm text-stone-700"
+                  >
+                    <span className="mr-2 font-semibold text-amber-700">{index + 1}.</span>
+                    {item}
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="rounded-[26px] border border-stone-200 bg-white px-5 py-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
-              <div className="text-sm font-medium text-amber-700">什么时候去记忆页</div>
-              <p className="mt-3 text-sm leading-7 text-stone-700">
-                在下次演讲、工作或就医前，把材料和模板先收好，沟通页里直接勾选。
-              </p>
-            </div>
-            <div className="rounded-[26px] border border-stone-200 bg-white px-5 py-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
-              <div className="text-sm font-medium text-amber-700">最简单的开始方式</div>
-              <p className="mt-3 text-sm leading-7 text-stone-700">
-                先沟通一轮，或者先练一句。不要先学系统，先让它帮你完成一件真实的小事。
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-medium text-amber-700">录音只记 3 件事</div>
+                  <div className="mt-4 space-y-3">
+                    {RECORDING_GUIDE.map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-[18px] bg-stone-50 px-4 py-4 text-sm text-stone-700"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  asChild
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 rounded-full border-amber-300 bg-amber-50 px-5 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+                >
+                  <Link href="/manual">完整手册</Link>
+                </Button>
+              </div>
             </div>
           </div>
         </section>

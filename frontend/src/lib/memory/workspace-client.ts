@@ -108,6 +108,8 @@ export interface SceneTemplateLibraryItem {
 }
 
 export interface UserProfileMemoryAsset {
+  etiology?: string
+  severity?: string
   document?: string
   summary?: string
   common_scenarios?: string[]

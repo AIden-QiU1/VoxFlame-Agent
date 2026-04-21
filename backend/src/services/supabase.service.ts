@@ -54,6 +54,12 @@ export interface Session {
   metadata?: JsonRecord;
 }
 
+interface VoiceContributionRow {
+  created_at?: string;
+  transcript?: string | null;
+  metadata?: JsonRecord;
+}
+
 export interface UserProfile {
   id?: string;
   name?: string;
@@ -82,6 +88,8 @@ const USER_PROFILE_ETIOLOGY_VALUES = [
   'parkinsons',
   'cerebral_palsy',
   'brain_injury',
+  'hearing_loss',
+  'neuromuscular',
   'other',
 ] as const;
 
@@ -98,6 +106,8 @@ const USER_PROFILE_ETIOLOGY_LABELS: Record<string, string> = {
   parkinsons: '帕金森相关',
   cerebral_palsy: '脑瘫相关',
   brain_injury: '脑损伤相关',
+  hearing_loss: '听力相关',
+  neuromuscular: '肌肉退化 / 神经肌肉相关',
   other: '其他或混合原因',
 };
 
@@ -393,7 +403,18 @@ export function normalizeUserProfileMemory(value: unknown): UserProfileMemoryRec
     return {};
   }
 
+  const etiology = readString(value, 'etiology');
+  const severity = readString(value, 'severity');
+
   return {
+    etiology:
+      etiology && USER_PROFILE_ETIOLOGY_VALUES.includes(etiology as typeof USER_PROFILE_ETIOLOGY_VALUES[number])
+        ? etiology
+        : undefined,
+    severity:
+      severity && USER_PROFILE_SEVERITY_VALUES.includes(severity as typeof USER_PROFILE_SEVERITY_VALUES[number])
+        ? severity
+        : undefined,
     document: readString(value, 'document') ?? undefined,
     summary: readString(value, 'summary') ?? undefined,
     common_scenarios: readStringList(value.common_scenarios),
@@ -774,10 +795,7 @@ export class SupabaseService {
     const candidates: Array<{ userId: string; lastGeneratedAt: string }> = [];
 
     for (const candidate of staleCandidates) {
-      const samples = await this.getPreparedExpressionTrainingSamples(
-        candidate.userId,
-        candidate.preparedExpressionId,
-      );
+      const samples = await this.getTrainingResultSamples(candidate.userId);
       const shouldRefreshDaily =
         candidate.dailyStale &&
         this.hasPendingPreparedExpressionSamples(
@@ -911,6 +929,8 @@ export class SupabaseService {
     const normalizedInput = normalizeUserProfileMemory(input);
     const updatedAt = normalizedInput.updated_at ?? new Date().toISOString();
     const nextProfileMemory: UserProfileMemoryRecord = {
+      etiology: normalizedInput.etiology ?? existingProfileMemory.etiology,
+      severity: normalizedInput.severity ?? existingProfileMemory.severity,
       document: normalizedInput.document ?? existingProfileMemory.document,
       summary: normalizedInput.summary ?? existingProfileMemory.summary,
       common_scenarios: dedupeStrings(
@@ -1136,10 +1156,7 @@ export class SupabaseService {
     if (!existingAsset) {
       return existingLibrary;
     }
-    const samples = await this.getPreparedExpressionTrainingSamples(
-      userId,
-      existingAsset.structured.id,
-    );
+    const samples = await this.getTrainingResultSamples(userId);
     const summarized = await this.preparedExpressionSummaryService.summarize(
       existingAsset,
       samples,
@@ -1525,18 +1542,28 @@ export class SupabaseService {
     return preparedExpression?.training_reports?.training_plan ?? null;
   }
 
-  private async getPreparedExpressionTrainingSamples(
+  private async getTrainingResultSamples(
     userId: string,
-    preparedExpressionId: string,
   ): Promise<PreparedExpressionTrainingSample[]> {
-    const memories = await this.getMemories(userId, 240);
+    const { data, error } = await this.adminClient
+      .from('voice_contributions')
+      .select('created_at, transcript, metadata')
+      .eq('contributor_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(160);
 
-    return memories
-      .filter((memory) => {
-        const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+    if (error || !Array.isArray(data)) {
+      if (error) {
+        console.error('Error fetching training result samples:', error);
+      }
+      return [];
+    }
+
+    return (data as VoiceContributionRow[])
+      .filter((row) => {
+        const metadata = isRecord(row.metadata) ? row.metadata : undefined;
         return (
-          readString(metadata, 'kind') === 'training_result' &&
-          readString(metadata, 'prepared_expression_id') === preparedExpressionId
+          readString(metadata, 'kind') === 'training_result'
         );
       })
       .sort((left, right) => {
@@ -1545,13 +1572,18 @@ export class SupabaseService {
         return rightTime - leftTime;
       })
       .slice(0, 80)
-      .map((memory) => {
-        const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
+      .map((row) => {
+        const metadata = isRecord(row.metadata) ? row.metadata : undefined;
 
         return {
-          created_at: memory.created_at ?? null,
+          created_at: row.created_at ?? null,
           target_text: readString(metadata, 'target_text') ?? readString(metadata, 'exercise_text') ?? '',
-          recognized_text: readString(metadata, 'recognized_text') ?? readString(metadata, 'raw_transcript') ?? '',
+          recognized_text:
+            readString(metadata, 'recognized_text')
+            ?? readString(metadata, 'raw_transcript')
+            ?? (typeof row.transcript === 'string' ? row.transcript.trim() : '')
+            ?? '',
+          exercise_category: readString(metadata, 'exercise_category'),
           feedback_status: readString(metadata, 'feedback_status'),
           prepared_expression_section_id: readString(metadata, 'prepared_expression_section_id'),
           prepared_expression_section_title: readString(metadata, 'prepared_expression_section_title'),
