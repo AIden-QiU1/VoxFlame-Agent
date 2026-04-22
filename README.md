@@ -2,7 +2,7 @@
 
 > 让声音不仅被听见，更被理解。
 
-**更新时间**: 2026-03-26
+**更新时间**: 2026-04-21
 
 VoxFlame 是面向构音障碍沟通场景的主动沟通助手。当前目标不是做“通用语音助手”，而是把主链路收敛成一个真正可用的产品：先帮助用户说出第一句话，再帮助用户在实时沟通中被理解，并把练习与记忆沉淀成长期改进。
 
@@ -44,33 +44,22 @@ Frontend LiveKit RTC/Data
 - 长期用户状态正在继续收口到前端 [memory-service.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/memory-service.ts) 与后端 [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 共同维护的 `workspace snapshot / memory profile / expression kit` 读写链，不再继续向旧执行面分叉。
 - 记忆系统当前重点不是继续堆训练复盘，而是把“用户画像、常见场景、即将面对场景的准备、热词、发音规律、补救策略”压缩成可直接服务沟通与训练的 owner 数据。
 
-## 当前重点
+## 开源后的协作重点
 
-当前不再继续做 transport 大迁移。下一阶段重点是先把已有能力收成一个可长期扩展的产品和 contract：
+当前仓库已经从“架构反复迁移期”进入“开源协作与长期扩展期”。接下来最值得聚焦的，不再是重新争论主链，而是围绕现有稳态继续扩展：
 
-1. 首页与沟通工作台
-- 把首页改成高压场景优先的任务入口，再把 `starter kit + personalized phrases + live session` 收成一条“先开口，再持续沟通”的主路径。
+1. `Web 主产品继续打磨`
+   继续提升沟通页、训练页、记忆页的真实可用性和可验证性。
+2. `App / companion 接入`
+   在复用 `workspace snapshot / recording envelope / upload receipt` 的前提下，推进移动端和桌面 companion。
+3. `硬件接入`
+   先做 BLE / USB / 外接麦克风 / 一键控制桥，再决定是否走更重的硬件形态。
+4. `自主语音 agent 架构`
+   继续把 `livekit_agent` 演进成 provider-neutral、可解释、可验证的语音 runtime，而不是一上来整套重写。
 
-2. 数据录入与上传地基
-- 继续把 `recording envelope / recorder queue / upload receipt / manifest` 收成稳定 contract，为 PWA、未来 app 和 companion 复用打地基。
+详细方向见：
 
-3. 后端读模型
-- 把 `profile bundle / session review / expression kit merge` 做成 backend 正式 contract，减少页面自己拼记忆和画像。
-
-4. 前端变薄
-- 把会话 transport、字幕 reducer、短语动作和训练同步从巨型 hook 里拆开，避免前端继续长成第二控制面。
-
-5. 执行面去供应商化
-- 继续围绕 `self-hosted LiveKit + livekit_agent` 收紧 vendor-neutral 的 `session / transport / capability` 语言。
-
-## 近期开发路径
-
-1. 先改沟通页首屏，让 `CommunicationStarterKit` 成为正式入口，并把 `QuickPhrasesPanel` 降成表达工具箱的第二层。
-2. 继续把训练数据链路收口到 `recording envelope / recorder queue / upload/complete`，补 authenticated live smoke，并强化上传幂等性。
-   当前 web 端已经补到“队列状态可追踪、失败可解释、重试可见”，下一步重点是把真实登录态 smoke 和队列/manifest 落盘一起跑通。
-3. 在 backend 增加 `profile bundle` 和 `session review` 读写口，让沟通页、训练页、记忆页消费同一份长期画像。
-4. 继续收紧前端 session hooks：沿当前 LiveKit RTC/Data 主链，把 transport bootstrap、消息归并、memory sync 解耦。
-5. 在不再改变大架构的前提下，把训练页与记忆页的 AI 功能继续补齐，并清掉仓库里仍把 TEN/Agora 当现役主链的旧入口与旧叙事。
+- [VoxFlame 开源协作方向（2026-04-21）](docs/VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
 
 ## 快速开始
 
@@ -158,9 +147,6 @@ VoxFlame-Agent/
 
 ## 验证脚本
 
-- Qwen ASR live smoke: `bash scripts/qwen_asr_live_smoke.sh`
-- Qwen TTS live smoke: `bash scripts/qwen_tts_live_smoke.sh`
-- AI 文档校验: `bash scripts/check_ai_docs.sh`
 
 ## 协作入口
 
@@ -168,6 +154,7 @@ VoxFlame-Agent/
 - 项目摘要：[.claude-summary.md](/home/ubuntu/VoxFlame-Agent/.claude-summary.md)
 - 工程规范：[AGENTS.md](/home/ubuntu/VoxFlame-Agent/AGENTS.md)
 - 产品主文档：[docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
+- 开源协作方向：[docs/VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
 
 ---
 
@@ -197,15 +184,14 @@ VoxFlame-Agent/
 
 ## 项目号召
 
-我们正在寻找以下方向的贡献者：
+我们正在寻找 4 条长期 owner 方向的贡献者：
 
-- 语音算法（ASR 个体化、语音重表达、TTS 声纹保真）
-- 实时系统工程（WebSocket/RTC、低延迟音频链路）
-- 康复与沟通科学（评估指标、训练方案、伦理边界）
-- 硬件工程（麦克风阵列、耳机形态、低功耗端侧）
-- 临床与用户研究（构音障碍真实场景数据与反馈）
+- Web 产品与实时体验：沟通页、训练页、记忆页、评估区、可用性与 QA
+- App / companion：移动端、桌面端、后台同步、通知、设备权限
+- 硬件接入：外接麦克风、BLE 控制、音频输入质量监测、设备桥接
+- 自主语音 agent：turn controller、context assembler、provider adapter、evaluation harness
 
-如果你认同“沟通权”是基本权利，欢迎一起把它做成可用产品。
+如果你认同“沟通权”是基本权利，欢迎一起把它做成真正可用、可扩展、可协作的开源产品。
 
 ---
 

@@ -13,6 +13,19 @@
 
 ## 最新收口
 
+0. 2026-04-21 已把开源前的入口文档收成“当前现状 + 协作方向”
+   - [README.md](/home/ubuntu/VoxFlame-Agent/README.md) 已删除一批已完成但仍写成“当前重点 / 近期开发路径”的旧条目
+   - README 现在把重点改成：
+     - `Web 主产品继续打磨`
+     - `App / companion 接入`
+     - `硬件接入`
+     - `自主语音 agent 架构`
+   - 新增开源协作方向文档 [VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
+   - [产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 不再继续维护已经过时的“上线前 blocker / 最后测试清单”，只保留产品边界和文档路由
+   - [docs/README.md](/home/ubuntu/VoxFlame-Agent/docs/README.md) 已把开源协作方向加入现役入口和快速查找
+   - 已验证：
+   - `bash scripts/check_ai_docs.sh`
+
 0. 2026-04-21 已把核心 5 个页面往“能立刻上手的产品面”统一收口
    - 首页、手册页、记忆页、训练页、沟通页现在统一使用同一套暖色背景、卡片层级和更克制的说明密度
    - 首页已改成更直接的产品入口：保留核心能力卡，并新增“新用户先这样开始 / 录音只记 3 件事”
