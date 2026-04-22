@@ -13,6 +13,22 @@
 
 ## 最新收口
 
+0. 2026-04-22 已把指定账号的 OSS 训练数据导出成可人工审阅的数据集
+   - 根目录 [`.gitignore`](/home/ubuntu/VoxFlame-Agent/.gitignore) 已新增 `artifacts/dataset-review/`
+   - 账号 `2307294809@qq.com`（用户 `64758dee-5026-4b53-a063-1d02d0834f67`）当前 `194` 条样本已导出到：
+     - [samples.jsonl](/home/ubuntu/VoxFlame-Agent/artifacts/dataset-review/2307294809/samples.jsonl)
+     - [audio/](/home/ubuntu/VoxFlame-Agent/artifacts/dataset-review/2307294809/audio)
+   - backend 新增 [export_dataset_review_report.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/export_dataset_review_report.ts)，现在可以按账号输出：
+     - [label-review-summary.json](/home/ubuntu/VoxFlame-Agent/artifacts/dataset-review/2307294809/label-review-summary.json)
+     - [label-review.csv](/home/ubuntu/VoxFlame-Agent/artifacts/dataset-review/2307294809/label-review.csv)
+     - [label-review.md](/home/ubuntu/VoxFlame-Agent/artifacts/dataset-review/2307294809/label-review.md)
+   - 首轮判断：
+     - `metadata_incomplete = 0`
+     - `likely_reasonable = 88`
+     - `needs_manual_review = 106`
+     - `high_risk = 5`
+   - 当前更像“样本质量 / ASR 对齐信号需要人工复核”，而不是“大量监督标签字段本身填错”
+
 0. 2026-04-21 已把开源前的入口文档收成“当前现状 + 协作方向”
    - [README.md](/home/ubuntu/VoxFlame-Agent/README.md) 已删除一批已完成但仍写成“当前重点 / 近期开发路径”的旧条目
    - README 现在把重点改成：
