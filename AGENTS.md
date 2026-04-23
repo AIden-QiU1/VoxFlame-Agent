@@ -146,7 +146,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 - [docs/aiprompts/SKILL_ROUTING_GUIDE.md](docs/aiprompts/SKILL_ROUTING_GUIDE.md)：`gstack / 工程纪律 skill / 设计专项 skill / Context7 / Playwright / Linear` 的默认路由。
 - [docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md](docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md)：迁移 / 统一 / 废弃 / 兼容层任务模板。
 - [docs/README.md](docs/README.md)：文档导航。
-- [docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md](docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)：当前产品设计、页面系统、能力对象、UI 方向与架构蓝图的权威主文档。
+- [docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md](docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)：当前产品边界与上线后 `App / 硬件 / 自定义语音 agent / 记忆架构` 规划的权威主文档。
 - [docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)：吸收 `TEN ceiling / 五层映射 / Agora 替换 / light voice surface` 后的统一 runtime 与 surface 参考文档。
 - [docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)：吸收 `memory mechanisms / voice-agent-tooling` 后的统一 agent、memory、tooling 参考文档。
 - [frontend/README.md](frontend/README.md)：当前前端页面系统、共享 `workspace` contract、训练资产链路与 PWA 边界。

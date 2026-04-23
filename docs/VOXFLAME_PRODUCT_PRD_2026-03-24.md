@@ -1,337 +1,270 @@
-# VoxFlame Product PRD（上线收口版，2026-04-16）
+# VoxFlame Product And Expansion Plan（上线后规划版，2026-04-23）
 
-> 这版 PRD 不再保留已经完成的骨架建设，只保留 4 件事：
-> 1. 产品是什么
-> 2. agent 上下文到底包含什么
-> 3. 三个模型怎么分层
-> 4. 哪些东西允许进入长期记忆
+> 前提：当前 Web 主产品已具备上线基线。
+>
+> 这份主文档只回答 5 件事：
+> 1. 当前已固定的产品基线
+> 2. App / companion 怎么接
+> 3. 硬件怎么接
+> 4. 自定义语音 agent 框架怎么演进
+> 5. 记忆架构怎么长期收口
 
----
-
-## 1. 产品一句话
+## 1. 产品定义
 
 VoxFlame 不是“纠正用户声音”的产品，而是“帮助系统更准确理解构音障碍用户意图”的沟通工作台。
 
-当前上线前最后要看的，不是页面多少，而是两条真实体验：
+当前主文档的重点不再是“上线前还差什么”，而是上线后 4 条长期主线：
 
-1. 沟通页准确率到底够不够
-2. 训练页录音到底舒不舒服，且总结/计划到底有没有用
+1. `App / companion`
+2. `硬件接入`
+3. `自定义语音 agent 框架`
+4. `记忆架构`
 
----
+## 2. 当前已固定的产品基线
 
-## 2. 当前已完成的固定骨架
+默认成立，不再作为下一阶段主争论点：
 
-这些不再作为 PRD 待办：
-
-1. 主链已经固定为  
-   `Frontend LiveKit RTC/Data -> Backend /api/rtc/session/* -> self-hosted livekit-server -> livekit_agent`
-2. 沟通页已经有 `communication loadout`
-3. 记忆页已经固定成 4 个对象区：
-   - 自定义材料区
-   - 场景 / 热词模板
-   - 用户个人画像
-   - 训练总结
-4. 训练页总结已经固定成：
-   - 每日总结
-   - 7 天总结
-   - 下一轮计划
-5. `workspace` 继续是唯一 durable owner
-6. `livekit_agent` 已经有 typed session memory
-
-所以现在 PRD 不再问“要不要做记忆页 / loadout / 训练总结”，而是只问这些东西是否已经达到上线级别。
+1. 现役唯一主链：
 
----
+```text
+Frontend LiveKit RTC/Data
+  -> Backend /api/rtc/session/*
+  -> self-hosted livekit-server
+  -> livekit_agent
+  -> ASR / TTS / correction provider adapters
+```
 
-## 3. Agent 上下文 Contract
+2. 当前正式产品闭环：
+   - 沟通工作台
+   - 练习工作台
+   - 沟通档案 / workspace
+3. `workspace snapshot` 是 durable owner，`LiveKit` 只承接 session-local runtime。
+4. 训练数据最小 contract 是 `audio + target_text + optional labels`。
+5. `dataset != memory` 继续是硬边界。
+6. PWA 是正式产品面之一，但不等于未来原生 App。
+7. 下一阶段默认是稳态扩展，不再重开第二套主链或第二套 demo。
 
-这是上线前最重要的第一条。
+## 3. 这份文档的职责
 
-### 3.1 agent 当前轮真正吃到的上下文
+负责：
 
-沟通页 agent 上下文固定由 5 层组成：
+1. 定义当前产品边界。
+2. 定义 4 条长期扩展主线。
+3. 给后续 owner 和贡献者提供统一锚点。
 
-1. `session intent`
-   - 当前 surface
-   - 当前 mode
-   - 当前 scene
-   - 当前 loadout mode
-2. `durable memory context`
-   - 默认直接进入当前轮的用户画像
-   - 默认直接进入当前轮的场景模板 / 热词模板
-   - 默认直接进入当前轮的训练总结与训练重点
-   - 用户手动带入的自定义材料全文
-3. `runtime session memory`
-   - 最近几轮已确认纠错结果
-   - 当前 turn state
-   - interruption / barge-in 计数
-4. `当前轮输入`
-   - 本轮 ASR
-   - 当前参考原文
-5. `system prompt`
-   - 沟通页 correction 规则
-   - caption 规则
+不负责：
 
-### 3.2 前端用户选一份资料后，会不会自动进入 agent 上下文
+1. 维护上线前 blocker 清单。
+2. 记录最近 3 天开发状态。
+3. 代替 `.tasks/current.md` 管短期优先级。
+4. 代替 runtime / memory 深参考承接历史迁移细节。
 
-会。
+## 4. App / Companion 规划
 
-当前固定行为是：
+目标：
 
-1. backend 先把 `workspace snapshot.preparation` 的结构化字段装进初始上下文
-2. 前端再把本次手动选择的自定义材料和 loadout 状态补成 `preparation_context_update`
-3. 通过 room data 发给 `livekit_agent`
-4. agent 立刻替换当前 session 的 `PreparationContextPack`
-5. 后续 correction prompt 直接使用这份新上下文
+1. 更稳定的后台录音与补传。
+2. 更稳定的权限、蓝牙和系统入口。
+3. 更低摩擦的快捷沟通入口。
+4. 更适合高频日常沟通的 companion 形态。
 
-也就是说：
+接入时必须复用现役 contract：
 
-1. `用户画像 / 场景热词模板 / 训练总结` 会默认直接进入 agent 上下文
-2. `自定义材料` 仍然只在用户本次加载后才会进入当前轮 prompt
-3. 真正喂给 agent 的内容来自 `preparation / prepared_expression` 这些结构化字段，不靠前端展示文案二次截词
-4. `durable memory` 不会原封不动整库塞进 prompt，但也不应该被前端弱化成“只剩一行标题”
+1. `workspace snapshot`
+2. `recording envelope`
+3. `upload receipt`
+4. `preparation_context_update`
+5. `voice_contributions metadata`
+6. `RTC session orchestration`
 
-### 3.3 prompt cache 现在的边界
+不应该做的事：
 
-当前固定边界：
+1. 再长第二套 durable owner。
+2. 再长第二套训练样本 schema。
+3. 绕开 backend 与 runtime 自己形成私有主链。
 
-1. correction 链默认不依赖 prompt cache
-2. 每轮都带：
-   - 当前 ASR
-   - 最近确认过的纠错历史
-   - 默认 durable context
-   - 当前手动加载的自定义材料
-   - 当前参考原文 / 热词 / 风险词
-3. 这样做的目的不是省 token，而是避免 cache 过期后的上下文漂移
+建议分层：
 
-结论：
+1. `PWA`
+   - 安装、轻离线、录音补传、低摩擦入口
+2. `mobile companion`
+   - 后台同步、快捷短句、通知、设备权限
+3. `desktop companion`
+   - 固定工位、外接麦克风、外接扬声器、设备桥接
 
-当前上线前优先级是“上下文准确、可解释、可控”，不是先做激进 prompt cache。
+第一阶段最值得做：
 
-### 3.4 哪些记忆负责反映“现在的现状”
+1. 一键开口
+2. 最近准备材料直达
+3. 紧急求助模式
+4. 原生 recorder queue 与后台补传
+5. 登录态和 `workspace snapshot` 轻同步
 
-不是 4 类 durable memory 都要实时抖动。
+## 5. 硬件规划
 
-真正反映“当前现状”的层次固定如下：
+目标：
 
-1. `session memory`
-   - 负责会话内实时现状
-   - 最近几轮已确认表达、turn state、打断情况都在这里
-2. `用户个人画像`
-   - 负责沉淀最近稳定下来的现状
-   - 会话结束后允许小幅更新
-3. `训练总结`
-   - 负责反映最近 1 天 / 7 天训练规律
-   - 不负责逐轮实时刷新
-4. `场景 / 热词模板`
-   - 负责稳定场景知识和高频热词
-   - 是低频更新，不应该每轮抖动
-5. `自定义材料`
-   - 负责用户手动准备的当前任务材料
-   - 完全由用户更新
+1. 提升收音质量
+2. 降低控制负担
+3. 提供更合适的输出形态
+4. 让设备状态和环境质量可观测
 
-所以“当前状态”主要靠：
+推荐顺序：
 
-1. `session memory`
-2. 会话后小幅维护的 `用户个人画像`
+1. `输入硬件`
+   - 领夹麦、指向性麦克风、USB 声卡 / 外接麦、手机蓝牙麦
+2. `控制硬件`
+   - BLE 按钮、脚踏、一键重播 / 一键打断
+3. `输出硬件`
+   - 便携扬声器、骨传导耳机、外放设备
+4. `环境感知`
+   - 噪声监测、clipping / 输入音量、连接状态
+
+必须保持 4 个接口清晰：
+
+1. `capture control`
+2. `transport bridge`
+3. `device metadata`
+4. `telemetry`
+
+第一阶段最小原型：
+
+1. BLE / USB 最小设备控制桥
+2. 现成外设支持清单
+3. 设备状态与收音质量面板
+4. companion 与硬件之间的桥接协议
 
----
+## 6. 自定义语音 Agent 框架规划
 
-## 4. 三个模型分层
+目标：
 
-这是上线前最重要的第二条。
+1. 可替换 provider
+2. 可解释 runtime state
+3. 可验证回归质量
 
-### 4.1 模型 1：沟通页实时 correction
+下一阶段不直接重写 `livekit_agent`，按层继续收口：
 
-这是实时链，目标是低时延和高保真。
+1. `provider-neutral adapters`
+2. `owned turn controller`
+3. `context assembler`
+4. `policy / capability router`
+5. `session memory`
+6. `durable maintenance`
+7. `evaluation harness`
 
-owner：
+建议分层：
 
-- `DASHSCOPE_CORRECTION_MODEL`
-- 未设置时回退 `DASHSCOPE_LLM_MODEL`
-- 最终兜底 `qwen-flash`
+```text
+transport/session layer
+  -> audio turn controller
+  -> ASR / TTS / correction adapters
+  -> context assembler
+  -> policy + capability router
+  -> session memory
+  -> durable memory maintenance
+  -> dataset / evaluation pipeline
+```
 
-职责：
+第一阶段最值得做：
 
-1. 基于当前 ASR 做最小必要纠错
-2. 利用本轮已选材料、参考原文、最近确认历史提高准确率
-3. 不负责长期总结
-4. 不负责训练计划
-5. 不负责会后长期记忆整理
+1. 抽清 provider adapter
+2. 把 turn state machine 收成显式状态机
+3. 把 `context assembler` 做成独立可测层
+4. 把沟通页 / 训练页策略显式化
+5. 给 runtime 增加离线回放和回归集
 
-当前推荐：
+不建议：
 
-1. 默认继续用 `qwen-flash`
-2. 这条链不要上大模型
+1. 一次性重写整套 runtime
+2. 没有稳定评测前大改主执行链
+3. 一上来做复杂多 agent / handoff
+4. 先做通用工具平台化
 
-### 4.2 模型 2：记忆系统后台维护
+## 7. 记忆架构规划
 
-这是异步链，目标不是新增“会话后 compact 文档”，而是后台维护现有 4 块长期记忆。
+目标：
 
-owner：
+1. 收清长期 owner 和运行时 owner
+2. 保持 runtime / dataset / durable memory 的边界
+3. 让多端接入不再打散记忆体系
 
-- `DASHSCOPE_MEMORY_MAINTENANCE_MODEL`
-- 当前建议默认 `qwen3.5-plus`
+固定边界：
 
-职责：
+1. `backend workspace` 是 durable owner
+2. `livekit_agent` 只拥有 session-local working memory
+3. `dataset` 是录音资产、review、export 体系，不是长期记忆
+4. 页面不再各自拼 durable profile
 
-1. 读取当前会话里的稳定信号
-2. 判断是否值得更新现有长期记忆
-3. 当前只允许后台稳定维护 `用户个人画像`
-4. 不新增第五类 memory object
-5. 不把整段会话转成新的长期对象
-6. 不自动改写自定义材料
-7. 不自动改写场景 / 热词模板
-8. 不直接写训练总结
+建议中的长期架构：
 
-当前状态：
+```text
+surface state
+  -> session intent
+  -> session-local runtime memory
+  -> backend workspace snapshot
+  -> dataset / review / export layer
+  -> future semantic recall layer (Qdrant)
+  -> future coordination/cache layer (Redis only when necessary)
+```
 
-1. runtime 已经有 typed session memory
-2. `compaction_candidate` 现在只保留为会话内运行时信号
-3. 会话结束后不再写 `session_compaction` 这类新长期对象
-4. 当前实际落地是：会话结束只允许小幅更新 `用户个人画像`
+durable memory 继续只保留这些 owner：
 
-这条链和 correction 不是一个模型层。
+1. `prepared_expression`
+2. `hotword / scene templates`
+3. `user_profile_memory`
+4. `training reports`
 
-### 4.3 模型 3：训练页 summary / plan
+不应直接进入 durable memory：
 
-这是训练异步链，目标是短、准、有用。
+1. 原始 transcript 流水
+2. 单条训练录音
+3. review 未稳定的 heuristic
+4. 临时 UI 状态
+5. 新增的平级长期对象
 
-owner：
+中期最值得推进：
 
-- `DASHSCOPE_TRAINING_REPORT_MODEL`
-- 无值时兜底 `qwen3.5-plus`
+1. `typed session memory`
+2. `context assembly`
+3. `maintenance pipeline`
+4. `dataset-safe recall`
+5. `memory observability`
 
-职责：
+## 8. 推荐路线
 
-1. 只基于目标句 / 转录句差异生成：
-   - 每日总结
-   - 7 天总结
-   - 下一轮计划
-2. 不改写沟通页材料
-3. 不假装自己是沟通页实时纠错器
-4. 不把训练总结自动塞进沟通侧
+建议顺序：
 
-当前要求：
+1. 继续把 Web 主链打磨到稳定可演示、稳定可部署
+2. 先补 `evaluation + dataset tooling + observability`
+3. 再做 `mobile companion` 最小试点
+4. 再做 `硬件控制桥` 最小试点
+5. 最后逐步把 `livekit_agent` 演进成更自主、provider-neutral 的语音 agent runtime
 
-1. 总结要短
-2. 计划要少
-3. 用户看完就能继续录，不要写成长文
+每一阶段都必须满足：
 
----
+1. 不破坏现役 Web 主链
+2. 不新增平级 durable owner
+3. 不让 runtime / dataset / memory 再次混线
+4. 每条新能力都能被 smoke、回放或回归集验证
 
-## 5. 哪些东西可以进入后端长期记忆
+## 9. 配套文档
 
-这是上线前最重要的第三条。
-
-### 5.1 允许进入 durable memory 的内容
-
-长期记忆只允许表现为 4 块现有对象的更新，不允许再长出新的长期对象。
-
-这 4 块的 owner 和更新节奏固定如下：
-
-1. `自定义材料区`
-   - 完全由用户手动创建、编辑、删除
-   - 后台模型不能自动写入、自动补充、自动改写
-   - 系统最多只能给“可复制进去”的建议，不能直接落库
-2. `场景 / 热词模板`
-   - 由开发者维护模板库，用户负责选择是否加载
-   - 后台不会按单次会话自动改写模板
-   - 这一区是低频更新，不应该每次会话抖动
-3. `用户个人画像`
-   - 由后台维护链持续小幅更新
-   - 只允许写入稳定偏好、稳定误听规律、稳定补救策略
-   - 不允许把一次性的会话波动直接写进画像
-4. `训练总结`
-   - 由训练总结模型定期更新并覆盖旧版本
-   - daily / weekly / training plan 都从训练页 summary 流产生
-   - 沟通页不直接写这一区
-
-沟通页只允许触发这些更新：
-
-1. `自定义材料区`
-   - 沟通页不会自动写这一区
-   - 只有用户手动编辑时才会更新
-2. `场景 / 热词模板`
-   - 新增稳定高频场景
-   - 新增稳定高频热词
-3. `用户个人画像`
-   - 稳定的沟通偏好
-   - 稳定的误听规律
-   - 稳定的补救策略
-4. `训练总结`
-   - 沟通页不会直接写这一区
-
-训练页只允许触发这些更新：
-
-1. `训练总结`
-   - 每日总结
-   - 7 天总结
-   - 下一轮计划
-2. `用户个人画像`
-   - 只有真正稳定的表达规律才允许小幅更新
-3. `自定义材料区`
-   - 训练里提炼出的高价值材料只能作为建议展示
-   - 只有用户手动复制或编辑时才可进入这一区
-4. `场景 / 热词模板`
-   - 不自动更新
-
-### 5.2 不允许直接进入 durable memory 的内容
-
-这些不能直接进长期记忆：
-
-1. 沟通页原始音频
-2. 训练页原始句子全集
-3. 没被用户选中的整份材料全文
-4. 一整段实时 transcript
-5. 单独的“session compact 文档”
-6. 冗长 prompt
-7. 临时 UI 状态
-
-### 5.3 durable write 的固定原则
-
-所有长期写回都必须满足：
-
-1. 可解释
-2. 可删除
-3. 可回看来源
-4. 不跨 surface 偷渡
-
-也就是说：
-
-1. 训练页总结不能自动变成沟通页 loadout
-2. 沟通页后台更新不能自动污染用户画像
-3. 只有用户显式确认后，训练总结中的某条材料才可以复制成沟通材料
-
----
-
-## 6. 当前产品判断
-
-这版 PRD 不再继续维护“上线前 blocker 清单”。
-
-原因是：
-
-1. 主链骨架、页面骨架和 memory/write 边界已经基本固定。
-2. 剩余工作更多是持续验证、开源协作和长期扩展，不再是“最后几项上线前骨架待办”。
-
-因此当前产品判断只保留两条：
-
-1. PRD 继续负责定义产品边界、agent 上下文、模型分层和 durable write 原则。
-2. 真实开发优先级、最近验证结果和开源协作方向，改由下面两份文档承接。
-
----
-
-## 7. 配套文档
-
-短期执行状态以：
+短期执行状态：
 
 - [../.tasks/current.md](../.tasks/current.md)
 
-agent / memory 边界以：
-
-- [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
-
-开源后的协作方向以：
+开源协作拆线：
 
 - [VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
 
-为准。
+runtime / surface 深参考：
+
+- [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)
+
+agent / memory 边界：
+
+- [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
+
+录音、上传与训练资产 contract：
+
+- [VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)

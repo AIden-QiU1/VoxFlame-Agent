@@ -8,7 +8,7 @@ VoxFlame 是面向构音障碍沟通场景的主动沟通助手。当前目标�
 
 当前产品判断已经明确吸收“创始人即用户”的一手研究：真正决定成败的，不只是识别准确率，而是用户在面试、工作协作、医疗沟通、陌生人求助这些高压时刻，能不能不被打断、不被忽视、不被别人替他说话。
 
-文档使用上也已经进一步收口：继续开发时，默认以本 README、[产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](/home/ubuntu/VoxFlame-Agent/.tasks/current.md) 为主入口；仓库研究结论现在优先看 [Runtime And Surface Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) 和 [Agent, Memory And Tooling Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) 这 2 份综合参考。
+文档使用上也已经进一步收口：继续开发时，默认以本 README、[产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](/home/ubuntu/VoxFlame-Agent/.tasks/current.md) 为主入口；其中 PRD 现在主要负责当前产品边界和上线后 `App / 硬件 / 自定义语音 agent / 记忆架构` 规划。仓库研究结论则优先看 [Runtime And Surface Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) 和 [Agent, Memory And Tooling Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) 这 2 份综合参考。
 
 ## 当前架构
 

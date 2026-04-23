@@ -13,6 +13,20 @@
 
 ## 最新收口
 
+0. 2026-04-23 已把产品 PRD 改成“上线后规划版”
+   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 不再继续维护“上线前收口 / 最后 blocker”语气
+   - 当前明确承认 Web 主产品已经具备上线基线
+   - PRD 现在主要承接：
+     - `App / companion` 规划
+     - `硬件接入` 规划
+     - `自定义语音 agent 框架` 规划
+     - `记忆架构` 规划
+   - 现役主链、durable owner、dataset/memory 边界继续作为下一阶段默认前提，不再重复争论
+   - 已同步更新：
+     - [README.md](/home/ubuntu/VoxFlame-Agent/README.md)
+     - [docs/README.md](/home/ubuntu/VoxFlame-Agent/docs/README.md)
+     - [AGENTS.md](/home/ubuntu/VoxFlame-Agent/AGENTS.md)
+
 0. 2026-04-22 已把指定账号的 OSS 训练数据导出成可人工审阅的数据集
    - 根目录 [`.gitignore`](/home/ubuntu/VoxFlame-Agent/.gitignore) 已新增 `artifacts/dataset-review/`
    - 账号 `2307294809@qq.com`（用户 `64758dee-5026-4b53-a063-1d02d0834f67`）当前 `194` 条样本已导出到：

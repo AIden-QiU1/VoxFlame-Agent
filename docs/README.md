@@ -5,7 +5,7 @@
 ## 现役入口
 
 1. [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md)
-   当前产品设计、页面系统、能力对象、UI 方向与架构蓝图的权威主文档。
+   当前产品边界与上线后 `App / 硬件 / 自定义语音 agent / 记忆架构` 规划的权威主文档。
 2. [当前任务状态](../.tasks/current.md)
    当前现役任务、最近 3 天有效结论、下一步优先级与验证基线。
 3. [主项目 README](../README.md)
@@ -47,7 +47,7 @@
 
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
-| [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前产品设计与架构蓝图主文档 | ⭐⭐⭐ |
+| [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前产品边界与上线后扩展规划主文档 | ⭐⭐⭐ |
 | [开源协作方向（2026-04-21）](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md) | 开源后 `Web / App / 硬件 / 自主语音 agent` 的协作主线 | ⭐⭐⭐ |
 | [Runtime And Surface Reference（2026-03-26）](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) | runtime、surface 与历史架构演进的综合参考；不再代表当前执行面唯一真相 | ⭐⭐ |
 | [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md) | 把 LiveKit 官方 session/state/data 原语翻成 VoxFlame 的 memory 分层、context assembly 和 recall 判断 | ⭐⭐⭐ |
@@ -60,7 +60,7 @@
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
 | [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md) | `recording schema / recorder queue / manifest / upload` 的权威 contract | ⭐⭐⭐ |
-| [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前纠错链、记忆维护模型与训练总结模型的分层与上线边界 | ⭐⭐⭐ |
+| [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前上线基线，以及 `App / 硬件 / 自定义语音 agent / 记忆架构` 的主规划 | ⭐⭐⭐ |
 
 ### Memory
 
