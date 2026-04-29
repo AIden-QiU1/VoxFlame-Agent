@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { pickPreferredTrainingTranscriptCandidate } from './final-transcript.ts'
+import {
+  isRepetitiveTranscriptNoise,
+  pickPreferredTrainingTranscriptCandidate,
+} from './final-transcript.ts'
 
 test('training transcript selection prefers final transcript over longer interim noise', () => {
   const selected = pickPreferredTrainingTranscriptCandidate({
@@ -34,4 +37,20 @@ test('training transcript selection ignores unchanged baseline finals', () => {
   })
 
   assert.equal(selected, '')
+})
+
+test('training transcript selection drops repeated-character noise tails', () => {
+  const selected = pickPreferredTrainingTranscriptCandidate({
+    baseline: '',
+    latestFinal: '我我我我我我我我我我我我我我我我我我我我',
+    latestInterim: '我我我我我我我我我我我我我我我我我我我我',
+    bestObserved: '我我我我我我我我我我我我我我我我我我我我',
+  })
+
+  assert.equal(selected, '')
+})
+
+test('repetitive transcript noise keeps normal short repetitions', () => {
+  assert.equal(isRepetitiveTranscriptNoise('我想我想喝水。'), false)
+  assert.equal(isRepetitiveTranscriptNoise('我我我我我我我我我我我我我我我我'), true)
 })

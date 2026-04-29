@@ -14,6 +14,7 @@ from asr_runtime import (
     build_asr_session_payload,
     build_livekit_audio_apm_options,
     frame_to_pcm_bytes,
+    is_repetitive_transcript_noise,
     normalized_rms_energy,
     semantic_transcript_length,
     should_enable_livekit_audio_apm,
@@ -137,6 +138,10 @@ class TestASRRuntime(unittest.TestCase):
         self.assertEqual(semantic_transcript_length("嗯。"), 1)
         self.assertEqual(semantic_transcript_length("我想挂号。"), 4)
 
+    def test_repetitive_transcript_noise_detects_single_character_run(self) -> None:
+        self.assertTrue(is_repetitive_transcript_noise("我我我我我我我我我我我我我我我我我我"))
+        self.assertFalse(is_repetitive_transcript_noise("我想我想喝水。"))
+
     def test_vad_detector_emits_start_then_stop_after_silence_window(self) -> None:
         detector = RMSVoiceActivityDetector(threshold=0.01, silence_duration_ms=20)
         speech_frame = (1000).to_bytes(2, byteorder="little", signed=True) * 160
@@ -252,6 +257,40 @@ class TestASRRuntime(unittest.TestCase):
         self.assertEqual(final_transcripts, ["我想挂号。"])
         self.assertEqual(published_payloads[0]["text"], "我想挂号。")
         self.assertEqual(runtime._ignore_short_transcripts_until, 0.0)
+
+    def test_handle_server_event_ignores_repetitive_noise_transcript(self) -> None:
+        published_payloads: list[dict[str, object]] = []
+        final_transcripts: list[str] = []
+
+        async def publish_payload(payload: dict[str, object]) -> None:
+            published_payloads.append(payload)
+
+        async def on_final_transcript(text: str) -> None:
+            final_transcripts.append(text)
+
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type(
+                "Ctx",
+                (),
+                {"room_name": "room", "participant_identity": "user", "request_id": "req-1"},
+            )(),
+            participant=None,
+            publish_payload=publish_payload,
+            on_final_transcript=on_final_transcript,
+        )
+
+        asyncio.run(
+            runtime._handle_server_event(
+                {
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "transcript": "我我我我我我我我我我我我我我我我我我我我",
+                }
+            )
+        )
+
+        self.assertEqual(published_payloads, [])
+        self.assertEqual(final_transcripts, [])
 
     def test_handle_server_event_keeps_two_char_transcript_for_short_utterance_capture(self) -> None:
         published_payloads: list[dict[str, object]] = []

@@ -220,6 +220,18 @@ export interface WorkspaceMemorySnapshot {
     }>
   }
   prepared_expression: PreparedExpressionSnapshot | null
+  training_activity: {
+    daily_target_count: number
+    slogan: string
+    yesterday: {
+      day_key: string
+      total_recordings: number
+      top_contributors: Array<{
+        rank: number
+        recording_count: number
+      }>
+    }
+  }
   expression_kit: {
     active_scene_id: StarterKitScene['id'] | null
     recommended_phrases: ExpressionKitSuggestion[]

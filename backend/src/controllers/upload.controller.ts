@@ -83,4 +83,55 @@ router.post('/complete', async (req, res) => {
     }
 });
 
+/**
+ * DELETE /api/upload/contribution
+ * Remove one training recording from DB/OSS training material.
+ */
+router.delete('/contribution', async (req, res) => {
+    try {
+        const {
+            contributionId,
+            audioPath,
+            recordingId,
+        } = req.body as {
+            contributionId?: unknown;
+            audioPath?: unknown;
+            recordingId?: unknown;
+        };
+        const contributorId = req.user?.id;
+
+        if (!contributorId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        if (
+            typeof contributionId !== 'string' &&
+            typeof audioPath !== 'string' &&
+            typeof recordingId !== 'string'
+        ) {
+            return res.status(400).json({ error: 'Missing contributionId, audioPath, or recordingId' });
+        }
+
+        const result = await uploadArtifactService.discardCompletedUpload({
+            contributorId,
+            contributionId: typeof contributionId === 'string' ? contributionId : null,
+            audioPath: typeof audioPath === 'string' ? audioPath : null,
+            recordingId: typeof recordingId === 'string' ? recordingId : null,
+        });
+
+        console.log(
+            `[Upload] Discarded recordingId=${result.recordingId ?? 'null'} audioPath=${result.audioPath ?? 'null'} contributionId=${result.contributionId ?? 'null'}`,
+        );
+
+        res.json({
+            success: true,
+            ...result,
+        });
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Internal Server Error';
+        console.error('[Upload] Discard error:', message);
+        res.status(500).json({ error: message });
+    }
+});
+
 export const uploadRouter = router;

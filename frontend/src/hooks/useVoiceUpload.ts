@@ -59,6 +59,18 @@ export interface UploadResult {
   errorMessage?: string
 }
 
+export interface DiscardUploadOptions {
+  recordingId: string
+  contributionId?: string | null
+  storagePath?: string | null
+}
+
+export interface DiscardUploadResult {
+  ok: boolean
+  status: 'discarded' | 'auth_required' | 'failed'
+  errorMessage?: string
+}
+
 function toStorageSegment(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) {
     return 'unknown'
@@ -382,6 +394,78 @@ export function useVoiceUpload() {
     }
   }, [isAuthenticated, refreshLocalQueueCount, saveLocally, userId])
 
+  const discardUploadedRecording = useCallback(async (
+    options: DiscardUploadOptions,
+  ): Promise<DiscardUploadResult> => {
+    if (options.recordingId) {
+      await removeRecorderQueueItem(options.recordingId)
+      await refreshLocalQueueCount()
+    }
+
+    if (!options.contributionId && !options.storagePath) {
+      return {
+        ok: true,
+        status: 'discarded',
+      }
+    }
+
+    if (!isAuthenticated || !userId) {
+      const errorMessage = '请先登录后再撤回训练样本。'
+      setLastError(errorMessage)
+      return {
+        ok: false,
+        status: 'auth_required',
+        errorMessage,
+      }
+    }
+
+    const token = await getValidToken()
+    if (!token) {
+      const errorMessage = '登录状态已失效，请重新登录后再撤回。'
+      setLastError(errorMessage)
+      return {
+        ok: false,
+        status: 'auth_required',
+        errorMessage,
+      }
+    }
+
+    try {
+      const response = await fetch(`${config.api.baseUrl}/upload/contribution`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          contributionId: options.contributionId ?? null,
+          audioPath: options.storagePath ?? null,
+          recordingId: options.recordingId,
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: string } | null
+        throw new Error(payload?.error || `撤回失败: ${response.status}`)
+      }
+
+      setLastError(null)
+      setLastUploadReceipt(null)
+      return {
+        ok: true,
+        status: 'discarded',
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '撤回训练样本失败，请稍后再试。'
+      setLastError(errorMessage)
+      return {
+        ok: false,
+        status: 'failed',
+        errorMessage,
+      }
+    }
+  }, [isAuthenticated, refreshLocalQueueCount, userId])
+
   /**
    * 同步本地记录到云端
    */
@@ -538,6 +622,7 @@ export function useVoiceUpload() {
 
   return {
     uploadRecording,
+    discardUploadedRecording,
     syncLocalRecordings,
     getLocalRecordCount,
     isUploading,

@@ -39,16 +39,22 @@ interface TrainingSummaryWindowView {
   generatedAt: string
 }
 
-interface TrainingPlanView {
-  summary: string
-  items: string[]
-  generatedAt: string
-}
-
 interface TrainingReportsView {
   dailySummary: TrainingSummaryWindowView | null
   weeklySummary: TrainingSummaryWindowView | null
-  trainingPlan: TrainingPlanView | null
+}
+
+interface TrainingActivityView {
+  daily_target_count: number
+  slogan: string
+  yesterday: {
+    day_key: string
+    total_recordings: number
+    top_contributors: Array<{
+      rank: number
+      recording_count: number
+    }>
+  }
 }
 
 type MemorySectionId = 'profile' | 'custom_material' | 'training_summary' | 'scene_templates'
@@ -100,6 +106,25 @@ function renderChips(
         >
           {item}
         </span>
+      ))}
+    </div>
+  )
+}
+
+function renderYesterdayTopContributors(activity: TrainingActivityView | null | undefined) {
+  const topContributors = activity?.yesterday.top_contributors ?? []
+
+  if (!topContributors.length) {
+    return <p className="mt-3 text-sm text-gray-600">昨天还没有可展示的训练记录。</p>
+  }
+
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      {topContributors.map((item) => (
+        <div key={item.rank} className="rounded-[18px] bg-white px-4 py-3 ring-1 ring-stone-200">
+          <p className="text-sm font-medium text-gray-900">第 {item.rank} 名</p>
+          <p className="mt-1 text-xl font-semibold text-gray-900">{item.recording_count} 句</p>
+        </div>
       ))}
     </div>
   )
@@ -673,15 +698,10 @@ export default function MemoryPage() {
     return {
       dailySummary: mapWindow(reports.daily_summary),
       weeklySummary: mapWindow(reports.weekly_summary),
-      trainingPlan: reports.training_plan
-        ? {
-            summary: reports.training_plan.summary,
-            items: reports.training_plan.items,
-            generatedAt: reports.training_plan.generated_at,
-          }
-        : null,
     }
   }, [preparedExpressionAsset, workspaceSnapshot?.prepared_expression])
+  const trainingActivity = workspaceSnapshot?.training_activity ?? null
+  const dailyPracticeSlogan = trainingActivity?.slogan ?? '每天先练 20 句'
   const preparedExpressionPreview = summarizeText(
     activePreparedExpressionAsset
       ? `${activePreparedExpressionAsset.draft.title}：${activePreparedExpressionAsset.structured.summary}`
@@ -691,8 +711,7 @@ export default function MemoryPage() {
   )
   const trainingSummaryPreview = summarizeText(
     trainingReports?.weeklySummary?.summary
-      || trainingReports?.dailySummary?.summary
-      || trainingReports?.trainingPlan?.summary,
+      || trainingReports?.dailySummary?.summary,
     '还没有训练总结。训练页有真实录音后，这里再按时间窗更新。',
   )
   if (isLoading || !userId) {
@@ -1123,7 +1142,7 @@ export default function MemoryPage() {
               eyebrow="训练总结"
               eyebrowTone="stone"
               title="训练总结"
-              description="这里看训练页回流的今日总结、7 天总结和下一轮计划。"
+              description="这里看训练页回流的今日总结、7 天总结和匿名训练榜。"
               preview={trainingSummaryPreview}
               badge={trainingReports?.weeklySummary
                 ? `最近 7 天 ${trainingReports.weeklySummary.sampleCount} 条`
@@ -1160,23 +1179,17 @@ export default function MemoryPage() {
                 </div>
 
                 <div className="rounded-[20px] bg-sky-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">下一轮计划</p>
+                  <p className="text-sm font-medium text-gray-900">每日练习目标</p>
                   <p className="mt-3 text-sm leading-7 text-gray-700">
-                    {trainingReports.trainingPlan?.summary ?? '继续训练后，这里会出现下一轮计划。'}
+                    {dailyPracticeSlogan}。榜单只展示匿名名次和录音条数，不展示账号信息。
                   </p>
-                  {trainingReports.trainingPlan?.items.length ? (
-                    <div className="mt-3">
-                      {renderChips(trainingReports.trainingPlan.items, 'sky')}
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-sm text-gray-600">还没有生成下一轮计划。</p>
-                  )}
+                  {renderYesterdayTopContributors(trainingActivity)}
                 </div>
 
                 </div>
               ) : (
                 <div className="rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
-                  现在还没有训练总结。先去训练页按拆句开始录，这里会按时间窗回流今日总结、7 天总结和下一轮计划。
+                  现在还没有训练总结。先去训练页按拆句开始录，这里会按时间窗回流今日总结、7 天总结和匿名训练榜。
                 </div>
               )}
             </MemorySectionShell>

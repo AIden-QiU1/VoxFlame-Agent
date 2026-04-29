@@ -561,6 +561,21 @@ export function appendUploadedTrainingRecord(
   }
 }
 
+export function removeUploadedTrainingRecord(
+  userId: string,
+  recordId: string,
+): TrainingProfileSnapshot {
+  const current = safeParseState(userId)
+  const records = current.records.filter((record) => record.id !== recordId)
+  saveState(userId, {
+    ...current,
+    records,
+    lastSyncedUploadCount: Math.min(current.lastSyncedUploadCount, records.length),
+  })
+
+  return buildSnapshot(records)
+}
+
 export function markTrainingProfileSummarySynced(
   userId: string,
   totalUploadedRecordings: number,

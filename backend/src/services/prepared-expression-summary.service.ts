@@ -3,7 +3,6 @@ import {
   buildPreparedExpressionTemplateFromDraft,
   type PreparedExpressionAsset,
   type PreparedExpressionCorrectionPair,
-  type PreparedExpressionTrainingPlan,
   type PreparedExpressionTrainingReports,
   type PreparedExpressionTrainingSummaryWindow,
   type PreparedExpressionTemplate,
@@ -28,8 +27,10 @@ export type PreparedExpressionSummaryTrigger = 'manual' | 'periodic_auto';
 
 const DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const WEEKLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const DAILY_MODEL_SAMPLE_LIMIT = 24;
-const WEEKLY_MODEL_SAMPLE_LIMIT = 56;
+const DAILY_SUMMARY_SYSTEM_PROMPT =
+  '你是 VoxFlame 的今日训练总结器。你只返回 JSON，不要 markdown，不要解释。你只能根据输入的 last_24h_samples 生成 daily_summary，不能使用 7 天样本，不能重写准备材料。summary 必须是简练的规律性内容，不要只围绕一两个字、单个词或单条例子。';
+const WEEKLY_SUMMARY_SYSTEM_PROMPT =
+  '你是 VoxFlame 的 7 天训练总结器。你只返回 JSON，不要 markdown，不要解释。你只能根据输入的 last_7d_samples 生成 weekly_summary，重点找稳定规律，不要生成每日计划。summary 必须是简练的规律性内容，不要只围绕一两个字、单个词或单条例子。';
 
 interface SummaryWindowPayload {
   summary?: string;
@@ -44,15 +45,9 @@ interface SummaryWindowPayload {
   support_strategies?: string[];
 }
 
-interface TrainingPlanPayload {
-  summary?: string;
-  items?: string[];
-}
-
 interface PreparedExpressionTrainingReportPayload {
   daily_summary?: SummaryWindowPayload;
   weekly_summary?: SummaryWindowPayload;
-  training_plan?: TrainingPlanPayload;
 }
 
 function dedupeStrings(values: Array<string | null | undefined>, limit?: number): string[] {
@@ -208,19 +203,32 @@ function summarizeWindowHeuristically(
   const nextFocus = buildNextFocus(samples, asset, 4);
   const categoryFocus = buildCategoryFocus(samples);
   const summaryLead = label === 'daily' ? '今天' : '最近 7 天';
-  const mismatchLead = mismatchPairs[0]
-    ? `最值得先收口的是“${truncateText(mismatchPairs[0].target, 14)} -> ${truncateText(mismatchPairs[0].heard, 14)}”`
+  const focusLead = categoryFocus
+    ? `主要集中在“${truncateText(categoryFocus, 16)}”这类句子`
     : nextFocus[0]
-      ? `优先继续盯住“${truncateText(nextFocus[0], 16)}”`
-      : '继续把今天最常练的句子说稳';
-  const stableLead = stableWins[0] ? `已经较稳的是“${stableWins[0]}”` : null;
-  const categoryLead = categoryFocus ? `当前最有代表性的训练区是“${categoryFocus}”` : null;
+      ? `主要集中在“${truncateText(nextFocus[0], 16)}”这类表达`
+      : '主要集中在高频目标句';
+  const mismatchLead =
+    mismatchPairs.length > 1
+      ? '目标句和系统听到结果仍有反复差异'
+      : mismatchPairs.length === 1
+        ? '目标句和系统听到结果还有一处代表性差异'
+        : '整体识别较平稳';
+  const stableLead =
+    stableWins.length > 1
+      ? `已有 ${stableWins.length} 个表达相对稳定`
+      : stableWins.length === 1
+        ? '已有 1 个表达相对稳定'
+        : null;
+  const summaryTail =
+    label === 'daily'
+      ? '下一轮先保持同类句复练。'
+      : '后续先用同类句复练观察趋势。';
 
   return {
     summary:
-      `${summaryLead}共练了 ${samples.length} 句，${mismatchLead}` +
-      `${categoryLead ? `；${categoryLead}` : ''}` +
-      `${stableLead ? `；${stableLead}` : ''}。`,
+      `${summaryLead}共练了 ${samples.length} 句，${focusLead}，${mismatchLead}` +
+      `${stableLead ? `；${stableLead}` : ''}，${summaryTail}`,
     sampleCount: samples.length,
     mismatchPairs,
     nextFocus,
@@ -238,35 +246,6 @@ function summarizeWindowHeuristically(
       ],
       4,
     ),
-    generated_at: new Date().toISOString(),
-  };
-}
-
-function summarizePlanHeuristically(
-  dailySummary: PreparedExpressionTrainingSummaryWindow | null,
-  weeklySummary: PreparedExpressionTrainingSummaryWindow | null,
-): PreparedExpressionTrainingPlan | null {
-  const baseFocus = dailySummary?.nextFocus[0] ?? weeklySummary?.nextFocus[0] ?? null;
-  const basePair = dailySummary?.mismatchPairs[0] ?? weeklySummary?.mismatchPairs[0] ?? null;
-
-  const items = dedupeStrings(
-    [
-      basePair
-        ? `先单独练“${truncateText(basePair.target, 18)}”，重点避免再被听成“${truncateText(basePair.heard, 18)}”。`
-        : null,
-      baseFocus ? `下一轮先只盯“${truncateText(baseFocus, 18)}”，不要同时改太多点。` : null,
-      '先完成一轮短句复练，再回到整句，保证目标句和转录句差异明显缩小。',
-    ],
-    3,
-  );
-
-  if (items.length === 0) {
-    return null;
-  }
-
-  return {
-    summary: '下一轮计划只保留最少、最具体的动作，先把高频差异收小。',
-    items,
     generated_at: new Date().toISOString(),
   };
 }
@@ -299,6 +278,7 @@ async function requestDashScopeTrainingReport(
   prompt: string,
   model: string,
   timeoutMs: number,
+  systemPrompt: string,
 ): Promise<PreparedExpressionTrainingReportPayload | null> {
   const apiKey = process.env.DASHSCOPE_API_KEY?.trim();
   if (!apiKey) {
@@ -324,8 +304,7 @@ async function requestDashScopeTrainingReport(
           messages: [
             {
               role: 'system',
-              content:
-                '你是 VoxFlame 的训练总结器。你只返回 JSON，不要 markdown，不要解释。你的工作只有三件事：基于目标句和转录句的差异，生成今日总结、7天总结、下一轮计划。不要重写准备材料，不要生成 document summary，不要扩写成长文。',
+              content: systemPrompt,
             },
             {
               role: 'user',
@@ -371,57 +350,66 @@ async function requestDashScopeTrainingReport(
   }
 }
 
-function buildModelPrompt(
+function compactSamples(samples: PreparedExpressionTrainingSample[]) {
+  return samples.map((sample) => ({
+    created_at: sample.created_at,
+    category: sample.exercise_category,
+    section: sample.prepared_expression_section_title,
+    target_text: sample.target_text,
+    recognized_text: sample.recognized_text,
+    feedback_status: sample.feedback_status,
+    speech_patterns: sample.speech_patterns,
+    articulation_tips: sample.articulation_tips,
+    pronunciation_summary: sample.pronunciation_summary,
+  }));
+}
+
+function buildCategoryCounts(samples: PreparedExpressionTrainingSample[]): Record<string, number> {
+  return samples.reduce<Record<string, number>>((acc, sample) => {
+    const category = sample.exercise_category?.trim();
+    if (category) {
+      acc[category] = (acc[category] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
+}
+
+function buildPreparedExpressionContext(asset: PreparedExpressionAsset | null) {
+  return asset
+    ? {
+        title: asset.draft.title,
+        scene: asset.draft.scene,
+        source: asset.draft.source,
+        high_risk_phrases: asset.structured.highRiskPhrases.slice(0, 6),
+        section_titles: asset.structured.sections.slice(0, 8).map((section) => section.title),
+      }
+    : null;
+}
+
+function buildDailySummaryPrompt(
   asset: PreparedExpressionAsset | null,
   dailySamples: PreparedExpressionTrainingSample[],
-  weeklySamples: PreparedExpressionTrainingSample[],
   trigger: PreparedExpressionSummaryTrigger,
 ): string {
-  const compactDaily = dailySamples.slice(0, DAILY_MODEL_SAMPLE_LIMIT).map((sample) => ({
-    created_at: sample.created_at,
-    category: sample.exercise_category,
-    section: sample.prepared_expression_section_title,
-    target_text: sample.target_text,
-    recognized_text: sample.recognized_text,
-    feedback_status: sample.feedback_status,
-    speech_patterns: sample.speech_patterns,
-    articulation_tips: sample.articulation_tips,
-    pronunciation_summary: sample.pronunciation_summary,
-  }));
-
-  const compactWeekly = weeklySamples.slice(0, WEEKLY_MODEL_SAMPLE_LIMIT).map((sample) => ({
-    created_at: sample.created_at,
-    category: sample.exercise_category,
-    section: sample.prepared_expression_section_title,
-    target_text: sample.target_text,
-    recognized_text: sample.recognized_text,
-    feedback_status: sample.feedback_status,
-    speech_patterns: sample.speech_patterns,
-    articulation_tips: sample.articulation_tips,
-    pronunciation_summary: sample.pronunciation_summary,
-  }));
-
   return JSON.stringify(
     {
-      task: 'training_daily_weekly_summary_and_plan',
+      task: 'training_daily_summary',
       trigger,
       instructions: {
+        purpose: '训练页今日总结；帮助用户理解今天真实练习中最明显的规律性差异。',
         focus: [
-          'daily_summary 只根据 last_24h_samples 生成。',
-          'weekly_summary 只根据 last_7d_samples 生成。',
-          '只总结 target_text 和 recognized_text 的稳定差异，不要把材料说明、场景标题或系统提示改写成训练结论。',
-          'summary 先写一般性规律，再补 1 到 2 个最有代表性的例子。',
-          'mismatch_pairs 只保留真实稳定出现的“目标 -> 系统听到”错配。',
-          'training_plan 只给 2 到 3 条最具体、最窄的下一步动作。',
-          'weekly_summary 会同时服务训练页和纠错链路，所以要精确、短、可复用。',
-          '不管样本来自哪个训练专区，都按同一训练视角总结。',
+          '只使用 last_24h_samples。',
+          '每条样本都包含 target_text 和 recognized_text，必须围绕这两个字段的差异总结。',
+          'summary 用 1 句中文，只写今天可复用的主要规律；不要只围绕一两个字、单个词或单条例子；不超过 70 字。',
+          '具体例子放进 mismatch_pairs / stable_wins / support_strategies，不要让 summary 变成例子列表。',
+          'mismatch_pairs 只保留今天真实出现的“目标 -> 系统听到”错配。',
+          'next_focus 写今天下一轮最值得继续盯的 1 到 4 个短焦点。',
+          'stable_wins 只写今天已经较稳的目标句或短片段。',
         ],
         limits: {
           daily_mismatch_pairs: 4,
-          weekly_mismatch_pairs: 6,
           next_focus: 4,
           stable_wins: 3,
-          plan_items: 3,
           pronunciation_patterns: 8,
           support_strategies: 4,
         },
@@ -440,6 +428,47 @@ function buildModelPrompt(
             pronunciation_patterns: ['string'],
             support_strategies: ['string'],
           },
+        },
+      },
+      training_context: {
+        active_prepared_expression: buildPreparedExpressionContext(asset),
+        last_24h_category_counts: buildCategoryCounts(dailySamples),
+      },
+      last_24h_samples: compactSamples(dailySamples),
+    },
+    null,
+    2,
+  );
+}
+
+function buildWeeklySummaryPrompt(
+  asset: PreparedExpressionAsset | null,
+  weeklySamples: PreparedExpressionTrainingSample[],
+  trigger: PreparedExpressionSummaryTrigger,
+): string {
+  return JSON.stringify(
+    {
+      task: 'training_weekly_summary',
+      trigger,
+      instructions: {
+        purpose: '训练页最近 7 天总结；帮助用户和纠错链路复用一组跨天稳定规律。',
+        focus: [
+          '只使用 last_7d_samples。',
+          'last_7d_samples 是最近 7 天可用训练样本的目标句/识别句全量窗口，不要只看最近几条。',
+          '只总结 target_text 和 recognized_text 的稳定差异，不要把材料说明、场景标题或系统提示改写成训练结论。',
+          'summary 用 1 句中文，只写 7 天内可复用的稳定规律；不要只围绕一两个字、单个词或单条例子；不超过 90 字。',
+          '具体例子放进 mismatch_pairs / stable_wins / support_strategies，不要让 summary 变成例子列表。',
+          'mismatch_pairs 只保留最近 7 天重复或最有代表性的“目标 -> 系统听到”错配。',
+          'next_focus 要能服务训练页和纠错链路，短、明确、可复用。',
+        ],
+        limits: {
+          weekly_mismatch_pairs: 6,
+          next_focus: 4,
+          stable_wins: 3,
+          pronunciation_patterns: 8,
+          support_strategies: 4,
+        },
+        output_schema: {
           weekly_summary: {
             summary: 'string',
             mismatch_pairs: [
@@ -454,39 +483,13 @@ function buildModelPrompt(
             pronunciation_patterns: ['string'],
             support_strategies: ['string'],
           },
-          training_plan: {
-            summary: 'string',
-            items: ['string'],
-          },
         },
       },
       training_context: {
-        active_prepared_expression: asset
-          ? {
-              title: asset.draft.title,
-              scene: asset.draft.scene,
-              source: asset.draft.source,
-              high_risk_phrases: asset.structured.highRiskPhrases.slice(0, 6),
-              section_titles: asset.structured.sections.slice(0, 8).map((section) => section.title),
-            }
-          : null,
-        last_24h_category_counts: dailySamples.reduce<Record<string, number>>((acc, sample) => {
-          const category = sample.exercise_category?.trim();
-          if (category) {
-            acc[category] = (acc[category] ?? 0) + 1;
-          }
-          return acc;
-        }, {}),
-        last_7d_category_counts: weeklySamples.reduce<Record<string, number>>((acc, sample) => {
-          const category = sample.exercise_category?.trim();
-          if (category) {
-            acc[category] = (acc[category] ?? 0) + 1;
-          }
-          return acc;
-        }, {}),
+        active_prepared_expression: buildPreparedExpressionContext(asset),
+        last_7d_category_counts: buildCategoryCounts(weeklySamples),
       },
-      last_24h_samples: compactDaily,
-      last_7d_samples: compactWeekly,
+      last_7d_samples: compactSamples(weeklySamples),
     },
     null,
     2,
@@ -502,24 +505,44 @@ function readPayloadPairs(
     return [];
   }
 
-  return buildPreparedExpressionCorrectionPairs(
-    value
-      .map((pair) => {
-        if (!isRecord(pair)) {
-          return null;
-        }
+  const results: PreparedExpressionCorrectionPair[] = [];
+  let totalChars = 0;
 
-        return {
-          target: readString(pair, 'target'),
-          heard: readString(pair, 'heard'),
-        };
-      })
-      .filter((pair): pair is { target: string | null; heard: string | null } => Boolean(pair)),
-    {
-      maxPairs: limit,
-      maxChars,
-    },
-  );
+  for (const pair of value) {
+    if (!isRecord(pair)) {
+      continue;
+    }
+
+    const target = readString(pair, 'target');
+    const heard = readString(pair, 'heard');
+    if (!target || !heard || target === heard) {
+      continue;
+    }
+
+    const pairChars = target.length + heard.length + 12;
+    if (results.length > 0 && totalChars + pairChars > maxChars) {
+      break;
+    }
+
+    const occurrenceValue = pair.occurrence_count;
+    const occurrenceCount =
+      typeof occurrenceValue === 'number' && Number.isFinite(occurrenceValue)
+        ? Math.max(1, Math.round(occurrenceValue))
+        : 1;
+
+    results.push({
+      target,
+      heard,
+      occurrenceCount,
+    });
+    totalChars += pairChars;
+
+    if (results.length >= limit) {
+      break;
+    }
+  }
+
+  return results;
 }
 
 function buildWindowFromPayload(
@@ -548,27 +571,6 @@ function buildWindowFromPayload(
       payload?.support_strategies ?? heuristic?.supportStrategies ?? [],
       4,
     ),
-    generated_at: heuristic?.generated_at ?? new Date().toISOString(),
-  };
-}
-
-function buildPlanFromPayload(
-  payload: TrainingPlanPayload | undefined,
-  heuristic: PreparedExpressionTrainingPlan | null,
-): PreparedExpressionTrainingPlan | null {
-  if (!heuristic && !payload?.summary?.trim()) {
-    return null;
-  }
-
-  const items = dedupeStrings(payload?.items ?? heuristic?.items ?? [], 3);
-  const summary = payload?.summary?.trim() || heuristic?.summary;
-  if (!summary) {
-    return null;
-  }
-
-  return {
-    summary,
-    items,
     generated_at: heuristic?.generated_at ?? new Date().toISOString(),
   };
 }
@@ -608,7 +610,6 @@ export class PreparedExpressionSummaryService {
 
     const heuristicDaily = summarizeWindowHeuristically('daily', dailySamples, normalizedAsset);
     const heuristicWeekly = summarizeWindowHeuristically('weekly', weeklySamples, normalizedAsset);
-    const heuristicPlan = summarizePlanHeuristically(heuristicDaily, heuristicWeekly);
 
     const model = process.env.DASHSCOPE_TRAINING_REPORT_MODEL?.trim() || 'qwen3.5-plus';
     const timeoutMs = Math.max(
@@ -620,23 +621,39 @@ export class PreparedExpressionSummaryService {
         10,
       ) || 12000,
     );
-    const payload = await requestDashScopeTrainingReport(
-      buildModelPrompt(normalizedAsset, dailySamples, weeklySamples, trigger),
-      model,
-      timeoutMs,
-    );
+    const [dailyPayload, weeklyPayload] = await Promise.all([
+      dailySamples.length > 0
+        ? requestDashScopeTrainingReport(
+            buildDailySummaryPrompt(normalizedAsset, dailySamples, trigger),
+            model,
+            timeoutMs,
+            DAILY_SUMMARY_SYSTEM_PROMPT,
+          )
+        : Promise.resolve(null),
+      weeklySamples.length > 0
+        ? requestDashScopeTrainingReport(
+            buildWeeklySummaryPrompt(normalizedAsset, weeklySamples, trigger),
+            model,
+            timeoutMs,
+            WEEKLY_SUMMARY_SYSTEM_PROMPT,
+          )
+        : Promise.resolve(null),
+    ]);
+
+    const dailySummary = buildWindowFromPayload(dailyPayload?.daily_summary, heuristicDaily);
+    const weeklySummary = buildWindowFromPayload(weeklyPayload?.weekly_summary, heuristicWeekly);
 
     const trainingReports: PreparedExpressionTrainingReports = {
-      dailySummary: buildWindowFromPayload(payload?.daily_summary, heuristicDaily),
-      weeklySummary: buildWindowFromPayload(payload?.weekly_summary, heuristicWeekly),
-      trainingPlan: buildPlanFromPayload(payload?.training_plan, heuristicPlan),
+      dailySummary,
+      weeklySummary,
+      trainingPlan: null,
     };
 
     return {
       draft: asset.draft,
       structured,
       training_reports:
-        trainingReports.dailySummary || trainingReports.weeklySummary || trainingReports.trainingPlan
+        trainingReports.dailySummary || trainingReports.weeklySummary
           ? trainingReports
           : null,
     };

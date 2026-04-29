@@ -147,6 +147,44 @@ export class OssService {
             throw error;
         }
     }
+
+    /**
+     * Delete an object from OSS. Missing objects are treated as already deleted.
+     */
+    async deleteObject(name: string): Promise<void> {
+        if (!this.isConfigured || !this.client) {
+            return;
+        }
+
+        try {
+            await this.client.delete(name);
+        } catch (error: unknown) {
+            if (isOssNotFoundError(error)) {
+                return;
+            }
+
+            console.error(`[OSS] Failed to delete ${name}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Replace an append log while preserving append-object compatibility.
+     */
+    async replaceTextLog(name: string, lines: string[]): Promise<void> {
+        if (!this.isConfigured || !this.client) {
+            return;
+        }
+
+        await this.deleteObject(name);
+
+        for (const line of lines) {
+            const normalized = line.trim();
+            if (normalized) {
+                await this.appendTextLog(name, normalized);
+            }
+        }
+    }
 }
 
 export const ossService = new OssService();

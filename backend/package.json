@@ -10,6 +10,7 @@
     "start": "node dist/index.js",
     "reconcile:artifacts": "ts-node scripts/reconcile_upload_artifacts.ts",
     "export:audio-target": "ts-node scripts/export_audio_target_dataset.ts",
+    "download:oss-by-account": "ts-node scripts/download_oss_by_account.ts",
     "cleanup:prepared-expression": "ts-node scripts/cleanup_prepared_expression_data.ts"
   },
   "dependencies": {

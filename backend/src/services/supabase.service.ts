@@ -55,6 +55,7 @@ export interface Session {
 }
 
 interface VoiceContributionRow {
+  contributor_id?: string;
   created_at?: string;
   transcript?: string | null;
   metadata?: JsonRecord;
@@ -335,6 +336,18 @@ export interface WorkspaceMemorySnapshot {
     }>;
     updated_at: string;
   } | null;
+  training_activity: {
+    daily_target_count: number;
+    slogan: string;
+    yesterday: {
+      day_key: string;
+      total_recordings: number;
+      top_contributors: Array<{
+        rank: number;
+        recording_count: number;
+      }>;
+    };
+  };
   expression_kit: {
     active_scene_id: WorkspaceSceneId | null;
     recommended_phrases: ExpressionKitSuggestion[];
@@ -1522,12 +1535,6 @@ export class SupabaseService {
     return asset?.training_reports?.weeklySummary ?? asset?.training_reports?.dailySummary ?? null;
   }
 
-  private getTrainingPlan(
-    asset: PreparedExpressionAsset | null | undefined,
-  ) {
-    return asset?.training_reports?.trainingPlan ?? null;
-  }
-
   private getPreparedExpressionTrainingSummary(
     preparedExpression: WorkspaceMemorySnapshot['prepared_expression'] | null | undefined,
   ) {
@@ -1536,30 +1543,37 @@ export class SupabaseService {
       ?? null;
   }
 
-  private getPreparedExpressionTrainingPlan(
-    preparedExpression: WorkspaceMemorySnapshot['prepared_expression'] | null | undefined,
-  ) {
-    return preparedExpression?.training_reports?.training_plan ?? null;
-  }
-
   private async getTrainingResultSamples(
     userId: string,
   ): Promise<PreparedExpressionTrainingSample[]> {
-    const { data, error } = await this.adminClient
-      .from('voice_contributions')
-      .select('created_at, transcript, metadata')
-      .eq('contributor_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(160);
+    const weeklyWindowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const pageSize = 1000;
+    const rows: VoiceContributionRow[] = [];
 
-    if (error || !Array.isArray(data)) {
-      if (error) {
-        console.error('Error fetching training result samples:', error);
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await this.adminClient
+        .from('voice_contributions')
+        .select('created_at, transcript, metadata')
+        .eq('contributor_id', userId)
+        .gte('created_at', weeklyWindowStart)
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error || !Array.isArray(data)) {
+        if (error) {
+          console.error('Error fetching training result samples:', error);
+        }
+        return [];
       }
-      return [];
+
+      rows.push(...(data as VoiceContributionRow[]));
+
+      if (data.length < pageSize) {
+        break;
+      }
     }
 
-    return (data as VoiceContributionRow[])
+    return rows
       .filter((row) => {
         const metadata = isRecord(row.metadata) ? row.metadata : undefined;
         return (
@@ -1571,7 +1585,6 @@ export class SupabaseService {
         const rightTime = new Date(right.created_at ?? 0).getTime();
         return rightTime - leftTime;
       })
-      .slice(0, 80)
       .map((row) => {
         const metadata = isRecord(row.metadata) ? row.metadata : undefined;
 
@@ -1602,14 +1615,102 @@ export class SupabaseService {
       });
   }
 
+  private getChinaDayWindow(offsetDays: number): {
+    dayKey: string;
+    startIso: string;
+    endIso: string;
+  } {
+    const chinaOffsetMs = 8 * 60 * 60 * 1000;
+    const now = new Date();
+    const chinaNow = new Date(now.getTime() + chinaOffsetMs);
+    const dayStartUtcMs = Date.UTC(
+      chinaNow.getUTCFullYear(),
+      chinaNow.getUTCMonth(),
+      chinaNow.getUTCDate() + offsetDays,
+      0,
+      0,
+      0,
+      0,
+    ) - chinaOffsetMs;
+    const dayEndUtcMs = dayStartUtcMs + 24 * 60 * 60 * 1000;
+    const dayKey = new Date(dayStartUtcMs + chinaOffsetMs).toISOString().slice(0, 10);
+
+    return {
+      dayKey,
+      startIso: new Date(dayStartUtcMs).toISOString(),
+      endIso: new Date(dayEndUtcMs).toISOString(),
+    };
+  }
+
+  private async getTrainingActivitySnapshot(): Promise<WorkspaceMemorySnapshot['training_activity']> {
+    const yesterday = this.getChinaDayWindow(-1);
+    const pageSize = 1000;
+    const counts = new Map<string, number>();
+    let totalRecordings = 0;
+
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await this.adminClient
+        .from('voice_contributions')
+        .select('contributor_id, metadata')
+        .gte('created_at', yesterday.startIso)
+        .lt('created_at', yesterday.endIso)
+        .range(from, from + pageSize - 1);
+
+      if (error || !Array.isArray(data)) {
+        if (error) {
+          console.error('Error fetching yesterday training activity:', error);
+        }
+        break;
+      }
+
+      for (const row of data as VoiceContributionRow[]) {
+        const metadata = isRecord(row.metadata) ? row.metadata : undefined;
+        if (readString(metadata, 'kind') !== 'training_result') {
+          continue;
+        }
+
+        const contributorId = row.contributor_id?.trim();
+        if (!contributorId) {
+          continue;
+        }
+
+        totalRecordings += 1;
+        counts.set(contributorId, (counts.get(contributorId) ?? 0) + 1);
+      }
+
+      if (data.length < pageSize) {
+        break;
+      }
+    }
+
+    const topContributors = [...counts.values()]
+      .sort((left, right) => right - left)
+      .slice(0, 3)
+      .map((recordingCount, index) => ({
+        rank: index + 1,
+        recording_count: recordingCount,
+      }));
+
+    return {
+      daily_target_count: 20,
+      slogan: '每天先练 20 句',
+      yesterday: {
+        day_key: yesterday.dayKey,
+        total_recordings: totalRecordings,
+        top_contributors: topContributors,
+      },
+    };
+  }
+
   async getWorkspaceMemorySnapshot(
     userId: string,
     options: { sceneId?: WorkspaceSceneId } = {},
   ): Promise<WorkspaceMemorySnapshot> {
-    const [profileSnapshot, rawUserProfile, quickPhrases] = await Promise.all([
+    const [profileSnapshot, rawUserProfile, quickPhrases, trainingActivity] = await Promise.all([
       this.getUserMemoryProfile(userId, 400, 120),
       this.getUserProfile(userId),
       this.getUserPhrases(userId, undefined, 40),
+      this.getTrainingActivitySnapshot(),
     ]);
     const userProfile = await this.migratePreparedExpressionLibraryIfNeeded(
       userId,
@@ -1657,6 +1758,7 @@ export class SupabaseService {
       ),
       prepared_expression_library: preparedExpressionLibrary,
       prepared_expression: preparedExpression,
+      training_activity: trainingActivity,
       expression_kit: this.buildExpressionKit(
         profileSnapshot,
         quickPhrases,
@@ -1792,7 +1894,6 @@ export class SupabaseService {
 
     const trainingSummaryItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
     const preferredTrainingSummary = this.getPreparedExpressionTrainingSummary(preparedExpression);
-    const trainingPlan = this.getPreparedExpressionTrainingPlan(preparedExpression);
     if (preparedExpression && preferredTrainingSummary) {
       trainingSummaryItems.push({
         id: `training-summary-${preparedExpression.id}`,
@@ -1809,18 +1910,6 @@ export class SupabaseService {
         load_behavior: 'derived',
         editable: false,
         updated_at: preferredTrainingSummary.generated_at,
-      });
-    }
-    if (trainingPlan) {
-      trainingSummaryItems.push({
-        id: `training-plan-${preparedExpression?.id ?? syncedAt}`,
-        type: 'training_summary',
-        title: '当前训练计划',
-        summary: trainingPlan.summary,
-        tags: trainingPlan.items.slice(0, 3),
-        load_behavior: 'derived',
-        editable: false,
-        updated_at: trainingPlan.generated_at,
       });
     }
     return [

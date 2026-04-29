@@ -112,6 +112,26 @@ def semantic_transcript_length(text: str) -> int:
     return len(TRANSCRIPT_EDGE_PUNCTUATION_PATTERN.sub("", text.strip()))
 
 
+def compact_semantic_transcript(text: str) -> str:
+    return re.sub(r"[\s，。！？!?；;：:、,.…~～\-《》\"'“”‘’（）()【】\[\]]+", "", text)
+
+
+def is_repetitive_transcript_noise(text: str) -> bool:
+    compact = compact_semantic_transcript(text)
+    if len(compact) < 12:
+        return False
+
+    if re.search(r"(.)\1{8,}", compact):
+        return True
+
+    counts: dict[str, int] = {}
+    for char in compact:
+        counts[char] = counts.get(char, 0) + 1
+
+    top_count = max(counts.values()) if counts else 0
+    return top_count / len(compact) >= 0.65 and len(counts) <= 4
+
+
 def build_livekit_audio_apm_options(config: LiveKitAgentConfig) -> dict[str, bool]:
     return {
         "echo_cancellation": config.livekit_audio_apm_echo_cancellation,
@@ -531,8 +551,9 @@ class LiveKitASRRuntime:
                 pcm_bytes = self._apply_audio_apm(pcm_bytes, current.sample_rate)
                 if not pcm_bytes:
                     continue
-                await self.client.append_audio(pcm_bytes)
-                await self._observe_vad(pcm_bytes, current.sample_rate)
+                should_forward_audio = await self._observe_vad(pcm_bytes, current.sample_rate)
+                if should_forward_audio:
+                    await self.client.append_audio(pcm_bytes)
 
     def _apply_audio_apm(self, pcm_bytes: bytes, sample_rate: int) -> bytes:
         if self._audio_apm is None or not pcm_bytes:
@@ -594,9 +615,12 @@ class LiveKitASRRuntime:
             self.ctx.participant_identity,
         )
 
-    async def _observe_vad(self, pcm_bytes: bytes, sample_rate: int) -> None:
+    async def _observe_vad(self, pcm_bytes: bytes, sample_rate: int) -> bool:
         if self._vad is None:
-            return
+            return True
+
+        if self._client_capture_tracking_enabled and not self._client_recording_active:
+            return False
 
         speech_started, speech_stopped, energy = self._vad.observe(pcm_bytes, sample_rate)
         peak_level = normalized_peak_level(pcm_bytes)
@@ -621,7 +645,7 @@ class LiveKitASRRuntime:
             if self.on_speech_activity is not None:
                 await self.on_speech_activity("speech_started", False)
             await self._emit_audio_telemetry("speech_started")
-            return
+            return True
 
         if self._vad.state is VADState.SPEAKING:
             self._received_voice_since_commit = True
@@ -643,6 +667,7 @@ class LiveKitASRRuntime:
                 )
                 if self.on_speech_activity is not None:
                     await self.on_speech_activity("barge_in_triggered", False)
+            return True
 
         if speech_stopped and self._received_voice_since_commit:
             if (
@@ -658,7 +683,7 @@ class LiveKitASRRuntime:
                 self._received_voice_since_commit = False
                 self._speech_ms_since_commit = 0.0
                 self._barge_in_triggered_since_commit = False
-                return
+                return False
             await self._emit_audio_telemetry("speech_stopped")
             logger.info(
                 "LiveKit VAD speech_stopped room=%s participant=%s silence_ms=%s speech_ms=%s -> auto_finalize",
@@ -670,6 +695,8 @@ class LiveKitASRRuntime:
             if self.on_speech_activity is not None:
                 await self.on_speech_activity("speech_stopped", True)
             await self.commit_audio("vad_auto_finalize")
+
+        return False
 
     async def _emit_audio_telemetry(self, reason: str) -> None:
         if self.on_audio_telemetry is None or self._level_count_since_commit <= 0:
@@ -713,6 +740,15 @@ class LiveKitASRRuntime:
             text = str(payload.get("text", "") or "").strip()
             if not text:
                 return
+            if is_repetitive_transcript_noise(text):
+                logger.info(
+                    "LiveKit ASR ignored repetitive interim noise room=%s participant=%s chars=%s preview=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    len(text),
+                    text[:80],
+                )
+                return
 
             logger.info(
                 "LiveKit ASR interim transcript room=%s participant=%s chars=%s preview=%s",
@@ -745,6 +781,17 @@ class LiveKitASRRuntime:
                     self.ctx.room_name,
                     self.ctx.participant_identity,
                     payload,
+                )
+                return
+
+            if is_repetitive_transcript_noise(transcript):
+                self._ignore_short_transcripts_until = 0.0
+                logger.info(
+                    "LiveKit ASR ignored repetitive noise transcript room=%s participant=%s chars=%s preview=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    len(transcript),
+                    transcript[:80],
                 )
                 return
 

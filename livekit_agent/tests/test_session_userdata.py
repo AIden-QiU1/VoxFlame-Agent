@@ -79,11 +79,11 @@ class SessionUserDataTests(unittest.TestCase):
         self.assertEqual(userdata.preparation.risky_terms, ["邱文峰"])
         self.assertIn("描述症状", userdata.preparation.immediate_goal)
 
-    def test_build_session_userdata_keeps_voice_reply_for_training_workspace(self) -> None:
+    def test_build_session_userdata_skips_voice_reply_for_training_workspace(self) -> None:
         userdata = build_session_userdata(create_context(surface="training_workspace", mode="training"))
 
-        self.assertTrue(userdata.voice_reply_enabled)
-        self.assertFalse(userdata.should_skip_tts())
+        self.assertFalse(userdata.voice_reply_enabled)
+        self.assertTrue(userdata.should_skip_tts())
 
     def test_build_preparation_context_pack_from_payload_reads_document_and_pairs(self) -> None:
         preparation = build_preparation_context_pack_from_payload(

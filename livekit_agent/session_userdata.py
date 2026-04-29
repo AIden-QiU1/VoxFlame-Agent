@@ -199,7 +199,10 @@ def build_session_userdata(ctx: VoxFlameSessionContext) -> VoxFlameSessionUserDa
             context_revision=1,
             last_preparation_source=preparation.source,
         ),
-        voice_reply_enabled=ctx.surface != "communication_workspace",
+        voice_reply_enabled=(
+            ctx.surface not in {"communication_workspace", "training_workspace"}
+            and ctx.mode != "training"
+        ),
     )
 
 

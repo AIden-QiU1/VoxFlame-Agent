@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-04-21
+> 最后更新: 2026-04-28
 
 ## 当前主线
 
@@ -12,6 +12,62 @@
   - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-04-29 已把 OSS 全量对象按账户下载到本地 artifacts
+   - 输出目录：[artifacts/oss-by-account](/home/ubuntu/VoxFlame-Agent/artifacts/oss-by-account)
+   - 当前 OSS 对象总数 `463`，总量约 `63.6 MB`
+   - 本地排除 `_inventory.json / _objects.jsonl` 后文件数为 `463`
+   - 账户目录：
+   - `1137205964__8a533bbe`: `114` 个对象
+   - `13818790456__d01b4410`: `29` 个对象
+   - `2307294809__64758dee`: `286` 个对象
+   - `874888410__800f7d03`: `5` 个对象
+   - `legacy__v_gv7fxwrp`: `7` 个对象
+   - `ltf.edgar__53649c22`: `6` 个对象
+   - `unassigned`: `16` 个对象
+   - 新增 [download_oss_by_account.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/download_oss_by_account.ts)，可通过 `cd backend && npm run download:oss-by-account` 重跑
+   - 已验证：
+   - `cd backend && ./node_modules/.bin/tsc --noEmit --skipLibCheck --esModuleInterop --module commonjs --target ES2020 --moduleResolution node scripts/download_oss_by_account.ts`
+   - `cd backend && ./node_modules/.bin/ts-node scripts/download_oss_by_account.ts --dry-run`
+   - `cd backend && ./node_modules/.bin/ts-node scripts/download_oss_by_account.ts`
+
+0. 2026-04-28 已把训练页计划位改成固定练习目标和匿名昨日榜
+   - 训练总结模型现在只生成 `daily_summary / weekly_summary`，不再生成或展示 `training_plan`
+   - backend `workspace snapshot` 新增匿名 `training_activity`：
+     - 固定口号：`每天先练 20 句`
+     - 昨日 Top 3 只返回 `rank / recording_count`，不暴露邮箱、用户名或 user id
+   - 训练页和记忆页都改成展示固定 20 句目标、匿名昨日训练榜、今日总结和 7 天总结
+   - 训练总结取样现在按最近 7 天窗口分页读取 `voice_contributions`，不再只截最近 80 条
+   - 训练录音页默认关闭 agent TTS 回声，只保留系统听到文本和用户录音回听；本次结果卡片已压缩为目标 / 系统听到 / 回听 / 重录的最小面板
+   - 本次结果新增“不收录”小按钮：默认仍自动上传，用户不满意时可撤回本地队列 / 云端登记 / OSS 训练索引
+   - ASR 链路改成先 VAD 再送模型，并过滤“我我我…”这类重复字噪声 transcript
+   - 已验证：
+   - `cd backend && npm run build`
+   - `cd frontend && npm run build`
+   - `python3 -m unittest livekit_agent.tests.test_session_userdata`
+   - `python3 -m unittest livekit_agent.tests.test_asr_runtime livekit_agent.tests.test_session_userdata`
+   - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types src/lib/training/final-transcript.test.ts`
+   - `bash scripts/check_ai_docs.sh`
+
+0. 2026-04-28 已把脑卒中后持续说话练习写入 PRD
+   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 新增“练习工作台核心场景：脑卒中后持续说话练习”
+   - 明确后续每日 / 7 天总结要支持同句或同类句子的进步评估，但只能表达“训练表现 / 系统识别代理指标改善”，不能表达医学康复结论
+   - 今日总结 / 7 天总结的产品口径已收成简练规律性内容，具体字词错配留在结构化例子字段里
+   - 后续实现顺序先落 backend progress feature builder，再改 daily / weekly summary prompt
+   - 已验证：
+   - `cd backend && npm run build`
+   - `bash scripts/check_ai_docs.sh`
+
+0. 2026-04-27 已按客户反馈补训练录音页移动端与回放体验
+   - [frontend/src/app/contribute/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/contribute/page.tsx) 已调整训练录音页响应式顺序：
+     - 手机窄屏先显示当前词 / 当前句与录音按钮
+     - 词表与主题说明排到后面，避免 iPhone 首屏只看到 20 条筛查词而误以为“麦克风页面没出来”
+     - 桌面端仍保持左边句子准备、右边录音结果的两栏结构
+   - 录完一条后，本次结果区新增“回听自己的声音”，直接用浏览器原生 audio 控件播放刚录到的音频 blob
+   - 这次同时确认客户截图里的 `http://111.230.35.89` + iPhone Safari / 无痕浏览会触发移动端麦克风限制风险；真实麦克风验证应使用 HTTPS 域名或 localhost secure context
+   - 已验证：
+   - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types src/lib/training/training-assessment.test.ts src/lib/training/final-transcript.test.ts`
+   - `cd frontend && npm run build`
 
 0. 2026-04-23 已把产品 PRD 改成“上线后规划版”
    - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 不再继续维护“上线前收口 / 最后 blocker”语气

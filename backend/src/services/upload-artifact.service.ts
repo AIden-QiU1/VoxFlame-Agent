@@ -23,9 +23,29 @@ export interface UploadArtifactResult {
   transcriptAlreadySynced: boolean | null
 }
 
+export interface DiscardUploadPayload {
+  contributorId: string
+  contributionId?: string | null
+  audioPath?: string | null
+  recordingId?: string | null
+}
+
+export interface DiscardUploadResult {
+  contributionId: string | null
+  audioPath: string | null
+  recordingId: string | null
+  manifestPath: string
+  removedContribution: boolean
+  removedAudioObject: boolean
+  removedManifestEntry: boolean
+  removedTranscriptEntry: boolean
+}
+
 interface ContributionRecord {
   id: string
   metadata: JsonRecord
+  audio_path?: string | null
+  sentence_id?: string | null
 }
 
 interface UploadReceiptMetadata extends JsonRecord {
@@ -291,7 +311,7 @@ async function findExistingContribution(
 
   const { data, error } = await supabase
     .from('voice_contributions')
-    .select('id, metadata')
+    .select('id, metadata, audio_path, sentence_id')
     .eq('contributor_id', contributorId)
     .eq('audio_path', audioPath)
     .limit(1)
@@ -308,6 +328,45 @@ async function findExistingContribution(
   return {
     id: row.id,
     metadata: isRecord(row.metadata) ? row.metadata : {},
+    audio_path: typeof row.audio_path === 'string' ? row.audio_path : null,
+    sentence_id: typeof row.sentence_id === 'string' ? row.sentence_id : null,
+  }
+}
+
+async function findContributionForDiscard(payload: DiscardUploadPayload): Promise<ContributionRecord | null> {
+  if (!supabase) {
+    return null
+  }
+
+  let query = supabase
+    .from('voice_contributions')
+    .select('id, metadata, audio_path, sentence_id')
+    .eq('contributor_id', payload.contributorId)
+
+  if (payload.contributionId) {
+    query = query.eq('id', payload.contributionId)
+  } else if (payload.audioPath) {
+    query = query.eq('audio_path', payload.audioPath)
+  } else {
+    return null
+  }
+
+  const { data, error } = await query.limit(1)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const row = Array.isArray(data) && data.length > 0 ? data[0] : null
+  if (!row || typeof row.id !== 'string') {
+    return null
+  }
+
+  return {
+    id: row.id,
+    metadata: isRecord(row.metadata) ? row.metadata : {},
+    audio_path: typeof row.audio_path === 'string' ? row.audio_path : null,
+    sentence_id: typeof row.sentence_id === 'string' ? row.sentence_id : null,
   }
 }
 
@@ -367,6 +426,100 @@ async function updateContributionMetadata(
   if (error) {
     throw new Error(error.message)
   }
+}
+
+function lineMatchesRecording(line: string, recordingId: string | null, audioPath: string | null): boolean {
+  if (!line.trim()) {
+    return false
+  }
+
+  try {
+    const parsed = JSON.parse(line) as Record<string, unknown>
+    const audio = isRecord(parsed.audio) ? parsed.audio : {}
+    return (
+      (Boolean(recordingId) && parsed.recording_id === recordingId) ||
+      (Boolean(audioPath) && audio.path === audioPath)
+    )
+  } catch {
+    return (
+      (Boolean(audioPath) && line.includes(audioPath ?? '')) ||
+      (Boolean(recordingId) && line.includes(`"recording_id":"${recordingId}"`))
+    )
+  }
+}
+
+async function removeRecordingFromManifest(
+  manifestPath: string,
+  recordingId: string | null,
+  audioPath: string | null,
+): Promise<boolean> {
+  const content = await ossService.getTextObject(manifestPath)
+  if (!content) {
+    return false
+  }
+
+  const lines = content
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+  const remaining = lines.filter((line) => !lineMatchesRecording(line, recordingId, audioPath))
+
+  if (remaining.length === lines.length) {
+    return false
+  }
+
+  await ossService.replaceTextLog(manifestPath, remaining)
+  return true
+}
+
+async function removeRecordingFromTranscriptExport(
+  transcriptsPath: string,
+  audioPath: string | null,
+  recordingId: string | null,
+): Promise<boolean> {
+  const content = await ossService.getTextObject(transcriptsPath)
+  if (!content) {
+    return false
+  }
+
+  const lines = content
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+  const remaining = lines.filter((line) => {
+    if (audioPath && line.includes(`\t${audioPath}\t`)) {
+      return false
+    }
+
+    if (recordingId && line.startsWith(`${recordingId}\t`)) {
+      return false
+    }
+
+    return true
+  })
+
+  if (remaining.length === lines.length) {
+    return false
+  }
+
+  await ossService.replaceTextLog(transcriptsPath, remaining)
+  return true
+}
+
+async function deleteContribution(contributorId: string, contributionId: string): Promise<boolean> {
+  if (!supabase) {
+    return false
+  }
+
+  const { error } = await supabase
+    .from('voice_contributions')
+    .delete()
+    .eq('id', contributionId)
+    .eq('contributor_id', contributorId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return true
 }
 
 export class UploadArtifactService {
@@ -482,6 +635,55 @@ export class UploadArtifactService {
       reusedContribution,
       manifestAlreadySynced,
       transcriptAlreadySynced,
+    }
+  }
+
+  async discardCompletedUpload(payload: DiscardUploadPayload): Promise<DiscardUploadResult> {
+    const manifestPath = `dataset/${payload.contributorId}/manifest.jsonl`
+    const existing = await findContributionForDiscard(payload)
+    const metadata = existing?.metadata ?? {}
+    const receipt = readUploadReceipt(metadata)
+    const audioPath =
+      existing?.audio_path ||
+      payload.audioPath ||
+      receipt.audio_path ||
+      null
+    const recordingId =
+      payload.recordingId ||
+      receipt.recording_id ||
+      readString(metadata, 'recording_id') ||
+      (audioPath ? audioPath.split('/').pop()?.replace(/\.[^/.]+$/, '') || null : null)
+    const contributionId = existing?.id ?? payload.contributionId ?? null
+
+    const removedContribution = contributionId
+      ? await deleteContribution(payload.contributorId, contributionId)
+      : false
+    const removedManifestEntry = await removeRecordingFromManifest(
+      manifestPath,
+      recordingId,
+      audioPath,
+    )
+    const removedTranscriptEntry = await removeRecordingFromTranscriptExport(
+      `dataset/${payload.contributorId}/transcripts.txt`,
+      audioPath,
+      recordingId,
+    )
+
+    let removedAudioObject = false
+    if (audioPath) {
+      await ossService.deleteObject(audioPath)
+      removedAudioObject = true
+    }
+
+    return {
+      contributionId,
+      audioPath,
+      recordingId,
+      manifestPath,
+      removedContribution,
+      removedAudioObject,
+      removedManifestEntry,
+      removedTranscriptEntry,
     }
   }
 }
