@@ -146,4 +146,5 @@ QDRANT_URL=http://qdrant:6333  # Phase 3
 - [主项目 README](../README.md)
 - [前端 README](../frontend/README.md)
 - [LiveKit Agent README](../livekit_agent/README.md)
+- [Full-stack 架构学习指南](../docs/VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
 - [Agent, Memory And Tooling Reference](../docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)

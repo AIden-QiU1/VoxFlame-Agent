@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-04-28
+> 最后更新: 2026-04-29
 
 ## 当前主线
 
@@ -12,6 +12,22 @@
   - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-04-29 已新增“从需求到应用架构”的 full-stack 学习指南
+   - 新增 [VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
+   - 文档把新需求拆解固定成：
+   - `真实场景 -> surface -> 状态生命周期 -> owner -> contract -> flow -> failure -> verification`
+   - 结合当前 VoxFlame 主链说明：
+   - `Frontend = 产品 surface + 本地兜底`
+   - `Backend = durable owner + control plane`
+   - `LiveKit = realtime transport`
+   - `livekit_agent = session runtime intelligence`
+   - `Dataset = audio-target asset system`
+   - 同时补了 React / Next.js / Express / Supabase / LiveKit / MDN / Stripe / 12-Factor / Sam Newman / Martin Fowler 等学习链接
+   - 已同步入口：
+   - [docs/README.md](/home/ubuntu/VoxFlame-Agent/docs/README.md)
+   - [FOUNDER_COLLABORATION_LOOP_2026-03-25.md](/home/ubuntu/VoxFlame-Agent/docs/FOUNDER_COLLABORATION_LOOP_2026-03-25.md)
+   - [backend/README.md](/home/ubuntu/VoxFlame-Agent/backend/README.md)
 
 0. 2026-04-29 已把 OSS 全量对象按账户下载到本地 artifacts
    - 输出目录：[artifacts/oss-by-account](/home/ubuntu/VoxFlame-Agent/artifacts/oss-by-account)

@@ -62,7 +62,7 @@ interface ConnectRtcOptions {
   suppressGreeting?: boolean
 }
 
-interface StartRecordingOptions extends ConnectRtcOptions {}
+interface StartRecordingOptions extends ConnectRtcOptions { }
 
 export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
   const {

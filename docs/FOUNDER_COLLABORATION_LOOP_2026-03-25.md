@@ -128,6 +128,19 @@
    - 哪些模型负责总结 / 计划 / 压缩
    - 为什么 durable write 必须晚于 realtime correctness
 
+## 5.2 本轮最值得读：从需求到应用架构
+
+这轮已经把“面对一个需求，如何自己判断前端、后端、agent、数据和验证怎么建”沉淀成一份长期学习入口：
+
+- [VoxFlame Full-stack Architecture Learning Guide（2026-04-29）](VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
+
+它重点回答：
+
+1. 如何把一个需求拆成 `真实场景 -> surface -> 状态生命周期 -> owner -> contract -> flow -> failure -> verification`
+2. 为什么 `Frontend / Backend / LiveKit / livekit_agent / dataset` 不能互相抢 owner
+3. 为什么应用架构首先是事实源和数据流判断，不只是组件、接口和模型调用
+4. 该按什么顺序补 React、Next.js、Express、Supabase、LiveKit、MDN、service layer、BFF 等基础材料
+
 ## 6. 文档沉淀规则
 
 为了减少信息散落，默认按下面沉淀：
