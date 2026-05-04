@@ -1,17 +1,75 @@
 # 当前任务状态
 
-> 最后更新: 2026-04-29
+> 最后更新: 2026-05-04
 
 ## 当前主线
 
-- 主任务：把当前产品主线收成 `沟通成功率 -> typed memory -> 句子级准备资产 -> 数据录入/标注 -> 四块记忆系统后台维护` 的稳态闭环，不再新增大功能。
+- 主任务：在不破坏 Web/PWA 现役主链的前提下，开始 `App / Mobile Workbench` Phase 0 调研与 RFC；移动端目标从薄 companion 升级为完整移动端工作台。
 - 当前执行面：`frontend -> backend -> self-hosted livekit-server -> livekit_agent`。
 - 当前最重要的产品/工程重点：
+  - Mobile workbench 必须复用 `workspace snapshot / recording envelope / upload receipt / RTC session orchestration`
+  - 战略主线推荐 `Expo / React Native + LiveKit React Native`，从 day one 规划 `沟通 / 练习 / 记忆与准备 / 设备与同步` 四个一级 surface
+  - `Capacitor` 只保留为 WebView 原型或过渡方案，不再作为完整移动端工作台主线
+  - Phase 0 代码已开始落在 `apps/mobile-workbench`，移动端 surface id 统一为 `mobile_workbench`
   - 把 `session-local typed memory -> 四块记忆系统后台维护 -> workspace snapshot` 的 owner 与写回边界做扎实
   - 把 `prepared-expression / important-expression / 高频句` 的录入和复用入口统一起来
   - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-05-04 已确认可以进入 App / Mobile Workbench Phase 0
+   - 新增并更新 [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+   - 结论：
+   - 当前 Web/PWA 已基本具备稳定演示、录音补传和 workspace contract 基础，可以开始完整移动端工作台研发
+   - “一步到位”指产品信息架构、owner、contract 和技术路线一步到位；工程交付仍按可验证切片推进
+   - 推荐新建 `apps/mobile-workbench`，复用现有 backend contract，不复制 Next.js 整站，也不另造第二套 owner
+   - 官方调研已覆盖：
+   - Expo / React Native：适合深原生音频、LiveKit mobile、文件系统、权限、后台任务和长期移动端工作台；后台任务和 iOS background fetch 都有限制
+   - Capacitor：适合 Web 技术栈 + native plugin bridge 原型；常规工作流需要 build + `npx cap sync`，不作为完整工作台主线
+   - Supabase：React Native 不能沿用浏览器 localStorage/cookie 假设，需要 AsyncStorage / SecureStore adapter
+   - LiveKit：移动端必须继续通过 backend 拿 token，并显式管理 audio session
+   - iOS / Android：麦克风与后台录音都有系统级授权和 while-in-use 限制，不能在产品承诺里写满
+   - 已同步入口：
+   - [docs/README.md](/home/ubuntu/VoxFlame-Agent/docs/README.md)
+   - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
+   - [VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
+   - [FOUNDER_COLLABORATION_LOOP_2026-03-25.md](/home/ubuntu/VoxFlame-Agent/docs/FOUNDER_COLLABORATION_LOOP_2026-03-25.md)
+   - 创始人需要把控的方向已写入协作循环：
+   - 完整移动端工作台的承诺边界
+   - 后台录音与隐私
+   - 医疗 / 康复表述
+   - 硬件桥接优先级
+   - Expo / React Native / LiveKit mobile / Supabase mobile auth / Capacitor fallback 的学习顺序
+   - 本轮同时保留上一轮 Web/PWA 稳定性修复：
+   - `/api/rtc/health` 改成无认证最小健康信号，详细 RTC session/control 端点仍需认证
+   - PWA manifest 的 `home-wide.png` 已从坏占位文件换成有效 `1280x720` PNG
+   - 记忆页训练总结 fallback 已修复：材料库 asset 的空 reports 不再遮住 workspace snapshot 里的全训练样本总结
+
+0. 2026-05-04 已开始 `apps/mobile-workbench` Phase 0 skeleton
+   - 新增 [Mobile Workbench Phase 0 RFC](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
+   - 新增 [apps/mobile-workbench](/home/ubuntu/VoxFlame-Agent/apps/mobile-workbench)
+   - 当前落地：
+   - Expo / React Native package/app config skeleton
+   - 四个一级 surface：`communication / practice / memory / device`
+   - 移动端 contract boundary：RTC intent、recording envelope、upload receipt、workspace read model、recorder queue policy
+   - 静态验证脚本：`npm run check:mobile-workbench`
+   - 现役 RTC / recording 类型已从旧移动端 surface id 收口为 `mobile_workbench`
+   - 已验证：
+   - `npm run check:mobile-workbench`
+   - `cd apps/mobile-workbench && npm install --package-lock-only`
+   - `cd apps/mobile-workbench && npm install --ignore-scripts --no-audit --prefer-offline`
+   - `cd apps/mobile-workbench && npm run check`
+   - `cd apps/mobile-workbench && npm run typecheck`
+   - `HOME=/tmp/voxflame-expo-home EXPO_NO_TELEMETRY=1 npm run start -- --localhost --port 8123`
+   - `curl -s http://127.0.0.1:8123/status`
+   - `sudo docker compose up -d --build livekit-server backend frontend livekit-agent`
+   - `sudo docker compose ps`
+   - `curl -s http://127.0.0.1:3001/health`
+   - `curl -s http://127.0.0.1:3001/api/rtc/health`
+   - 注意：
+   - 首次完整安装曾因 npm registry 下载 `@livekit/components-core` 出现 `ECONNRESET`，重试后成功；当前仍有 LiveKit 依赖链里的 React peer warning，后续依赖治理要继续关注
+   - Expo dev server 当前使用 `/tmp/voxflame-expo-home` 避免写入仓库外 home 目录
+   - Docker 核心栈已重新 build / up，`backend` 与 `frontend` compose health 均为 healthy，`/api/rtc/health` 继续保持无认证最小健康信号
 
 0. 2026-04-29 已新增“从需求到应用架构”的 full-stack 学习指南
    - 新增 [VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
@@ -89,7 +147,7 @@
    - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 不再继续维护“上线前收口 / 最后 blocker”语气
    - 当前明确承认 Web 主产品已经具备上线基线
    - PRD 现在主要承接：
-     - `App / companion` 规划
+     - `App / Mobile Workbench` 规划
      - `硬件接入` 规划
      - `自定义语音 agent 框架` 规划
      - `记忆架构` 规划
@@ -119,7 +177,7 @@
    - [README.md](/home/ubuntu/VoxFlame-Agent/README.md) 已删除一批已完成但仍写成“当前重点 / 近期开发路径”的旧条目
    - README 现在把重点改成：
      - `Web 主产品继续打磨`
-     - `App / companion 接入`
+     - `App / Mobile Workbench 接入`
      - `硬件接入`
      - `自主语音 agent 架构`
    - 新增开源协作方向文档 [VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)

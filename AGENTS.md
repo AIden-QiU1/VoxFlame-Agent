@@ -39,7 +39,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 ### Runtime Instruction Boundary
 
 - 根 `AGENTS.md` 只服务“仓库协作 agent”。
-- 产品运行时 agent、未来 app companion、light voice surface 或训练场景的运行时指令，不应直接写进根 `AGENTS.md`。
+- 产品运行时 agent、未来 mobile workbench、light voice surface 或训练场景的运行时指令，不应直接写进根 `AGENTS.md`。
 - 运行时指令应单独维护在明确的 runtime 文档或配置体系里，并与仓库协作规则分开。
 
 ## Operating Model
@@ -147,11 +147,12 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 - [docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md](docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md)：迁移 / 统一 / 废弃 / 兼容层任务模板。
 - [docs/README.md](docs/README.md)：文档导航。
 - [docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md](docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)：当前产品边界与上线后 `App / 硬件 / 自定义语音 agent / 记忆架构` 规划的权威主文档。
-- [docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)：吸收 `TEN ceiling / 五层映射 / Agora 替换 / light voice surface` 后的统一 runtime 与 surface 参考文档。
+- [docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md](docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)：App / Mobile Workbench 技术路线、官方约束、机会点、阶段计划和创始人需要把控的技术方向。
+- [docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md](docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)：当前 `apps/mobile-workbench` skeleton、四 surface、contract boundary 与下一步实现顺序。
+- [docs/control-plane.md](docs/control-plane.md)：控制面的职责、边界、现有实现映射与后续收口方向。
 - [docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)：吸收 `memory mechanisms / voice-agent-tooling` 后的统一 agent、memory、tooling 参考文档。
 - [frontend/README.md](frontend/README.md)：当前前端页面系统、共享 `workspace` contract、训练资产链路与 PWA 边界。
 - [docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)：统一后的记忆系统主参考（含历史统一报告合并结论）。
-- [docs/control-plane.md](docs/control-plane.md)：控制面的职责、边界、现有实现映射与后续收口方向。
 - [docs/capability-registry.md](docs/capability-registry.md)：产品运行时能力与工程协作能力的 registry，明确 owner、调用边界、副作用和 smoke。
 - [docs/VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md](docs/VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)：基于 `ququ + vocotype-cli` 的实施文档，定义训练数据 schema、recorder pipeline、manifest 与本地 recorder queue 的收口方向。
 - [docs/VOXFLAME_REFACTOR_COLLABORATION_PLAYBOOK_2026-03-24.md](docs/VOXFLAME_REFACTOR_COLLABORATION_PLAYBOOK_2026-03-24.md)：重构协作手册，明确在哪个目录下开发、何时引用参考仓库、如何使用 `gstack / superpowers / 设计专项 skill` 跑完整流程。

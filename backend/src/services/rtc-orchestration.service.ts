@@ -19,7 +19,7 @@ export type RtcSurface =
   | 'training_workspace'
   | 'memory_workspace'
   | 'pwa_quick_talk'
-  | 'mobile_companion'
+  | 'mobile_workbench'
   | 'desktop_companion'
 export type RtcSessionStrategy = 'heavy_realtime' | 'light_voice'
 export type RtcCapabilityId =
@@ -177,7 +177,7 @@ const SUPPORTED_SURFACES: RtcSurface[] = [
   'training_workspace',
   'memory_workspace',
   'pwa_quick_talk',
-  'mobile_companion',
+  'mobile_workbench',
   'desktop_companion',
 ]
 

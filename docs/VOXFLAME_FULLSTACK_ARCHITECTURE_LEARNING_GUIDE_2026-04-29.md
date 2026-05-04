@@ -93,7 +93,7 @@ communication workspace
 training workspace
 memory workspace
 PWA
-mobile companion
+mobile workbench
 desktop companion
 hardware bridge
 livekit_agent runtime

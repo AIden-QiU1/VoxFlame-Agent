@@ -8,7 +8,7 @@ VoxFlame 是面向构音障碍沟通场景的主动沟通助手。当前目标�
 
 当前产品判断已经明确吸收“创始人即用户”的一手研究：真正决定成败的，不只是识别准确率，而是用户在面试、工作协作、医疗沟通、陌生人求助这些高压时刻，能不能不被打断、不被忽视、不被别人替他说话。
 
-文档使用上也已经进一步收口：继续开发时，默认以本 README、[产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](/home/ubuntu/VoxFlame-Agent/.tasks/current.md) 为主入口；其中 PRD 现在主要负责当前产品边界和上线后 `App / 硬件 / 自定义语音 agent / 记忆架构` 规划。仓库研究结论则优先看 [Runtime And Surface Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) 和 [Agent, Memory And Tooling Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) 这 2 份综合参考。
+文档使用上也已经进一步收口：继续开发时，默认以本 README、[产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](/home/ubuntu/VoxFlame-Agent/.tasks/current.md) 为主入口；其中 PRD 现在主要负责当前产品边界和上线后 `App / 硬件 / 自定义语音 agent / 记忆架构` 规划。App / Mobile Workbench 的技术路线优先看 [App / Mobile Workbench Best Practices And Opportunity](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)，control plane 实现细节看 [control-plane.md](/home/ubuntu/VoxFlame-Agent/docs/control-plane.md)，agent / memory 边界看 [Agent, Memory And Tooling Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)。
 
 ## 当前架构
 
@@ -39,7 +39,7 @@ Frontend LiveKit RTC/Data
 
 - 沟通主链已经能用；沟通页首屏已经从 `chat-first` 收成 `starter kit + live session + expression kit drawer`，首页、练习页和沟通档案页的顶层信息也开始从“说明书式页面”收成“任务入口 + 资源入口 + 低压力提示”。
 - 训练数据入口这轮也开始扎实起来：前端已围绕 `recording envelope -> recorder queue -> upload receipt` 收口，后端 `/api/upload/complete` 已开始按 `audio_path` 复用已有 contribution / manifest，减少补传和重试时的重复写入。
-- 本地待同步录音现在不再只是“有个数量提示”，而是会带 `syncStatus / syncAttempts / lastAttemptAt / lastError` 显式展示，后续 PWA、web 和 future companion 可以围绕同一套 recorder queue contract 继续扩展。
+- 本地待同步录音现在不再只是“有个数量提示”，而是会带 `syncStatus / syncAttempts / lastAttemptAt / lastError` 显式展示，后续 PWA、Web 和 mobile workbench 可以围绕同一套 recorder queue contract 继续扩展。
 - [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 同时承担会话启动、RTM 事件路由、字幕聚合、voice profile 同步和本地 memory session 管理，已经逼近“第二控制面”。
 - 长期用户状态正在继续收口到前端 [memory-service.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/memory-service.ts) 与后端 [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 共同维护的 `workspace snapshot / memory profile / expression kit` 读写链，不再继续向旧执行面分叉。
 - 记忆系统当前重点不是继续堆训练复盘，而是把“用户画像、常见场景、即将面对场景的准备、热词、发音规律、补救策略”压缩成可直接服务沟通与训练的 owner 数据。
@@ -50,8 +50,9 @@ Frontend LiveKit RTC/Data
 
 1. `Web 主产品继续打磨`
    继续提升沟通页、训练页、记忆页的真实可用性和可验证性。
-2. `App / companion 接入`
-   在复用 `workspace snapshot / recording envelope / upload receipt` 的前提下，推进移动端和桌面 companion。
+2. `App / Mobile Workbench 接入`
+   在复用 `workspace snapshot / recording envelope / upload receipt` 的前提下，推进完整移动端工作台和桌面 companion。
+   当前移动端 Phase 0 skeleton 已落在 [apps/mobile-workbench](/home/ubuntu/VoxFlame-Agent/apps/mobile-workbench)，执行 RFC 见 [Mobile Workbench Phase 0 RFC](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)。
 3. `硬件接入`
    先做 BLE / USB / 外接麦克风 / 一键控制桥，再决定是否走更重的硬件形态。
 4. `自主语音 agent 架构`
@@ -187,7 +188,7 @@ VoxFlame-Agent/
 我们正在寻找 4 条长期 owner 方向的贡献者：
 
 - Web 产品与实时体验：沟通页、训练页、记忆页、评估区、可用性与 QA
-- App / companion：移动端、桌面端、后台同步、通知、设备权限
+- App / Mobile Workbench：移动端、桌面端、后台同步、通知、设备权限
 - 硬件接入：外接麦克风、BLE 控制、音频输入质量监测、设备桥接
 - 自主语音 agent：turn controller、context assembler、provider adapter、evaluation harness
 

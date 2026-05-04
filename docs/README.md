@@ -16,17 +16,21 @@
    当前页面系统、共享 `workspace` contract、训练资产链路与 PWA 边界。
 6. [Full-stack 架构学习指南（2026-04-29）](VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
    把“面对一个需求，如何拆 surface / state / owner / contract / runtime / verification”沉淀成可复用的方法，并附官方文档与经典工程文章阅读路线。
-7. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
+7. [App / Mobile Workbench 最佳实践与机会文档（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+   判断当前为什么适合启动完整移动端工作台、为什么主线推荐 `Expo / React Native + LiveKit React Native`、如何复用现有 `workspace snapshot / recording envelope / upload receipt / RTC session orchestration`。
+8. [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
+   当前 `apps/mobile-workbench` skeleton、四个一级 surface、移动端 contract boundary 和下一步实现顺序。
+9. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
    当前数据录入、上传、manifest 和 recorder queue 的权威 contract。
-8. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+10. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
    把 LiveKit 官方的 session/state/data 原语翻成 VoxFlame 可执行的 memory 分层判断，明确 `LiveKit != durable memory owner`，以及 `Qdrant / Redis` 应分别放在哪一层。
 
 ## 综合参考
 
 下面这些文档保留为概念参考、历史设计判断或按主题查阅入口；当前代码现状与下一步开发，不再以旧迁移文档为主入口。
 
-1. [Runtime And Surface Reference（2026-03-26）](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)
-   吸收 `TEN ceiling / 五层映射 / Agora 替换 / light voice surface` 后的统一 runtime 与 surface 参考。
+1. [control-plane.md](control-plane.md)
+   backend 控制面实现、session orchestration、surface contract 与诊断深文档。
 2. [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
    吸收 `memory mechanisms / voice-agent-tooling` 后的统一 agent、memory、tooling 参考。
 3. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
@@ -51,8 +55,9 @@
 |------|------|--------|
 | [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前产品边界与上线后扩展规划主文档 | ⭐⭐⭐ |
 | [开源协作方向（2026-04-21）](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md) | 开源后 `Web / App / 硬件 / 自主语音 agent` 的协作主线 | ⭐⭐⭐ |
+| [App / Mobile Workbench 最佳实践与机会文档（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md) | 完整移动端工作台的技术路线、官方约束、机会点、阶段计划和创始人需要把控的技术方向 | ⭐⭐⭐ |
+| [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md) | `apps/mobile-workbench` 的 skeleton、surface、contract boundary 和实现顺序 | ⭐⭐⭐ |
 | [Full-stack 架构学习指南（2026-04-29）](VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md) | 从真实需求拆到 surface、state 生命周期、owner、contract、runtime、failure 和 verification 的学习与实践路线 | ⭐⭐⭐ |
-| [Runtime And Surface Reference（2026-03-26）](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md) | runtime、surface 与历史架构演进的综合参考；不再代表当前执行面唯一真相 | ⭐⭐ |
 | [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md) | 把 LiveKit 官方 session/state/data 原语翻成 VoxFlame 的 memory 分层、context assembly 和 recall 判断 | ⭐⭐⭐ |
 | [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) | agent、memory、tooling 与 dataset/memory 边界的综合参考 | ⭐⭐⭐ |
 | [control-plane.md](control-plane.md) | backend 控制面实现、schema 与诊断深文档 | ⭐⭐ |
@@ -105,15 +110,19 @@
 6. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
 
 **要判断 runtime / surface / PWA / App 方向**
-1. [Runtime And Surface Reference（2026-03-26）](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)
-2. [前端 README](../frontend/README.md)
-3. [开源协作方向（2026-04-21）](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
-4. 当前代码现状以 [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](../.tasks/current.md) 为准
+1. [App / Mobile Workbench 最佳实践与机会文档（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+2. [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
+3. [control-plane.md](control-plane.md)
+4. [前端 README](../frontend/README.md)
+5. [开源协作方向（2026-04-21）](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
+6. 当前代码现状以 [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](../.tasks/current.md) 为准
 
 **要判断开源协作 / App / 硬件 / 自主语音 agent 架构**
 1. [开源协作方向（2026-04-21）](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
-2. [主项目 README](../README.md)
-3. [前端 README](../frontend/README.md)
+2. [App / Mobile Workbench 最佳实践与机会文档（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+3. [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
+4. [主项目 README](../README.md)
+5. [前端 README](../frontend/README.md)
 
 **要判断 agent / memory / tooling 边界**
 1. [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)

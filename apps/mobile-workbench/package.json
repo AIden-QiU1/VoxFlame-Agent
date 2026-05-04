@@ -1,0 +1,36 @@
+{
+  "name": "@voxflame/mobile-workbench",
+  "version": "0.0.1",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "prebuild": "expo prebuild",
+    "typecheck": "tsc --noEmit",
+    "check": "node scripts/check-mobile-workbench.mjs"
+  },
+  "dependencies": {
+    "@config-plugins/react-native-webrtc": "14.0.0",
+    "@livekit/react-native": "^2.10.2",
+    "@livekit/react-native-expo-plugin": "^1.0.2",
+    "@livekit/react-native-webrtc": "^144.0.0",
+    "@react-native-async-storage/async-storage": "^3.0.2",
+    "@supabase/supabase-js": "^2.105.1",
+    "expo": "~55.0.19",
+    "expo-audio": "~55.0.14",
+    "expo-file-system": "~55.0.17",
+    "expo-secure-store": "~55.0.13",
+    "expo-status-bar": "~55.0.5",
+    "livekit-client": "^2.18.8",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-url-polyfill": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~5.9.2"
+  }
+}

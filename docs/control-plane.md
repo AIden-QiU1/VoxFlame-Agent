@@ -2,9 +2,9 @@
 
 > 状态：控制面实现深文档。
 >
-> 产品层关于 multi-surface、session_strategy、surface contract 的主参考，优先看 [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)。
+> 产品层关于 multi-surface、session_strategy、surface contract 的主参考，优先看 [产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)；App / Mobile Workbench 方向看 [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)。
 >
-> 本文档不再承担产品运行时主文角色；相关产品判断已经并回 runtime reference，这里只继续保留 backend 控制面实现、对象模型和风险收口。
+> 本文档不再承担产品运行时主文角色；相关产品判断已经并回 PRD 与具体 surface 专题文档，这里只继续保留 backend 控制面实现、对象模型和风险收口。
 
 ## 为什么单独写这份文档
 

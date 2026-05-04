@@ -250,7 +250,7 @@ PWA 现在适合承担：
 - 安装感和较轻的离线体验
 - 与 recorder queue 结合，降低“临时断网就丢数据”的风险
 
-PWA 还不能替代未来原生 App / companion 的部分：
+PWA 还不能替代未来原生 App / mobile workbench 的部分：
 
 - 更稳定的后台音频与长时录制
 - 更强的系统级权限与设备集成

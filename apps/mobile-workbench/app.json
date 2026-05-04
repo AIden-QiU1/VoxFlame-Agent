@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "VoxFlame Workbench",
+    "slug": "voxflame-mobile-workbench",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "scheme": "voxflame",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.voxflame.mobileworkbench",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "VoxFlame 需要麦克风权限用于沟通、练习录音和用户确认后的训练样本采集。"
+      }
+    },
+    "android": {
+      "package": "org.voxflame.mobileworkbench",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "android": {
+            "audioType": "communication",
+            "enableScreenShareService": false
+          },
+          "ios": {
+            "enableMultitaskingCameraAccess": false
+          }
+        }
+      ],
+      "@config-plugins/react-native-webrtc",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "runtimeBoundary": "backend-orchestrated",
+      "rtcSurface": "mobile_workbench"
+    }
+  }
+}

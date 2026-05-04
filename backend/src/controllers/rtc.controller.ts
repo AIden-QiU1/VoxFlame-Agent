@@ -12,6 +12,7 @@ import {
   RtcSessionStrategy,
   RtcSurface,
 } from '../services/rtc-orchestration.service'
+import { authMiddleware } from '../middlewares/auth.middleware'
 
 const router = Router()
 const rtcService = new RtcOrchestrationService()
@@ -92,7 +93,7 @@ function parseSurface(value: unknown): RtcSurface | undefined {
     value === 'training_workspace' ||
     value === 'memory_workspace' ||
     value === 'pwa_quick_talk' ||
-    value === 'mobile_companion' ||
+    value === 'mobile_workbench' ||
     value === 'desktop_companion'
     ? value
     : undefined
@@ -222,14 +223,16 @@ function handleRtcError(res: Response, error: unknown): void {
 }
 
 router.get('/health', (_req: Request, res: Response) => {
+  const enabled = rtcService.isConfigured()
+
   res.json({
-    enabled: rtcService.isConfigured(),
-    controlServerUrl: rtcService.getControlServerUrl() || null,
-    defaultGraph: rtcService.getDefaultGraph(),
-    defaultTimeoutSeconds: rtcService.getDefaultTimeoutSeconds(),
-    controlPlane: rtcService.getControlPlaneStatus(),
+    status: enabled ? 'ok' : 'degraded',
+    enabled,
+    executionBackend: 'livekit',
   })
 })
+
+router.use(authMiddleware)
 
 router.get('/graphs', async (_req: Request, res: Response) => {
   try {

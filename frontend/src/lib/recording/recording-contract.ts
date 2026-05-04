@@ -4,7 +4,7 @@ export type VoxFlameSourceSurface =
   | 'web'
   | 'pwa'
   | 'desktop_companion'
-  | 'mobile_companion'
+  | 'mobile_workbench'
   | 'local_cli'
 
 export type VoxFlameCollectionMode =

@@ -139,6 +139,18 @@ function summarizeText(value: string | null | undefined, fallback: string, maxLe
   return normalized.length > maxLength ? `${normalized.slice(0, maxLength).trim()}...` : normalized
 }
 
+function hasTrainingReportSummary(
+  reports: {
+    daily_summary: { summary: string } | null
+    weekly_summary: { summary: string } | null
+  } | null | undefined,
+): boolean {
+  return Boolean(
+    reports?.daily_summary?.summary.trim()
+    || reports?.weekly_summary?.summary.trim(),
+  )
+}
+
 interface MemorySectionShellProps {
   id: MemorySectionId
   expandedSectionId: MemorySectionId | null
@@ -650,10 +662,11 @@ export default function MemoryPage() {
   }
 
   const trainingReports = useMemo<TrainingReportsView | null>(() => {
-    const reports =
-      preparedExpressionAsset?.training_reports
-      ?? workspaceSnapshot?.prepared_expression?.training_reports
-      ?? null
+    const assetReports = preparedExpressionAsset?.training_reports ?? null
+    const workspaceReports = workspaceSnapshot?.prepared_expression?.training_reports ?? null
+    const reports = hasTrainingReportSummary(assetReports)
+      ? assetReports
+      : workspaceReports
 
     if (!reports) {
       return null

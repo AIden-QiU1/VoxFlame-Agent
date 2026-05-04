@@ -52,8 +52,8 @@ app.use('/api/agent', agentRouter)
 // Session API 路由 (compat only; runtime sessions now bootstrap via /api/rtc/session/start)
 app.use('/api/session', sessionRouter)
 
-// RTC orchestration API 路由
-app.use('/api/rtc', authMiddleware, rtcRouter)
+// RTC orchestration API 路由；/api/rtc/health 在 router 内保持无认证，session/control 端点仍需认证。
+app.use('/api/rtc', rtcRouter)
 
 // Memory API 路由 (记忆系统) - 需要认证
 const memoryRouter = express.Router()

@@ -141,6 +141,30 @@
 3. 为什么应用架构首先是事实源和数据流判断，不只是组件、接口和模型调用
 4. 该按什么顺序补 React、Next.js、Express、Supabase、LiveKit、MDN、service layer、BFF 等基础材料
 
+## 5.3 本轮最值得读：App / Mobile Workbench 从机会到技术路线
+
+当前 Web/PWA 已经基本具备稳定演示和录音补传基础，可以开始完整移动端工作台研发。这里的“一步到位”指产品信息架构、owner、contract 和技术路线一步到位；工程交付仍按可验证切片推进，不能用一次性重写破坏现役 Web / PWA 主链。
+
+- [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+
+它重点回答：
+
+1. 为什么现在可以开始完整移动端工作台，而不是继续停留在 Web/PWA。
+2. 为什么主线应改成 `Expo / React Native + LiveKit React Native`。
+3. 为什么 `Capacitor` 只适合 WebView 原型或过渡，不作为长期工作台主线。
+4. `沟通 / 练习 / 记忆与准备 / 设备与同步` 四个一级 surface 如何围绕同一套 contract 展开。
+5. `workspace snapshot / recording envelope / upload receipt / RTC session orchestration` 如何继续作为 App 的事实源。
+6. iOS / Android 麦克风、后台任务、录音权限、Supabase mobile auth、LiveKit audio session 这些官方约束会怎样影响产品承诺。
+7. 哪些技术方向需要你作为创始人把控，而不是让 agent 自动替你决定。
+
+这轮你最值得先掌握：
+
+1. `Expo / React Native` 更适合长期完整移动端工作台，因为它能正面处理 native audio session、文件系统、权限、LiveKit mobile 和后续硬件桥接。
+2. `Capacitor` 是 native plugin bridge，不是自动把所有 Next.js 服务端能力变成原生 App；它可以保留为原型或过渡方案。
+3. 移动端“后台录音 / 自动补传 / 麦克风常驻”都有系统级限制，产品文案不能承诺过满。
+4. App 第一版的信息架构应覆盖完整工作台：沟通、练习、记忆与准备、设备与同步。
+5. 硬件先做 App 承接的 BLE / USB / 外接麦桥接，不要先做硬件优先项目。
+
 ## 6. 文档沉淀规则
 
 为了减少信息散落，默认按下面沉淀：
@@ -161,3 +185,30 @@
 3. `读完后你应该掌握什么`
 
 这样你可以逐步建立对 `VoxFlame` 架构演进的全局把握，而不是每次都从零进入上下文。
+
+## 8. 技术把控与学习点持续更新约定
+
+如果后续开发中出现你不太熟悉、但会影响产品路线或长期架构的技术点，我默认不只在聊天里解释，而是把它同步沉淀到合适文档。
+
+进入文档的触发条件：
+
+1. 会影响产品承诺边界，例如后台录音、隐私、医疗表述、硬件能力。
+2. 会影响长期技术路线，例如 `Expo / React Native`、`Capacitor fallback`、`LiveKit mobile SDK`、`Supabase mobile auth`、`BLE / USB bridge`。
+3. 会影响用户信任或合规，例如 App Store 隐私说明、录音授权、训练数据删除。
+4. 你明确说“这个技术栈我不太懂”或“这个方向我需要把控”。
+
+默认沉淀格式：
+
+1. `你需要把控什么`
+2. `为什么现在要懂`
+3. `不懂会带来什么风险`
+4. `推荐先读哪 1 到 3 个官方资料`
+5. `VoxFlame 当前采用什么默认判断`
+
+当前已进入这个机制的主题：
+
+1. App / Mobile Workbench 技术路线与移动端权限边界。
+2. Expo / React Native 主线与 Capacitor fallback 的分工。
+3. Supabase mobile auth 与本地 session 存储。
+4. LiveKit React Native audio session 与 backend token orchestration。
+5. 后续硬件桥接的 BLE / USB / 外接麦边界。

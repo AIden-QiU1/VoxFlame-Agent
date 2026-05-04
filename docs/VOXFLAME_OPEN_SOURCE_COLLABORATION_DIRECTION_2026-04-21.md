@@ -50,16 +50,16 @@ Frontend LiveKit RTC/Data
 4. 训练总结、评估区和标签链的可解释性。
 5. QA、可观测性、Docker/部署验证。
 
-### 2.2 主线 B：App / Companion 接入
+### 2.2 主线 B：App / Mobile Workbench 接入
 
-原则不是“为了有 App 而有 App”，而是让 Web 之外的入口复用同一套 contract。
+原则不是“为了有 App 而有 App”，而是把移动端做成高频沟通、练习、准备、补传和设备管理的完整工作台，并让 Web 之外的入口复用同一套 contract。
 
 推荐顺序：
 
 1. `PWA`
    继续承担安装、基础离线、录音补传、低摩擦入口。
-2. `Mobile companion`
-   适合承接更稳定的后台录音、通知、设备权限和系统级入口。
+2. `Mobile workbench`
+   适合承接 `沟通 / 练习 / 记忆与准备 / 设备与同步` 四个一级 surface，以及原生录音、LiveKit mobile、通知、设备权限和系统级入口。
 3. `Desktop companion`
    适合承接固定工作场景、外接麦克风、外接扬声器、硬件桥接。
 
@@ -71,11 +71,13 @@ App 接入时，不要新造第二套业务协议，优先复用：
 4. `preparation_context_update`
 5. `voice_contributions metadata`
 
+当前 App / Mobile Workbench 的更细技术路线与官方约束见 [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)。默认主线推荐 `Expo / React Native + LiveKit React Native`；`Capacitor` 只保留为 WebView 原型或过渡方案。
+
 推荐的开源切题：
 
-1. `Capacitor / React Native` 版录音与上传 bridge。
+1. `Expo / React Native` 版录音与上传 bridge。
 2. 原生后台同步与 recorder queue 落盘。
-3. 登录态与 `workspace snapshot` 的轻客户端同步。
+3. 登录态与 `workspace snapshot` 的移动端同步。
 4. App 侧辅助入口：
    - 一键开口
    - 快捷短句
@@ -180,7 +182,7 @@ transport/session layer
 
 ### 3.3 适合长期 owner
 
-1. 移动端 companion。
+1. 移动端工作台。
 2. 硬件桥接层。
 3. livekit_agent runtime 重构。
 4. 个体化语音模型训练与评测。
@@ -200,7 +202,7 @@ transport/session layer
 5. `area:backend`
 6. `area:livekit-agent`
 7. `area:dataset`
-8. `area:app-companion`
+8. `area:mobile-workbench`
 9. `area:hardware`
 10. `area:eval`
 11. `good-first-issue`
@@ -231,7 +233,7 @@ transport/session layer
 
 1. 先继续把 Web 主链打磨到可稳定演示、可稳定部署。
 2. 再补 `evaluation + dataset tooling`，让外部贡献者知道怎么验证好坏。
-3. 再开 `App companion` 最小试点。
+3. 再开 `App / Mobile Workbench` Phase 0 / Phase 1 试点。
 4. 再做 `硬件控制桥` 最小试点。
 5. 最后逐步把 `livekit_agent` 演进成更自主、provider-neutral 的语音 agent runtime。
 

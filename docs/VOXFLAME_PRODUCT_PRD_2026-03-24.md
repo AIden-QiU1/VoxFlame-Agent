@@ -5,7 +5,7 @@
 > 这份主文档只回答 6 件事：
 > 1. 当前已固定的产品基线
 > 2. 练习工作台的核心用户场景
-> 3. App / companion 怎么接
+> 3. App / mobile workbench 怎么接
 > 4. 硬件怎么接
 > 5. 自定义语音 agent 框架怎么演进
 > 6. 记忆架构怎么长期收口
@@ -22,7 +22,7 @@ VoxFlame 不是“纠正用户声音”的产品，而是“帮助系统更准�
 
 长期扩展主线：
 
-1. `App / companion`
+1. `App / mobile workbench`
 2. `硬件接入`
 3. `自定义语音 agent 框架`
 4. `记忆架构`
@@ -108,14 +108,14 @@ Frontend LiveKit RTC/Data
 4. 给进步评估加离线 fixture，验证同一句多次练习时输出稳定。
 5. 在 UI 中保持简洁：先显示 `每天先练 20 句`，进步点只作为总结的一句话出现。
 
-## 5. App / Companion 规划
+## 5. App / Mobile Workbench 规划
 
 目标：
 
-1. 更稳定的后台录音与补传。
-2. 更稳定的权限、蓝牙和系统入口。
-3. 更低摩擦的快捷沟通入口。
-4. 更适合高频日常沟通的 companion 形态。
+1. 成为高频日常沟通、练习、准备、补传和设备管理的完整移动端工作台。
+2. 更稳定的原生录音、权限、蓝牙和系统入口。
+3. 更低摩擦的一键开口、quick talk 和准备材料直达。
+4. 继续复用 Web/PWA 已经跑通的 backend contract，不另造第二套事实源。
 
 接入时必须复用现役 contract：
 
@@ -136,8 +136,9 @@ Frontend LiveKit RTC/Data
 
 1. `PWA`
    - 安装、轻离线、录音补传、低摩擦入口
-2. `mobile companion`
-   - 后台同步、快捷短句、通知、设备权限
+2. `mobile workbench`
+   - 沟通、练习、记忆与准备、设备与同步四个一级 surface
+   - 原生录音、LiveKit mobile、通知、设备权限、后台补传和硬件桥接
 3. `desktop companion`
    - 固定工位、外接麦克风、外接扬声器、设备桥接
 
@@ -148,6 +149,8 @@ Frontend LiveKit RTC/Data
 3. 紧急求助模式
 4. 原生 recorder queue 与后台补传
 5. 登录态和 `workspace snapshot` 轻同步
+
+当前 App / Mobile Workbench 的技术路线、官方约束和阶段计划以 [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md) 为准。默认主线改为 `Expo / React Native + LiveKit React Native`；`Capacitor` 仅作为 WebView 原型或过渡方案。移动端从 day one 按完整工作台 IA 设计，但交付仍按可验证切片推进。
 
 ## 6. 硬件规划
 
@@ -285,7 +288,7 @@ durable memory 继续只保留这些 owner：
 
 1. 继续把 Web 主链打磨到稳定可演示、稳定可部署
 2. 先补 `evaluation + dataset tooling + observability`
-3. 再做 `mobile companion` 最小试点
+3. 再做 `mobile workbench` Phase 0 / Phase 1 试点
 4. 再做 `硬件控制桥` 最小试点
 5. 最后逐步把 `livekit_agent` 演进成更自主、provider-neutral 的语音 agent runtime
 
@@ -306,9 +309,13 @@ durable memory 继续只保留这些 owner：
 
 - [VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
 
-runtime / surface 深参考：
+App / Mobile Workbench 技术路线：
 
-- [VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md](VOXFLAME_RUNTIME_AND_SURFACE_REFERENCE_2026-03-26.md)
+- [VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+
+control plane 实现深参考：
+
+- [control-plane.md](control-plane.md)
 
 agent / memory 边界：
 
