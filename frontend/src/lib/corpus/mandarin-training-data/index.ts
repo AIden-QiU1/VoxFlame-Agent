@@ -3,6 +3,8 @@ import { ASSESSMENT_SCREENING_EXERCISES } from './assessment-screening'
 import { CURATED_TOPIC_EXERCISES } from './curated-topics'
 import {
   MANDARIN_TRAINING_CATEGORY_ORDER,
+} from './types'
+import type {
   MandarinTrainingCategory,
   MandarinTrainingCategoryMeta,
   MandarinTrainingExercise,
@@ -14,7 +16,9 @@ interface GeneratedCategoryPayload {
 }
 
 interface GeneratedTrainingCorpus {
-  generated_from: Record<string, string>
+  generated_at?: string
+  generated_from: Record<string, unknown>
+  policy?: Record<string, unknown>
   categories: Partial<Record<MandarinTrainingCategory, GeneratedCategoryPayload>>
 }
 
@@ -28,15 +32,38 @@ export type {
 
 export const MANDARIN_TRAINING_CATEGORIES = [...MANDARIN_TRAINING_CATEGORY_ORDER]
 
+function mergeExercises(
+  category: MandarinTrainingCategory,
+  primary: MandarinTrainingExercise[],
+  generated: MandarinTrainingExercise[],
+): MandarinTrainingExercise[] {
+  const seen = new Set<string>()
+  const merged: MandarinTrainingExercise[] = []
+
+  for (const exercise of [...primary, ...generated]) {
+    const text = exercise.text.trim()
+    if (!text || seen.has(text)) {
+      continue
+    }
+
+    seen.add(text)
+    merged.push({
+      ...exercise,
+      text,
+      category,
+    })
+  }
+
+  return merged
+}
+
 const CATEGORY_EXERCISE_MAP = MANDARIN_TRAINING_CATEGORIES.reduce(
   (accumulator, category) => {
+    const generated = REAL_CORPUS.categories[category]?.items ?? []
     accumulator[category] =
       category === '评估筛查'
         ? ASSESSMENT_SCREENING_EXERCISES
-        :
-      CURATED_TOPIC_EXERCISES[category]
-      ?? REAL_CORPUS.categories[category]?.items
-      ?? []
+        : mergeExercises(category, CURATED_TOPIC_EXERCISES[category] ?? [], generated)
     return accumulator
   },
   {} as Record<MandarinTrainingCategory, MandarinTrainingExercise[]>,
@@ -52,9 +79,9 @@ export const MANDARIN_TRAINING_CATEGORY_META: Record<
   '评估筛查': {
     label: '评估主题区',
     shortLabel: '20 词筛查',
-    description: '用 20 条高频双字词做一次轻量普通话筛查，先看正确字数 / 总字数，给出训练用的初步严重程度分层。',
+    description: '用 20 条高频双字词做一次轻量普通话筛查，先看正确字数 / 总字数和系统听懂分。',
     examples: ['爸爸', '刷牙', '蓝牙'],
-    helper: '这组不是普通训练句，而是筛查词表。先完整录完，再看字符准确率和初步等级。',
+    helper: '这组不是普通训练句，而是筛查词表。先完整录完，再看字符准确率和系统听懂分。',
     trainingTips: ['先把每个字说完整，不用刻意求快。', '这一组先看字准率，结果只作为训练筛查，不替代医学评估。'],
     corpusCount: CATEGORY_EXERCISE_MAP['评估筛查'].length,
   },

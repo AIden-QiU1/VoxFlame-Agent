@@ -1,8 +1,8 @@
 import type {
   MobileWorkbenchRtcSessionIntent,
   MobileWorkbenchRtcSessionResponse,
-} from '@/contracts/workbench-contracts'
-import type { MobileWorkspaceSnapshotContract } from '@/contracts/workspace-read-model'
+} from '../contracts/workbench-contracts'
+import type { MobileWorkspaceSnapshotContract } from '../contracts/workspace-read-model'
 
 export interface MobileAuthTokenProvider {
   getAccessToken(): Promise<string | null>

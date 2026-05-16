@@ -1,4 +1,4 @@
-import type { MobileWorkbenchSurfaceId } from '@/constants/surfaces'
+import type { MobileWorkbenchSurfaceId } from '../constants/surfaces'
 import type {
   MobileWorkbenchCapabilityId,
   MobileWorkbenchDeviceContext,
@@ -6,7 +6,7 @@ import type {
   MobileWorkbenchScene,
   MobileWorkbenchSessionMode,
   MobileWorkbenchSessionStrategy,
-} from '@/contracts/workbench-contracts'
+} from '../contracts/workbench-contracts'
 
 const CAPABILITIES_BY_MODE: Record<MobileWorkbenchSessionMode, MobileWorkbenchCapabilityId[]> = {
   communication: [

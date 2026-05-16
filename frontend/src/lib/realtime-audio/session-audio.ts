@@ -12,13 +12,7 @@ import type {
 import type { RtcSessionMode } from './session-contract'
 import type { SessionExecutionClient } from './session-execution'
 import type { SessionMicrophoneTrack } from './session-types'
-
-const MICROPHONE_CONSTRAINTS = {
-  channelCount: 1,
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
-} as const
+import { buildMicrophoneConstraints } from '@/lib/audio/microphone-preferences'
 
 interface SessionAudioRefs {
   micTrackRef: MutableRefObject<SessionMicrophoneTrack | null>
@@ -158,7 +152,7 @@ export async function warmUpSessionMicrophone(
 
   try {
     const mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: MICROPHONE_CONSTRAINTS,
+      audio: buildMicrophoneConstraints(),
     })
     const mediaStreamTrack = mediaStream.getAudioTracks()[0]
 
@@ -215,7 +209,7 @@ export async function ensurePublishedMicrophoneTrack(
 
     if (!mediaStream) {
       mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: MICROPHONE_CONSTRAINTS,
+        audio: buildMicrophoneConstraints(),
       })
     }
 

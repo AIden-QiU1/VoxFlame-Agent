@@ -16,13 +16,27 @@
    当前页面系统、共享 `workspace` contract、训练资产链路与 PWA 边界。
 6. [Full-stack 架构学习指南（2026-04-29）](VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
    把“面对一个需求，如何拆 surface / state / owner / contract / runtime / verification”沉淀成可复用的方法，并附官方文档与经典工程文章阅读路线。
-7. [App / Mobile Workbench 最佳实践与机会文档（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+7. [Expert Standard And Collaboration Playbook（2026-05-10）](VOXFLAME_EXPERT_STANDARD_AND_COLLABORATION_PLAYBOOK_2026-05-10.md)
+   统一 `标准 / 技术 / 用户反馈` 三角闭环，定义专家材料、评测 prompt、沟通技巧、训练语料、memory、用户反馈登记和医学 / 沟通专家合作门槛。
+8. [App / Mobile Workbench 最佳实践与机会文档（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
    判断当前为什么适合启动完整移动端工作台、为什么主线推荐 `Expo / React Native + LiveKit React Native`、如何复用现有 `workspace snapshot / recording envelope / upload receipt / RTC session orchestration`。
-8. [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
+9. [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
    当前 `apps/mobile-workbench` skeleton、四个一级 surface、移动端 contract boundary 和下一步实现顺序。
-9. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
+10. [Mobile Workbench 真机验证手册（2026-05-05）](VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)
+   明确 App 验证梯度：代码级检查、真机 development build、业务 smoke、小范围内测和正式上架；当前不需要先上架应用商店。
+11. [硬件桥接开发手册（2026-05-05）](VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md)
+   ESP32-S3 / BLE 控制桥 / I2S 录音上传原型的硬件购买、官方文档、软硬件协议和验收手册。
+12. [第一功能：训练评估开发文档（2026-05-08）](VOXFLAME_TRAINING_ASSESSMENT_FUNCTION_DEVELOPMENT_2026-05-08.md)
+   定义“训练表现分 / 系统听懂分”的产品边界、20 词筛查局限、普通话评估语料升级、模型职责和阶段路线。
+13. [构音障碍病因差异参考（2026-05-15）](VOXFLAME_DYSARTHRIA_ETIOLOGY_DIFFERENCE_REFERENCE_2026-05-15.md)
+   分析 CP、TBI、DS、Stroke、MS、ALS/MND、ASD、Parkinson、听力损失等不同病因导致沟通困难的本质差异，以及对 VoxFlame 训练、识别、音频设置和 profile schema 的启发。
+14. [分病因言语康复与沟通产品化深度文档（2026-05-15）](VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
+   以 ReTalk / 复言的中风康复产品化样板为参照，逐病因拆解成熟疗法、科学原理、AI 自动化方式、专家边界和产品功能映射。
+15. [Voiceitt 功能设置深度分析与 VoxFlame 启发（2026-05-15）](VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
+   拆解 Voiceitt 的 Speak / Dictate / Integrations、训练、麦克风、停顿、短语、字幕、展示和账号数据设置，分析哪些值得 VoxFlame 吸收，哪些不应照搬。
+16. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
    当前数据录入、上传、manifest 和 recorder queue 的权威 contract。
-10. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+17. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
    把 LiveKit 官方的 session/state/data 原语翻成 VoxFlame 可执行的 memory 分层判断，明确 `LiveKit != durable memory owner`，以及 `Qdrant / Redis` 应分别放在哪一层。
 
 ## 综合参考
@@ -54,9 +68,16 @@
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
 | [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前产品边界与上线后扩展规划主文档 | ⭐⭐⭐ |
+| [Expert Standard And Collaboration Playbook（2026-05-10）](VOXFLAME_EXPERT_STANDARD_AND_COLLABORATION_PLAYBOOK_2026-05-10.md) | `标准 / 技术 / 用户反馈` 三角闭环、专家材料、用户反馈 registry、医学 / 沟通专家合作和开发准入门槛 | ⭐⭐⭐ |
 | [开源协作方向（2026-04-21）](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md) | 开源后 `Web / App / 硬件 / 自主语音 agent` 的协作主线 | ⭐⭐⭐ |
 | [App / Mobile Workbench 最佳实践与机会文档（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md) | 完整移动端工作台的技术路线、官方约束、机会点、阶段计划和创始人需要把控的技术方向 | ⭐⭐⭐ |
 | [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md) | `apps/mobile-workbench` 的 skeleton、surface、contract boundary 和实现顺序 | ⭐⭐⭐ |
+| [Mobile Workbench 真机验证手册（2026-05-05）](VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md) | App 从代码检查到真机 smoke、内测分发和正式上架的验证梯度 | ⭐⭐⭐ |
+| [硬件桥接开发手册（2026-05-05）](VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md) | ESP32-S3、BLE 控制桥、I2S 录音上传原型的购买、开发、协议和验收指南 | ⭐⭐⭐ |
+| [第一功能：训练评估开发文档（2026-05-08）](VOXFLAME_TRAINING_ASSESSMENT_FUNCTION_DEVELOPMENT_2026-05-08.md) | `训练表现分 / 系统听懂分` 的产品边界、语料升级、评分 contract 和模型职责 | ⭐⭐⭐ |
+| [构音障碍病因差异参考（2026-05-15）](VOXFLAME_DYSARTHRIA_ETIOLOGY_DIFFERENCE_REFERENCE_2026-05-15.md) | CP、TBI、DS、Stroke、MS、ALS/MND、ASD、Parkinson、听力损失等 diagnosis label 背后的言语机制差异和产品启发 | ⭐⭐⭐ |
+| [分病因言语康复与沟通产品化深度文档（2026-05-15）](VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md) | 逐病因映射成熟疗法、医院常用训练原则、AI 自动化边界、专家复核边界和 VoxFlame 可落地功能 | ⭐⭐⭐ |
+| [Voiceitt 功能设置深度分析与 VoxFlame 启发（2026-05-15）](VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md) | 竞品模式、设置项、训练闭环、跨平台输出和 VoxFlame 短中期吸收路线 | ⭐⭐⭐ |
 | [Full-stack 架构学习指南（2026-04-29）](VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md) | 从真实需求拆到 surface、state 生命周期、owner、contract、runtime、failure 和 verification 的学习与实践路线 | ⭐⭐⭐ |
 | [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md) | 把 LiveKit 官方 session/state/data 原语翻成 VoxFlame 的 memory 分层、context assembly 和 recall 判断 | ⭐⭐⭐ |
 | [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md) | agent、memory、tooling 与 dataset/memory 边界的综合参考 | ⭐⭐⭐ |
@@ -67,6 +88,10 @@
 
 | 文档 | 描述 | 优先级 |
 |------|------|--------|
+| [第一功能：训练评估开发文档（2026-05-08）](VOXFLAME_TRAINING_ASSESSMENT_FUNCTION_DEVELOPMENT_2026-05-08.md) | 当前 20 词筛查的局限、普通话音系评估语料升级和训练表现分路线 | ⭐⭐⭐ |
+| [构音障碍病因差异参考（2026-05-15）](VOXFLAME_DYSARTHRIA_ETIOLOGY_DIFFERENCE_REFERENCE_2026-05-15.md) | 不同疾病标签背后的 dysarthria / apraxia / aphasia / hearing feedback / prosody / progression 差异，指导 profile、训练和沟通策略 | ⭐⭐⭐ |
+| [分病因言语康复与沟通产品化深度文档（2026-05-15）](VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md) | 从 ReTalk 中风样板出发，为每类病因定义最适合的训练 / 沟通功能、AI 接轨方式和专家边界 | ⭐⭐⭐ |
+| [Voiceitt 功能设置深度分析与 VoxFlame 启发（2026-05-15）](VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md) | Voiceitt 训练、Speak、Dictate、Integrations 和设置项拆解，指导 VoxFlame 训练、沟通和设置收口 | ⭐⭐⭐ |
 | [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md) | `recording schema / recorder queue / manifest / upload` 的权威 contract | ⭐⭐⭐ |
 | [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) | 当前上线基线，以及 `App / 硬件 / 自定义语音 agent / 记忆架构` 的主规划 | ⭐⭐⭐ |
 
@@ -105,32 +130,41 @@
 1. [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md)
 2. [当前任务状态](../.tasks/current.md)
 3. [主项目 README](../README.md)
-4. [Full-stack 架构学习指南（2026-04-29）](VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
-5. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
-6. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+4. [Expert Standard And Collaboration Playbook（2026-05-10）](VOXFLAME_EXPERT_STANDARD_AND_COLLABORATION_PLAYBOOK_2026-05-10.md)
+5. [Full-stack 架构学习指南（2026-04-29）](VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
+6. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
+7. [第一功能：训练评估开发文档（2026-05-08）](VOXFLAME_TRAINING_ASSESSMENT_FUNCTION_DEVELOPMENT_2026-05-08.md)
+8. [构音障碍病因差异参考（2026-05-15）](VOXFLAME_DYSARTHRIA_ETIOLOGY_DIFFERENCE_REFERENCE_2026-05-15.md)
+9. [分病因言语康复与沟通产品化深度文档（2026-05-15）](VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
+10. [Voiceitt 功能设置深度分析与 VoxFlame 启发（2026-05-15）](VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
+11. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
 
 **要判断 runtime / surface / PWA / App 方向**
 1. [App / Mobile Workbench 最佳实践与机会文档（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
 2. [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
-3. [control-plane.md](control-plane.md)
-4. [前端 README](../frontend/README.md)
-5. [开源协作方向（2026-04-21）](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
-6. 当前代码现状以 [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](../.tasks/current.md) 为准
+3. [Mobile Workbench 真机验证手册（2026-05-05）](VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)
+4. [control-plane.md](control-plane.md)
+5. [前端 README](../frontend/README.md)
+6. [开源协作方向（2026-04-21）](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
+7. 当前代码现状以 [产品 PRD（2026-03-24）](VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](../.tasks/current.md) 为准
 
 **要判断开源协作 / App / 硬件 / 自主语音 agent 架构**
 1. [开源协作方向（2026-04-21）](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
 2. [App / Mobile Workbench 最佳实践与机会文档（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
 3. [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
-4. [主项目 README](../README.md)
-5. [前端 README](../frontend/README.md)
+4. [Mobile Workbench 真机验证手册（2026-05-05）](VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)
+5. [硬件桥接开发手册（2026-05-05）](VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md)
+6. [主项目 README](../README.md)
+7. [前端 README](../frontend/README.md)
 
 **要判断 agent / memory / tooling 边界**
 1. [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
 2. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
 
 **要继续做录音、上传和训练资产**
-1. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
-2. [前端 README](../frontend/README.md)
+1. [第一功能：训练评估开发文档（2026-05-08）](VOXFLAME_TRAINING_ASSESSMENT_FUNCTION_DEVELOPMENT_2026-05-08.md)
+2. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
+3. [前端 README](../frontend/README.md)
 
 ## 优先级说明
 

@@ -1,0 +1,46 @@
+{
+  "sources": [
+    {
+      "id": "pts_reading_01_10",
+      "source": "https://www.educity.cn/ntce/1833159.html",
+      "priority": 1.25,
+      "usage_weight": 0.9,
+      "note": "普通话水平测试朗读作品第 1-10 篇，用于补规范朗读、停连和语调覆盖"
+    },
+    {
+      "id": "pts_reading_11_20",
+      "source": "https://www.educity.cn/ntce/1833161.html",
+      "priority": 1.25,
+      "usage_weight": 0.9,
+      "note": "普通话水平测试朗读作品第 11-20 篇，用于补规范朗读、停连和语调覆盖"
+    },
+    {
+      "id": "pts_reading_21_30",
+      "source": "https://www.educity.cn/ntce/1833164.html",
+      "priority": 1.25,
+      "usage_weight": 0.9,
+      "note": "普通话水平测试朗读作品第 21-30 篇，用于补规范朗读、停连和语调覆盖"
+    },
+    {
+      "id": "pts_reading_31_40",
+      "source": "https://www.educity.cn/ntce/1833166.html",
+      "priority": 1.25,
+      "usage_weight": 0.9,
+      "note": "普通话水平测试朗读作品第 31-40 篇，用于补规范朗读、停连和语调覆盖"
+    },
+    {
+      "id": "pts_reading_41_50",
+      "source": "https://www.educity.cn/ntce/1833168.html",
+      "priority": 1.25,
+      "usage_weight": 0.9,
+      "note": "普通话水平测试朗读作品第 41-50 篇，用于补规范朗读、停连和语调覆盖"
+    },
+    {
+      "id": "pts_reading_51_60",
+      "source": "https://www.educity.cn/ntce/1833170.html",
+      "priority": 1.25,
+      "usage_weight": 0.9,
+      "note": "普通话水平测试朗读作品第 51-60 篇，用于补规范朗读、停连和语调覆盖"
+    }
+  ]
+}

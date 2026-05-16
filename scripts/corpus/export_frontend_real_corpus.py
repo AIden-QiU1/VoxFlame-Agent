@@ -25,8 +25,8 @@ from build_mandarin_scene_corpus import (
     read_source,
 )
 
-MIN_LENGTH = 5
-MAX_LENGTH = 20
+MIN_LENGTH = 6
+MAX_LENGTH = 16
 LEADING_INDEX_RE = re.compile(r"^(?:[0-9]{1,2}(?=[\u4e00-\u9fff])|[0-9一二三四五六七八九十]+[.、，])")
 
 
@@ -549,7 +549,7 @@ def score_sentence(text: str, preferred_terms: Iterable[str]) -> float:
     score += 0.5 if any(term in text for term in ("我", "你", "请")) else 0.0
     score += 0.45 if any(term in text for term in ("吗", "怎么", "哪里")) else 0.0
     score += 0.35 if any(term in text for term in ("帮", "告诉", "回复", "发送", "拨打")) else 0.0
-    score += 0.25 if 6 <= chinese_length(text) <= 14 else 0.0
+    score += 0.25 if 6 <= chinese_length(text) <= 16 else 0.0
     score += 1.4 if any(term in text for term in ("我需要", "我想", "再说一次", "帮我", "请")) else 0.0
     score -= 1.3 if text.startswith("你可以") else 0.0
     score -= 1.5 if text.startswith(("2，", "3，", "4，", "5，", "后，")) else 0.0

@@ -1,0 +1,11 @@
+{
+  "sources": [
+    {
+      "id": "tatoeba_cmn_example_sentences",
+      "source": "https://raw.githubusercontent.com/krmanik/Chinese-Example-Sentences/main/Chinese%20Example%20Sentences/cmn_sen_db_2.tsv",
+      "priority": 1.15,
+      "usage_weight": 1.1,
+      "note": "Tatoeba 派生中文例句 TSV，含 6 万余条简体中文例句，适合补语义完整的日常短句"
+    }
+  ]
+}

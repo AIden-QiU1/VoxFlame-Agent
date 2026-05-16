@@ -1,4 +1,4 @@
-import type { MobileWorkbenchSurfaceId } from '@/constants/surfaces'
+import type { MobileWorkbenchSurfaceId } from '../constants/surfaces'
 
 export type MobileWorkbenchRtcSurface = 'mobile_workbench'
 export type MobileWorkbenchSourceSurface = 'mobile_workbench'
@@ -90,6 +90,11 @@ export type MobileWorkbenchCaptureTransport =
   | 'livekit_track'
   | 'imported_file'
 
+export type MobileWorkbenchAudioQualityDisposition =
+  | 'high_confidence'
+  | 'review'
+  | 'low_confidence'
+
 export type MobileWorkbenchConsentScope =
   | 'training_only'
   | 'training_and_model_improvement'
@@ -121,6 +126,17 @@ export interface MobileWorkbenchRecordingEnvelope {
     fileSizeBytes: number
     sha256?: string
     captureTransport: MobileWorkbenchCaptureTransport
+    quality?: {
+      durationMs: number
+      speechDurationMs?: number
+      leadingSilenceMs?: number
+      trailingSilenceMs?: number
+      silenceRatio?: number
+      inputLevelRms?: number
+      inputLevelPeak?: number
+      disposition: MobileWorkbenchAudioQualityDisposition
+      reasons: string[]
+    }
   }
 }
 
@@ -137,6 +153,7 @@ export interface MobileWorkbenchRecorderQueueItem {
   syncAttempts: number
   lastAttemptAt?: string
   lastError?: string
+  uploadReceipt?: MobileWorkbenchUploadReceipt | null
   createdAt: string
   recording: MobileWorkbenchRecordingEnvelope
 }

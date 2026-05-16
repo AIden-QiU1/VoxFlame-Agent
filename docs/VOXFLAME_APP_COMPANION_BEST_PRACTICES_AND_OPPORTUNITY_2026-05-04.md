@@ -383,6 +383,10 @@ device_quality_sample
 3. 已新增移动端 contract boundary：RTC intent、recording envelope、workspace read model、recorder queue policy。
 4. 已新增 `npm run check:mobile-workbench` 静态验证入口。
 5. 现役 RTC / recording contract 已把移动端 surface 收口为 `mobile_workbench`。
+6. 已接入 Supabase React Native auth adapter 与只读 `workspace snapshot` 同步壳子。
+7. 已完成移动端依赖安装、typecheck、Expo dev server smoke 和 Android Metro bundle export。
+8. 已用真实账号跑通 `Supabase Auth -> backend auth middleware -> workspace snapshot`，取消 `NODE_TLS_REJECT_UNAUTHORIZED` 后仍通过。
+9. 已按 Expo 官方 `expo-audio` / `expo-file-system` 路线接入 Native recorder queue 的本地最小闭环：权限、录音、持久本地文件、recording envelope、本地 queue、回放、待补传标记和丢弃。
 
 ### Phase 1：Expo / React Native shell + 四 tab 工作台
 
@@ -468,7 +472,56 @@ device_quality_sample
 2. 事件不会直接触发高风险副作用。
 3. 样本 metadata 能记录设备类型与输入质量。
 
-## 7. 创始人需要把控的技术方向
+## 7. 标准 / 技术 / 用户反馈闭环
+
+移动端不能只按技术路线推进。App 是用户最高频的沟通入口，后续每个阶段都必须同时回答三件事：
+
+```text
+Standard:
+  这个 surface 引用了哪些专家框架 / 无障碍标准 / 医学边界？
+
+Technical:
+  这个 surface 的权限、录音、上传、LiveKit、memory contract 是否稳定？
+
+Feedback:
+  真实用户、创始人即用户、沟通伙伴、专家反馈是否证明它值得继续？
+```
+
+当前 App 研发已经有技术闭环：
+
+1. Expo / React Native skeleton。
+2. Supabase mobile auth。
+3. workspace snapshot read。
+4. native recorder queue。
+5. upload sign / complete。
+6. LiveKit room connection slice。
+
+但用户反馈闭环还没有形成。下一阶段必须补：
+
+1. `founder_self_observation_template`
+   - 每次真实沟通或训练后记录：场景、目标、哪里卡住、情绪成本、是否愿意下次继续用。
+2. `target_user_interview_template`
+   - 面向构音障碍用户：最怕在哪些场景开口、最想保留哪些准备句、最不能接受哪些代播方式。
+3. `communication_partner_feedback_template`
+   - 面向家属 / 同事 / 医生 / 陌生人：是否更容易理解、是否知道该怎么等、怎么问、怎么确认。
+4. `weekly_feedback_triage`
+   - 每周把反馈分到 `communication / practice / memory / device / prompt / hardware / data`。
+5. `ship decision log`
+   - 每个 App 阶段写明：ship / iterate / hold / delete，以及依据的是标准、技术还是用户反馈。
+
+App 用户反馈最小指标：
+
+| Surface | 必须采集的反馈 | 不足时不能宣称 |
+|---|---|---|
+| 沟通 | 用户是否完成原本想说的话、对方是否理解、修复是否顺手 | “沟通成功率提升” |
+| 练习 | 用户是否愿意继续练、反馈是否听得懂、是否觉得被评价 / 被羞辱 | “训练体验有效” |
+| 记忆与准备 | 准备句是否真的在高压场景被复用、memory 是否让用户安心 | “长期记忆有帮助” |
+| 设备与同步 | 用户是否理解本地/云端状态、是否能删除未上传录音 | “同步可靠可信” |
+| 硬件桥接 | 佩戴 / 外放 / 按钮是否自然，是否减少开口负担 | “硬件形态成立” |
+
+对应总标准见 [VoxFlame Expert Standard And Collaboration Playbook（2026-05-10）](VOXFLAME_EXPERT_STANDARD_AND_COLLABORATION_PLAYBOOK_2026-05-10.md)。
+
+## 8. 创始人需要把控的技术方向
 
 这些点不应完全交给 agent 自动决定：
 
@@ -493,7 +546,7 @@ device_quality_sample
    - 哪些 owner 必须留在 backend？
    - 哪些本地缓存只能是 cache，不能变成 truth？
 
-## 8. 当前最值得补的学习点
+## 9. 当前最值得补的学习点
 
 建议按这个顺序学：
 
@@ -510,15 +563,16 @@ device_quality_sample
 6. Capacitor 基础
    - 只需要理解它适合什么原型场景，以及为什么不作为完整工作台主线。
 
-## 9. 下一步建议
+## 10. 下一步建议
 
 下一步可以直接开工，但按下面顺序：
 
-1. 先建 `apps/mobile-workbench` RFC 和 skeleton。
-2. 先做 `Expo / React Native` shell、auth adapter、四 tab 信息架构和共享 contract audit。
-3. 再做 `workspace snapshot` 只读接入与快捷表达。
-4. 再做原生 recorder queue。
-5. 再做 LiveKit communication workbench。
+1. `apps/mobile-workbench` RFC、skeleton 和四 tab 信息架构已落地。
+2. Supabase mobile auth adapter 已落地，真实账号 backend smoke 已通过；下一步做真机 UI smoke。
+3. `workspace snapshot` 只读接入与快捷表达已落地，下一步在真机上确认 Web / App 读到同一份 active prepared expression。
+4. 原生 recorder queue 的代码闭环已落地，下一步做 Android / iPhone 真机录音、回放和断网队列 smoke。
+5. 再做 upload receipt / retry 去重接入。
+6. 再做 LiveKit communication workbench。
 6. 再补移动端记忆写回。
 7. 最后接硬件桥。
 

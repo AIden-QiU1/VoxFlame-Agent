@@ -1,0 +1,205 @@
+import { File } from 'expo-file-system'
+
+import type {
+  MobileWorkbenchRecorderQueueItem,
+  MobileWorkbenchUploadReceipt,
+} from '../contracts/workbench-contracts'
+import type {
+  MobileAuthTokenProvider,
+  MobileWorkbenchClientOptions,
+} from './mobile-workbench-client'
+
+interface UploadSignResponse {
+  url: string
+}
+
+interface UploadCompleteResponse {
+  success: boolean
+  contributionId?: string | null
+  recordingId?: string
+  manifestPath?: string
+  reusedContribution?: boolean
+  manifestAlreadySynced?: boolean
+}
+
+function buildApiUrl(apiBaseUrl: string, path: string): string {
+  return `${apiBaseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`
+}
+
+async function getAuthorizationHeader(
+  tokenProvider: MobileAuthTokenProvider,
+): Promise<Record<string, string>> {
+  const token = await tokenProvider.getAccessToken()
+  if (!token) {
+    throw new Error('mobile_auth_required')
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+  }
+}
+
+function normalizeExtension(format: string): string {
+  const normalized = format.trim().toLowerCase().replace(/^\./, '')
+  return normalized || 'm4a'
+}
+
+function contentTypeForFormat(format: string): string {
+  const extension = normalizeExtension(format)
+
+  if (extension === 'wav') {
+    return 'audio/wav'
+  }
+
+  if (extension === 'mp4' || extension === 'm4a') {
+    return 'audio/mp4'
+  }
+
+  if (extension === 'webm') {
+    return 'audio/webm'
+  }
+
+  if (extension === 'caf') {
+    return 'audio/x-caf'
+  }
+
+  return 'application/octet-stream'
+}
+
+function buildMobileStoragePath(item: MobileWorkbenchRecorderQueueItem): string {
+  const extension = normalizeExtension(item.recording.audio.format)
+  return [
+    'dataset',
+    item.contributorId,
+    'mobile-workbench',
+    `${item.recordingId}.${extension}`,
+  ].join('/')
+}
+
+function buildUploadMetadata(
+  item: MobileWorkbenchRecorderQueueItem,
+  contentType: string,
+): Record<string, unknown> {
+  return {
+    recording_id: item.recording.recordingId,
+    session_id: item.recording.sessionId,
+    mode: item.recording.mode,
+    source_surface: item.recording.sourceSurface,
+    collection_mode: item.recording.collectionMode,
+    consent_scope: item.consentScope,
+    source: 'mobile_workbench_native_recorder',
+    app_surface: 'mobile_workbench',
+    queue_owner: 'mobile_cache',
+    target_text: item.text,
+    exercise_text: item.text,
+    timestamp: item.recording.createdAt,
+    storage_type: 'oss',
+    audio_format: contentType,
+    local_audio_format: item.recording.audio.format,
+    sample_rate: item.recording.audio.sampleRate,
+    channel_count: item.recording.audio.channelCount,
+    duration_ms: item.recording.audio.durationMs,
+    file_size_bytes: item.recording.audio.fileSizeBytes,
+    capture_transport: item.recording.audio.captureTransport,
+    speech_duration_ms: item.recording.audio.quality?.speechDurationMs,
+    leading_silence_ms: item.recording.audio.quality?.leadingSilenceMs,
+    trailing_silence_ms: item.recording.audio.quality?.trailingSilenceMs,
+    silence_ratio: item.recording.audio.quality?.silenceRatio,
+    input_level_rms: item.recording.audio.quality?.inputLevelRms,
+    input_level_peak: item.recording.audio.quality?.inputLevelPeak,
+    audio_quality_disposition: item.recording.audio.quality?.disposition,
+    audio_quality_reasons: item.recording.audio.quality?.reasons,
+    mobile_recording_id: item.recordingId,
+    ...item.metadata,
+  }
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  return await response.json() as T
+}
+
+export async function uploadMobileRecorderQueueItem(
+  item: MobileWorkbenchRecorderQueueItem,
+  options: MobileWorkbenchClientOptions,
+): Promise<MobileWorkbenchUploadReceipt> {
+  const authHeaders = await getAuthorizationHeader(options.tokenProvider)
+  const storagePath = buildMobileStoragePath(item)
+  const contentType = contentTypeForFormat(item.recording.audio.format)
+  const signResponse = await fetch(
+    buildApiUrl(options.apiBaseUrl, '/upload/sign'),
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        filename: storagePath,
+        contentType,
+      }),
+    },
+  )
+
+  if (!signResponse.ok) {
+    throw new Error(`mobile_upload_sign_${signResponse.status}`)
+  }
+
+  const signPayload = await parseJsonResponse<UploadSignResponse>(signResponse)
+  const audioFile = new File(item.recording.audio.uri)
+  if (!audioFile.exists) {
+    throw new Error('mobile_upload_audio_missing')
+  }
+
+  const putResponse = await fetch(signPayload.url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': contentType,
+    },
+    body: audioFile,
+  })
+
+  if (!putResponse.ok) {
+    throw new Error(`mobile_upload_put_${putResponse.status}`)
+  }
+
+  const completeResponse = await fetch(
+    buildApiUrl(options.apiBaseUrl, '/upload/complete'),
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        audioPath: storagePath,
+        text: item.text,
+        recognizedText: null,
+        sentenceId: item.sentenceId ?? null,
+        duration: item.recording.audio.durationSeconds,
+        source: 'mobile_workbench_native_recorder',
+        metadata: buildUploadMetadata(item, contentType),
+      }),
+    },
+  )
+
+  if (!completeResponse.ok) {
+    throw new Error(`mobile_upload_complete_${completeResponse.status}`)
+  }
+
+  const completePayload =
+    await parseJsonResponse<UploadCompleteResponse>(completeResponse)
+
+  return {
+    recordingId: completePayload.recordingId ?? item.recordingId,
+    contributionId: completePayload.contributionId ?? null,
+    manifestPath: completePayload.manifestPath,
+    storagePath,
+    reusedContribution: completePayload.reusedContribution,
+    manifestAlreadySynced: completePayload.manifestAlreadySynced,
+    source: 'cloud',
+    syncStatus: 'uploaded',
+    message: completePayload.manifestAlreadySynced
+      ? '这条移动端录音已经写入训练资产，本次重试已安全复用。'
+      : '移动端录音已上传并写入训练资产。',
+  }
+}

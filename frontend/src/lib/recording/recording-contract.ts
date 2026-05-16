@@ -18,6 +18,11 @@ export type VoxFlameCaptureTransport =
   | 'rtc_dup_track'
   | 'local_pcm_stream'
 
+export type VoxFlameAudioQualityDisposition =
+  | 'high_confidence'
+  | 'review'
+  | 'low_confidence'
+
 export type VoxFlameConsentScope =
   | 'training_only'
   | 'training_and_model_improvement'
@@ -48,6 +53,24 @@ export interface VoxFlameRecordingEnvelope {
     durationSeconds: number
     fileSizeBytes: number
     captureTransport: VoxFlameCaptureTransport
+    inputDevice?: {
+      deviceId?: string
+      label?: string
+      selectedDeviceId?: string
+      selectedLabel?: string
+      isSystemDefault: boolean
+    }
+    quality?: {
+      durationMs: number
+      speechDurationMs?: number
+      leadingSilenceMs?: number
+      trailingSilenceMs?: number
+      silenceRatio?: number
+      inputLevelRms?: number
+      inputLevelPeak?: number
+      disposition: VoxFlameAudioQualityDisposition
+      reasons: string[]
+    }
   }
 }
 

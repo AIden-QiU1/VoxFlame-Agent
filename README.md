@@ -2,13 +2,29 @@
 
 > 让声音不仅被听见，更被理解。
 
-**更新时间**: 2026-04-21
+**更新时间**: 2026-05-10
 
 VoxFlame 是面向构音障碍沟通场景的主动沟通助手。当前目标不是做“通用语音助手”，而是把主链路收敛成一个真正可用的产品：先帮助用户说出第一句话，再帮助用户在实时沟通中被理解，并把练习与记忆沉淀成长期改进。
 
 当前产品判断已经明确吸收“创始人即用户”的一手研究：真正决定成败的，不只是识别准确率，而是用户在面试、工作协作、医疗沟通、陌生人求助这些高压时刻，能不能不被打断、不被忽视、不被别人替他说话。
 
-文档使用上也已经进一步收口：继续开发时，默认以本 README、[产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](/home/ubuntu/VoxFlame-Agent/.tasks/current.md) 为主入口；其中 PRD 现在主要负责当前产品边界和上线后 `App / 硬件 / 自定义语音 agent / 记忆架构` 规划。App / Mobile Workbench 的技术路线优先看 [App / Mobile Workbench Best Practices And Opportunity](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)，control plane 实现细节看 [control-plane.md](/home/ubuntu/VoxFlame-Agent/docs/control-plane.md)，agent / memory 边界看 [Agent, Memory And Tooling Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)。
+文档使用上也已经进一步收口：继续开发时，默认以本 README、[产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)、[当前任务状态](/home/ubuntu/VoxFlame-Agent/.tasks/current.md) 和 [Expert Standard And Collaboration Playbook](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_EXPERT_STANDARD_AND_COLLABORATION_PLAYBOOK_2026-05-10.md) 为主入口。PRD 负责当前产品边界和上线后 `App / 硬件 / 自定义语音 agent / 记忆架构` 规划；Expert Standard 负责 `标准 / 技术 / 用户反馈` 三角闭环、专家材料、用户反馈登记、专家协作和开发准入门槛。App / Mobile Workbench 的技术路线优先看 [App / Mobile Workbench Best Practices And Opportunity](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)，control plane 实现细节看 [control-plane.md](/home/ubuntu/VoxFlame-Agent/docs/control-plane.md)，agent / memory 边界看 [Agent, Memory And Tooling Reference](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)。
+
+## 开发标准
+
+VoxFlame 后续所有 Web / App / 硬件 / prompt / 训练语料 / memory 开发，都按 `标准 / 技术 / 用户反馈` 三角闭环推进：
+
+```text
+专家标准决定“应该怎么做”
+技术验证决定“能不能稳定做”
+用户反馈决定“真实场景里值不值得继续做”
+```
+
+- 专家标准：优先对齐 ASHA、WHO ICF、W3C WCAG / COGA、NIST AI RMF、FDA human factors / GMLP、中文构音评估与普通话音系资料。
+- 技术验证：每个改动都要有对应 smoke、fixture、contract、上传回执、manifest 对账或真机验证。
+- 用户反馈：当前缺口是还没有形成闭环；下一步需要建立 `feedback registry`、创始人即用户观察模板、目标用户访谈模板、沟通伙伴反馈模板和每周 feedback triage。
+
+具体标准、材料下载清单、专家合作计划和反馈闭环见 [Expert Standard And Collaboration Playbook](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_EXPERT_STANDARD_AND_COLLABORATION_PLAYBOOK_2026-05-10.md)。
 
 ## 当前架构
 
@@ -52,9 +68,10 @@ Frontend LiveKit RTC/Data
    继续提升沟通页、训练页、记忆页的真实可用性和可验证性。
 2. `App / Mobile Workbench 接入`
    在复用 `workspace snapshot / recording envelope / upload receipt` 的前提下，推进完整移动端工作台和桌面 companion。
-   当前移动端 Phase 0 skeleton 已落在 [apps/mobile-workbench](/home/ubuntu/VoxFlame-Agent/apps/mobile-workbench)，执行 RFC 见 [Mobile Workbench Phase 0 RFC](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)。
+   当前移动端 Phase 0 已落在 [apps/mobile-workbench](/home/ubuntu/VoxFlame-Agent/apps/mobile-workbench)，已接入 Supabase React Native auth adapter 与只读 `workspace snapshot`。App 不依赖 Web/Next.js 运行时，而是和 Web 作为两个 sibling client 共同依赖 backend-owned contracts；执行 RFC 见 [Mobile Workbench Phase 0 RFC](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)。
 3. `硬件接入`
    先做 BLE / USB / 外接麦克风 / 一键控制桥，再决定是否走更重的硬件形态。
+   第一版硬件开发路线、购买清单、ESP32-S3 / BLE / I2S / LiveKit 边界见 [硬件桥接开发手册](docs/VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md)。
 4. `自主语音 agent 架构`
    继续把 `livekit_agent` 演进成 provider-neutral、可解释、可验证的语音 runtime，而不是一上来整套重写。
 

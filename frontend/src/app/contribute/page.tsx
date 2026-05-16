@@ -259,6 +259,27 @@ function buildUploadMetadata(
     save_trigger: saveTrigger,
     auto_saved: saveTrigger === 'auto',
   }
+  const inputDevice = recording.audio.inputDevice
+  const audioQuality = recording.audio.quality
+
+  if (inputDevice) {
+    metadata.microphone_device_id = inputDevice.deviceId
+    metadata.microphone_label = inputDevice.label
+    metadata.selected_microphone_device_id = inputDevice.selectedDeviceId
+    metadata.selected_microphone_label = inputDevice.selectedLabel
+    metadata.microphone_is_system_default = inputDevice.isSystemDefault
+  }
+
+  if (audioQuality) {
+    metadata.speech_duration_ms = audioQuality.speechDurationMs
+    metadata.leading_silence_ms = audioQuality.leadingSilenceMs
+    metadata.trailing_silence_ms = audioQuality.trailingSilenceMs
+    metadata.silence_ratio = audioQuality.silenceRatio
+    metadata.input_level_rms = audioQuality.inputLevelRms
+    metadata.input_level_peak = audioQuality.inputLevelPeak
+    metadata.audio_quality_disposition = audioQuality.disposition
+    metadata.audio_quality_reasons = audioQuality.reasons
+  }
 
   if (uploadLabels?.etiology && uploadLabels.etiology !== DEFAULT_TRAINING_GUIDANCE_PROFILE.etiology) {
     metadata.etiology = uploadLabels.etiology

@@ -165,6 +165,62 @@
 4. App 第一版的信息架构应覆盖完整工作台：沟通、练习、记忆与准备、设备与同步。
 5. 硬件先做 App 承接的 BLE / USB / 外接麦桥接，不要先做硬件优先项目。
 
+## 5.4 当前 App 开发现状与下一刀
+
+当前 `apps/mobile-workbench` 已经不是概念壳子，而是进入“本地原生能力接入后，等待真机验证与上传链路打通”的阶段。
+
+已完成的开发切片：
+
+1. `Expo / React Native` skeleton 已落在 [apps/mobile-workbench](../apps/mobile-workbench)。
+2. 四个一级 surface 已固定：`communication / practice / memory / device`。
+3. Supabase React Native auth adapter 已接入，session storage 走 `AsyncStorage`，`SecureStore` 只保存 last email 这类提示信息。
+4. 真实账号 backend smoke 已跑通：`Supabase Auth -> backend auth middleware -> workspace snapshot`。
+5. App 已能只读展示 `workspace snapshot` 中的 active prepared expression、quick phrases 和 daily target。
+6. Native recorder queue 已接入 `expo-audio / expo-file-system`，支持权限、录音、持久本地文件、recording envelope、本地 queue、回放、待补传标记和丢弃。
+7. Native recorder queue 已接入现有 `/api/upload/sign` 和 `/api/upload/complete`，上传成功后会把 `uploadReceipt` 写回本地 queue item。
+8. Communication surface 已能通过 backend `/api/rtc/session/start` 请求 quick talk session，并展示 room/readiness；participant token 不渲染。
+9. LiveKit React Native 最小 room 连接代码已接入：`registerGlobals`、`AudioSession.startAudioSession`、room connect、麦克风发布和断开清理。
+
+当前尚未完成的关键验证：
+
+1. Android 真机录音 smoke。
+2. iPhone 真机录音 smoke。
+3. 断网队列 UI smoke。
+4. 真实设备 upload receipt smoke 与 retry 去重细化。
+5. App 与 Web 同读同一份 active prepared expression 的人工确认。
+6. LiveKit quick talk：真机进入 room，并处理断网 / 中断 / 切后台状态。
+
+因此下一刀建议不是先做硬件，也不是先做复杂移动端编辑，而是按下面顺序继续 App：
+
+1. 先做 Android / iPhone 真机录音 smoke。
+2. 再做真实设备 upload receipt smoke 和 retry 去重细化。
+3. 再确认 Web / App 同读同一份 active prepared expression。
+4. 再做 LiveKit React Native 真机 room smoke、断网 / 中断 / 切后台 UI。
+5. 最后再接 BLE / USB / 外接麦事件。
+
+这一轮你需要把控的不是每个 React Native API，而是 4 个产品承诺：
+
+1. App 录音是否足够显式，用户能不能知道“正在录 / 已保存在本地 / 已上传 / 可删除”。
+2. 本地未上传录音保存多久，用户能不能手动删除。
+3. 移动端是否只表达“沟通辅助 / 训练记录”，不表达医学康复结论。
+4. 硬件事件是否永远先进 App，再由 App 可见地映射到录音、回放、中断或上传。
+
+## 5.5 本轮最值得读：硬件桥接不要抢 App 主线
+
+这轮已经把硬件方向收成“App 承接的辅助入口”，而不是“先造一台完整硬件终端”：
+
+- [VoxFlame Hardware Bridge Development Guide（2026-05-05）](VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md)
+
+它重点回答：
+
+1. 为什么第一阶段不让 ESP32 直接承接 LiveKit 实时语音。
+2. 为什么 ESP32-S3 第一版更适合做 BLE 控制桥。
+3. 为什么 I2S 麦克风录音上传原型先服务训练样本，而不是实时沟通。
+4. 应该买哪些开发板、按钮、I2S 麦克风和可选外设。
+5. BLE GATT 协议、App 接入、LiveKit 边界、上传链路和验收清单怎么定义。
+
+你现在只需要把控一个判断：硬件是 App 的外设入口，不是 App 的替代品。手机 App 继续承担登录、权限、LiveKit audio session、upload receipt、隐私状态和用户可见控制。
+
 ## 6. 文档沉淀规则
 
 为了减少信息散落，默认按下面沉淀：
@@ -212,3 +268,5 @@
 3. Supabase mobile auth 与本地 session 存储。
 4. LiveKit React Native audio session 与 backend token orchestration。
 5. 后续硬件桥接的 BLE / USB / 外接麦边界。
+6. Native recorder queue、upload receipt、retry 去重与本地录音删除边界。
+7. ESP32-S3 硬件控制桥与 App 主线的优先级关系。

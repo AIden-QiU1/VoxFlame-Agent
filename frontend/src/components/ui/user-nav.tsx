@@ -102,9 +102,11 @@ export function UserNav() {
                         个人资料
                         <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                        设置
-                        <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                    <DropdownMenuItem asChild>
+                        <Link href="/settings/audio" className="flex w-full items-center justify-between">
+                            音频设置
+                            <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                        </Link>
                     </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />

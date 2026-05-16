@@ -5,7 +5,7 @@ import type { MandarinTrainingCategory, MandarinTrainingExercise } from './types
 // such as 12306 priority-passenger guidance, 120 emergency call guidance,
 // public-service language norms, and common high-frequency device workflows.
 const MIN_TEXT_LENGTH = 6
-const MAX_TEXT_LENGTH = 15
+const MAX_TEXT_LENGTH = 16
 
 function countVisibleChars(text: string): number {
   return Array.from(text.replace(/\s+/g, '')).length
@@ -27,7 +27,7 @@ function buildExercises(
 
     if (length < MIN_TEXT_LENGTH || length > MAX_TEXT_LENGTH) {
       throw new Error(
-        `[training corpus] ${category} sentence length must be 6-15 chars: "${normalized}" (${length})`,
+        `[training corpus] ${category} sentence length must be 6-16 chars: "${normalized}" (${length})`,
       )
     }
 

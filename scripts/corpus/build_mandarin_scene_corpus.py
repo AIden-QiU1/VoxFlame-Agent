@@ -358,10 +358,10 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="按场景拆分输出的目录路径",
     )
-    parser.add_argument("--min-length", type=int, default=5)
-    parser.add_argument("--max-length", type=int, default=20)
-    parser.add_argument("--soft-min-length", type=int, default=5)
-    parser.add_argument("--soft-max-length", type=int, default=20)
+    parser.add_argument("--min-length", type=int, default=6)
+    parser.add_argument("--max-length", type=int, default=16)
+    parser.add_argument("--soft-min-length", type=int, default=6)
+    parser.add_argument("--soft-max-length", type=int, default=16)
     parser.add_argument("--per-scene", type=int, default=200)
     parser.add_argument("--per-source-cap", type=int, default=80)
     parser.add_argument(

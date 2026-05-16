@@ -2,6 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { VoxFlameRecordingEnvelope } from '@/lib/recording/recording-contract'
+import {
+  createRecordingQualityAccumulator,
+  type RecordingQualityAccumulator,
+} from '@/lib/audio/recording-quality'
+import {
+  getRecordingInputDeviceMetadata,
+  readPreferredMicrophoneDevice,
+} from '@/lib/audio/microphone-preferences'
+import { calculateNormalizedInputLevel } from '@/lib/audio/microphone-input-feedback'
 import { pickPreferredTrainingTranscriptCandidate } from '@/lib/training/final-transcript'
 import { useRtcAgentSession } from './useRtcAgentSession'
 
@@ -57,6 +66,8 @@ export function useMandarinTrainingSession(
   const recordedChunksRef = useRef<Blob[]>([])
   const recordingStartedAtRef = useRef<number | null>(null)
   const recordingSampleRateRef = useRef<number>(16000)
+  const recordingQualityRef = useRef<RecordingQualityAccumulator | null>(null)
+  const recordingQualityTimerRef = useRef<number | null>(null)
 
   const rtc = useRtcAgentSession({
     userId,
@@ -153,6 +164,19 @@ export function useMandarinTrainingSession(
       recorderOwnsTrackRef.current = ownsTrack
       recordingStartedAtRef.current = Date.now()
       recordingSampleRateRef.current = recorderTrack.getSettings().sampleRate || 16000
+      const analyserNode = analyser
+      const qualityAccumulator = createRecordingQualityAccumulator()
+      recordingQualityRef.current = qualityAccumulator
+      if (recordingQualityTimerRef.current !== null) {
+        window.clearInterval(recordingQualityTimerRef.current)
+      }
+      if (analyserNode) {
+        const data = new Uint8Array(analyserNode.frequencyBinCount)
+        recordingQualityTimerRef.current = window.setInterval(() => {
+          analyserNode.getByteTimeDomainData(data)
+          qualityAccumulator.observeLevel(calculateNormalizedInputLevel(data))
+        }, 120)
+      }
 
       recorder.addEventListener('dataavailable', (event: BlobEvent) => {
         if (event.data.size > 0) {
@@ -178,13 +202,17 @@ export function useMandarinTrainingSession(
           : '训练录音初始化失败，请再点一次；如果还是这样，就是本地录音链路还没接稳。'
       throw new Error(message)
     }
-  }, [getMicrophoneMediaStream, getMicrophoneStreamTrack])
+  }, [analyser, getMicrophoneMediaStream, getMicrophoneStreamTrack])
 
   const stopLocalRecording = useCallback(async (): Promise<StopRecordingResult['recording']> => {
     const recorder = recorderRef.current
     const startedAt = recordingStartedAtRef.current
     recorderRef.current = null
     recordingStartedAtRef.current = null
+    if (recordingQualityTimerRef.current !== null) {
+      window.clearInterval(recordingQualityTimerRef.current)
+      recordingQualityTimerRef.current = null
+    }
 
     const finalize = async (): Promise<StopRecordingResult['recording']> => {
       const chunks = recordedChunksRef.current
@@ -192,6 +220,12 @@ export function useMandarinTrainingSession(
 
       const track = recorderTrackRef.current
       recorderTrackRef.current = null
+      const qualityMetrics = recordingQualityRef.current
+        ? recordingQualityRef.current.finish(
+            startedAt ? Math.max(300, Date.now() - startedAt) : 0,
+          )
+        : null
+      recordingQualityRef.current = null
       const ownsTrack = recorderOwnsTrackRef.current
       recorderOwnsTrackRef.current = false
       if (ownsTrack) {
@@ -207,6 +241,10 @@ export function useMandarinTrainingSession(
       })
       const stoppedAt = Date.now()
       const durationMs = startedAt ? Math.max(300, stoppedAt - startedAt) : 0
+      const inputDevice = getRecordingInputDeviceMetadata(
+        track,
+        readPreferredMicrophoneDevice(),
+      )
 
       return {
         recordingId: crypto.randomUUID(),
@@ -226,6 +264,18 @@ export function useMandarinTrainingSession(
           durationSeconds: Math.max(1, Math.round(durationMs / 1000)),
           fileSizeBytes: blob.size,
           captureTransport: 'rtc_dup_track',
+          inputDevice,
+          quality: qualityMetrics ? {
+            durationMs: qualityMetrics.duration_ms,
+            speechDurationMs: qualityMetrics.speech_duration_ms,
+            leadingSilenceMs: qualityMetrics.leading_silence_ms,
+            trailingSilenceMs: qualityMetrics.trailing_silence_ms,
+            silenceRatio: qualityMetrics.silence_ratio,
+            inputLevelRms: qualityMetrics.input_level_rms,
+            inputLevelPeak: qualityMetrics.input_level_peak,
+            disposition: qualityMetrics.quality_disposition,
+            reasons: qualityMetrics.quality_reasons,
+          } : undefined,
         },
       }
     }

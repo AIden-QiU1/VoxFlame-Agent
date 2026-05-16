@@ -1,7 +1,7 @@
 import type {
   MobileWorkbenchRecorderQueueItem,
   MobileWorkbenchSyncStatus,
-} from '@/contracts/workbench-contracts'
+} from '../contracts/workbench-contracts'
 
 export interface RecorderQueueSummary {
   total: number

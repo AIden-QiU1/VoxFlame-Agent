@@ -5,7 +5,7 @@
 ## 设计原则
 
 - 训练页只消费筛好的标准句库。
-- 句长默认控制在 `5-20` 个汉字。
+- 句长默认控制在 `6-16` 个汉字。这个范围优先服务“看提示录一句”的 supervised recording：足够短，能降低构音障碍用户的呼吸、注意和运动负担；又比单字/双字更能覆盖连续语流、停顿和真实沟通句式。`1-5` 字材料仍可作为音系筛查和最小对立练习，但不作为主功能句池主体。
 - 句库来源必须可追溯，但来源信息只保留在离线产物里，不展示给用户。
 - 如果环境里有 `pypinyin`，脚本会额外按声母 / 韵母 / 声调做覆盖度打分；没有的话也能跑，只是不会做音系均衡评分。
 - 网页来源会先做文章打散、子句拆分和页面噪声过滤，尽量剔除导航、按钮、面包屑等无效文本。
@@ -22,6 +22,46 @@
 - `Context7 不适用`：Context7 适合查软件库和框架文档，不适合抓取语料正文或下载数据集正文；语料获取应优先用 `web/curl/本地转写文件/Hugging Face/OpenSLR/GitHub 数据页`。
 
 ## 用法
+
+### 常规刷新前端训练语料
+
+默认路线是“先抓公开/本地来源快照，再从来源文本切分、过滤、去重、导出”。不要用模板批量造句。当前前端扩充池来自：
+
+- 普通话水平测试朗读作品 60 篇页面。
+- Tatoeba 派生中文例句 TSV。
+- 公版/公开经典朗读与音韵材料。
+
+先抓取公开网页或文本来源：
+
+```bash
+python3 scripts/corpus/fetch_public_corpus_sources.py \
+  --manifest scripts/corpus/source_inventory_putonghua_reading_2026.json \
+  --output-dir /tmp/voxflame-putonghua-reading-fetch
+
+python3 scripts/corpus/fetch_public_corpus_sources.py \
+  --manifest scripts/corpus/source_inventory_phonology_2026.json \
+  --output-dir /tmp/voxflame-phonology-fetch
+```
+
+大 TSV / 大 transcript 如果 `fetch_public_corpus_sources.py` 下载不稳，可以用 `curl -L` 落成本地文件，再写一个 `_local_manifest.json` 指向本地路径。
+
+然后构建音韵池并导出前端 JSON：
+
+```bash
+python3 scripts/corpus/build_phonology_article_corpus.py \
+  --manifest /tmp/voxflame-phonology-fetch/_local_manifest.json \
+  --output /tmp/voxflame-phonology-corpus.json
+
+python3 scripts/corpus/export_frontend_source_corpus.py \
+  --phonology-corpus /tmp/voxflame-phonology-corpus.json \
+  --manifest /tmp/voxflame-putonghua-reading-fetch/_local_manifest.json \
+  --manifest /tmp/voxflame-open-example-sentences-fetch/_local_manifest.json \
+  --output frontend/src/lib/corpus/generated/mandarin-training-real.json
+```
+
+如果本机已经下载了 AISHELL-1 / AISHELL-2 / 其他转写文本，不要把大数据集提交进仓库，直接把本地 transcript 放进 manifest，再交给 `build_mandarin_scene_corpus.py` 或 `export_frontend_source_corpus.py` 抽取。
+
+导出脚本只抽取符合长度与清洗规则的中文目标句；录音流程仍然是 `target_text -> supervised recording -> upload receipt / manifest`，不是先自由录音再事后转写。
 
 ```bash
 python3 scripts/corpus/build_mandarin_scene_corpus.py \

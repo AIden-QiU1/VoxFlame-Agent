@@ -135,6 +135,26 @@ mobile_workbench
 
 ## 5. 下一步实现顺序
 
+当前 App 验证不需要先打包上架到 App Store 或 Google Play。Phase 0 的验收梯度是：
+
+1. 代码级检查和 Android bundle export。
+2. 真机 development build。
+3. 真机登录、workspace read、录音、回放、上传 receipt、LiveKit quick talk smoke。
+4. 小范围内测分发。
+5. 正式商店上架。
+
+详细步骤见 [Mobile Workbench 真机验证手册（2026-05-05）](VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)。
+
+Android 当前已提供 EAS 构建入口：
+
+```bash
+cd apps/mobile-workbench
+npm run build:android:development
+npm run build:android:preview
+```
+
+构建完成后，通过 EAS build 页面里的 Install 链接或二维码在 Android 手机上下载安装 APK。手机通常用系统相机扫码，最终会在浏览器里打开下载页。
+
 ### Step 1：依赖安装与 Expo smoke
 
 目标：
@@ -158,8 +178,10 @@ mobile_workbench
 4. `npm run typecheck` 已通过。
 5. Expo dev server 已用 `/tmp/voxflame-expo-home` 启动在 `http://localhost:8123`，`/status` 返回 `packager-status:running`。
 6. Docker 核心栈已重新 build / up，`backend` 与 `frontend` compose health 均为 healthy，`/health` 与 `/api/rtc/health` 均返回 OK。
-7. 真机 smoke 尚未完成；下一步进入 Auth adapter 前应做一次设备预览。
-8. 依赖安装期间出现 LiveKit 依赖链 React peer warning，需在后续 Native LiveKit 接入前复核。
+7. Android Metro bundle export 已通过：`HOME=/tmp/voxflame-expo-home EXPO_NO_TELEMETRY=1 npm run export:android -- --output-dir /tmp/voxflame-mobile-workbench-android-export-20260504-stage2`。
+8. Web export 当前不作为 smoke 路径；package 已移除 `web` script，避免在未声明 `react-dom / react-native-web` 依赖时误导验证。
+9. 真机 smoke 尚未完成；下一步进入 Native recorder queue / LiveKit room 前应做一次设备预览。
+10. 依赖安装期间出现 LiveKit 依赖链 React peer warning，需在后续 Native LiveKit 接入前复核。
 
 ### Step 2：Auth adapter
 
@@ -175,6 +197,15 @@ mobile_workbench
 2. token 不进日志。
 3. 退出登录后本地 session 清除。
 
+当前状态：
+
+1. 已新增 `src/auth/mobile-supabase-client.ts`，按官方 React Native 路径使用 `@react-native-async-storage/async-storage` 作为 Supabase session storage，启用 `autoRefreshToken / persistSession`，并关闭 `detectSessionInUrl`。
+2. 已新增 `src/auth/use-mobile-auth.ts`，提供 `signInWithPassword / signOut / MobileAuthTokenProvider`。
+3. 已新增 `src/auth/mobile-auth-hint-storage.ts`，只把 last email 这类小型提示放入 `expo-secure-store`；不把整份 Supabase session 塞进 SecureStore，避免单值大小限制与刷新边界不清。
+4. `App.tsx` 已有登录卡片、状态展示、退出登录和 token provider 接入。
+5. 真实账号 smoke 已通过：取消 `NODE_TLS_REJECT_UNAUTHORIZED` 后，测试账号可通过 Supabase Auth 登录，并能带 token 读取本地 Docker backend 的 workspace snapshot。
+6. 自动化验证已覆盖 typecheck、mobile check 与 Android Metro bundle export；真机登录 UI 尚未手动 smoke。
+
 ### Step 3：Workspace snapshot read
 
 目标：
@@ -187,6 +218,38 @@ mobile_workbench
 
 1. 真实账号可读。
 2. Web 记忆页和 App 读到同一个 active prepared expression。
+
+当前状态：
+
+1. 已新增 `src/workspace/use-mobile-workspace.ts`，登录后通过 `GET /api/memory/workspace/:userId` 读取 backend-owned snapshot。
+2. `App.tsx` 已把 `selectMobileWorkspaceReadModel` 接到准备材料、快捷短句和今日练习目标展示。
+3. 缺少 API、未登录、同步中、同步失败、已同步都有显式 UI 状态。
+4. 当前真实账号 smoke 返回 `workspaceStatus=200`、`hasPreparedExpression=true`、`dailyTarget=20`。
+5. 当前仍是只读接入；写入 prepared expression、quick phrase 或 profile memory 继续留给后续阶段。
+
+## 5.1 Web / App 架构关系
+
+App 不应该依赖 Web / Next.js 运行时，也不应该复用 Web 页面作为长期主线。
+
+默认架构关系：
+
+```text
+Web / PWA client
+  -> backend-owned contracts
+
+Expo / React Native app client
+  -> backend-owned contracts
+
+backend
+  -> Supabase / LiveKit / upload / workspace owner
+```
+
+也就是说，Web 和 App 是两个 sibling client：
+
+1. 可以共享 contract、schema、测试样本和产品判断。
+2. 不共享浏览器 cookie、Next.js middleware、DOM audio、PWA service worker 或页面组件。
+3. App 需要自己的 auth storage、native permission、recording queue、app lifecycle 和 LiveKit audio session adapter。
+4. 真正需要稳定的是 backend contract，而不是让 App 依赖 Web 的实现细节。
 
 ### Step 4：Native recorder queue
 
@@ -203,6 +266,37 @@ mobile_workbench
 2. 断网补传可见。
 3. 后端 upload receipt 可见。
 
+当前状态：
+
+1. 已按 Expo 官方 `expo-audio` 路线接入 `useAudioRecorder / useAudioRecorderState / AudioModule.requestRecordingPermissionsAsync / setAudioModeAsync`。
+2. 已按 Expo `expo-file-system` document storage 路线新增 `src/queue/native-recorder-storage.ts`：
+   - 队列文件：`Paths.document/voxflame-recorder-queue/queue.json`
+   - 音频目录：`Paths.document/voxflame-recorder-queue/audio`
+   - 录音临时 URI 会复制为持久本地文件
+3. 已新增 `src/queue/use-native-recorder-queue.ts`：
+   - 麦克风权限检查 / 请求
+   - 开始录音 / 停止录音
+   - 生成 `recording envelope`
+   - 本地 queue 读取、追加、丢弃、标记 `upload_pending`
+   - 调用现有 upload sign / complete 链
+   - 最近一条录音回放
+4. `App.tsx` 的练习 surface 已接上：
+   - 本次练习句输入
+   - 权限按钮
+   - 录音 / 停止并保存
+   - 回放
+   - 上传 / 上传中 / 已上传状态
+   - 丢弃
+   - 本地 / 待传 / 失败统计
+5. 已新增 `src/api/mobile-upload-client.ts`：
+   - 复用 backend `/api/upload/sign`
+   - PUT 本地音频文件到 OSS signed URL
+   - 调用 backend `/api/upload/complete`
+   - 成功后把 `uploadReceipt` 写回本地 queue item，并将状态改为 `uploaded`
+   - 失败时保留本地文件，记录 `lastError`，并将状态改为 `failed`
+6. 已验证 typecheck、mobile static check 与 Android Metro bundle export。
+7. 尚未完成真机录音 smoke；因此“真机录音可回放”“断网补传可见”和“后端 upload receipt 真机可见”还不能宣布完成。
+
 ### Step 5：LiveKit quick talk
 
 目标：
@@ -217,6 +311,27 @@ mobile_workbench
 1. 不绕过 backend。
 2. token 不落日志。
 3. 中断、断网、切后台都有 UI 状态。
+
+当前状态：
+
+1. 已新增 `src/realtime/use-mobile-rtc-session.ts`：
+   - 调用 backend `/api/rtc/session/start`
+   - 只从 backend 接收 LiveKit room metadata、readiness 和 participant token
+   - App UI 只展示 room/readiness，不渲染 participant token
+   - 可清除当前 session state
+2. 已新增 `src/realtime/use-livekit-room-connection.ts`：
+   - 调用 `AudioSession.startAudioSession`
+   - 使用 backend 返回的 `serverUrl + participantToken` 连接 LiveKit room
+   - 连接后发布本机麦克风音频
+   - 断开时关闭麦克风、disconnect room，并停止 `AudioSession`
+3. `index.ts` 已调用 `registerGlobals()`，确保 React Native WebRTC globals 在 App 启动时注册。
+4. `App.tsx` 的沟通 surface 已能：
+   - 登录后请求 quick talk session
+   - 显示 backend readiness、room name、blockers、warnings
+   - 进入 / 断开 LiveKit room
+   - 显示 room connection status 与麦克风发布状态
+5. 已验证 typecheck、mobile static check 与 Android Metro bundle export。
+6. 尚未完成真机 LiveKit room smoke、中断 / 断网 / 切后台 UI。
 
 ## 6. 创始人需要把控
 

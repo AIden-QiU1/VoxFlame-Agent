@@ -86,6 +86,14 @@ export function assessTrainingSampleQuality(
   const reasons: string[] = []
 
   if (recording) {
+    if (recording.audio.quality?.disposition === 'low_confidence') {
+      score -= 22
+      reasons.push('这次收音质量偏低，已保留为一次尝试，不建议当作高置信训练样本。')
+    } else if (recording.audio.quality?.disposition === 'review') {
+      score -= 8
+      reasons.push('这次收音需要回看，后面可以补一条更稳的版本。')
+    }
+
     if (recording.audio.durationMs < 900) {
       score -= 18
       reasons.push('录音过短，建议把整句完整说完再停。')
