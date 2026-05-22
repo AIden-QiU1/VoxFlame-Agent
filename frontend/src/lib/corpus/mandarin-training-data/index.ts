@@ -121,14 +121,23 @@ export const MANDARIN_TRAINING_CATEGORY_META: Record<
     trainingTips: ['数字相关内容一位一位说，停顿要清楚。', '设备口令尽量先说动作，再说对象。'],
     corpusCount: CATEGORY_EXERCISE_MAP['设备与数字'].length,
   },
-  '发音与朗读': {
-    label: '发音与朗读',
-    shortLabel: '朗读音韵',
-    description: '用经典文章打散句补声母、韵母、声调和整句节奏，让训练页不只练场景，也能补音韵音调覆盖。',
-    examples: ['不宜妄自菲薄', '不知老之将至', '仰观宇宙之大'],
-    helper: '这组句子主要服务音韵、节奏和整句朗读能力。',
-    trainingTips: ['先把整句节奏读顺，再抠单个字。', '这一组重点看声调、停顿和朗读起伏。'],
-    corpusCount: CATEGORY_EXERCISE_MAP['发音与朗读'].length,
+  '现代文章朗读': {
+    label: '现代文章朗读',
+    shortLabel: '现代短文',
+    description: '以普通话水平测试现代白话朗读作品为主，练连续语流、停连、轻重音和自然语调。',
+    examples: ['仿佛是风筝的歌唱', '我喜欢出发', '清塘荷韵'],
+    helper: '这组是朗读训练的默认入口，优先使用现代白话短文片段，降低理解负担。',
+    trainingTips: ['先按现代汉语语序自然断句。', '注意停连、轻重音和整句流畅度，不用故意读成播音腔。'],
+    corpusCount: CATEGORY_EXERCISE_MAP['现代文章朗读'].length,
+  },
+  '文言文节奏': {
+    label: '文言文节奏',
+    shortLabel: '文言进阶',
+    description: '保留经典文言和声律材料，用作进阶节奏、声调、对偶和长短句控制训练。',
+    examples: ['不宜妄自菲薄', '仰观宇宙之大', '木兰当户织'],
+    helper: '这组认知负担更高，适合作为进阶节奏训练，不作为默认朗读主入口。',
+    trainingTips: ['先慢读，把停顿位置放稳。', '遇到文言句不要抢速度，先保证每个字清楚。'],
+    corpusCount: CATEGORY_EXERCISE_MAP['文言文节奏'].length,
   },
 }
 

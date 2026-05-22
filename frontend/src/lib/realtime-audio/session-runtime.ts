@@ -44,6 +44,7 @@ import {
   type SessionExecutionClient,
 } from './session-execution'
 import type {
+  LatestUserTranscriptSnapshot,
   RtcAgentState,
   RtcMessageEnvelope,
   RtmMessageEvent,
@@ -60,13 +61,13 @@ export interface SessionRuntimeRefs {
   sessionRef: MutableRefObject<StartRtcSessionResponse | null>
   connectPromiseRef: MutableRefObject<Promise<void> | null>
   inboundRtmChunksRef: MutableRefObject<Map<string, ChunkAccumulator>>
-  latestUserTranscriptRef: MutableRefObject<string>
+  latestUserTranscriptRef: MutableRefObject<LatestUserTranscriptSnapshot>
   onDecodedEnvelopeRef: MutableRefObject<((message: RtcMessageEnvelope) => void) | null>
 }
 
 interface CreateDecodedRtcMessageHandlerOptions {
   memoryOwnerId: string | null
-  latestUserTranscriptRef: MutableRefObject<string>
+  latestUserTranscriptRef: MutableRefObject<LatestUserTranscriptSnapshot>
   setState: Dispatch<SetStateAction<RtcAgentState>>
 }
 
@@ -209,7 +210,7 @@ function resetRuntimeRefs(refs: SessionRuntimeRefs): void {
   refs.micTrackRef.current = null
   refs.sessionRef.current = null
   refs.inboundRtmChunksRef.current.clear()
-  refs.latestUserTranscriptRef.current = ''
+  refs.latestUserTranscriptRef.current = { text: '', clientCaptureId: null }
   refs.onDecodedEnvelopeRef.current = null
 }
 

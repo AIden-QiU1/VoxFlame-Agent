@@ -139,7 +139,7 @@ test('session-runtime publishes a structured control envelope through RTM when r
 
 test('session-runtime updates latest transcript, memory turns, and reduced state for final user transcripts', () => {
   const harness = createStateHarness()
-  const latestTranscriptRef = { current: '' }
+  const latestTranscriptRef = { current: { text: '', clientCaptureId: null } }
   const addTurnCalls: Array<[string, string]> = []
   const originalAddTurn = memoryService.addTurn
   memoryService.addTurn = ((role: string, content: string) => {
@@ -159,12 +159,16 @@ test('session-runtime updates latest transcript, memory turns, and reduced state
       role: 'user',
       text: '我想慢一点说',
       is_final: true,
+      client_capture_id: 'capture-1',
     })
   } finally {
     memoryService.addTurn = originalAddTurn
   }
 
-  assert.equal(latestTranscriptRef.current, '我想慢一点说')
+  assert.deepEqual(latestTranscriptRef.current, {
+    text: '我想慢一点说',
+    clientCaptureId: 'capture-1',
+  })
   assert.deepEqual(addTurnCalls, [['user', '我想慢一点说']])
   assert.equal(harness.getState().messages.at(-1)?.content, '我想慢一点说')
   assert.equal(harness.getState().latestUserTranscript, '我想慢一点说')
@@ -172,7 +176,7 @@ test('session-runtime updates latest transcript, memory turns, and reduced state
 
 test('session-runtime writes audio input telemetry into current session metadata', () => {
   const harness = createStateHarness()
-  const latestTranscriptRef = { current: '' }
+  const latestTranscriptRef = { current: { text: '', clientCaptureId: null } }
   const metadataUpdates: Array<Record<string, unknown>> = []
   const originalUpdateCurrentSessionMetadata = memoryService.updateCurrentSessionMetadata
   memoryService.updateCurrentSessionMetadata = ((metadata: Record<string, unknown>) => {
@@ -209,7 +213,7 @@ test('session-runtime writes audio input telemetry into current session metadata
 
 test('session-runtime writes session userdata ack memory summary into current session metadata', () => {
   const harness = createStateHarness()
-  const latestTranscriptRef = { current: '' }
+  const latestTranscriptRef = { current: { text: '', clientCaptureId: null } }
   const metadataUpdates: Array<Record<string, unknown>> = []
   let persistCalls = 0
   const originalUpdateCurrentSessionMetadata = memoryService.updateCurrentSessionMetadata
@@ -304,7 +308,7 @@ test('session-runtime rejects the bootstrap gate when no session_init_ack arrive
 
 test('session-runtime forwards decoded envelopes to the optional onDecodedEnvelope callback', () => {
   const seenTypes: string[] = []
-  const latestTranscriptRef = { current: '' }
+  const latestTranscriptRef = { current: { text: '', clientCaptureId: null } }
   const harness = createStateHarness()
 
   const handleMessage = createRtmMessageHandler({

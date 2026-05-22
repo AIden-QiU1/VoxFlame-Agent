@@ -147,8 +147,9 @@ def build_user_transcript_output(
     *,
     is_final: bool,
     source: str = "dashscope_realtime_asr",
+    client_capture_id: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "type": "transcript",
         "role": "user",
         "text": user_text.strip(),
@@ -159,6 +160,13 @@ def build_user_transcript_output(
             "request_id": ctx.request_id,
         },
     }
+
+    if client_capture_id and client_capture_id.strip():
+        normalized_capture_id = client_capture_id.strip()
+        payload["client_capture_id"] = normalized_capture_id
+        payload["metadata"]["client_capture_id"] = normalized_capture_id
+
+    return payload
 
 
 def build_voice_profile_updated_output(
@@ -258,7 +266,7 @@ def extract_end_audio_reason(message: dict[str, Any]) -> str | None:
 
 def extract_client_speech_activity(
     message: dict[str, Any],
-) -> tuple[str, bool, bool] | None:
+) -> tuple[str, bool, bool, str | None] | None:
     if message.get("type") != "speech_activity":
         return None
 
@@ -268,10 +276,14 @@ def extract_client_speech_activity(
 
     auto_finalize = message.get("auto_finalize")
     short_utterance_expected = message.get("short_utterance_expected")
+    client_capture_id = message.get("client_capture_id")
     return (
         state.strip(),
         auto_finalize if isinstance(auto_finalize, bool) else False,
         short_utterance_expected if isinstance(short_utterance_expected, bool) else False,
+        client_capture_id.strip()
+        if isinstance(client_capture_id, str) and client_capture_id.strip()
+        else None,
     )
 
 

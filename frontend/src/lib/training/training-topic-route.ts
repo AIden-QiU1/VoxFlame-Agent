@@ -11,6 +11,7 @@ export type TrainingTopicId =
   | 'roles'
   | 'devices-numbers'
   | 'pronunciation-reading'
+  | 'classical-reading'
 
 const CATEGORY_TO_TOPIC_ID: Record<MandarinTrainingCategory, TrainingTopicId> = {
   '评估筛查': 'assessment-screening',
@@ -18,7 +19,8 @@ const CATEGORY_TO_TOPIC_ID: Record<MandarinTrainingCategory, TrainingTopicId> = 
   '看病与求助': 'medical-help',
   '人群与角色': 'roles',
   '设备与数字': 'devices-numbers',
-  '发音与朗读': 'pronunciation-reading',
+  '现代文章朗读': 'pronunciation-reading',
+  '文言文节奏': 'classical-reading',
 }
 
 const TOPIC_ID_TO_CATEGORY: Partial<Record<TrainingTopicId, MandarinTrainingCategory>> = Object.entries(
@@ -37,6 +39,7 @@ export function isTrainingTopicId(value: string): value is TrainingTopicId {
     'roles',
     'devices-numbers',
     'pronunciation-reading',
+    'classical-reading',
   ].includes(value)
 }
 

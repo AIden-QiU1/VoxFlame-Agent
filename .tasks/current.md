@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-05-15
+> 最后更新: 2026-05-22
 
 ## 当前主线
 
@@ -16,6 +16,77 @@
   - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-05-22 已把原 `发音与朗读` 拆成 `现代文章朗读` 和 `文言文节奏`，并统一清洗为简体中文
+   - `scripts/corpus/export_frontend_source_corpus.py` 已改为优先使用 OpenCC `t2s` 繁转简；没有安装 `opencc-python-reimplemented` 时才退回脚本内置兜底表
+   - `现代文章朗读` 只接普通话水平测试现代白话朗读作品这类来源，作为默认朗读入口；`文言文节奏` 单独保留《出师表》《木兰诗》《兰亭集序》等进阶声律材料
+   - 已重新生成 [frontend/src/lib/corpus/generated/mandarin-training-real.json](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/corpus/generated/mandarin-training-real.json)，当前分类计数：`日常与出行 360 / 看病与求助 23 / 人群与角色 140 / 设备与数字 96 / 现代文章朗读 560 / 文言文节奏 240`
+   - 已新增前端 corpus 测试，拦截训练目标句里的繁体 / 旧字形，并拦截现代文章池里的网页 / 培训站噪声
+   - 已验证：
+   - `python3 scripts/corpus/export_frontend_source_corpus.py ...`
+   - `cd frontend && npm test -- src/lib/corpus/mandarin-training-data/index.test.ts`
+   - `cd frontend && npx tsc --noEmit --allowImportingTsExtensions`
+   - `bash scripts/check_ai_docs.sh`
+
+0. 2026-05-22 已给现有实用分类补充专业精选语料
+   - 在 [frontend/src/lib/corpus/mandarin-training-data/curated-topics.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/corpus/mandarin-training-data/curated-topics.ts) 补充重点旅客 / 无障碍出行、急救与康复就医、照护 / 窗口 / 课堂角色、实时语音 / 字幕 / 辅助功能设备操作等短句
+   - 不直接把网页正文灌进前端；高风险场景先按官方 / 高可信来源的业务语义抽象成短、清楚、可录音的目标句
+   - 当前 curated 计数：`日常与出行 104 / 看病与求助 85 / 人群与角色 107 / 设备与数字 178`
+   - 已验证：
+   - `cd frontend && npm test -- src/lib/corpus/mandarin-training-data/index.test.ts`
+   - `cd frontend && npx tsc --noEmit --allowImportingTsExtensions`
+   - `bash scripts/check_ai_docs.sh`
+
+0. 2026-05-21 已继续收紧训练页 transcript 绑定，针对“前两句对、后面又错配”的残余竞态
+   - 进一步把训练录音结果锁到 `client_capture_id` 维度，避免后续录音复用上一轮的 interim / bestObserved
+   - `livekit_agent` 对“没有稳定语音的 manual_stop”不再把 capture 塞进 final transcript 队列，避免后续 final transcript 被整体错位
+   - 已验证：
+   - `cd frontend && npx tsc --noEmit --allowImportingTsExtensions`
+   - `cd frontend && npm test -- src/lib/training/final-transcript.test.ts src/lib/realtime-audio/session-runtime.test.ts`
+   - `python3 -m unittest livekit_agent.tests.test_asr_runtime`
+
+0. 2026-05-20 已清空 `2307294809@qq.com` 的上传语料
+   - 账号 userId：`64758dee-5026-4b53-a063-1d02d0834f67`
+   - 新增 [backend/scripts/clear_uploaded_training_corpus.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/clear_uploaded_training_corpus.ts)，默认 dry-run；只有带 `--write` 时才执行删除
+   - 本次只清空上传语料，不删除 Supabase Auth 账号，不清空记忆 / workspace / prepared expression
+   - 删除范围：
+   - `voice_contributions` 中该用户上传训练记录 `317` 条
+   - OSS 中该用户上传语料对象 `319` 个，包括 `317` 个音频对象、`dataset/<userId>/manifest.jsonl`、`dataset/<userId>/transcripts.txt`
+   - 清空后复查：`voiceContributionCount=0`、`ossObjectCount=0`、删除失败 `0`
+   - 已验证：
+   - `cd backend && npm run clear:uploaded-training-corpus -- --email 2307294809@qq.com`
+   - `cd backend && npm run clear:uploaded-training-corpus -- --email 2307294809@qq.com --write`
+   - `cd backend && npx tsc --noEmit --skipLibCheck --esModuleInterop --module commonjs --target ES2020 --moduleResolution node scripts/clear_uploaded_training_corpus.ts`
+
+0. 2026-05-20 已完成对话页 / 训练页降噪 P0 调参
+   - 已按 LiveKit 2026 官方策略判断：当前 self-host 路线先保留 WebRTC 基础降噪和 agent APM/VAD；Krisp / ai-coustics 作为 P1 增强，不在本次 P0 引入依赖
+   - `livekit_agent` 默认 VAD 阈值从 `0.018` 提到 `0.032`
+   - VAD silence finalize 从 `720ms` 提到 `860ms`
+   - barge-in 最短语音从 `220ms` 提到 `360ms`
+   - 新增 `QWEN_ASR_MIN_COMMIT_SPEECH_MS=420`，避免短促噪声 / 空音频 manual stop 继续提交 ASR
+   - 新增短 filler transcript 过滤：普通沟通模式过滤 `嗯 / 呃 / 啊 / 哦 / 喔 / 额 / 唔 / 哼`；训练短词 / 筛查模式不启用该误杀风险较高的过滤
+   - 已验证：
+   - `python3 -m unittest discover livekit_agent/tests`
+   - `python3 -m py_compile livekit_agent/config.py livekit_agent/asr_runtime.py livekit_agent/data_contract.py livekit_agent/app.py`
+
+0. 2026-05-20 已修复 Web 训练页 transcript 串条与空音频 commit 报错
+   - 根因：上一条 ASR final transcript 可能晚到，被下一条训练录音当成“系统听到”消费，导致页面看起来总显示上一句
+   - 前端现在每次训练录音生成 `client_capture_id`，只接受同一 capture 的 final transcript；没有可信 final 时不再用旧 interim/bestObserved 兜底保存
+   - `livekit_agent` 会把 `client_capture_id` 从 `speech_activity` 透传到 user transcript payload
+   - 对无稳定语音的 manual stop，`livekit_agent` 不再提交 ASR audio buffer，避免 `Error committing input audio buffer...` 冒成红色错误
+   - Docker 日志确认撤回链路本身成功：backend 出现 `[Upload] Discarded ...`；截图红错来自 ASR commit，不是撤回接口
+   - 已验证：
+   - `cd frontend && npx tsc --noEmit --allowImportingTsExtensions`
+   - `cd frontend && npm test -- src/lib/realtime-audio/session-actions.test.ts src/lib/realtime-audio/session-runtime.test.ts src/lib/training/final-transcript.test.ts`
+   - `python3 -m unittest livekit_agent.tests.test_data_contract livekit_agent.tests.test_asr_runtime`
+
+0. 2026-05-16 已新增 restsend 作者合作价值与硬件音频桥研究文档
+   - 新增 [restsend Rust 通信栈与硬件音频桥研究（2026-05-16）](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RESTSEND_RUST_STACK_AND_HARDWARE_AUDIO_BRIDGE_RESEARCH_2026-05-16.md)
+   - 文档基于 Context7 和 GitHub 公开资料分析 `rustpbx / rsipstack / rustrtc / audio-codec`：这位作者更像 VoxFlame 未来 `SIP / PBX / RTP / WebRTC / audio codec` 通信网关层合作者，而不是第一版 ESP32-S3 固件外包
+   - 核心判断：restsend 栈最适合 P2/P3 的电话 / 医院分机 / 远程随访 / SIP trunk / WebRTC-SIP bridge / 音频转码 / 通话录音接入；当前 P0/P1 硬件仍应以 Mobile Workbench + 现成麦克风/音箱 + ESP32-S3 音频外设为主
+   - 硬件形态判断收口为 `耳挂式近口麦克风 + 挂脖 / 胸前扬声器盒 + 手机 App brain`；胸针更适合按钮/状态/扬声器，不适合作主麦；眼镜是高预算后期路线
+   - ESP32-S3 定位明确为低成本音频桥和交互外设，负责 I2S mic、按钮、LED、小屏、本地提示音和短录音，不负责 LiveKit/WebRTC/SIP/LLM/ASR/TTS 主链
+   - 已同步 [docs/README.md](/home/ubuntu/VoxFlame-Agent/docs/README.md)
 
 0. 2026-05-15 已新增 Voiceitt 功能设置深度分析文档
    - 新增 [Voiceitt 功能设置深度分析与 VoxFlame 启发（2026-05-15）](/home/ubuntu/VoxFlame-Agent/docs/VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)

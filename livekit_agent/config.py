@@ -36,6 +36,7 @@ class LiveKitAgentConfig:
     dashscope_asr_vad_silence_duration_ms: int
     dashscope_asr_vad_hop_size_ms: int
     dashscope_asr_barge_in_min_speech_ms: int
+    dashscope_asr_min_commit_speech_ms: int
     dashscope_tts_url: str
     dashscope_tts_model: str
     dashscope_tts_voice: str
@@ -129,13 +130,16 @@ def load_config() -> LiveKitAgentConfig:
             os.getenv("LIVEKIT_AUDIO_APM_AUTO_GAIN_CONTROL", "0").strip().lower()
             not in {"0", "false", "no"}
         ),
-        dashscope_asr_vad_threshold=float(os.getenv("QWEN_ASR_VAD_THRESHOLD", "0.018").strip() or "0.018"),
+        dashscope_asr_vad_threshold=float(os.getenv("QWEN_ASR_VAD_THRESHOLD", "0.032").strip() or "0.032"),
         dashscope_asr_vad_silence_duration_ms=int(
-            os.getenv("QWEN_ASR_VAD_SILENCE_DURATION_MS", "720").strip() or "720"
+            os.getenv("QWEN_ASR_VAD_SILENCE_DURATION_MS", "860").strip() or "860"
         ),
         dashscope_asr_vad_hop_size_ms=int(os.getenv("QWEN_ASR_VAD_HOP_SIZE_MS", "16").strip() or "16"),
         dashscope_asr_barge_in_min_speech_ms=int(
-            os.getenv("QWEN_ASR_BARGE_IN_MIN_SPEECH_MS", "220").strip() or "220"
+            os.getenv("QWEN_ASR_BARGE_IN_MIN_SPEECH_MS", "360").strip() or "360"
+        ),
+        dashscope_asr_min_commit_speech_ms=int(
+            os.getenv("QWEN_ASR_MIN_COMMIT_SPEECH_MS", "420").strip() or "420"
         ),
         dashscope_tts_url=(
             os.getenv("QWEN_TTS_REALTIME_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")

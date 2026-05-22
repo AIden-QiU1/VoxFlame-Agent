@@ -14,6 +14,7 @@ import {
   applyRtcError,
 } from './session-state'
 import type {
+  LatestUserTranscriptSnapshot,
   RtcAgentState,
   SessionMicrophoneTrack,
   StartRtcSessionResponse,
@@ -24,7 +25,7 @@ interface SessionActionRefs {
   micStreamRef: MutableRefObject<MediaStream | null>
   preflightMicStreamRef: MutableRefObject<MediaStream | null>
   sessionRef: MutableRefObject<StartRtcSessionResponse | null>
-  latestUserTranscriptRef: MutableRefObject<string>
+  latestUserTranscriptRef: MutableRefObject<LatestUserTranscriptSnapshot>
 }
 
 interface StartRtcRecordingActionOptions {
@@ -69,7 +70,7 @@ export async function startRtcRecordingAction({
 
   const micTrack = await ensureMicrophoneTrack()
   await micTrack.setEnabled(true)
-  refs.latestUserTranscriptRef.current = ''
+  refs.latestUserTranscriptRef.current = { text: '', clientCaptureId: null }
   setState((prev) => applyRecordingStarted(prev))
 }
 
@@ -118,11 +119,11 @@ export async function sendRtcTextAction({
 }
 
 export function clearRtcMessagesAction(
-  latestUserTranscriptRef: MutableRefObject<string>,
+  latestUserTranscriptRef: MutableRefObject<LatestUserTranscriptSnapshot>,
   setState: Dispatch<SetStateAction<RtcAgentState>>,
 ): void {
   setState((prev) => applyClearedMessages(prev))
-  latestUserTranscriptRef.current = ''
+  latestUserTranscriptRef.current = { text: '', clientCaptureId: null }
 }
 
 export function getRtcMicrophoneStreamTrack(

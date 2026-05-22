@@ -34,6 +34,7 @@ import {
 } from '@/lib/realtime-audio/session-runtime'
 import type { SessionExecutionClient } from '@/lib/realtime-audio/session-execution'
 import type {
+  LatestUserTranscriptSnapshot,
   RtcAgentState,
   RtcMessageEnvelope,
   SessionControlClient,
@@ -56,6 +57,11 @@ interface UseRtcAgentSessionOptions {
   executionBackend?: RtcExecutionBackend
   connectionNotice?: string | null
   timeoutSeconds?: number
+}
+
+interface TranscriptCacheEntry {
+  text: string
+  clientCaptureId: string | null
 }
 
 interface ConnectRtcOptions {
@@ -94,7 +100,11 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
   const sessionRef = useRef<StartRtcSessionResponse | null>(null)
   const connectPromiseRef = useRef<Promise<void> | null>(null)
   const pingTimerRef = useRef<number | null>(null)
-  const latestUserTranscriptRef = useRef('')
+  const latestUserTranscriptRef = useRef<LatestUserTranscriptSnapshot>({
+    text: '',
+    clientCaptureId: null,
+  })
+  const transcriptCacheRef = useRef<Map<string, TranscriptCacheEntry>>(new Map())
   const inboundRtmChunksRef = useRef<Map<string, ChunkAccumulator>>(new Map())
   const onDecodedEnvelopeRef = useRef<((message: RtcMessageEnvelope) => void) | null>(null)
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null)
@@ -154,6 +164,19 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
       latestUserTranscriptRef,
       setState,
       onDecodedEnvelope: (message) => {
+        if (message.type === 'transcript' && message.role === 'user' && message.is_final && message.text) {
+          const clientCaptureId =
+            typeof message.client_capture_id === 'string' && message.client_capture_id.trim()
+              ? message.client_capture_id.trim()
+              : null
+
+          if (clientCaptureId) {
+            transcriptCacheRef.current.set(clientCaptureId, {
+              text: message.text,
+              clientCaptureId,
+            })
+          }
+        }
         onDecodedEnvelopeRef.current?.(message)
       },
     })
@@ -168,7 +191,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
         .find((message) => message.role === 'assistant')?.content
       memoryService.updateCurrentSessionMetadata({
         sessionEndedReason: 'rtc_disconnect',
-        latestUserTranscript: latestUserTranscriptRef.current || undefined,
+        latestUserTranscript: latestUserTranscriptRef.current.text || undefined,
         latestCorrectionText: latestAssistantText,
         lastVoiceProfileSource: latestState.lastVoiceProfileSync?.source,
         clarity_score:
@@ -352,6 +375,15 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
     return getRtcMicrophoneMediaStream(micStreamRef, preflightMicStreamRef)
   }, [])
 
+  const getLatestUserTranscriptSnapshot = useCallback((): LatestUserTranscriptSnapshot => {
+    return latestUserTranscriptRef.current
+  }, [])
+
+  const getCachedTranscriptByCaptureId = useCallback((clientCaptureId: string): LatestUserTranscriptSnapshot | null => {
+    const cached = transcriptCacheRef.current.get(clientCaptureId)
+    return cached ? { ...cached } : null
+  }, [])
+
   return {
     ...state,
     analyser,
@@ -365,6 +397,8 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
     clearMessages,
     getMicrophoneStreamTrack,
     getMicrophoneMediaStream,
+    getLatestUserTranscriptSnapshot,
+    getCachedTranscriptByCaptureId,
   }
 }
 

@@ -193,9 +193,15 @@ export function extractMemoryTurnsFromEnvelope(
 
 export function extractLatestUserTranscriptFromEnvelope(
   message: RtcMessageEnvelope,
-): string | null {
+): { text: string; clientCaptureId: string | null } | null {
   if (message.type === 'transcript' && message.role === 'user' && message.is_final && message.text) {
-    return message.text
+    return {
+      text: message.text,
+      clientCaptureId:
+        typeof message.client_capture_id === 'string' && message.client_capture_id.trim()
+          ? message.client_capture_id.trim()
+          : null,
+    }
   }
 
   return null

@@ -76,6 +76,7 @@ export interface RtcMessageEnvelope {
   clarity_score?: number
   state?: string
   auto_finalize?: boolean
+  client_capture_id?: string
   interruption_requested?: boolean
   speech_duration_ms?: number
   reason?: string
@@ -123,6 +124,11 @@ export interface RtcMessageEnvelope {
     interruption_count?: number
     barge_in_count?: number
   }
+}
+
+export interface LatestUserTranscriptSnapshot {
+  text: string
+  clientCaptureId: string | null
 }
 
 export interface RtmMessageEvent {

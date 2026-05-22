@@ -159,11 +159,18 @@ class DataContractTests(unittest.TestCase):
         self.assertEqual(payload["metadata"]["source"], "dashscope_chat_completion")
 
     def test_build_user_transcript_output_matches_frontend_reducer_shape(self) -> None:
-        payload = build_user_transcript_output(create_context(), "我想挂号", is_final=False)
+        payload = build_user_transcript_output(
+            create_context(),
+            "我想挂号",
+            is_final=False,
+            client_capture_id="capture-1",
+        )
 
         self.assertEqual(payload["type"], "transcript")
         self.assertEqual(payload["role"], "user")
         self.assertFalse(payload["is_final"])
+        self.assertEqual(payload["client_capture_id"], "capture-1")
+        self.assertEqual(payload["metadata"]["client_capture_id"], "capture-1")
         self.assertEqual(payload["metadata"]["type"], "user_transcript_output")
 
     def test_build_voice_profile_updated_output_matches_frontend_reducer_shape(self) -> None:

@@ -18,6 +18,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+try:
+    from opencc import OpenCC
+except ImportError:  # pragma: no cover - optional offline corpus dependency
+    OpenCC = None  # type: ignore[assignment]
+
 from build_mandarin_scene_corpus import (
     build_coverage_scores,
     build_length_score,
@@ -34,7 +39,8 @@ CATEGORY_ORDER = [
     "看病与求助",
     "人群与角色",
     "设备与数字",
-    "发音与朗读",
+    "现代文章朗读",
+    "文言文节奏",
 ]
 
 SCENE_TO_CATEGORY = {
@@ -55,16 +61,16 @@ SOURCE_CATEGORY_HINTS = {
     "nurse": "人群与角色",
     "pep_textbook": "人群与角色",
     "customer_service": "人群与角色",
-    "pts_reading": "发音与朗读",
-    "shenglv": "发音与朗读",
-    "liweng": "发音与朗读",
-    "mulan": "发音与朗读",
-    "taohuayuan": "发音与朗读",
-    "yueyang": "发音与朗读",
-    "zuoweng": "发音与朗读",
-    "lanting": "发音与朗读",
-    "chushibiao": "发音与朗读",
-    "tengwang": "发音与朗读",
+    "pts_reading": "现代文章朗读",
+    "shenglv": "文言文节奏",
+    "liweng": "文言文节奏",
+    "mulan": "文言文节奏",
+    "taohuayuan": "文言文节奏",
+    "yueyang": "文言文节奏",
+    "zuoweng": "文言文节奏",
+    "lanting": "文言文节奏",
+    "chushibiao": "文言文节奏",
+    "tengwang": "文言文节奏",
 }
 
 DEFAULT_CAPS = {
@@ -72,7 +78,15 @@ DEFAULT_CAPS = {
     "看病与求助": 120,
     "人群与角色": 180,
     "设备与数字": 180,
-    "发音与朗读": 720,
+    "现代文章朗读": 560,
+    "文言文节奏": 240,
+}
+
+OPENCC_T2S = OpenCC("t2s") if OpenCC is not None else None
+
+CATEGORY_SOURCE_SOFT_CAPS = {
+    "现代文章朗读": 120,
+    "文言文节奏": 80,
 }
 
 BLOCK_PATTERNS = (
@@ -135,9 +149,22 @@ BLOCK_PATTERNS = (
     "教师资格",
     "小学教师",
     "中学综合素质",
+    "初中学科",
+    "学科知识",
+    "综合素质",
+    "幼儿综合素质",
     "确认通过",
     "备考",
     "告别盲目",
+    "刷题",
+    "快人一步",
+    "在线老师",
+    "在线咨询",
+    "咨询在线",
+    "加入收藏",
+    "收藏本站",
+    "希赛",
+    "育路",
     "考生",
     "题库",
     "课程",
@@ -292,8 +319,127 @@ TRADITIONAL_MAP = str.maketrans(
         "號": "号",
         "門": "门",
         "樓": "楼",
+        "亂": "乱",
+        "傳": "传",
+        "兩": "两",
+        "冊": "册",
+        "勝": "胜",
+        "喚": "唤",
+        "嘗": "尝",
+        "圖": "图",
+        "報": "报",
+        "壯": "壮",
+        "將": "将",
+        "宮": "宫",
+        "廬": "庐",
+        "張": "张",
+        "從": "从",
+        "復": "复",
+        "慮": "虑",
+        "憶": "忆",
+        "戰": "战",
+        "戶": "户",
+        "撲": "扑",
+        "攬": "揽",
+        "敵": "敌",
+        "暢": "畅",
+        "業": "业",
+        "極": "极",
+        "樂": "乐",
+        "機": "机",
+        "殤": "殇",
+        "洩": "泄",
+        "漢": "汉",
+        "濺": "溅",
+        "營": "营",
+        "爺": "爷",
+        "猶": "犹",
+        "畢": "毕",
+        "畫": "画",
+        "當": "当",
+        "盡": "尽",
+        "簡": "简",
+        "紅": "红",
+        "終": "终",
+        "絕": "绝",
+        "絲": "丝",
+        "織": "织",
+        "脫": "脱",
+        "腳": "脚",
+        "蓋": "盖",
+        "虛": "虚",
+        "見": "见",
+        "視": "视",
+        "親": "亲",
+        "觴": "觞",
+        "討": "讨",
+        "託": "托",
+        "許": "许",
+        "訴": "诉",
+        "詩": "诗",
+        "該": "该",
+        "誕": "诞",
+        "誠": "诚",
+        "諮": "咨",
+        "豬": "猪",
+        "責": "责",
+        "買": "买",
+        "賞": "赏",
+        "跡": "迹",
+        "軍": "军",
+        "載": "载",
+        "轡": "辔",
+        "辭": "辞",
+        "連": "连",
+        "週": "周",
+        "達": "达",
+        "遺": "遗",
+        "邊": "边",
+        "錄": "录",
+        "鐵": "铁",
+        "閣": "阁",
+        "際": "际",
+        "隨": "随",
+        "雖": "虽",
+        "韉": "鞯",
+        "領": "领",
+        "頭": "头",
+        "願": "愿",
+        "類": "类",
+        "顧": "顾",
+        "飛": "飞",
+        "馬": "马",
+        "馳": "驰",
+        "駿": "骏",
+        "騁": "骋",
+        "驅": "驱",
+        "鳴": "鸣",
+        "黃": "黄",
+        "齊": "齐",
+        "龜": "龟",
+        "僞": "伪",
+        "創": "创",
+        "娛": "娱",
+        "妝": "妆",
+        "爾": "尔",
+        "窺": "窥",
+        "舊": "旧",
+        "舎": "舍",
+        "衞": "卫",
+        "覩": "睹",
+        "遊": "游",
+        "歎": "叹",
+        "羣": "群",
+        "円": "元",
+        "脩": "修",
+        "稧": "禊",
     }
 )
+
+
+def to_simplified_chinese(raw: str) -> str:
+    text = OPENCC_T2S.convert(raw) if OPENCC_T2S is not None else raw
+    return text.translate(TRADITIONAL_MAP)
 
 
 @dataclass(frozen=True)
@@ -315,7 +461,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-length", type=int, default=6)
     parser.add_argument("--max-length", type=int, default=16)
     parser.add_argument("--per-source-cap", type=int, default=140)
-    parser.add_argument("--cap", action="append", default=[], help="分类上限，如 发音与朗读=700")
+    parser.add_argument("--cap", action="append", default=[], help="分类上限，如 现代文章朗读=560")
     return parser.parse_args()
 
 
@@ -332,7 +478,7 @@ def parse_caps(values: Iterable[str]) -> dict[str, int]:
 
 
 def visible_text(raw: str) -> str:
-    text = raw.translate(TRADITIONAL_MAP)
+    text = to_simplified_chinese(raw)
     text = text.replace("//", "")
     text = re.sub(r"[“”\"'‘’《》〈〉【】\[\]()（）·…—\-]", "", text)
     text = re.sub(r"[，,、：:/／；;。！？!?\\s]+", "", text)
@@ -455,7 +601,7 @@ def load_phonology_corpus(path: Path) -> list[SourceItem]:
         rows.append(
             SourceItem(
                 text=text,
-                category="发音与朗读",
+                category=category_for_source(str(item.get("source_id", "phonology")), text),
                 source_id=str(item.get("source_id", "phonology")),
                 source_ref=str(item.get("source_ref", path)),
                 score=float(item.get("total_score", 0.0)),
@@ -645,7 +791,28 @@ def rebalance(rows: list[SourceItem], caps: dict[str, int]) -> dict[str, list[So
                 item.text,
             ),
         )
-        balanced[category] = ordered[: caps[category]]
+        soft_cap = CATEGORY_SOURCE_SOFT_CAPS.get(category)
+        if soft_cap is None:
+            balanced[category] = ordered[: caps[category]]
+            continue
+
+        selected: list[SourceItem] = []
+        deferred: list[SourceItem] = []
+        source_counts: dict[str, int] = {}
+        for item in ordered:
+            if len(selected) >= caps[category]:
+                break
+            count = source_counts.get(item.source_id, 0)
+            if count < soft_cap:
+                selected.append(item)
+                source_counts[item.source_id] = count + 1
+            else:
+                deferred.append(item)
+
+        if len(selected) < caps[category]:
+            selected.extend(deferred[: caps[category] - len(selected)])
+
+        balanced[category] = selected[: caps[category]]
     return balanced
 
 

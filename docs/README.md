@@ -26,17 +26,19 @@
    明确 App 验证梯度：代码级检查、真机 development build、业务 smoke、小范围内测和正式上架；当前不需要先上架应用商店。
 11. [硬件桥接开发手册（2026-05-05）](VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md)
    ESP32-S3 / BLE 控制桥 / I2S 录音上传原型的硬件购买、官方文档、软硬件协议和验收手册。
-12. [第一功能：训练评估开发文档（2026-05-08）](VOXFLAME_TRAINING_ASSESSMENT_FUNCTION_DEVELOPMENT_2026-05-08.md)
+12. [restsend Rust 通信栈与硬件音频桥研究（2026-05-16）](VOXFLAME_RESTSEND_RUST_STACK_AND_HARDWARE_AUDIO_BRIDGE_RESEARCH_2026-05-16.md)
+   分析 restsend 作者的 `rustpbx / rsipstack / rustrtc / audio-codec` 对 VoxFlame 未来电话 / SIP / WebRTC / 音频网关和硬件音频桥的合作价值，并明确 ESP32-S3、手机 App、挂脖扬声器盒与耳挂麦克风的分工。
+13. [第一功能：训练评估开发文档（2026-05-08）](VOXFLAME_TRAINING_ASSESSMENT_FUNCTION_DEVELOPMENT_2026-05-08.md)
    定义“训练表现分 / 系统听懂分”的产品边界、20 词筛查局限、普通话评估语料升级、模型职责和阶段路线。
-13. [构音障碍病因差异参考（2026-05-15）](VOXFLAME_DYSARTHRIA_ETIOLOGY_DIFFERENCE_REFERENCE_2026-05-15.md)
+14. [构音障碍病因差异参考（2026-05-15）](VOXFLAME_DYSARTHRIA_ETIOLOGY_DIFFERENCE_REFERENCE_2026-05-15.md)
    分析 CP、TBI、DS、Stroke、MS、ALS/MND、ASD、Parkinson、听力损失等不同病因导致沟通困难的本质差异，以及对 VoxFlame 训练、识别、音频设置和 profile schema 的启发。
-14. [分病因言语康复与沟通产品化深度文档（2026-05-15）](VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
+15. [分病因言语康复与沟通产品化深度文档（2026-05-15）](VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
    以 ReTalk / 复言的中风康复产品化样板为参照，逐病因拆解成熟疗法、科学原理、AI 自动化方式、专家边界和产品功能映射。
-15. [Voiceitt 功能设置深度分析与 VoxFlame 启发（2026-05-15）](VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
+16. [Voiceitt 功能设置深度分析与 VoxFlame 启发（2026-05-15）](VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
    拆解 Voiceitt 的 Speak / Dictate / Integrations、训练、麦克风、停顿、短语、字幕、展示和账号数据设置，分析哪些值得 VoxFlame 吸收，哪些不应照搬。
-16. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
+17. [训练数据 schema 与 recorder pipeline 实施文档（2026-03-23）](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
    当前数据录入、上传、manifest 和 recorder queue 的权威 contract。
-17. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+18. [LiveKit 记忆最佳实践研究（2026-04-05）](VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
    把 LiveKit 官方的 session/state/data 原语翻成 VoxFlame 可执行的 memory 分层判断，明确 `LiveKit != durable memory owner`，以及 `Qdrant / Redis` 应分别放在哪一层。
 
 ## 综合参考
@@ -74,6 +76,7 @@
 | [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md) | `apps/mobile-workbench` 的 skeleton、surface、contract boundary 和实现顺序 | ⭐⭐⭐ |
 | [Mobile Workbench 真机验证手册（2026-05-05）](VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md) | App 从代码检查到真机 smoke、内测分发和正式上架的验证梯度 | ⭐⭐⭐ |
 | [硬件桥接开发手册（2026-05-05）](VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md) | ESP32-S3、BLE 控制桥、I2S 录音上传原型的购买、开发、协议和验收指南 | ⭐⭐⭐ |
+| [restsend Rust 通信栈与硬件音频桥研究（2026-05-16）](VOXFLAME_RESTSEND_RUST_STACK_AND_HARDWARE_AUDIO_BRIDGE_RESEARCH_2026-05-16.md) | 判断 restsend 作者作为通信栈 / 音频网关合作者的价值，以及 ESP32-S3、手机 App、耳挂麦克风、挂脖扬声器盒和未来 SIP/WebRTC 网关的分工 | ⭐⭐⭐ |
 | [第一功能：训练评估开发文档（2026-05-08）](VOXFLAME_TRAINING_ASSESSMENT_FUNCTION_DEVELOPMENT_2026-05-08.md) | `训练表现分 / 系统听懂分` 的产品边界、语料升级、评分 contract 和模型职责 | ⭐⭐⭐ |
 | [构音障碍病因差异参考（2026-05-15）](VOXFLAME_DYSARTHRIA_ETIOLOGY_DIFFERENCE_REFERENCE_2026-05-15.md) | CP、TBI、DS、Stroke、MS、ALS/MND、ASD、Parkinson、听力损失等 diagnosis label 背后的言语机制差异和产品启发 | ⭐⭐⭐ |
 | [分病因言语康复与沟通产品化深度文档（2026-05-15）](VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md) | 逐病因映射成熟疗法、医院常用训练原则、AI 自动化边界、专家复核边界和 VoxFlame 可落地功能 | ⭐⭐⭐ |
@@ -154,8 +157,9 @@
 3. [Mobile Workbench Phase 0 RFC（2026-05-04）](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
 4. [Mobile Workbench 真机验证手册（2026-05-05）](VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)
 5. [硬件桥接开发手册（2026-05-05）](VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md)
-6. [主项目 README](../README.md)
-7. [前端 README](../frontend/README.md)
+6. [restsend Rust 通信栈与硬件音频桥研究（2026-05-16）](VOXFLAME_RESTSEND_RUST_STACK_AND_HARDWARE_AUDIO_BRIDGE_RESEARCH_2026-05-16.md)
+7. [主项目 README](../README.md)
+8. [前端 README](../frontend/README.md)
 
 **要判断 agent / memory / tooling 边界**
 1. [Agent, Memory And Tooling Reference（2026-03-26）](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)

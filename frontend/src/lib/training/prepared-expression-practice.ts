@@ -26,7 +26,7 @@ export interface PreparedExpressionPracticeSummary {
   nextFocus: string[]
 }
 
-const DEFAULT_PREPARED_EXPRESSION_CATEGORY: MandarinTrainingCategory = '发音与朗读'
+const DEFAULT_PREPARED_EXPRESSION_CATEGORY: MandarinTrainingCategory = '现代文章朗读'
 const TARGET_SEGMENT_MIN_LENGTH = 5
 const TARGET_SEGMENT_MAX_LENGTH = 15
 const CLAUSE_BREAK_PUNCTUATION = new Set(['，', '、', '：', ':', '；', ';', '。', '！', '？', '!', '?'])

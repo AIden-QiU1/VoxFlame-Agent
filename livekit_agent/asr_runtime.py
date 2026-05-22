@@ -9,7 +9,7 @@ import re
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -27,6 +27,7 @@ AudioTelemetryHandler = Callable[[float, float, bool, bool, str], Awaitable[None
 TRANSCRIPT_EDGE_PUNCTUATION_PATTERN = re.compile(
     r"^[\s，。！？!?；;：:、,.…~～-]+|[\s，。！？!?；;：:、,.…~～-]+$"
 )
+FILLER_TRANSCRIPT_PATTERN = re.compile(r"^(嗯+|呃+|啊+|哦+|喔+|额+|唔+|哼+)$")
 MANUAL_STOP_SHORT_TRANSCRIPT_GRACE_SECONDS = 2.0
 SHORT_UTTERANCE_EXTRA_FINALIZE_GRACE_SECONDS = 1.1
 
@@ -130,6 +131,14 @@ def is_repetitive_transcript_noise(text: str) -> bool:
 
     top_count = max(counts.values()) if counts else 0
     return top_count / len(compact) >= 0.65 and len(counts) <= 4
+
+
+def is_filler_transcript_noise(text: str) -> bool:
+    compact = compact_semantic_transcript(text)
+    if not compact:
+        return True
+
+    return bool(FILLER_TRANSCRIPT_PATTERN.fullmatch(compact))
 
 
 def build_livekit_audio_apm_options(config: LiveKitAgentConfig) -> dict[str, bool]:
@@ -345,6 +354,9 @@ class LiveKitASRRuntime:
     _client_capture_tracking_enabled: bool = False
     _client_capture_id: int = 0
     _last_committed_client_capture_id: int | None = None
+    _client_capture_external_id: str | None = None
+    _last_committed_client_capture_external_id: str | None = None
+    _pending_final_transcript_client_capture_ids: list[str] = field(default_factory=list)
     _suppress_vad_auto_finalize_until: float = 0.0
     _short_utterance_capture_expected: bool = False
 
@@ -395,6 +407,7 @@ class LiveKitASRRuntime:
         auto_finalize: bool,
         *,
         short_utterance_expected: bool = False,
+        client_capture_id: str | None = None,
     ) -> None:
         normalized_state = state.strip()
         if not normalized_state:
@@ -405,6 +418,11 @@ class LiveKitASRRuntime:
             self._client_capture_tracking_enabled = True
             self._client_capture_id += 1
             self._last_committed_client_capture_id = None
+            self._client_capture_external_id = (
+                client_capture_id.strip()
+                if isinstance(client_capture_id, str) and client_capture_id.strip()
+                else str(self._client_capture_id)
+            )
             self._suppress_vad_auto_finalize_until = 0.0
             self._short_utterance_capture_expected = short_utterance_expected
             return
@@ -429,6 +447,13 @@ class LiveKitASRRuntime:
             and self._last_committed_client_capture_id == self._client_capture_id
         )
 
+    def _mark_client_capture_committed(self, queue_final_transcript: bool = True) -> None:
+        if self._client_capture_tracking_enabled and self._client_capture_id > 0:
+            self._last_committed_client_capture_id = self._client_capture_id
+            self._last_committed_client_capture_external_id = self._client_capture_external_id
+            if queue_final_transcript and self._client_capture_external_id:
+                self._pending_final_transcript_client_capture_ids.append(self._client_capture_external_id)
+
     async def commit_audio(self, reason: str | None = None) -> None:
         if self.client is None or not self._started:
             return
@@ -441,6 +466,21 @@ class LiveKitASRRuntime:
                 reason or "unknown",
                 self._client_capture_id,
             )
+            return
+
+        if (
+            reason == "manual_stop"
+            and self._client_capture_tracking_enabled
+            and self._speech_ms_since_commit < self.config.dashscope_asr_min_commit_speech_ms
+        ):
+            logger.info(
+                "LiveKit ASR manual commit skipped because capture had no stable speech room=%s participant=%s capture_id=%s speech_ms=%s",
+                self.ctx.room_name,
+                self.ctx.participant_identity,
+                self._client_capture_id,
+                int(self._speech_ms_since_commit),
+            )
+            self._mark_client_capture_committed(queue_final_transcript=False)
             return
 
         self._ignore_short_transcripts_until = 0.0
@@ -466,8 +506,7 @@ class LiveKitASRRuntime:
         self._clipping_detected_since_commit = False
         self._clipping_reported_since_commit = False
         self._apm_remainder = b""
-        if self._client_capture_tracking_enabled and self._client_capture_id > 0:
-            self._last_committed_client_capture_id = self._client_capture_id
+        self._mark_client_capture_committed()
 
     async def stop(self) -> None:
         logger.info(
@@ -749,6 +788,20 @@ class LiveKitASRRuntime:
                     text[:80],
                 )
                 return
+            if (
+                is_filler_transcript_noise(text)
+                and not self._short_utterance_capture_expected
+                and self._speech_ms_since_commit < self.config.dashscope_asr_min_commit_speech_ms
+            ):
+                logger.info(
+                    "LiveKit ASR ignored filler interim noise room=%s participant=%s chars=%s preview=%s speech_ms=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    len(text),
+                    text[:80],
+                    round(self._speech_ms_since_commit),
+                )
+                return
 
             logger.info(
                 "LiveKit ASR interim transcript room=%s participant=%s chars=%s preview=%s",
@@ -764,6 +817,7 @@ class LiveKitASRRuntime:
                     text,
                     is_final=False,
                     source="dashscope_realtime_asr",
+                    client_capture_id=self._client_capture_external_id,
                 )
             )
             return
@@ -794,6 +848,21 @@ class LiveKitASRRuntime:
                     transcript[:80],
                 )
                 return
+            if (
+                is_filler_transcript_noise(transcript)
+                and not self._short_utterance_capture_expected
+                and self._speech_ms_since_commit < self.config.dashscope_asr_min_commit_speech_ms
+            ):
+                self._ignore_short_transcripts_until = 0.0
+                logger.info(
+                    "LiveKit ASR ignored filler transcript noise room=%s participant=%s chars=%s transcript=%s speech_ms=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    len(transcript),
+                    transcript,
+                    round(self._speech_ms_since_commit),
+                )
+                return
 
             if ignore_short_transcript:
                 self._ignore_short_transcripts_until = 0.0
@@ -818,12 +887,20 @@ class LiveKitASRRuntime:
                 transcript,
             )
 
+            final_capture_external_id = (
+                self._pending_final_transcript_client_capture_ids.pop(0)
+                if self._pending_final_transcript_client_capture_ids
+                else self._last_committed_client_capture_external_id
+                or self._client_capture_external_id
+            )
+
             await self.publish_payload(
                 build_user_transcript_output(
                     self.ctx,
                     transcript,
                     is_final=True,
                     source="dashscope_realtime_asr",
+                    client_capture_id=final_capture_external_id,
                 )
             )
             await self.on_final_transcript(transcript)

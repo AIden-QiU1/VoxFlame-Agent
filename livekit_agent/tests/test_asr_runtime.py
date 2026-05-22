@@ -15,6 +15,7 @@ from asr_runtime import (
     build_livekit_audio_apm_options,
     frame_to_pcm_bytes,
     is_repetitive_transcript_noise,
+    is_filler_transcript_noise,
     normalized_rms_energy,
     semantic_transcript_length,
     should_enable_livekit_audio_apm,
@@ -50,10 +51,11 @@ def create_config() -> LiveKitAgentConfig:
         livekit_audio_apm_noise_suppression=True,
         livekit_audio_apm_high_pass_filter=True,
         livekit_audio_apm_auto_gain_control=False,
-        dashscope_asr_vad_threshold=0.018,
-        dashscope_asr_vad_silence_duration_ms=720,
+        dashscope_asr_vad_threshold=0.032,
+        dashscope_asr_vad_silence_duration_ms=860,
         dashscope_asr_vad_hop_size_ms=16,
-        dashscope_asr_barge_in_min_speech_ms=220,
+        dashscope_asr_barge_in_min_speech_ms=360,
+        dashscope_asr_min_commit_speech_ms=420,
         dashscope_tts_url="wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
         dashscope_tts_model="qwen3-tts-flash-realtime",
         dashscope_tts_voice="Cherry",
@@ -141,6 +143,11 @@ class TestASRRuntime(unittest.TestCase):
     def test_repetitive_transcript_noise_detects_single_character_run(self) -> None:
         self.assertTrue(is_repetitive_transcript_noise("我我我我我我我我我我我我我我我我我我"))
         self.assertFalse(is_repetitive_transcript_noise("我想我想喝水。"))
+
+    def test_filler_transcript_noise_detects_short_nonsemantic_fillers(self) -> None:
+        self.assertTrue(is_filler_transcript_noise("嗯。"))
+        self.assertTrue(is_filler_transcript_noise("呃呃"))
+        self.assertFalse(is_filler_transcript_noise("六级。"))
 
     def test_vad_detector_emits_start_then_stop_after_silence_window(self) -> None:
         detector = RMSVoiceActivityDetector(threshold=0.01, silence_duration_ms=20)
@@ -341,11 +348,39 @@ class TestASRRuntime(unittest.TestCase):
         runtime.client = FakeASRClient()
         runtime._started = True
         runtime.note_client_recording_event("speech_started", False)
+        runtime._speech_ms_since_commit = 520
 
         asyncio.run(runtime.commit_audio("manual_stop"))
         asyncio.run(runtime.commit_audio("vad_auto_finalize"))
 
         self.assertEqual(runtime.client.commit_calls, 1)
+
+    def test_commit_audio_skips_manual_stop_when_capture_has_no_stable_speech(self) -> None:
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type("Ctx", (), {"room_name": "room", "participant_identity": "user"})(),
+            participant=None,
+            publish_payload=None,
+            on_final_transcript=None,
+        )
+        runtime.client = FakeASRClient()
+        runtime._started = True
+        runtime.note_client_recording_event(
+            "speech_started",
+            False,
+            client_capture_id="capture-empty",
+        )
+        runtime._speech_ms_since_commit = 0
+
+        asyncio.run(runtime.commit_audio("manual_stop"))
+
+        self.assertEqual(runtime.client.commit_calls, 0)
+        self.assertEqual(runtime._last_committed_client_capture_id, runtime._client_capture_id)
+        self.assertEqual(
+            runtime._last_committed_client_capture_external_id,
+            "capture-empty",
+        )
+        self.assertEqual(runtime._pending_final_transcript_client_capture_ids, [])
 
     def test_commit_audio_allows_new_client_capture_after_restart(self) -> None:
         runtime = LiveKitASRRuntime(
@@ -358,12 +393,70 @@ class TestASRRuntime(unittest.TestCase):
         runtime.client = FakeASRClient()
         runtime._started = True
         runtime.note_client_recording_event("speech_started", False)
+        runtime._speech_ms_since_commit = 520
         asyncio.run(runtime.commit_audio("manual_stop"))
 
         runtime.note_client_recording_event("speech_started", False)
+        runtime._speech_ms_since_commit = 520
         asyncio.run(runtime.commit_audio("manual_stop"))
 
         self.assertEqual(runtime.client.commit_calls, 2)
+
+    def test_final_transcript_uses_fifo_capture_binding_across_back_to_back_speech(self) -> None:
+        published_payloads: list[dict[str, object]] = []
+        final_transcripts: list[str] = []
+
+        async def publish_payload(payload: dict[str, object]) -> None:
+            published_payloads.append(payload)
+
+        async def on_final_transcript(text: str) -> None:
+            final_transcripts.append(text)
+
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type(
+                "Ctx",
+                (),
+                {"room_name": "room", "participant_identity": "user", "request_id": "req-1"},
+            )(),
+            participant=None,
+            publish_payload=publish_payload,
+            on_final_transcript=on_final_transcript,
+        )
+        runtime.client = FakeASRClient()
+        runtime._started = True
+
+        runtime.note_client_recording_event("speech_started", False, client_capture_id="capture-1")
+        runtime._speech_ms_since_commit = 520
+        asyncio.run(runtime.commit_audio("manual_stop"))
+
+        runtime.note_client_recording_event("speech_started", False, client_capture_id="capture-2")
+        runtime._speech_ms_since_commit = 520
+        asyncio.run(runtime.commit_audio("manual_stop"))
+
+        asyncio.run(
+            runtime._handle_server_event(
+                {
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "transcript": "第一句",
+                }
+            )
+        )
+
+        asyncio.run(
+            runtime._handle_server_event(
+                {
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "transcript": "第二句",
+                }
+            )
+        )
+
+        self.assertEqual(final_transcripts, ["第一句", "第二句"])
+        self.assertEqual(
+            [payload["client_capture_id"] for payload in published_payloads],
+            ["capture-1", "capture-2"],
+        )
 
     def test_manual_stop_does_not_enable_short_tail_ignore_for_short_utterance_capture(self) -> None:
         runtime = LiveKitASRRuntime(
@@ -380,6 +473,7 @@ class TestASRRuntime(unittest.TestCase):
             False,
             short_utterance_expected=True,
         )
+        runtime._speech_ms_since_commit = 520
 
         asyncio.run(runtime.commit_audio("manual_stop"))
 

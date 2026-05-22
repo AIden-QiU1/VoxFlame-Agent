@@ -11,7 +11,8 @@
     "reconcile:artifacts": "ts-node scripts/reconcile_upload_artifacts.ts",
     "export:audio-target": "ts-node scripts/export_audio_target_dataset.ts",
     "download:oss-by-account": "ts-node scripts/download_oss_by_account.ts",
-    "cleanup:prepared-expression": "ts-node scripts/cleanup_prepared_expression_data.ts"
+    "cleanup:prepared-expression": "ts-node scripts/cleanup_prepared_expression_data.ts",
+    "clear:uploaded-training-corpus": "ts-node scripts/clear_uploaded_training_corpus.ts"
   },
   "dependencies": {
     "@alicloud/pop-core": "^1.7.13",

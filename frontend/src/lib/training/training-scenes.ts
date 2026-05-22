@@ -20,7 +20,7 @@ export const TRAINING_SCENE_PROFILES: TrainingSceneProfile[] = [
     summary: '先把自我介绍、节奏说明和关键判断练稳，再去面向陌生人表达。',
     rationale: '这类场景失败成本高，先练角色表达和起手句，比纯朗读更能提升真实信心。',
     primaryCategory: '人群与角色',
-    recommendedCategories: ['人群与角色', '日常与出行', '发音与朗读'],
+    recommendedCategories: ['人群与角色', '日常与出行', '现代文章朗读'],
     coachingFocus: '先把“请先听我说完”“请直接和我沟通”这类角色句说稳。',
   },
   {

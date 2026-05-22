@@ -2,8 +2,9 @@ import type { MandarinTrainingCategory, MandarinTrainingExercise } from './types
 
 // These curated prompts are rewritten into short spoken Mandarin rather than
 // copied lists. They were shaped from official/authoritative usage patterns
-// such as 12306 priority-passenger guidance, 120 emergency call guidance,
-// public-service language norms, and common high-frequency device workflows.
+// such as 12306 priority-passenger guidance, first-aid guidance, accessibility
+// service requirements, public-service language norms, and assistive-device
+// workflows.
 const MIN_TEXT_LENGTH = 6
 const MAX_TEXT_LENGTH = 16
 
@@ -133,6 +134,22 @@ const DAILY_MOBILITY_TEXTS = [
   '我想坐一会儿',
   '先帮我看看地址',
   '请把地址发我',
+  '请带我去服务台',
+  '我要申请重点旅客',
+  '请帮我预约服务',
+  '请带我去绿色通道',
+  '请帮我确认检票口',
+  '请协助我上下车',
+  '我需要站内轮椅',
+  '请帮我联系车站人员',
+  '请带我到低位服务台',
+  '请带我去无障碍窗口',
+  '请告诉我换乘路线',
+  '请陪我到候车区',
+  '请帮我找优先座',
+  '请帮我找无障碍入口',
+  '请帮我预约接送',
+  '请提醒我提前进站',
 ]
 
 const MEDICAL_HELP_TEXTS = [
@@ -203,6 +220,24 @@ const MEDICAL_HELP_TEXTS = [
   '我需要重复一次',
   '疼痛已经减轻了',
   '疼痛还在加重',
+  '我突然说话不清',
+  '我一侧手脚无力',
+  '我有点意识模糊',
+  '请马上拨打一二零',
+  '请帮我找急救人员',
+  '请判断我呼吸情况',
+  '请告诉医生过敏史',
+  '请把病历带给医生',
+  '请先确认用药时间',
+  '请帮我记录血压',
+  '请问药怎么服用',
+  '请问饭前吃吗',
+  '请问能不能吞咽',
+  '我需要康复评估',
+  '请帮我约康复科',
+  '请给我无障碍协助',
+  '请帮我联系社工',
+  '请写清复诊时间',
 ]
 
 const PEOPLE_AND_ROLES_TEXTS = [
@@ -295,6 +330,24 @@ const PEOPLE_AND_ROLES_TEXTS = [
   '请帮我联系老师',
   '请帮我联系前台',
   '请帮我联系护士',
+  '志愿者请帮我引导',
+  '站务员请帮我进站',
+  '乘务员请帮我换乘',
+  '司机请等我坐稳',
+  '护工请帮我转移',
+  '康复师请看我的动作',
+  '物理治疗师请示范',
+  '语言治疗师请慢说',
+  '老师请给我字幕',
+  '同学请发文字给我',
+  '社工请帮我登记',
+  '窗口人员请等等我',
+  '前台请给我手写板',
+  '医生请写给我看',
+  '护士请确认姓名',
+  '服务人员请引导我',
+  '快递员请上门取件',
+  '家属请带好证件',
 ]
 
 const DEVICE_AND_NUMBERS_TEXTS = [
@@ -458,6 +511,24 @@ const DEVICE_AND_NUMBERS_TEXTS = [
   '收到码后告诉我',
   '请读出验证码',
   '请读出手机号',
+  '请打开实时语音',
+  '请打开实时字幕',
+  '请打开朗读内容',
+  '请打开语音控制',
+  '请把文字读出来',
+  '请把声音调慢点',
+  '请切换到扬声器',
+  '请连接我的助听器',
+  '请打开字幕窗口',
+  '请显示大号文字',
+  '请打开辅助触控',
+  '请打开无障碍设置',
+  '请关闭来电静音',
+  '请把通话开免提',
+  '请保存我的常用句',
+  '请播放这句语音',
+  '请重新播放一遍',
+  '请分享我的位置',
 ]
 
 export const CURATED_TOPIC_EXERCISES: Partial<Record<

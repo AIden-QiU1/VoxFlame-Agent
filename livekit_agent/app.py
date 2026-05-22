@@ -426,19 +426,21 @@ async def entrypoint(ctx: JobContext) -> None:
 
         client_speech_activity = extract_client_speech_activity(message)
         if client_speech_activity is not None:
-            state, auto_finalize, short_utterance_expected = client_speech_activity
+            state, auto_finalize, short_utterance_expected, client_capture_id = client_speech_activity
             asr_runtime.note_client_recording_event(
                 state,
                 auto_finalize,
                 short_utterance_expected=short_utterance_expected,
+                client_capture_id=client_capture_id,
             )
             logger.info(
-                "LiveKit client speech activity room=%s participant=%s state=%s auto_finalize=%s short_utterance_expected=%s",
+                "LiveKit client speech activity room=%s participant=%s state=%s auto_finalize=%s short_utterance_expected=%s client_capture_id=%s",
                 session_context.room_name,
                 session_context.participant_identity,
                 state,
                 auto_finalize,
                 short_utterance_expected,
+                client_capture_id,
             )
             return
 

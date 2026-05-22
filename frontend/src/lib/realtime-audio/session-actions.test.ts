@@ -106,14 +106,19 @@ test('session-actions clears conversation state and latest transcript refs toget
       },
     ],
   })
-  const latestTranscriptRef = { current: '稳定转写' }
+  const latestTranscriptRef = {
+    current: {
+      text: '稳定转写',
+      clientCaptureId: null,
+    },
+  }
 
   clearRtcMessagesAction(latestTranscriptRef, harness.setState)
 
   assert.equal(harness.getState().messages.length, 0)
   assert.equal(harness.getState().currentASRText, '')
   assert.equal(harness.getState().latestUserTranscript, '')
-  assert.equal(latestTranscriptRef.current, '')
+  assert.deepEqual(latestTranscriptRef.current, { text: '', clientCaptureId: null })
 })
 
 test('session-actions prefers the live microphone media stream and falls back to preflight stream', () => {
