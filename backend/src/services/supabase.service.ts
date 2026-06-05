@@ -145,7 +145,7 @@ export interface ProfileBundleItem {
   id: string;
   title: string;
   content: string;
-  source: 'user_profile' | 'hotword_profile' | 'growth_profile' | 'memory' | 'session';
+  source: 'user_profile' | 'hotword_profile' | 'memory' | 'session';
   emphasis: 'high' | 'medium' | 'low';
   tags?: string[];
   updated_at?: string;
@@ -202,13 +202,13 @@ export interface WorkspaceMemorySnapshot {
     }>;
   };
   object_zones: Array<{
-    id: 'custom_materials' | 'scene_and_hotword_templates' | 'user_profile' | 'training_summaries';
+    id: 'custom_materials' | 'scene_and_hotword_templates' | 'user_profile';
     title: string;
     description: string;
     empty_state: string;
     items: Array<{
       id: string;
-      type: 'custom_material' | 'scene_template' | 'user_profile' | 'training_summary';
+      type: 'custom_material' | 'scene_template' | 'user_profile';
       title: string;
       summary: string;
       tags: string[];
@@ -221,14 +221,14 @@ export interface WorkspaceMemorySnapshot {
     recommended_mode: 'urgent' | 'long_form';
     reason: string;
     sections: Array<{
-      id: 'always_on' | 'scene_pack' | 'custom_materials' | 'training_summary';
+      id: 'always_on' | 'scene_pack' | 'custom_materials';
       title: string;
       description: string;
       items: Array<{
         id: string;
         title: string;
         summary: string;
-        source_type: 'custom_material' | 'scene_template' | 'user_profile' | 'training_summary';
+        source_type: 'custom_material' | 'scene_template' | 'user_profile';
         required: boolean;
         default_selected?: boolean;
         document_content?: string | null;
@@ -484,19 +484,6 @@ function readStringList(value: unknown): string[] {
   return value
     .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     .map((item) => item.trim());
-}
-
-function readFirstLabel(values: unknown): string | null {
-  if (!Array.isArray(values) || values.length === 0) {
-    return null;
-  }
-
-  const first = values[0];
-  if (!isRecord(first)) {
-    return null;
-  }
-
-  return readString(first, 'label');
 }
 
 function sortPhrasesForSuggestions(phrases: QuickPhrase[]): QuickPhrase[] {
@@ -1529,20 +1516,6 @@ export class SupabaseService {
     return normalizeUserProfileMemory(preferences?.user_profile_memory);
   }
 
-  private getPreferredTrainingSummary(
-    asset: PreparedExpressionAsset | null | undefined,
-  ) {
-    return asset?.training_reports?.weeklySummary ?? asset?.training_reports?.dailySummary ?? null;
-  }
-
-  private getPreparedExpressionTrainingSummary(
-    preparedExpression: WorkspaceMemorySnapshot['prepared_expression'] | null | undefined,
-  ) {
-    return preparedExpression?.training_reports?.weekly_summary
-      ?? preparedExpression?.training_reports?.daily_summary
-      ?? null;
-  }
-
   private async getTrainingResultSamples(
     userId: string,
   ): Promise<PreparedExpressionTrainingSample[]> {
@@ -1782,23 +1755,19 @@ export class SupabaseService {
       preferences?.communication_preferences,
     );
     const userProfileMemory = this.readUserProfileMemoryFromProfile(userProfile);
-    const growthProfile = snapshot.growth_profile;
-
     const preparedExpressionLibrary = this.readPreparedExpressionLibraryFromProfile(userProfile);
     const customMaterialsItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] =
       preparedExpressionLibrary.assets.map((asset) => {
-        const preferredTrainingSummary = this.getPreferredTrainingSummary(asset);
         const isActive = preparedExpressionLibrary.active_asset_id === asset.draft.id;
         return {
           id: asset.draft.id,
           type: 'custom_material' as const,
           title: asset.draft.title,
-          summary: preferredTrainingSummary?.summary ?? asset.structured.summary,
+          summary: asset.structured.summary,
           tags: dedupeStrings(
             [
               isActive ? '当前加载' : null,
               asset.draft.scene,
-              preferredTrainingSummary?.nextFocus[0],
               asset.structured.highRiskPhrases[0],
             ].filter((value): value is string => typeof value === 'string' && value.length > 0),
             4,
@@ -1836,9 +1805,7 @@ export class SupabaseService {
       userProfileMemory.document ||
       userProfileMemory.summary ||
       userProfileMemory.common_scenarios?.length ||
-      userProfileMemory.risky_terms?.length ||
-      growthProfile.nextStep ||
-      growthProfile.frequentFocus[0]?.label
+      userProfileMemory.risky_terms?.length
     ) {
       userProfileItems.push({
         id: 'profile-speaking-pattern',
@@ -1847,15 +1814,11 @@ export class SupabaseService {
         summary:
           summarizeLongText(userProfileMemory.document) ||
           userProfileMemory.summary ||
-          growthProfile.nextStep ||
-          `当前最值得继续盯住的是：${growthProfile.frequentFocus[0]?.label ?? '稳定表达'}`,
+          '当前会围绕用户自己确认过的稳定沟通画像继续装配上下文。',
         tags: dedupeStrings(
           [
             ...(userProfileMemory.common_scenarios ?? []).slice(0, 2),
             ...(userProfileMemory.risky_terms ?? []).slice(0, 2),
-            growthProfile.frequentFocus[0]?.label,
-            growthProfile.frequentSpeechPatterns[0]?.label,
-            growthProfile.frequentConfusions[0]?.label,
           ].filter((value): value is string => typeof value === 'string' && value.length > 0),
           4,
         ),
@@ -1892,26 +1855,6 @@ export class SupabaseService {
       });
     }
 
-    const trainingSummaryItems: WorkspaceMemorySnapshot['object_zones'][number]['items'] = [];
-    const preferredTrainingSummary = this.getPreparedExpressionTrainingSummary(preparedExpression);
-    if (preparedExpression && preferredTrainingSummary) {
-      trainingSummaryItems.push({
-        id: `training-summary-${preparedExpression.id}`,
-        type: 'training_summary',
-        title: '当前训练总结',
-        summary: preferredTrainingSummary.summary,
-        tags: dedupeStrings(
-          [
-            ...preferredTrainingSummary.next_focus.slice(0, 2),
-            ...preferredTrainingSummary.stable_wins.slice(0, 2),
-          ],
-          4,
-        ),
-        load_behavior: 'derived',
-        editable: false,
-        updated_at: preferredTrainingSummary.generated_at,
-      });
-    }
     return [
       {
         id: 'custom_materials',
@@ -1933,13 +1876,6 @@ export class SupabaseService {
         description: '常驻上下文的小而稳的用户画像与沟通偏好。',
         empty_state: '这里还没有稳定画像，继续训练后会逐步形成。',
         items: userProfileItems,
-      },
-      {
-        id: 'training_summaries',
-        title: '训练总结',
-        description: '系统按训练结果和会话复盘生成的精简总结。',
-        empty_state: '这里还没有训练总结，先录满一个周期再回来查看。',
-        items: trainingSummaryItems,
       },
     ];
   }
@@ -1971,9 +1907,9 @@ export class SupabaseService {
         summary:
           summarizeLongText(userProfileMemory.document) ||
           userProfileMemory.summary ||
-          snapshot.growth_profile.nextStep ||
-          snapshot.growth_profile.frequentFocus[0]?.label ||
-          '当前会围绕用户的稳定表达规律和沟通偏好继续装配上下文。',
+          communicationPreferences.opening_phrase ||
+          communicationPreferences.pace_hint ||
+          '当前会围绕用户确认过的稳定画像和沟通偏好继续装配上下文。',
         source_type: 'user_profile',
         required: true,
       },
@@ -2027,16 +1963,6 @@ export class SupabaseService {
       })),
     ]);
 
-    const trainingSummaryItems: WorkspaceMemorySnapshot['communication_loadout']['sections'][number]['items'] = dedupeLoadoutItems([
-      preparedExpression && this.getPreparedExpressionTrainingSummary(preparedExpression) ? {
-        id: `loadout-training-summary-${preparedExpression.id}`,
-        title: '当前训练总结',
-        summary: this.getPreparedExpressionTrainingSummary(preparedExpression)?.summary ?? '',
-        source_type: 'training_summary',
-        required: true,
-      } : null,
-    ]);
-
     return {
       recommended_mode: recommendedMode,
       reason:
@@ -2061,12 +1987,6 @@ export class SupabaseService {
           title: '自定义材料',
           description: '用户主动准备的稿件、提纲和本次表达材料。',
           items: customMaterialItems,
-        },
-        {
-          id: 'training_summary',
-          title: '训练总结',
-          description: '训练页沉淀出的精简总结，可作为辅助上下文加载。',
-          items: trainingSummaryItems,
         },
       ],
       updated_at: syncedAt,
@@ -2118,7 +2038,6 @@ export class SupabaseService {
     const staticItems: ProfileBundleItem[] = [];
     const dynamicItems: ProfileBundleItem[] = [];
     const relevantItems: ProfileBundleItem[] = [];
-    const growthProfile = snapshot.growth_profile;
     const nowIso = new Date().toISOString();
     const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
     const communicationPreferences = normalizeCommunicationPreferences(
@@ -2189,65 +2108,6 @@ export class SupabaseService {
       });
     }
 
-    if (growthProfile.nextStep) {
-      dynamicItems.push({
-        id: 'next-step',
-        title: '当前最值得继续做的事',
-        content: growthProfile.nextStep,
-        source: 'growth_profile',
-        emphasis: 'high',
-        updated_at: nowIso,
-      });
-    }
-
-    if (growthProfile.frequentFocus.length > 0) {
-      dynamicItems.push({
-        id: 'frequent-focus',
-        title: '近期重点',
-        content: growthProfile.frequentFocus.slice(0, 4).map((item) => item.label).join('、'),
-        source: 'growth_profile',
-        emphasis: 'medium',
-        tags: growthProfile.frequentFocus.slice(0, 4).map((item) => item.label),
-        updated_at: nowIso,
-      });
-    }
-
-    if (growthProfile.articulationTips.length > 0) {
-      dynamicItems.push({
-        id: 'articulation-tip',
-        title: '当前动作提醒',
-        content: growthProfile.articulationTips[0].label,
-        source: 'growth_profile',
-        emphasis: 'high',
-        tags: growthProfile.articulationTips.slice(0, 3).map((item) => item.label),
-        updated_at: nowIso,
-      });
-    }
-
-    if (growthProfile.frequentConfusions.length > 0) {
-      dynamicItems.push({
-        id: 'confusion-spotlight',
-        title: '当前最容易卡住的点',
-        content: growthProfile.frequentConfusions[0].label,
-        source: 'growth_profile',
-        emphasis: 'medium',
-        tags: growthProfile.frequentConfusions.slice(0, 4).map((item) => item.label),
-        updated_at: nowIso,
-      });
-    }
-
-    if (growthProfile.frequentExpressions.length > 0) {
-      dynamicItems.push({
-        id: 'frequent-expressions',
-        title: '近期常用表达',
-        content: growthProfile.frequentExpressions.slice(0, 4).map((item) => item.label).join('、'),
-        source: 'growth_profile',
-        emphasis: 'medium',
-        tags: growthProfile.frequentExpressions.slice(0, 4).map((item) => item.label),
-        updated_at: nowIso,
-      });
-    }
-
     snapshot.hotword_profiles.slice(0, 4).forEach((profile) => {
       relevantItems.push({
         id: `hotword-${profile.id}`,
@@ -2257,28 +2117,6 @@ export class SupabaseService {
         emphasis: 'medium',
         tags: dedupeStrings([profile.category, profile.scenario], 3),
         updated_at: new Date(profile.updatedAt).toISOString(),
-      });
-    });
-
-    growthProfile.recentTraining.slice(0, 2).forEach((memory) => {
-      const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
-      const nextStep = readString(metadata, 'next_step');
-      const pronunciationSummary =
-        readString(metadata, 'pronunciation_summary') ??
-        readString(metadata, 'last_pronunciation_summary');
-
-      relevantItems.push({
-        id: `memory-${memory.id}`,
-        title: '最近训练复盘',
-        content: nextStep || pronunciationSummary || memory.content,
-        source: 'memory',
-        emphasis: 'low',
-        tags: dedupeStrings([
-          ...readStringList(metadata?.speech_patterns),
-          ...readStringList(metadata?.pronunciation_targets),
-          ...readStringList(metadata?.articulation_tips),
-        ], 4),
-        updated_at: new Date(memory.updatedAt).toISOString(),
       });
     });
 
@@ -2293,50 +2131,18 @@ export class SupabaseService {
     snapshot: MemoryProfileSnapshot,
     syncedAt: string,
   ): SessionReviewSnapshot {
-    const latestSession = snapshot.growth_profile.recentSessions[0];
-    const latestTrainingMemory = snapshot.growth_profile.recentTraining[0];
-    const latestTrainingMetadata = isRecord(latestTrainingMemory?.metadata)
-      ? latestTrainingMemory.metadata
-      : undefined;
-    const focusSpotlight =
-      readFirstLabel(latestTrainingMetadata?.frequent_focus) ??
-      readFirstLabel(latestTrainingMetadata?.speech_patterns) ??
-      snapshot.growth_profile.frequentFocus[0]?.label ??
-      snapshot.growth_profile.frequentSpeechPatterns[0]?.label ??
-      null;
-    const articulationSpotlight =
-      readFirstLabel(latestTrainingMetadata?.articulation_tips) ??
-      snapshot.growth_profile.articulationTips[0]?.label ??
-      null;
-    const recentWin =
-      snapshot.growth_profile.stats.improvementDirection === 'improving'
-        ? `最近 7 次训练清晰度已经回升到 ${formatPercent(snapshot.growth_profile.stats.rollingClarityAverage)}`
-        : articulationSpotlight ??
-          snapshot.growth_profile.frequentExpressions[0]?.label ??
-          null;
-    const trainingSummary =
-      readString(latestTrainingMetadata, 'last_pronunciation_summary') ??
-      readString(latestTrainingMetadata, 'pronunciation_summary') ??
-      latestTrainingMemory?.content ??
-      null;
-    const trainingUploads =
-      readNumber(latestTrainingMetadata, 'total_training_uploads') ??
-      snapshot.growth_profile.stats.totalTrainingAttempts;
+    const latestSession = snapshot.growth_profile.recentSessions.find(
+      (session) => session.kind !== 'training',
+    );
 
     if (!latestSession) {
       return {
         session_id: null,
-        headline: trainingSummary ? '最近一次训练复盘' : '还没有稳定的会话复盘',
-        summary: trainingSummary
-          ? `${trainingSummary} 现在已经累计 ${trainingUploads} 条训练记录，近 7 次平均清晰度 ${formatPercent(snapshot.growth_profile.stats.rollingClarityAverage)}。`
-          : '先用 starter kit 和表达工具箱把第一句话说出去，系统会逐步积累你的个体表达画像。',
-        focus: dedupeStrings([
-          ...(focusSpotlight ? [focusSpotlight] : []),
-          ...snapshot.growth_profile.frequentFocus.slice(0, 3).map((item) => item.label),
-          ...snapshot.growth_profile.frequentSpeechPatterns.slice(0, 2).map((item) => item.label),
-        ], 4),
-        recent_win: recentWin,
-        next_step: snapshot.growth_profile.nextStep || null,
+        headline: '还没有稳定的沟通复盘',
+        summary: '先用沟通页完成一次真实沟通，系统会只围绕沟通场景整理下一次可复用的准备信息。',
+        focus: [],
+        recent_win: null,
+        next_step: null,
         updated_at: syncedAt,
       };
     }
@@ -2345,24 +2151,19 @@ export class SupabaseService {
       [
         ...latestSession.topFocusTags,
         ...latestSession.topSpeechPatterns,
-        ...snapshot.growth_profile.frequentFocus.slice(0, 2).map((item) => item.label),
       ],
       4,
     );
 
     return {
       session_id: latestSession.id,
-      headline:
-        latestSession.kind === 'training'
-          ? '最近一次训练复盘'
-          : '最近一次沟通复盘',
-      summary:
-        latestSession.kind === 'training' && trainingSummary
-          ? `${trainingSummary} 这次训练共 ${latestSession.turnCount} 轮，持续 ${latestSession.durationSeconds} 秒，平均清晰度 ${formatPercent(latestSession.avgClarityScore)}。`
-          : `最近一次 ${latestSession.kind} 会话共 ${latestSession.turnCount} 轮，持续 ${latestSession.durationSeconds} 秒，平均清晰度 ${formatPercent(latestSession.avgClarityScore)}。`,
+      headline: '最近一次沟通复盘',
+      summary: `最近一次 ${latestSession.kind} 会话共 ${latestSession.turnCount} 轮，持续 ${latestSession.durationSeconds} 秒，平均清晰度 ${formatPercent(latestSession.avgClarityScore)}。`,
       focus,
-      recent_win: recentWin,
-      next_step: snapshot.growth_profile.nextStep || null,
+      recent_win: latestSession.memoryCount > 0
+        ? `这次沟通沉淀了 ${latestSession.memoryCount} 条可复用信息`
+        : null,
+      next_step: focus[0] ? `下次沟通优先检查：${focus[0]}` : null,
       updated_at: syncedAt,
     };
   }
@@ -2374,11 +2175,6 @@ export class SupabaseService {
     syncedAt: string,
     preparedExpression: WorkspaceMemorySnapshot['prepared_expression'],
   ): WorkspaceMemorySnapshot['preparation'] {
-    const growthProfile = snapshot.growth_profile;
-    const latestTrainingMemory = growthProfile.recentTraining[0];
-    const latestTrainingMetadata = isRecord(latestTrainingMemory?.metadata)
-      ? latestTrainingMemory.metadata
-      : undefined;
     const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : undefined;
     const communicationPreferences = normalizeCommunicationPreferences(
       preferences?.communication_preferences,
@@ -2397,13 +2193,10 @@ export class SupabaseService {
           emergency: '这次重点是先把求助、位置和风险说清楚。',
         } satisfies Record<WorkspaceSceneId, string>)[sceneId]
       : null;
-    const preferredTrainingSummary = this.getPreparedExpressionTrainingSummary(preparedExpression);
     const immediateGoal =
-      preferredTrainingSummary?.next_focus[0] ||
       userProfileMemory.support_strategies?.[0] ||
-      growthProfile.nextStep ||
-      readString(latestTrainingMetadata, 'next_step') ||
       communicationPreferences.opening_phrase ||
+      sceneBrief ||
       null;
     const supportStrategies = dedupeStrings(
       [
@@ -2411,7 +2204,6 @@ export class SupabaseService {
         preparedExpression?.fallback_phrases[0]
           ? `保底句先准备好：${preparedExpression.fallback_phrases[0]}`
           : '',
-        ...(preferredTrainingSummary?.support_strategies ?? []),
         ...(userProfileMemory.support_strategies ?? []),
         communicationPreferences.opening_phrase
           ? `先用固定开场白把节奏稳住：${communicationPreferences.opening_phrase}`
@@ -2421,9 +2213,6 @@ export class SupabaseService {
           : '',
         communicationPreferences.repair_phrase
           ? `没听清时优先用补救句：${communicationPreferences.repair_phrase}`
-          : '',
-        growthProfile.articulationTips[0]?.label
-          ? `动作提醒：${growthProfile.articulationTips[0].label}`
           : '',
       ],
       4,
@@ -2441,24 +2230,15 @@ export class SupabaseService {
           ? `没听清时优先这样补救：${communicationPreferences.repair_phrase}`
           : '',
         ...(userProfileMemory.support_strategies ?? []),
-        growthProfile.articulationTips[0]?.label
-          ? `当前最有效的动作提醒：${growthProfile.articulationTips[0].label}`
-          : '',
       ],
       3,
     );
     const strongPhrases = dedupeStrings(
       [
         ...(preparedExpression?.fallback_phrases ?? []),
-        ...growthProfile.frequentExpressions.slice(0, 4).map((item) => item.label),
-        ...snapshot.memories
-          .filter((memory) => {
-            const metadata = isRecord(memory.metadata) ? memory.metadata : undefined;
-            return readString(metadata, 'kind') === 'training_result';
-          })
-          .slice(0, 2)
-          .map((memory) => memory.content),
-      ],
+        communicationPreferences.opening_phrase,
+        communicationPreferences.repair_phrase,
+      ].filter((value): value is string => typeof value === 'string' && value.length > 0),
       6,
     );
     const commonScenarios = dedupeStrings(
@@ -2477,20 +2257,10 @@ export class SupabaseService {
         ...selectedSceneTemplates.flatMap((template) => template.risky_terms),
         ...(preparedExpression?.high_risk_phrases ?? []),
         ...(userProfileMemory.risky_terms ?? []),
-        ...(preferredTrainingSummary?.mismatch_pairs ?? []).flatMap((pair) => [pair.target, pair.heard]),
-        ...growthProfile.frequentConfusions.slice(0, 4).map((item) => item.label),
       ],
       6,
     );
-    const pronunciationPatterns = dedupeStrings(
-      [
-        ...(preferredTrainingSummary?.pronunciation_patterns ?? []),
-        ...growthProfile.frequentFocus.slice(0, 3).map((item) => item.label),
-        ...growthProfile.frequentSpeechPatterns.slice(0, 4).map((item) => item.label),
-        ...growthProfile.articulationTips.slice(0, 2).map((item) => item.label),
-      ],
-      6,
-    );
+    const pronunciationPatterns: string[] = [];
     const hotwords = dedupeStrings(
       [
         ...selectedSceneTemplates.flatMap((template) => template.hotwords.map((entry) => entry.phrase)),
@@ -2501,11 +2271,6 @@ export class SupabaseService {
       8,
     );
     const profileSummary = (() => {
-      const focus = growthProfile.frequentFocus[0]?.label ?? growthProfile.frequentSpeechPatterns[0]?.label;
-      const confusion = userProfileMemory.risky_terms?.[0] ?? growthProfile.frequentConfusions[0]?.label;
-      const trainingVolume = growthProfile.stats.totalTrainingAttempts;
-      const clarity = growthProfile.stats.rollingClarityAverage;
-
       if (userProfileMemory.document) {
         return summarizeLongText(userProfileMemory.document, 260) ?? userProfileMemory.document;
       }
@@ -2514,20 +2279,12 @@ export class SupabaseService {
         return userProfileMemory.summary;
       }
 
-      if (focus && confusion) {
-        return `你现在已经有比较稳定的个人表达规律：常见重点会落在“${focus}”，系统最容易听偏的是“${confusion}”。${
-          trainingVolume > 0
-            ? ` 目前累计 ${trainingVolume} 条训练记录，近 7 次平均清晰度 ${formatPercent(clarity)}。`
-            : ''
-        }`;
-      }
-
       if (communicationPreferences.opening_phrase || communicationPreferences.pace_hint) {
         return '你已经开始形成自己的沟通方式：先用固定开场白稳住节奏，再告诉对方怎样配合你，这会比临场硬撑更有效。';
       }
 
       if (preparedExpression) {
-        return `你已经为“${preparedExpression.title}”建立了一层结构化准备：重点原句、关键提示和保底句会继续从训练总结里收紧。`;
+        return `你已经为“${preparedExpression.title}”建立了一层结构化准备：重点原句、关键提示和保底句会在本次沟通中优先参考。`;
       }
 
       return '这里会逐步压缩出你的个人表达画像：你最常面对什么场景、系统最容易听偏什么、什么表达和补救方式最适合你。';
@@ -2557,8 +2314,8 @@ export class SupabaseService {
       document_context_summary: preparedExpression?.summary ?? null,
       document_content: preparedExpression?.document_content ?? null,
       reference_lines: preparedExpression?.reference_lines ?? [],
-      training_pairs: preferredTrainingSummary?.mismatch_pairs ?? [],
-      next_step: userProfileMemory.support_strategies?.[0] ?? growthProfile.nextStep ?? null,
+      training_pairs: [],
+      next_step: userProfileMemory.support_strategies?.[0] ?? null,
       updated_at: syncedAt,
     };
   }
@@ -2641,10 +2398,8 @@ export class SupabaseService {
 
     const lastRehearsedAt = preparedTrainingMemories[0]?.created_at ?? null;
     const rehearsedSectionCount = sections.filter((section) => section.rehearsal_count > 0).length;
-    const preferredTrainingSummary = this.getPreferredTrainingSummary(asset);
     const nextFocus = dedupeStrings(
       [
-        ...(preferredTrainingSummary?.nextFocus ?? []),
         ...sections
           .filter((section) => section.is_priority)
           .flatMap((section) => [
@@ -2655,9 +2410,7 @@ export class SupabaseService {
       ],
       5,
     );
-    const summary = preferredTrainingSummary?.summary
-      ? preferredTrainingSummary.summary
-      : lastRehearsedAt
+    const summary = lastRehearsedAt
         ? `“${template.title}”已经练过 ${preparedTrainingMemories.length} 次，当前覆盖 ${rehearsedSectionCount}/${sections.length} 个结构段落。优先继续收口：${nextFocus[0] ?? sections[0]?.title ?? '开场段落'}。`
         : template.summary;
     const referenceLines = dedupeStrings(
@@ -2771,12 +2524,10 @@ export class SupabaseService {
             const rightTime = new Date(right.created_at ?? 0).getTime();
             return rightTime - leftTime;
           });
-        const preferredTrainingSummary = this.getPreferredTrainingSummary(asset);
-
         return {
           id: asset.draft.id,
           title: asset.draft.title,
-          summary: preferredTrainingSummary?.summary ?? asset.structured.summary,
+          summary: asset.structured.summary,
           scene: asset.draft.scene,
           source: asset.draft.source,
           updated_at: asset.draft.updated_at,
@@ -2865,16 +2616,6 @@ export class SupabaseService {
       });
     });
 
-    snapshot.growth_profile.frequentExpressions.slice(0, 4).forEach((item, index) => {
-      suggestions.push({
-        id: `expression-${item.label}-${index}`,
-        text: item.label,
-        source: 'frequent_expression',
-        category: 'frequent',
-        priority: 40 - index,
-      });
-    });
-
     const recommendedPhrases = rankExpressionKitSuggestions(
       suggestions
       .filter((item, index, array) => array.findIndex((candidate) => candidate.text === item.text) === index)
@@ -2885,8 +2626,6 @@ export class SupabaseService {
 
     const recommendedFocus = dedupeStrings(
       [
-        snapshot.growth_profile.nextStep,
-        ...snapshot.growth_profile.frequentFocus.slice(0, 3).map((item) => item.label),
         ...snapshot.hotword_profiles.slice(0, 2).map((profile) => profile.phrase),
       ].filter((value): value is string => typeof value === 'string'),
       6,

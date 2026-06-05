@@ -12,6 +12,7 @@ import {
   readPreferredMicrophoneDevice,
 } from '@/lib/audio/microphone-preferences'
 import { calculateNormalizedInputLevel } from '@/lib/audio/microphone-input-feedback'
+import { LocalPcmWavRecorder } from '@/lib/audio/local-pcm-wav-recorder'
 import { pickPreferredTrainingTranscriptCandidate } from '@/lib/training/final-transcript'
 import { useRtcAgentSession } from './useRtcAgentSession'
 
@@ -48,22 +49,6 @@ interface UseMandarinTrainingSessionOptions {
   shortUtteranceMode?: boolean
 }
 
-function pickRecorderMimeType(): string {
-  const candidates = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4',
-  ]
-
-  for (const mimeType of candidates) {
-    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mimeType)) {
-      return mimeType
-    }
-  }
-
-  return ''
-}
-
 function transcriptLength(text: string): number {
   return text.replace(/\s+/g, '').trim().length
 }
@@ -82,12 +67,10 @@ export function useMandarinTrainingSession(
   const recordingBaselineRef = useRef<LatestUserTranscriptSnapshot>(createEmptyTranscriptSnapshot())
   const activeTranscriptStateRef = useRef<PracticeTranscriptState>(createEmptyPracticeTranscriptState())
   const activeClientCaptureIdRef = useRef<string | null>(null)
-  const recorderRef = useRef<MediaRecorder | null>(null)
+  const recorderRef = useRef<LocalPcmWavRecorder | null>(null)
   const recorderTrackRef = useRef<MediaStreamTrack | null>(null)
   const recorderOwnsTrackRef = useRef(false)
-  const recordedChunksRef = useRef<Blob[]>([])
   const recordingStartedAtRef = useRef<number | null>(null)
-  const recordingSampleRateRef = useRef<number>(16000)
   const recordingQualityRef = useRef<RecordingQualityAccumulator | null>(null)
   const recordingQualityTimerRef = useRef<number | null>(null)
 
@@ -183,15 +166,11 @@ export function useMandarinTrainingSession(
     })
   }, [sendControlEvent, shortUtteranceMode])
 
-  const beginLocalRecording = useCallback(() => {
+  const beginLocalRecording = useCallback(async () => {
     const sourceStream = getMicrophoneMediaStream()
     const sourceTrack = sourceStream?.getAudioTracks()[0] ?? getMicrophoneStreamTrack()
     if (!sourceTrack) {
       return null
-    }
-
-    if (typeof MediaRecorder === 'undefined') {
-      throw new Error('当前浏览器暂不支持训练录音保存，请换到较新的浏览器再试。')
     }
 
     let recorderTrack: MediaStreamTrack = sourceTrack
@@ -206,15 +185,12 @@ export function useMandarinTrainingSession(
     }
 
     try {
-      const stream = new MediaStream([recorderTrack])
-      const mimeType = pickRecorderMimeType()
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+      const recorder = new LocalPcmWavRecorder(recorderTrack)
+      await recorder.start()
 
-      recordedChunksRef.current = []
       recorderTrackRef.current = recorderTrack
       recorderOwnsTrackRef.current = ownsTrack
       recordingStartedAtRef.current = Date.now()
-      recordingSampleRateRef.current = recorderTrack.getSettings().sampleRate || 16000
       const analyserNode = analyser
       const qualityAccumulator = createRecordingQualityAccumulator()
       recordingQualityRef.current = qualityAccumulator
@@ -229,13 +205,6 @@ export function useMandarinTrainingSession(
         }, 120)
       }
 
-      recorder.addEventListener('dataavailable', (event: BlobEvent) => {
-        if (event.data.size > 0) {
-          recordedChunksRef.current.push(event.data)
-        }
-      })
-
-      recorder.start(250)
       recorderRef.current = recorder
       return recorder
     } catch (error) {
@@ -250,7 +219,7 @@ export function useMandarinTrainingSession(
       const message =
         error instanceof Error && error.message
           ? error.message
-          : '训练录音初始化失败，请再点一次；如果还是这样，就是本地录音链路还没接稳。'
+          : '训练录音初始化失败，请再点一次；如果还是这样，就是本地 PCM 录音链路还没接稳。'
       throw new Error(message)
     }
   }, [analyser, getMicrophoneMediaStream, getMicrophoneStreamTrack])
@@ -266,9 +235,6 @@ export function useMandarinTrainingSession(
     }
 
     const finalize = async (): Promise<StopRecordingResult['recording']> => {
-      const chunks = recordedChunksRef.current
-      recordedChunksRef.current = []
-
       const track = recorderTrackRef.current
       recorderTrackRef.current = null
       const qualityMetrics = recordingQualityRef.current
@@ -279,19 +245,20 @@ export function useMandarinTrainingSession(
       recordingQualityRef.current = null
       const ownsTrack = recorderOwnsTrackRef.current
       recorderOwnsTrackRef.current = false
+      const pcmRecording = await recorder?.stop()
       if (ownsTrack) {
         track?.stop()
       }
 
-      if (!chunks.length) {
+      if (!pcmRecording) {
         return null
       }
 
-      const blob = new Blob(chunks, {
-        type: recorder?.mimeType || 'audio/webm',
-      })
       const stoppedAt = Date.now()
-      const durationMs = startedAt ? Math.max(300, stoppedAt - startedAt) : 0
+      const durationMs = Math.max(
+        pcmRecording.durationMs,
+        startedAt ? Math.max(300, stoppedAt - startedAt) : 0,
+      )
       const inputDevice = getRecordingInputDeviceMetadata(
         track,
         readPreferredMicrophoneDevice(),
@@ -307,14 +274,14 @@ export function useMandarinTrainingSession(
         startedAt: new Date(startedAt ?? stoppedAt).toISOString(),
         stoppedAt: new Date(stoppedAt).toISOString(),
         audio: {
-          blob,
-          format: recorder?.mimeType || 'audio/webm',
-          sampleRate: recordingSampleRateRef.current,
-          channelCount: 1,
+          blob: pcmRecording.blob,
+          format: 'audio/wav',
+          sampleRate: pcmRecording.sampleRate,
+          channelCount: pcmRecording.channelCount,
           durationMs,
           durationSeconds: Math.max(1, Math.round(durationMs / 1000)),
-          fileSizeBytes: blob.size,
-          captureTransport: 'rtc_dup_track',
+          fileSizeBytes: pcmRecording.fileSizeBytes,
+          captureTransport: 'local_pcm_stream',
           inputDevice,
           quality: qualityMetrics ? {
             durationMs: qualityMetrics.duration_ms,
@@ -335,20 +302,7 @@ export function useMandarinTrainingSession(
       return finalize()
     }
 
-    if (recorder.state === 'inactive') {
-      return finalize()
-    }
-
-    return new Promise((resolve) => {
-      recorder.addEventListener(
-        'stop',
-        () => {
-          void finalize().then(resolve)
-        },
-        { once: true },
-      )
-      recorder.stop()
-    })
+    return finalize()
   }, [])
 
   const readScopedFinalTranscript = useCallback((
@@ -434,7 +388,7 @@ export function useMandarinTrainingSession(
       currentASRTextRef.current = ''
       bestObservedTranscriptRef.current = ''
       await startRtcRecording({ suppressGreeting: true })
-      const recorder = beginLocalRecording()
+      const recorder = await beginLocalRecording()
 
       if (!recorder) {
         throw new Error('训练会话已连上，但录音没有真正开始。请再点一次；如果还是这样，就是代码链路还没接稳。')

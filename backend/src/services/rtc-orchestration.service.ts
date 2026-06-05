@@ -313,6 +313,7 @@ export class RtcOrchestrationService {
       apiKey: process.env.LIVEKIT_API_KEY!.trim(),
       apiSecret: process.env.LIVEKIT_API_SECRET!.trim(),
       agentName: liveKitStatus.agentName,
+      authenticatedUserId: input.authenticatedUserId,
       preparationContext,
     })
 

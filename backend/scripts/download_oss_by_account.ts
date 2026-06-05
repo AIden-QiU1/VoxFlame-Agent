@@ -11,6 +11,8 @@ interface ScriptOptions {
   dryRun: boolean
   maxObjects?: number
   prefixes: string[]
+  since?: Date
+  sinceInput?: string
 }
 
 interface AccountInfo {
@@ -66,6 +68,17 @@ function parseArgs(argv: string[]): ScriptOptions {
       if (Number.isFinite(parsed) && parsed > 0) {
         options.maxObjects = parsed
       }
+      index += 1
+      continue
+    }
+
+    if (arg === '--since' && argv[index + 1]) {
+      const parsed = new Date(argv[index + 1])
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error(`--since 不是有效时间: ${argv[index + 1]}`)
+      }
+      options.since = parsed
+      options.sinceInput = argv[index + 1]
       index += 1
       continue
     }
@@ -261,6 +274,18 @@ async function listOssObjects(
   return objects
 }
 
+function filterObjectsBySince(objects: OSS.ObjectMeta[], since: Date | undefined): OSS.ObjectMeta[] {
+  if (!since) {
+    return objects
+  }
+
+  const sinceMs = since.getTime()
+  return objects.filter((object) => {
+    const lastModifiedMs = new Date(object.lastModified).getTime()
+    return Number.isFinite(lastModifiedMs) && lastModifiedMs > sinceMs
+  })
+}
+
 async function fileSizeMatches(filePath: string, expectedSize: number): Promise<boolean> {
   try {
     const stats = await fs.stat(filePath)
@@ -289,7 +314,8 @@ async function main() {
   await fs.mkdir(options.outputDir, { recursive: true })
 
   console.log(`[download_oss_by_account] listing bucket=${bucket} region=${region}`)
-  const objects = await listOssObjects(client, options.prefixes, options.maxObjects)
+  const listedObjects = await listOssObjects(client, options.prefixes, options.maxObjects)
+  const objects = filterObjectsBySince(listedObjects, options.since)
 
   const accountSummaries = new Map<string, AccountSummary>()
   const records: ObjectDownloadRecord[] = []
@@ -344,6 +370,9 @@ async function main() {
     outputDir: options.outputDir,
     dryRun: options.dryRun,
     prefixes: options.prefixes,
+    since: options.since?.toISOString() ?? null,
+    sinceInput: options.sinceInput ?? null,
+    listedObjects: listedObjects.length,
     totalObjects: objects.length,
     totalBytes: objects.reduce((sum, object) => sum + object.size, 0),
     accounts: summaries,
@@ -358,7 +387,7 @@ async function main() {
     )
   }
 
-  console.log(`[download_oss_by_account] objects=${objects.length} bytes=${formatBytes(inventory.totalBytes)} outputDir=${options.outputDir} dryRun=${options.dryRun}`)
+  console.log(`[download_oss_by_account] objects=${objects.length} listed=${listedObjects.length} bytes=${formatBytes(inventory.totalBytes)} outputDir=${options.outputDir} dryRun=${options.dryRun}`)
 
   for (const summary of summaries) {
     console.log(

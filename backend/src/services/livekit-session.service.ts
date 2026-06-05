@@ -12,6 +12,7 @@ export interface LiveKitSessionInput {
   requestId: string
   roomName: string
   userUid: number
+  authenticatedUserId?: string | null
   userDisplayName?: string | null
   timeoutSeconds: number
   intent: RtcResolvedSessionIntent
@@ -70,6 +71,9 @@ export class LiveKitSessionService {
       input.userDisplayName?.trim() || `voxflame-user-${input.userUid}`
     const participantMetadata = JSON.stringify({
       request_id: input.requestId,
+      ...(input.authenticatedUserId
+        ? { authenticated_user_id: input.authenticatedUserId }
+        : {}),
       session_intent: {
         surface: input.intent.surface,
         mode: input.intent.mode,
@@ -164,6 +168,9 @@ export class LiveKitSessionService {
       'vox.strategy': input.intent.sessionStrategy,
       ...(input.intent.scene ? { 'vox.scene': input.intent.scene } : {}),
       'vox.request_id': input.requestId,
+      ...(input.authenticatedUserId
+        ? { 'vox.authenticated_user_id': input.authenticatedUserId }
+        : {}),
     }
   }
 
@@ -179,6 +186,9 @@ export class LiveKitSessionService {
       agentName,
       metadata: JSON.stringify({
         request_id: input.requestId,
+        ...(input.authenticatedUserId
+          ? { authenticated_user_id: input.authenticatedUserId }
+          : {}),
         participant_identity: this.buildParticipantIdentity(
           input.userUid,
           input.requestId,

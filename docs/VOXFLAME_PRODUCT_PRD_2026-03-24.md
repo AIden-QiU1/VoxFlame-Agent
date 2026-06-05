@@ -1,37 +1,26 @@
-# VoxFlame Product And Expansion Plan（上线后规划版，2026-04-23）
+# VoxFlame Product PRD（当前代码对齐版，2026-05-26）
 
-> 前提：当前 Web 主产品已具备上线基线。
+> 本文只保留当前产品定义、代码现状判断和下一步执行计划。
 >
-> 这份主文档只回答 6 件事：
-> 1. 当前已固定的产品基线
-> 2. 练习工作台的核心用户场景
-> 3. App / mobile workbench 怎么接
-> 4. 硬件怎么接
-> 5. 自定义语音 agent 框架怎么演进
-> 6. 记忆架构怎么长期收口
+> 已完成的迁移、上线前 blocker、训练页拆层、音频设置、移动端 skeleton、训练语料整理等历史任务，不再放在本文当作未来计划。最近 3 天流水状态仍以 [../.tasks/current.md](../.tasks/current.md) 为准。
 
 ## 1. 产品定义
 
 VoxFlame 不是“纠正用户声音”的产品，而是“帮助系统更准确理解构音障碍用户意图”的沟通工作台。
 
-当前主文档的重点不再是“上线前还差什么”，而是上线后 1 个核心练习场景和 4 条长期主线。
+长期留存的价值不应来自固定句库本身，而应来自三件事：
 
-核心练习场景：
+1. **不同场景下更高效沟通**：陌生人、医生、家人、工作对象都能更快理解用户当前真正想表达的事。
+2. **稳定住内心的东西**：用户在高压场景里不必从空白开始，可以用准备材料、补救句、展示界面和外放来守住表达自主权。
+3. **能感受到进步**：训练页只记录可复查的训练表现和系统识别代理指标，不把波动包装成医学疗效。
 
-1. `脑卒中后持续说话练习`
+当前第一优先级仍是沟通成功率；训练和记忆都服务于沟通，而不是反过来让用户为了系统数据结构而练。
 
-长期扩展主线：
+## 2. 当前代码事实
 
-1. `App / mobile workbench`
-2. `硬件接入`
-3. `自定义语音 agent 框架`
-4. `记忆架构`
+### 已经稳定成立
 
-## 2. 当前已固定的产品基线
-
-默认成立，不再作为下一阶段主争论点：
-
-1. 现役唯一主链：
+1. 现役唯一主链已经收口：
 
 ```text
 Frontend LiveKit RTC/Data
@@ -41,285 +30,295 @@ Frontend LiveKit RTC/Data
   -> ASR / TTS / correction provider adapters
 ```
 
-2. 当前正式产品闭环：
-   - 沟通工作台
-   - 练习工作台
-   - 沟通档案 / workspace
-3. `workspace snapshot` 是 durable owner，`LiveKit` 只承接 session-local runtime。
-4. 训练数据最小 contract 是 `audio + target_text + optional labels`。
-5. `dataset != memory` 继续是硬边界。
-6. PWA 是正式产品面之一，但不等于未来原生 App。
-7. 下一阶段默认是稳态扩展，不再重开第二套主链或第二套 demo。
+2. Web 首页已经按 `沟通 / 训练 / 记忆` 三个 surface 组织。
+3. 沟通页已经是主链入口：
+   - `frontend/src/components/chat/ChatInterface.tsx`
+   - 支持 LiveKit 连接、语音输入、文本输入、字幕辅助、表达工具箱、场景 starter kit、workspace loadout 和麦克风输入反馈。
+4. 训练页已经拆成两层：
+   - `/contribute`：主题选择、今日 / 7 天训练总结、匿名榜单。
+   - `/contribute/topic/[topicId]`：单主题录音训练、评估筛查、自定义材料切句训练、自动上传与撤回。
+5. 记忆页已经不是单文档壳子：
+   - 支持用户画像、场景 / 热词模板、多份自定义材料库、当前 active material、材料摘要和编辑删除。
+6. Web 音频设置已经落地：
+   - `/settings/audio` 支持麦克风授权、设备列表、首选麦克风保存和现场电平测试。
+7. Mobile Workbench skeleton 已经存在：
+   - `apps/mobile-workbench` 已有 `communication / practice / memory / device` 四个 surface、登录态、workspace snapshot 读取、native recorder queue 和 RTC session intent 雏形。
+8. `dataset != memory` 仍是硬边界：
+   - 训练样本上传进入 dataset / review / export 路线。
+   - workspace snapshot 是 durable owner。
+   - LiveKit 只承接 session-local runtime。
 
-## 3. 这份文档的职责
+### 仍然不成立
 
-负责：
+1. **confirmed output 层已有本机 v0，但闭环还不完整**。当前沟通页已经能把同一个“沟通转写 agent”的结果稳定收成确认输出缓冲区：
+   - 给对方看：大字展示、面对面反转、确认后展示。
+   - 文本发声：浏览器本机朗读，后续再接硬件扬声器。
+   - 听写复制：确认文本复制、粘贴到第三方。
+   - 仍缺：保存为短语 / 准备材料的显式闭环、第三方接入状态流、硬件接口选型。
+3. **训练页还不是专家协作系统**。现在只有病因标签、严重度粗分、20 词筛查、通用句库和自定义材料练习；还没有治疗师配置、专家复核、病因机制化训练协议或报告审核闭环。
+4. **listener-facing 呈现层已有本机 v0，但还没进入真实硬件链路**。大字展示、反转、本机朗读、复制已补齐；硬件外放先等接口选型，不做伪接入。
+5. **固定句库仍然偏重**。表达工具箱和 starter kit 已有价值，但下一步要把它从“句库”升级为“场景沟通协议”：先表达、被确认、补救、外放、保存有效表达。
 
-1. 定义当前产品边界。
-2. 定义 4 条长期扩展主线。
-3. 给后续 owner 和贡献者提供统一锚点。
+## 3. 产品结构重新收口
 
-不负责：
+### 沟通页
 
-1. 维护上线前 blocker 清单。
-2. 记录最近 3 天开发状态。
-3. 代替 `.tasks/current.md` 管短期优先级。
-4. 代替 runtime / memory 深参考承接历史迁移细节。
+沟通页是主产品，也是后续硬件连接页面。
 
-## 4. 练习工作台核心场景：脑卒中后持续说话练习
-
-目标用户场景：
-
-脑卒中后的构音障碍 / 失语相关用户，常常需要长期、重复、低压力地练习开口。VoxFlame 的练习工作台不应把这件事做成一次性测评，也不应把用户的声音当作需要被“纠正”的对象。产品目标是帮助用户每天持续练习真实句子，并让系统越来越能看懂这些训练信号。
-
-当前产品口径：
-
-1. 每日固定小目标：`每天先练 20 句`。
-2. 训练页只展示清晰、低压力的行动目标，而不是复杂计划清单。
-3. 每日总结回答“今天练习里最明显的规律性目标句 / 识别句差异是什么”，不把总结写成只针对一两个字或单个词的纠错。
-4. 7 天总结回答“最近一周哪些规律性差异稳定存在，哪些表达正在变稳”。
-5. 匿名榜单只展示名次和录音条数，不暴露邮箱、用户名或 user id。
-
-后续进步评估必须补齐的能力：
-
-1. 按 `target_text / prompt_fingerprint / exercise_category` 对训练样本分组。
-2. 对同一句或同类句子比较 `first_attempt / latest_attempt / best_attempt`。
-3. 评估“系统识别代理指标”的变化，例如：
-   - target 与 recognized 的字符匹配度是否提高
-   - repeated mismatch 是否减少
-   - confidence / alignment / coverage 是否更稳定
-   - 同一句练习次数是否足够支持趋势判断
-4. 每日总结可以引用“今天相对上一次同句练习更稳的一点”。
-5. 7 天总结可以引用“一周内稳定改善的句子 / 音节 / 类别”和“仍然反复出现的错配”。
-
-必须守住的边界：
-
-1. 只能说“训练表现 / 系统识别代理指标出现改善”，不能说“中风康复程度改善”。
-2. 不能替代医生、言语治疗师或正式康复评估。
-3. 不能把单条录音或单次 ASR 结果写成长期医学结论。
-4. 不能因为用户表现波动就给出负面人格化评价。
-5. 用户个人身份不进入公开榜单；榜单只做匿名激励和整体活跃度反馈。
-
-建议的后续实现顺序：
-
-1. 在 backend summary 层新增 progress feature builder，先结构化输出同句 / 同类练习趋势。
-2. 将 `daily_summary` prompt 改成“今日差异 + 一个明确进步点”。
-3. 将 `weekly_summary` prompt 改成“7 天稳定规律 + 改善趋势 + 仍需关注的错配”。
-4. 给进步评估加离线 fixture，验证同一句多次练习时输出稳定。
-5. 在 UI 中保持简洁：先显示 `每天先练 20 句`，进步点只作为总结的一句话出现。
-
-## 5. App / Mobile Workbench 规划
-
-目标：
-
-1. 成为高频日常沟通、练习、准备、补传和设备管理的完整移动端工作台。
-2. 更稳定的原生录音、权限、蓝牙和系统入口。
-3. 更低摩擦的一键开口、quick talk 和准备材料直达。
-4. 继续复用 Web/PWA 已经跑通的 backend contract，不另造第二套事实源。
-
-接入时必须复用现役 contract：
-
-1. `workspace snapshot`
-2. `recording envelope`
-3. `upload receipt`
-4. `preparation_context_update`
-5. `voice_contributions metadata`
-6. `RTC session orchestration`
-
-不应该做的事：
-
-1. 再长第二套 durable owner。
-2. 再长第二套训练样本 schema。
-3. 绕开 backend 与 runtime 自己形成私有主链。
-
-建议分层：
-
-1. `PWA`
-   - 安装、轻离线、录音补传、低摩擦入口
-2. `mobile workbench`
-   - 沟通、练习、记忆与准备、设备与同步四个一级 surface
-   - 原生录音、LiveKit mobile、通知、设备权限、后台补传和硬件桥接
-3. `desktop companion`
-   - 固定工位、外接麦克风、外接扬声器、设备桥接
-
-第一阶段最值得做：
-
-1. 一键开口
-2. 最近准备材料直达
-3. 紧急求助模式
-4. 原生 recorder queue 与后台补传
-5. 登录态和 `workspace snapshot` 轻同步
-
-当前 App / Mobile Workbench 的技术路线、官方约束和阶段计划以 [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md) 为准。默认主线改为 `Expo / React Native + LiveKit React Native`；`Capacitor` 仅作为 WebView 原型或过渡方案。移动端从 day one 按完整工作台 IA 设计，但交付仍按可验证切片推进。
-
-## 6. 硬件规划
-
-目标：
-
-1. 提升收音质量
-2. 降低控制负担
-3. 提供更合适的输出形态
-4. 让设备状态和环境质量可观测
-
-推荐顺序：
-
-1. `输入硬件`
-   - 领夹麦、指向性麦克风、USB 声卡 / 外接麦、手机蓝牙麦
-2. `控制硬件`
-   - BLE 按钮、脚踏、一键重播 / 一键打断
-3. `输出硬件`
-   - 便携扬声器、骨传导耳机、外放设备
-4. `环境感知`
-   - 噪声监测、clipping / 输入音量、连接状态
-
-必须保持 4 个接口清晰：
-
-1. `capture control`
-2. `transport bridge`
-3. `device metadata`
-4. `telemetry`
-
-第一阶段最小原型：
-
-1. BLE / USB 最小设备控制桥
-2. 现成外设支持清单
-3. 设备状态与收音质量面板
-4. companion 与硬件之间的桥接协议
-
-## 7. 自定义语音 Agent 框架规划
-
-目标：
-
-1. 可替换 provider
-2. 可解释 runtime state
-3. 可验证回归质量
-
-下一阶段不直接重写 `livekit_agent`，按层继续收口：
-
-1. `provider-neutral adapters`
-2. `owned turn controller`
-3. `context assembler`
-4. `policy / capability router`
-5. `session memory`
-6. `durable maintenance`
-7. `evaluation harness`
-
-建议分层：
+下一步不应该把 `给对方看 / 文本发声 / 听写` 做成独立 agent 或平行页面。它们都属于实时沟通环节：
 
 ```text
-transport/session layer
-  -> audio turn controller
-  -> ASR / TTS / correction adapters
-  -> context assembler
-  -> policy + capability router
-  -> session memory
-  -> durable memory maintenance
-  -> dataset / evaluation pipeline
+用户语音 / 文本输入
+  -> 沟通转写 agent（读取用户画像、准备材料、场景模板、热词、短语）
+  -> confirmed output buffer
+  -> 给对方看 / 文本发声 / 听写复制 / 显式保存 / 后续硬件外放
 ```
 
-第一阶段最值得做：
+其中：
 
-1. 抽清 provider adapter
-2. 把 turn state machine 收成显式状态机
-3. 把 `context assembler` 做成独立可测层
-4. 把沟通页 / 训练页策略显式化
-5. 给 runtime 增加离线回放和回归集
+1. **沟通转写 agent 是唯一主干**
+   - 负责听懂用户、结合记忆和场景、生成 confirmed output。
+   - 所有出口共用同一份 session state、同一份 workspace snapshot、同一套 correction policy。
+2. **给对方看只是呈现出口**
+   - 大字显示、面对面反转、确认后展示。
+   - 适合医院窗口、陌生人问路、嘈杂环境。
+3. **文本发声只是呈现出口，硬件等接口明确后再接**
+   - 当前先把 confirmed output 送到浏览器本机朗读。
+   - 未来胸前 / 挂脖扬声器盒再根据 BLE、串口、局域网、系统音频路由或厂商 SDK 做真实接入。
+   - 不另起一套 TTS 页面作为第二主链。
+4. **听写 / Dictate 只是呈现出口**
+   - 把同一个 confirmed output 变成可复制、可粘贴、可转交文本。
+   - 默认不和另一个助手对话，不自动写长期记忆。
+   - 适合微信、会议、客服输入框、表单、文档和第三方粘贴。
 
-不建议：
+沟通页必须优先解决真实场景的效率问题，不应只强化“聊天感”。
 
-1. 一次性重写整套 runtime
-2. 没有稳定评测前大改主执行链
-3. 一上来做复杂多 agent / handoff
-4. 先做通用工具平台化
+### Confirmed Output Buffer
 
-## 8. 记忆架构规划
+沟通页需要的不是多个 agent，而是一层稳定的 confirmed output buffer。它承接沟通转写 agent 的结果，再把同一句话送到不同出口。
 
-目标：
+P1 本机 v0 已支持这些出口：
 
-1. 收清长期 owner 和运行时 owner
-2. 保持 runtime / dataset / durable memory 的边界
-3. 让多端接入不再打散记忆体系
+1. 大字展示。
+2. 面对面反转。
+3. 文本发声 / 本机外放。
+4. 一键复制。
+5. 后续粘贴到第三方的状态流。
+6. 显式保存为短语或准备材料。
 
-固定边界：
+默认不保存原始音频，不默认写入长期记忆。只有用户明确点“保存为短语 / 保存为准备材料”时，才进入 workspace。
 
-1. `backend workspace` 是 durable owner
-2. `livekit_agent` 只拥有 session-local working memory
-3. `dataset` 是录音资产、review、export 体系，不是长期记忆
-4. 页面不再各自拼 durable profile
+复制、第三方输入、会议字幕等如果被验证为高频入口，也只是增加快捷入口；底层仍然走同一个沟通转写 agent。
 
-建议中的长期架构：
+### 第一句话 / 破冰材料库
+
+当前 starter kit 不应继续被理解成“人工造的一批句子”。它应该升级成沟通转写 agent 的第一轮沟通协议。
+
+它的作用不是替用户说漂亮话，而是用第一句话建立 4 个条件：
+
+1. **让对方知道怎么听**：例如“我说话会慢一点，请先听我说完。”
+2. **保护用户表达权**：例如“请直接和我沟通，我可以自己回答。”
+3. **建立补救规则**：例如“如果没听清，请告诉我，我会换一种方式说。”
+4. **给 agent 装入场景目标**：例如当前是就医、面试、陌生人求助还是家人照护。
+
+它可以结合这些理论和实践锚点：
+
+1. **Supported Conversation / Communication Partner Training**
+   - 先教对方怎么配合，而不是只要求用户说得更清楚。
+   - 适合“给对方看”和第一句开场。
+2. **AAC self-advocacy**
+   - 用户主动说明自己的沟通方式、需要的等待时间和替代输出方式。
+   - 适合大字展示、外放和短语保存。
+3. **Conversation repair**
+   - 把“没听清”设计成可恢复流程：重说关键词、确认对方听到什么、切短句、切文字。
+   - 适合 confirmed output 的修正和复制出口。
+4. **Speech Systems / Intelligibility strategy**
+   - 第一句话不追求标准口音，而是先稳住听众注意力、语速、停顿和关键词。
+   - 适合陌生人、工作、面试和医疗窗口。
+
+因此第一句话材料库应该进入实时沟通链路：
 
 ```text
-surface state
-  -> session intent
-  -> session-local runtime memory
-  -> backend workspace snapshot
-  -> dataset / review / export layer
-  -> future semantic recall layer (Qdrant)
-  -> future coordination/cache layer (Redis only when necessary)
+场景 + 用户画像 + 破冰协议
+  -> 沟通转写 agent 的第一轮上下文
+  -> confirmed output
+  -> 给对方看 / 外放 / 复制 / 后续补救
 ```
 
-durable memory 继续只保留这些 owner：
+下一步不要继续横向堆句子，而是给每条第一句话补结构化 metadata：
 
-1. `prepared_expression`
-2. `hotword / scene templates`
-3. `user_profile_memory`
-4. `training reports`
+1. `intent`: 建立等待 / 保护自主 / 请求确认 / 切文字 / 紧急求助。
+2. `partner_instruction`: 对方应该怎么配合。
+3. `fallback_output`: 适合大字展示、外放、复制还是保存为短语。
+4. `scene_fit`: 医疗、陌生人、工作、面试、家人、紧急。
+5. `theory_basis`: supported conversation、AAC self-advocacy、conversation repair、speech intelligibility strategy。
 
-不应直接进入 durable memory：
+### 记忆页
 
-1. 原始 transcript 流水
-2. 单条训练录音
-3. review 未稳定的 heuristic
-4. 临时 UI 状态
-5. 新增的平级长期对象
+记忆页应该叫“沟通档案 / 准备材料”，不是包办所有长期状态。
 
-中期最值得推进：
+应该保留：
 
-1. `typed session memory`
-2. `context assembly`
-3. `maintenance pipeline`
-4. `dataset-safe recall`
-5. `memory observability`
+1. 用户画像：稳定偏好、沟通对象、常见场景、对方配合方式。
+2. 准备材料：稿件、说明、医疗信息、面试稿、会议提纲。
+3. 场景模板：开发者维护、用户选择启用。
+4. 高频短语 / 补救句：能直接进入沟通页或 TTS 出口。
 
-## 9. 推荐路线
+暂时不应作为长期记忆保留：
 
-建议顺序：
+1. 单条训练录音。
+2. 未经复核的训练总结。
+3. 一次性 ASR 误听。
+4. 只对当天有用的训练提示。
 
-1. 继续把 Web 主链打磨到稳定可演示、稳定可部署
-2. 先补 `evaluation + dataset tooling + observability`
-3. 再做 `mobile workbench` Phase 0 / Phase 1 试点
-4. 再做 `硬件控制桥` 最小试点
-5. 最后逐步把 `livekit_agent` 演进成更自主、provider-neutral 的语音 agent runtime
+训练总结可以留在训练页和 dataset review 中，但不应默认进入沟通页上下文。
 
-每一阶段都必须满足：
+### 训练页
 
-1. 不破坏现役 Web 主链
-2. 不新增平级 durable owner
-3. 不让 runtime / dataset / memory 再次混线
-4. 每条新能力都能被 smoke、回放或回归集验证
+训练页短期先服务两件事：
 
-## 10. 配套文档
+1. 让用户能稳定、低压力地录到可训练的 `audio + target_text` 样本。
+2. 让用户看到“系统识别代理指标”的进步，而不是宣称医学康复。
+
+中期再进入专家协作：
+
+1. 专家选择训练目标和禁忌边界。
+2. 软件承载高频任务。
+3. AI 记录表现、归纳薄弱环节。
+4. 专家复核报告和调整方案。
+5. 被专家确认后的策略再自动化进产品。
+
+训练页不要急着按病名硬编码功能。应先按机制组织任务：
+
+1. 听理解 / 语义链接。
+2. 命名 / 口语模仿。
+3. 构音 / 音节强化。
+4. 响度 / 气息 / 句尾衰减。
+5. 节奏 / 停顿 / 旋律支架。
+6. 场景描述 / 叙事。
+7. AAC / 短语 / TTS 迁移。
+
+病因标签只做适用画像、风险约束和专家分流。
+
+## 4. 下一步执行计划
+
+### P0：训练总结退出长期记忆和沟通上下文（已完成 2026-05-26）
+
+目标：先把“训练报告”和“长期记忆”分开。
+
+代码范围：
+
+1. `backend/src/services/supabase.service.ts`
+   - `WorkspaceMemorySnapshot.object_zones` 移除 `training_summaries` zone。
+   - `communication_loadout.sections` 移除 `training_summary` section。
+   - `buildPreparationSnapshot` 不再把 `preferredTrainingSummary` 注入 `immediate_goal / support_strategies / risky_terms / pronunciation_patterns / training_pairs`。
+   - `session_review` 不再用训练复盘兜底，只保留最近沟通会话复盘。
+2. `frontend/src/lib/memory/workspace-snapshot.ts`
+   - 删除 `training_summary` loadout 类型。
+3. `frontend/src/components/chat/ChatInterface.tsx`
+   - 删除“用户画像和训练总结会默认进入这次上下文”文案。
+   - `contextResultSummary` 不再展示默认训练总结。
+4. `frontend/src/app/memory/page.tsx`
+   - 移除记忆页里的训练总结区。
+5. 保留 `prepared_expression.training_reports` 给训练页使用，不进入沟通 loadout。
+
+验证：
+
+1. `cd backend && npm test -- memory-maintenance`
+2. `cd frontend && npx tsc --noEmit --allowImportingTsExtensions`
+3. 沟通页 smoke：workspace snapshot 仍可读、材料和模板仍可加载、训练总结不再进入“本次上下文”。
+
+### P1：沟通页补 confirmed output 呈现层（本机 v0 已完成 2026-05-26）
+
+目标：让同一个实时沟通链路的结果，可以稳定呈现为给对方看、文本发声和听写复制。硬件输出不做伪接口，等接口选型后再接。
+
+交付：
+
+1. 新增 `confirmed_output` 前端状态：
+   - 已来源于沟通转写 agent 的最终确认文本。
+   - 已与 interim transcript 分开，避免把未确认错字直接展示给对方。
+   - 用户可手动改写确认输出。
+2. `给对方看`出口：
+   - 已大字展示最新确认文本。
+   - 已支持反转显示。
+   - 已支持“确认后再展示”，避免把 interim 错字直接给对方看。
+3. `文本发声`出口：
+   - 当前先用浏览器本机 `speechSynthesis` 朗读确认文本。
+   - 未来硬件输出等接口选型后再接，不在当前 Web 里发伪请求。
+4. `听写复制`出口：
+   - 已支持一键复制和展示。
+   - 待补：清空、保存为短语或准备材料、第三方接入状态流。
+   - 默认不保存到长期记忆。
+5. `memory 写入`：
+   - 当前只写 session metadata 的 `latestConfirmedOutput*` 动作记录。
+   - 只有用户显式保存为短语、材料或画像片段时才写 workspace。
+
+验证：
+
+1. `cd frontend && npm run build`。
+2. Playwright 或浏览器 smoke 检查同一条 confirmed output 能被展示、反转、复制、外放。
+3. LiveKit smoke 确认所有出口仍走现有沟通 session，不新增第二套 agent。
+
+### P2：高频输出面增强
+
+目标：在同一条实时沟通链路里补齐 Voiceitt 式真实使用场景，不把它误做训练，也不先拆第二个沟通页。
+
+交付：
+
+1. confirmed output 增加“复制到剪贴板 / 发送到第三方 / 保留本次文本”的状态提示。
+2. 给会议、客服、文档、微信等场景增加轻量 preset。
+3. 记录匿名使用信号：复制次数、展示次数、保存为短语次数，不记录原始文本内容。
+4. 如果听写复制明显高频，可以新增快捷入口；但底层仍进入沟通页 / 沟通转写 agent，不新建第二条主链。
+
+验证：
+
+1. 不登录时按当前授权策略处理。
+2. 登录时只在用户显式保存后写 workspace。
+3. 不产生训练上传记录。
+
+### P3：训练页专家协作 v0
+
+目标：让训练从“通用录音工具”走向“专家知识自动化执行面”。
+
+交付：
+
+1. 训练 profile 拆成 `observable speech profile`：
+   - 病因标签
+   - 构音 / 韵律 / 响度 / 疲劳 / 听觉反馈 / 失语或言语动作计划风险
+2. 增加专家配置对象：
+   - 训练目标
+   - 禁忌和风险提示
+   - 任务类型
+   - 复核节奏
+3. 先做非医疗承诺的训练协议：
+   - 响度校准
+   - 可懂度策略训练
+   - 自定义材料高频句复练
+4. MIT / MUSTIM、PECS、LSVT LOUD 等正式疗法只做专家准入协议，不开放成自助娱乐化按钮。
+
+验证：
+
+1. 训练上传 metadata 带 profile / protocol id。
+2. 报告文案不写医学疗效。
+3. 专家配置缺失时只显示低风险通用训练。
+
+## 5. 配套文档
 
 短期执行状态：
 
 - [../.tasks/current.md](../.tasks/current.md)
 
-开源协作拆线：
-
-- [VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md](VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
-
 App / Mobile Workbench 技术路线：
 
 - [VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
 
-control plane 实现深参考：
+分病因疗法锚点：
 
-- [control-plane.md](control-plane.md)
+- [VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md](VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
 
-agent / memory 边界：
+Voiceitt 对标与设置启发：
 
-- [VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)
+- [VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md](VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
 
 录音、上传与训练资产 contract：
 

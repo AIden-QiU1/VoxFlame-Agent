@@ -27,7 +27,8 @@ RUN pip install \
     --index-url "${LIVEKIT_AGENT_PIP_INDEX_URL}" \
     --extra-index-url "${LIVEKIT_AGENT_PIP_EXTRA_INDEX_URL}" \
     --no-deps \
-    "websockets>=15.0,<16.0"
+    "websockets>=15.0,<16.0" \
+    "httpx>=0.27,<1.0"
 
 COPY . /app
 

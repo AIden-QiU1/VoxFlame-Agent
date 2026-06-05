@@ -27,6 +27,10 @@ class LiveKitAgentConfig:
     dashscope_asr_language: str
     dashscope_asr_enable_interim: bool
     dashscope_asr_connect_timeout_seconds: int
+    qwen_http_asr_url: str | None
+    qwen_http_asr_language: str
+    qwen_http_asr_timeout_seconds: float
+    qwen_http_asr_user_ids: frozenset[str]
     livekit_audio_apm_enabled: bool
     livekit_audio_apm_echo_cancellation: bool
     livekit_audio_apm_noise_suppression: bool
@@ -110,6 +114,17 @@ def load_config() -> LiveKitAgentConfig:
         ),
         dashscope_asr_connect_timeout_seconds=int(
             os.getenv("QWEN_ASR_CONNECT_TIMEOUT_SECONDS", "15").strip() or "15"
+        ),
+        qwen_http_asr_url=(os.getenv("QWEN_HTTP_ASR_URL", "").strip() or None),
+        qwen_http_asr_language=os.getenv("QWEN_HTTP_ASR_LANGUAGE", "Chinese").strip()
+        or "Chinese",
+        qwen_http_asr_timeout_seconds=float(
+            os.getenv("QWEN_HTTP_ASR_TIMEOUT_SECONDS", "30").strip() or "30"
+        ),
+        qwen_http_asr_user_ids=frozenset(
+            user_id.strip()
+            for user_id in os.getenv("QWEN_HTTP_ASR_USER_IDS", "").split(",")
+            if user_id.strip()
         ),
         livekit_audio_apm_enabled=(
             os.getenv("LIVEKIT_AUDIO_APM_ENABLED", "1").strip().lower() not in {"0", "false", "no"}

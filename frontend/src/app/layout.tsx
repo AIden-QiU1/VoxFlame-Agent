@@ -7,6 +7,7 @@ import './globals.css'
 const pwaEnabled = process.env.NEXT_PUBLIC_PWA_ENABLED === '1'
 const allowLocalhostPwa = process.env.NEXT_PUBLIC_PWA_ALLOW_LOCALHOST === '1'
 const shouldResetLocalRuntime = !pwaEnabled || !allowLocalhostPwa
+const siteOrigin = process.env.VOXFLAME_PUBLIC_BASE_URL || 'https://voxember.com'
 const LOCAL_RUNTIME_RESET_BOOTSTRAP = `
 (() => {
   if (typeof window === 'undefined') return;
@@ -42,7 +43,7 @@ const LOCAL_RUNTIME_RESET_BOOTSTRAP = `
 `
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://ranyan.app'),
+  metadataBase: new URL(siteOrigin),
   title: '燃言 - 让每个声音都被听见',
   description: '专为构音障碍患者打造的开源语音识别项目，让AI听懂你的声音',
   manifest: pwaEnabled ? '/manifest.json' : undefined,
@@ -86,7 +87,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'zh_CN',
-    url: 'https://ranyan.app',
+    url: siteOrigin,
     siteName: '燃言',
     title: '燃言 - 让每个声音都被听见',
     description: '专为构音障碍患者打造的开源语音识别项目',

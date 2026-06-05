@@ -33,6 +33,10 @@ class ConfigTests(unittest.TestCase):
             "QWEN_ASR_REALTIME_LANGUAGE": "zh",
             "QWEN_ASR_ENABLE_INTERIM": "1",
             "QWEN_ASR_CONNECT_TIMEOUT_SECONDS": "11",
+            "QWEN_HTTP_ASR_URL": "http://121.41.45.9:8080/transcribe",
+            "QWEN_HTTP_ASR_LANGUAGE": "Chinese",
+            "QWEN_HTTP_ASR_TIMEOUT_SECONDS": "18",
+            "QWEN_HTTP_ASR_USER_IDS": "64758dee-5026-4b53-a063-1d02d0834f67, other-user",
             "LIVEKIT_AUDIO_APM_ENABLED": "1",
             "LIVEKIT_AUDIO_APM_ECHO_CANCELLATION": "0",
             "LIVEKIT_AUDIO_APM_NOISE_SUPPRESSION": "1",
@@ -85,6 +89,13 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.dashscope_asr_language, "zh")
         self.assertTrue(config.dashscope_asr_enable_interim)
         self.assertEqual(config.dashscope_asr_connect_timeout_seconds, 11)
+        self.assertEqual(config.qwen_http_asr_url, "http://121.41.45.9:8080/transcribe")
+        self.assertEqual(config.qwen_http_asr_language, "Chinese")
+        self.assertEqual(config.qwen_http_asr_timeout_seconds, 18)
+        self.assertEqual(
+            config.qwen_http_asr_user_ids,
+            frozenset({"64758dee-5026-4b53-a063-1d02d0834f67", "other-user"}),
+        )
         self.assertTrue(config.livekit_audio_apm_enabled)
         self.assertFalse(config.livekit_audio_apm_echo_cancellation)
         self.assertTrue(config.livekit_audio_apm_noise_suppression)

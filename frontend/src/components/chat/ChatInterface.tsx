@@ -29,7 +29,14 @@ import {
 import { memoryService } from '@/lib/memory/memory-service'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
 import { cn } from '@/lib/utils'
-import { XIcon } from 'lucide-react'
+import {
+  CheckCircle2,
+  ClipboardCopy,
+  RotateCcw,
+  ScreenShare,
+  Volume2,
+  XIcon,
+} from 'lucide-react'
 
 interface ChatInterfaceProps {
   userId?: string
@@ -39,6 +46,8 @@ interface ChatInterfaceProps {
   homeHref?: string
   onReturnHome?: () => void
 }
+
+type ConfirmedOutputMode = 'display' | 'copy' | 'speech'
 
 function mapStarterSceneToRuntimeScene(
   sceneId: StarterKitScene['id'] | undefined,
@@ -259,6 +268,12 @@ export default function ChatInterface({
   const [microphoneEnvironmentWarning, setMicrophoneEnvironmentWarning] = useState<string | null>(null)
   const [activeStarterSceneId, setActiveStarterSceneId] = useState<StarterKitScene['id'] | undefined>(initialStarterSceneId)
   const [selectedLoadoutItemIds, setSelectedLoadoutItemIds] = useState<string[]>([])
+  const [confirmedOutputText, setConfirmedOutputText] = useState('')
+  const [confirmedOutputSourceId, setConfirmedOutputSourceId] = useState<string | null>(null)
+  const [confirmedOutputStatus, setConfirmedOutputStatus] = useState<string | null>(null)
+  const [isListenerDisplayOpen, setIsListenerDisplayOpen] = useState(false)
+  const [isListenerDisplayFlipped, setIsListenerDisplayFlipped] = useState(false)
+  const [isSpeakingConfirmedOutput, setIsSpeakingConfirmedOutput] = useState(false)
   const {
     snapshot: workspaceSnapshot,
   } = useWorkspaceMemorySnapshot({
@@ -317,6 +332,9 @@ export default function ChatInterface({
       if (e.code === 'Escape' && isCaptionMode) {
         setIsCaptionMode(false)
       }
+      if (e.code === 'Escape' && isListenerDisplayOpen) {
+        setIsListenerDisplayOpen(false)
+      }
       // Escape to stop recording
       if (e.code === 'Escape' && isRecording) {
         stopRecording()
@@ -325,7 +343,7 @@ export default function ChatInterface({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isCaptionMode, isConnected, isRecording, toggleRecording, stopRecording])
+  }, [isCaptionMode, isConnected, isListenerDisplayOpen, isRecording, toggleRecording, stopRecording])
 
   // Handle text submit
   const handleSubmit = (e: React.FormEvent) => {
@@ -335,6 +353,11 @@ export default function ChatInterface({
       setTextInput('')
     }
   }
+
+  const latestAssistantMessage = useMemo(
+    () => [...messages].reverse().find((message) => message.role === 'assistant'),
+    [messages],
+  )
 
   const handlePhrasePlay = async (text: string) => {
     setIsLaunchingStarter(true)
@@ -351,6 +374,110 @@ export default function ChatInterface({
     }
   }
 
+  useEffect(() => {
+    if (!latestAssistantMessage || latestAssistantMessage.id === confirmedOutputSourceId) {
+      return
+    }
+
+    setConfirmedOutputText(latestAssistantMessage.content)
+    setConfirmedOutputSourceId(latestAssistantMessage.id)
+    setConfirmedOutputStatus('已更新为最新整理文本')
+  }, [confirmedOutputSourceId, latestAssistantMessage])
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+      }
+    }
+  }, [])
+
+  const recordConfirmedOutputAction = (mode: ConfirmedOutputMode, text: string) => {
+    memoryService.updateCurrentSessionMetadata({
+      latestConfirmedOutputText: text,
+      latestConfirmedOutputMode: mode,
+      latestConfirmedOutputAt: new Date().toISOString(),
+    })
+  }
+
+  const handleOpenListenerDisplay = () => {
+    if (!hasConfirmedOutput) {
+      setConfirmedOutputStatus('先确认一段要给对方看的文字')
+      return
+    }
+
+    recordConfirmedOutputAction('display', trimmedConfirmedOutput)
+    setIsListenerDisplayOpen(true)
+    setConfirmedOutputStatus('已打开大字展示')
+  }
+
+  const handleCopyConfirmedOutput = async () => {
+    if (!hasConfirmedOutput) {
+      setConfirmedOutputStatus('先确认一段要复制的文字')
+      return
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(trimmedConfirmedOutput)
+      } else {
+        const textArea = document.createElement('textarea')
+        textArea.value = trimmedConfirmedOutput
+        textArea.setAttribute('readonly', 'true')
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-9999px'
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+      }
+
+      recordConfirmedOutputAction('copy', trimmedConfirmedOutput)
+      setConfirmedOutputStatus('已复制，可以粘贴到第三方应用')
+    } catch (error) {
+      console.warn('[chat] failed to copy confirmed output:', error)
+      setConfirmedOutputStatus('复制失败，请手动选中文字复制')
+    }
+  }
+
+  const handleSpeakConfirmedOutput = () => {
+    if (isSpeakingConfirmedOutput) {
+      window.speechSynthesis.cancel()
+      setIsSpeakingConfirmedOutput(false)
+      setConfirmedOutputStatus('已停止朗读')
+      return
+    }
+
+    if (!hasConfirmedOutput) {
+      setConfirmedOutputStatus('先确认一段要朗读的文字')
+      return
+    }
+
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setConfirmedOutputStatus('当前浏览器不支持本机朗读')
+      return
+    }
+
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(trimmedConfirmedOutput)
+    utterance.lang = 'zh-CN'
+    utterance.rate = 0.92
+    utterance.pitch = 1
+    utterance.onend = () => {
+      setIsSpeakingConfirmedOutput(false)
+      setConfirmedOutputStatus('朗读完成')
+    }
+    utterance.onerror = () => {
+      setIsSpeakingConfirmedOutput(false)
+      setConfirmedOutputStatus('朗读中断，可以再点一次')
+    }
+
+    recordConfirmedOutputAction('speech', trimmedConfirmedOutput)
+    setIsSpeakingConfirmedOutput(true)
+    setConfirmedOutputStatus('正在本机朗读')
+    window.speechSynthesis.speak(utterance)
+  }
+
   const recentCaptionMessages = useMemo(
     () => messages.filter((message) => message.role === 'assistant').slice(-6),
     [messages],
@@ -359,7 +486,7 @@ export default function ChatInterface({
   const captionText = currentResponseText
     || latestAssistantText
     || (isThinking ? '正在整理本句...' : '正在等待语音输入...')
-  const hasConversationStarted = messages.length > 0 || Boolean(currentResponseText) || Boolean(currentASRText)
+  const hasConversationStarted = messages.length > 0 || Boolean(currentResponseText) || Boolean(currentASRText) || isRecording
   const statusText = isRecording
     ? '正在听你说话'
     : isConnecting
@@ -371,6 +498,8 @@ export default function ChatInterface({
         : isConnected
           ? '已经准备好沟通'
           : '还没连接助手'
+  const trimmedConfirmedOutput = confirmedOutputText.trim()
+  const hasConfirmedOutput = trimmedConfirmedOutput.length > 0
   const communicationLoadout = workspaceSnapshot?.communication_loadout ?? null
   const effectiveSceneId = workspaceSnapshot?.expression_kit.active_scene_id ?? activeStarterSceneId
   const activeStarterScene = useMemo(
@@ -430,9 +559,6 @@ export default function ChatInterface({
   )
   const contextResultSummary = useMemo(() => {
     const autoItems = ['用户画像']
-    if (selectedLoadoutEntries.some((entry) => entry.sourceType === 'training_summary')) {
-      autoItems.push('训练总结')
-    }
 
     const selectedCustomMaterials = selectedLoadoutEntries
       .filter((entry) => entry.sourceType === 'custom_material')
@@ -522,7 +648,6 @@ export default function ChatInterface({
 
   return (
     <div className="flex h-dvh bg-[linear-gradient(180deg,_#fcf7ee_0%,_#fffdf9_42%,_#f4efe6_100%)]">
-      <WaveformVisualizer analyser={analyser} isRecording={isRecording} />
       {showPhrasesPanel ? (
         <button
           type="button"
@@ -733,11 +858,11 @@ export default function ChatInterface({
                       : '当前会按本次场景和资料自动准备沟通'}
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600 text-pretty">
-                    用户画像和训练总结会默认进入这次上下文。你这里只需要决定要不要再带上自定义材料和场景模板。
+                    用户画像会默认进入这次上下文。你这里只需要决定要不要再带上自定义材料和场景模板。
                   </p>
                 </div>
                 <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-stone-700">
-                  手动已选 {selectedLoadoutEntries.filter((entry) => !['user_profile', 'training_summary'].includes(entry.sourceType)).length} 份资料
+                  手动已选 {selectedLoadoutEntries.filter((entry) => entry.sourceType !== 'user_profile').length} 份资料
                 </div>
               </div>
 
@@ -860,6 +985,90 @@ export default function ChatInterface({
             </section>
           ) : null}
 
+          {hasConversationStarted || hasConfirmedOutput ? (
+            <section className="rounded-[32px] border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-sm font-medium text-amber-700">确认输出</div>
+                  <h2 className="mt-1 text-xl font-semibold text-stone-950">给对方看的这一句</h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600 text-pretty">
+                    这里承接沟通转写 agent 整理后的文本。你可以先改一下，再展示、朗读或复制。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (latestAssistantMessage) {
+                      setConfirmedOutputText(latestAssistantMessage.content)
+                      setConfirmedOutputSourceId(latestAssistantMessage.id)
+                      setConfirmedOutputStatus('已同步最新整理文本')
+                    }
+                  }}
+                  disabled={!latestAssistantMessage}
+                  className="inline-flex items-center gap-2 rounded-full border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  同步最新
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_16rem]">
+                <label className="block">
+                  <span className="sr-only">确认输出文本</span>
+                  <textarea
+                    value={confirmedOutputText}
+                    onChange={(event) => {
+                      setConfirmedOutputText(event.target.value)
+                      setConfirmedOutputSourceId((current) => current ?? latestAssistantMessage?.id ?? null)
+                      setConfirmedOutputStatus('已手动改写，动作会使用这版文字')
+                    }}
+                    placeholder="助手整理后的文本会出现在这里。也可以直接输入一句要给对方看的话。"
+                    className="min-h-[150px] w-full resize-none rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-4 text-lg leading-8 text-stone-950 outline-none transition focus:border-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-100"
+                  />
+                </label>
+
+                <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+                  <button
+                    type="button"
+                    onClick={handleOpenListenerDisplay}
+                    disabled={!hasConfirmedOutput}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-stone-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+                  >
+                    <ScreenShare className="h-4 w-4" />
+                    给对方看
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSpeakConfirmedOutput}
+                    disabled={!hasConfirmedOutput}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-800 transition-colors hover:border-stone-300 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Volume2 className="h-4 w-4" />
+                    {isSpeakingConfirmedOutput ? '停止朗读' : '文本发声'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleCopyConfirmedOutput()
+                    }}
+                    disabled={!hasConfirmedOutput}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-800 transition-colors hover:border-stone-300 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ClipboardCopy className="h-4 w-4" />
+                    复制文本
+                  </button>
+                </div>
+              </div>
+
+              {confirmedOutputStatus ? (
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {confirmedOutputStatus}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
           {/* Message list */}
           {hasConversationStarted ? (
             <section className="rounded-[32px] border border-stone-200 bg-white px-4 py-5 shadow-sm sm:px-6">
@@ -877,6 +1086,17 @@ export default function ChatInterface({
                     </div>
                   </div>
                 )}
+
+                {isRecording ? (
+                  <div className="flex justify-end">
+                    <div className="w-full max-w-2xl rounded-[28px] border border-red-100 bg-white p-3 shadow-sm">
+                      <WaveformVisualizer analyser={analyser} isRecording={isRecording} />
+                      <div className="mt-2 text-right text-xs font-medium text-red-500">
+                        正在录音... 再次点击或按空格停止
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 {/* Thinking indicator */}
                 {isThinking && (
@@ -1019,6 +1239,54 @@ export default function ChatInterface({
                 {captionText}
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isListenerDisplayOpen && (
+        <div className="fixed inset-0 z-40 flex flex-col bg-stone-950 text-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/15 px-4 py-4 sm:px-6">
+            <div>
+              <div className="text-sm font-medium text-white/70">给对方看</div>
+              <div className="mt-1 text-lg font-semibold">确认文本</div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsListenerDisplayFlipped((current) => !current)}
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/15"
+              >
+                <RotateCcw className="h-4 w-4" />
+                {isListenerDisplayFlipped ? '恢复方向' : '面对面反转'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleCopyConfirmedOutput()
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/15"
+              >
+                <ClipboardCopy className="h-4 w-4" />
+                复制
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsListenerDisplayOpen(false)}
+                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-stone-950 transition-colors hover:bg-white/90"
+              >
+                退出
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-1 items-center justify-center overflow-y-auto px-6 py-10">
+            <p
+              className={cn(
+                'max-w-6xl whitespace-pre-wrap text-center text-4xl font-semibold leading-tight text-balance sm:text-6xl lg:text-7xl',
+                isListenerDisplayFlipped ? 'rotate-180' : '',
+              )}
+            >
+              {trimmedConfirmedOutput}
+            </p>
           </div>
         </div>
       )}

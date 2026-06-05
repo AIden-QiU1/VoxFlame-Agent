@@ -1,12 +1,14 @@
 # 当前任务状态
 
-> 最后更新: 2026-05-22
+> 最后更新: 2026-06-05
 
 ## 当前主线
 
 - 主任务：在不破坏 Web/PWA 现役主链的前提下，开始 `App / Mobile Workbench` Phase 0 调研与 RFC；移动端目标从薄 companion 升级为完整移动端工作台。
 - 当前执行面：`frontend -> backend -> self-hosted livekit-server -> livekit_agent`。
 - 当前最重要的产品/工程重点：
+  - 先把长期使用价值收口到真实沟通：沟通页优先补 `confirmed output -> 给对方看 / 文本发声 / 听写复制` 这一层，而不是新增平行沟通页或继续加固定句库；硬件外放等真实接口选型后再接
+  - 暂时把训练总结移出长期记忆和沟通默认上下文；训练总结只留在训练页、dataset review 和未来专家复核材料里
   - Mobile workbench 必须复用 `workspace snapshot / recording envelope / upload receipt / RTC session orchestration`
   - 战略主线推荐 `Expo / React Native + LiveKit React Native`，从 day one 规划 `沟通 / 练习 / 记忆与准备 / 设备与同步` 四个一级 surface
   - `Capacitor` 只保留为 WebView 原型或过渡方案，不再作为完整移动端工作台主线
@@ -16,6 +18,111 @@
   - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-06-05 已定位并修复沟通页录音时出现大面积空白的问题
+   - 根因：`WaveformVisualizer` 录音波形组件使用 `fixed bottom-0 left-0 right-0 h-screen z-20`，并在底部渲染 `h-[400px]` 波形层；录音开始后它脱离消息流覆盖整屏，视觉上把对话文字流和输入栏之间撑成一大片空白
+   - 线上 `https://voxember.com` 当前 page chunk 已确认仍包含这组全屏 fixed 波形类名，所以线上截图不是单独的部署环境问题；本地当前源码同样会复现，属于前端组件布局问题
+   - [WaveformVisualizer](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) 已改为行内容器：`relative h-20 / sm:h-24`，不再全屏 fixed；同时 resize 时重置 canvas transform，避免重复 scale
+   - [ChatInterface](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx) 已把录音状态加入 `hasConversationStarted`，录音开始后直接在消息列表里展示行内波形和“正在录音”提示
+   - 已验证：`cd frontend && npm run build`
+   - Playwright 打开本地 `http://127.0.0.1:3220/?mode=communicate` 时按现有鉴权跳转登录页，未登录浏览器无法直接做录音 UI smoke；已用线上 chunk 与本地源码确认 root cause
+
+0. 2026-05-30 已清理 `oss-by-account-after-20260524` 对应的云端 OSS 对象
+   - 已把 [artifacts/oss-by-account-after-20260524](/home/ubuntu/VoxFlame-Agent/artifacts/oss-by-account-after-20260524) 加入 `.gitignore`
+   - 新增 [delete_oss_objects_from_manifest.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/delete_oss_objects_from_manifest.ts)，从 `_objects.jsonl` 精确读取 `objectName`，默认 dry-run，`--write` 才删除
+   - 本次删除范围：`voxflame / oss-cn-shanghai` 中 `artifacts/oss-by-account-after-20260524/_objects.jsonl` 列出的 `1258` 个对象
+   - 删除结果：`deletedCount=1258`、`missingCount=0`、`failedCount=0`
+   - 删除后复查：`cd backend && ./node_modules/.bin/ts-node scripts/download_oss_by_account.ts --dry-run --since 2026-05-24T03:24:01.898Z` 返回 `objects=0`
+   - 本次没有删除本地 artifact、压缩包、Supabase 账号或数据库记录
+
+0. 2026-05-26 已修复移动端训练录音“不能整理成标准 WAV”的兼容问题
+   - 根因：训练页本地保存录音原先使用 `MediaRecorder` 产出 `audio/webm` / `audio/mp4`，上传前再用 `AudioContext.decodeAudioData` 解码并转成 16k mono WAV；部分移动端内置浏览器 / WebView 会录出自己无法解码的 blob，导致上传前转 WAV 失败
+   - 新增 [local-pcm-wav-recorder.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/audio/local-pcm-wav-recorder.ts)，训练页本地录音现在直接从麦克风轨道走 WebAudio PCM 收集并写标准 WAV
+   - [useMandarinTrainingSession](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useMandarinTrainingSession.ts) 已从 `MediaRecorder` 本地保存改为 `LocalPcmWavRecorder`，实时 ASR 仍走原 LiveKit 链路
+   - 上传前 `normalizeRecordingToWav` 会直接复用 `audio/wav + 16k + mono`，不再触发移动端浏览器解码 mp4/webm
+   - 新增 [local-pcm-wav-recorder.test.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/audio/local-pcm-wav-recorder.test.ts)，验证 WAV header 和 normalize 复用路径
+   - 已验证：
+   - `cd frontend && npm test -- src/lib/audio/local-pcm-wav-recorder.test.ts`
+   - `cd frontend && npm run build`
+
+0. 2026-05-26 已完成沟通页 confirmed output 本机输出 v0
+   - [ChatInterface](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx) 新增“确认输出”缓冲区，自动承接最新 assistant final transcript，也允许用户手动改写
+   - 同一段确认文本现在可以：
+   - 给对方看：打开大字展示层
+   - 面对面反转：展示层内一键 180 度反转
+   - 文本发声：使用浏览器本机 `speechSynthesis` 朗读
+   - 听写复制：一键复制到剪贴板，供第三方应用粘贴
+   - 每次展示 / 复制 / 朗读会写入当前 session metadata 的 `latestConfirmedOutput*` 字段，先记录动作，不把文本另写长期记忆
+   - 硬件外放本轮先不接伪接口；等真正做硬件时再决定走 BLE、串口、局域网、系统音频路由或厂商 SDK
+   - 已验证：
+   - `cd frontend && npm run build`
+   - 已按用户要求直接拉取 Playwright CLI，不再起本地 dev server；`bash /home/ubuntu/.codex/skills/playwright/scripts/playwright_cli.sh --help` 正常输出
+   - 浏览器交互 smoke 待接入现成运行地址或用户本机已有服务后再跑
+
+0. 2026-05-26 已完成 P0：训练总结退出长期记忆和沟通默认上下文
+   - [backend/src/services/supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 已移除 `training_summaries` object zone、`training_summary` communication loadout section，以及训练总结对 `preparation` 的默认注入
+   - `buildPreparationSnapshot` 现在不再把训练报告写入 `immediate_goal / support_strategies / risky_terms / pronunciation_patterns / training_pairs`
+   - `session_review` 不再用训练复盘兜底，只保留最近非训练沟通会话复盘
+   - [frontend/src/lib/memory/workspace-snapshot.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/workspace-snapshot.ts) 已删除 `training_summary` / `training_summaries` 长期对象类型
+   - [frontend/src/components/chat/ChatInterface.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx) 已删除“用户画像和训练总结默认进入上下文”的文案与计数逻辑
+   - [frontend/src/app/memory/page.tsx](/home/ubuntu/VoxFlame-Agent/frontend/src/app/memory/page.tsx) 已移除记忆页训练总结区；训练报告仍留在训练页、dataset review 和未来专家复核材料里
+   - 已验证：
+   - `cd backend && npm run build`
+   - `cd frontend && npm run build`
+   - `bash scripts/check_ai_docs.sh`
+   - 下一步顺序：进入沟通页 confirmed output 呈现层，让同一个沟通转写 agent 的结果输出到给对方看、文本发声、复制 / 第三方粘贴；硬件外放等实际接口选型后再接
+
+0. 2026-05-26 已按当前代码现状重写产品 PRD 和分病因疗法映射文档
+   - [产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 已删掉已完成历史计划，改成当前代码事实 + 下一步执行计划
+   - [分病因疗法锚点文档](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md) 已删掉大而全病因清单，保留正式疗法 / 理论锚点、专家边界和产品化顺序
+   - 当前代码深度盘点结论：
+   - 沟通页已有 LiveKit 主链、表达工具箱、starter kit、workspace loadout、字幕辅助和麦克风输入反馈
+   - 训练页已拆为 `/contribute` 主题选择和 `/contribute/topic/[topicId]` 录音训练，支持评估筛查、自定义材料切句、上传 metadata、病因标签和质量信息
+   - 记忆页已有用户画像、场景模板、多份自定义材料库和 active material
+   - TTS 只有 runtime 代播能力；沟通页本机输出 v0 已补 `confirmed output -> 大字展示 / 面对面反转 / 本机朗读 / 复制`
+   - 语音转文本、给对方看、文本发声都不应拆独立 agent；当前缺口从“没有 confirmed output 层”收窄为“还没有硬件外放接口和更完整的保存 / 第三方接入状态流”
+   - P1：
+   - 沟通页补 confirmed output 呈现层：同一个沟通转写 agent 的结果已经可以给对方看、文本发声、复制到第三方；硬件输出待接口选型
+   - 第一句话 / 破冰材料库不要继续按人工句库扩展，应升级为沟通转写 agent 的第一轮协议：让对方知道怎么听、保护用户表达权、建立补救规则，并给每条句子补 `intent / partner_instruction / fallback_output / scene_fit / theory_basis`
+   - P2：
+   - 增强沟通页内高频输出出口；即使后续增加快捷入口，底层仍进入沟通页 / 沟通转写 agent，不新增第二条主链
+
+0. 2026-05-25 已把 ICP 备案信息挂到 Web 首页底部
+   - 根据腾讯云备案通过信息，网站备案 / 许可证编号为 `沪ICP备2026020229号`，审核通过日期为 `2026-05-14`
+   - 新增首页底部备案展示，备案号链接到工信部备案首页 `https://beian.miit.gov.cn/`
+   - 备案主体默认展示为 `上海生声不息科技有限公司`
+   - 前端 Docker build args、Next build-time env 和 `.env.example` 已补齐 `NEXT_PUBLIC_ICP_BEIAN_*` 配置
+   - 已把 `.env` 的正式入口切到 `https://voxember.com`，并把 frontend metadata 默认域名从旧 `ranyan.app` 切到 `voxember.com`
+   - 新增 [set_dnspod_voxember_record.cjs](/home/ubuntu/VoxFlame-Agent/scripts/ops/set_dnspod_voxember_record.cjs)，读取本机 `.env.dnspod` 中的腾讯云 CAM 子用户密钥，创建 / 更新 DNSPod `voxember.com @ A -> 111.230.35.89`
+   - 已通过 DNSPod 创建根域名 A 记录，记录 id 为 `2299420650`
+   - 已重启 `caddy` HTTPS profile，Caddy 日志确认 Let's Encrypt `http-01` 验证通过并成功获取 `voxember.com` 证书
+   - 已验证：
+   - `dig +short @1.1.1.1 voxember.com A` -> `111.230.35.89`
+   - `curl -I --noproxy '*' https://voxember.com` -> `HTTP/2 200`
+   - `curl -I --noproxy '*' https://voxember.com/api/rtc/health` -> `HTTP/2 200`
+   - Headless Chrome hydration 后确认首页底部展示 `上海生声不息科技有限公司`、`沪ICP备2026020229号` 和工信部链接
+
+0. 2026-05-24 已下载并整理 `2307294809@qq.com` 与 `3083029019@qq.com` 的训练语料
+   - Supabase 复查：`230729489@qq.com` 不存在；按真实账号 `2307294809@qq.com` 合并处理
+   - `2307294809@qq.com` userId：`64758dee-5026-4b53-a063-1d02d0834f67`
+   - `3083029019@qq.com` userId：`3368b1cb-8014-4502-8b4d-6011c17371ce`
+   - 已用 `cd backend && npm run download:oss-by-account -- --output-dir ../artifacts/oss-by-account` 刷新 OSS 本地下载；当前远端清单：`2307294809__64758dee` `237` 个对象，`3083029019__3368b1cb` `80` 个对象
+   - 新增 [prepare_training_corpus_artifact.py](/home/ubuntu/VoxFlame-Agent/scripts/audio/prepare_training_corpus_artifact.py)，从当前 `_objects.jsonl` 取指定账号，跳过 `manifest.jsonl`，输出 raw 与 trimmed 两套语料
+   - 已输出到 [artifacts/training-corpus-20260524](/home/ubuntu/VoxFlame-Agent/artifacts/training-corpus-20260524)
+   - raw：`313` 条音频 + `2` 个 `transcripts.txt`，没有 `manifest.jsonl`
+   - trimmed：`313` 条 WAV；按 `>500ms` 静默段裁剪，长静默段保留约 `120ms` 缓冲；共检测并处理 `320` 段长静默，累计裁掉约 `293.24s`
+   - 已额外生成 `2307294809` 全量本地缓存审计包：[2307294809-all-merged](/home/ubuntu/VoxFlame-Agent/artifacts/training-corpus-20260524/2307294809-all-merged)，合并本地缓存 WAV `519` 条；其中只有当前 manifest/transcripts/DB 可验证目标文本的 `235` 条可直接用于训练，另外 `284` 条是 2026-04-29 本地历史缓存残留，当前 OSS 远端清单、`dataset/<userId>/transcripts.txt` 和 `voice_contributions` 均已找不到对应 target
+   - 已生成可训练的目标-音频强对应包：[2307294809-target-audio-verified](/home/ubuntu/VoxFlame-Agent/artifacts/training-corpus-20260524/2307294809-target-audio-verified)，包含 `235` 条 raw WAV、`235` 条 trimmed WAV、`metadata.jsonl` `235` 行、`errors.json` 为空；分类为 `人群与角色 142 / 发音与朗读 35 / 看病与求助 12 / 现代文章朗读 46`
+   - 已验证：
+   - `node backend/scripts/manage_users.js find 230729489@qq.com`
+   - `node backend/scripts/manage_users.js find 2307294809@qq.com`
+   - `node backend/scripts/manage_users.js find 3083029019@qq.com`
+   - `cd backend && npm run download:oss-by-account -- --output-dir ../artifacts/oss-by-account`
+   - `python3 scripts/audio/prepare_training_corpus_artifact.py --objects-jsonl artifacts/oss-by-account/_objects.jsonl --output-dir artifacts/training-corpus-20260524 --account-label 2307294809__64758dee --account-label 3083029019__3368b1cb`
+   - `python3 -m py_compile scripts/audio/prepare_training_corpus_artifact.py`
+   - `cd backend && ./node_modules/.bin/ts-node scripts/download_oss_by_account.ts --dry-run --prefix supervised/mandarin/`
+   - `cd backend && ./node_modules/.bin/ts-node scripts/download_oss_by_account.ts --dry-run --prefix dataset/64758dee-5026-4b53-a063-1d02d0834f67/`
+   - `cd backend && ./node_modules/.bin/ts-node scripts/export_dataset_review_report.ts --email 2307294809@qq.com --limit 1000 --output-dir ../artifacts/dataset-review-20260524/2307294809`
 
 0. 2026-05-22 已把原 `发音与朗读` 拆成 `现代文章朗读` 和 `文言文节奏`，并统一清洗为简体中文
    - `scripts/corpus/export_frontend_source_corpus.py` 已改为优先使用 OpenCC `t2s` 繁转简；没有安装 `opencc-python-reimplemented` 时才退回脚本内置兜底表

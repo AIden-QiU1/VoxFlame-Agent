@@ -5,9 +5,10 @@ import { useEffect, useRef } from 'react'
 interface WaveformVisualizerProps {
   analyser: AnalyserNode | null
   isRecording: boolean
+  className?: string
 }
 
-export default function WaveformVisualizer({ analyser, isRecording }: WaveformVisualizerProps) {
+export default function WaveformVisualizer({ analyser, isRecording, className = '' }: WaveformVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const animationRef = useRef<number | null>(null)
   const currentVolRef = useRef<number>(0)
@@ -63,6 +64,7 @@ export default function WaveformVisualizer({ analyser, isRecording }: WaveformVi
       if (parent) {
         canvas.width = parent.clientWidth * dpr
         canvas.height = parent.clientHeight * dpr
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
         ctx.scale(dpr, dpr)
         canvas.style.width = `${parent.clientWidth}px`
         canvas.style.height = `${parent.clientHeight}px`
@@ -162,11 +164,11 @@ export default function WaveformVisualizer({ analyser, isRecording }: WaveformVi
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 h-screen z-20 pointer-events-none flex items-end justify-center transition-opacity duration-500 ${
+      className={`pointer-events-none relative h-20 w-full overflow-hidden rounded-3xl bg-stone-50 transition-opacity duration-300 sm:h-24 ${
         isRecording ? 'opacity-100' : 'opacity-0'
-      }`}
+      } ${className}`}
     >
-      <div className="w-full h-[400px] relative">
+      <div className="relative h-full w-full">
         {/* Ambient Glow */}
         <div className="absolute inset-0 bg-gray-300/10 blur-3xl rounded-full pointer-events-none transform scale-y-75" />
         <canvas ref={canvasRef} className="w-full h-full block" />

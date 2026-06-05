@@ -8,10 +8,12 @@ import logging
 import re
 import time
 import uuid
+import wave
+from io import BytesIO
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from config import LiveKitAgentConfig
@@ -24,6 +26,16 @@ PublishPayload = Callable[[dict[str, Any]], Awaitable[None]]
 FinalTranscriptHandler = Callable[[str], Awaitable[None]]
 SpeechActivityHandler = Callable[[str, bool], Awaitable[None]]
 AudioTelemetryHandler = Callable[[float, float, bool, bool, str], Awaitable[None]]
+
+
+class ASRClient(Protocol):
+    async def start(self, session_payload: dict[str, Any]) -> None: ...
+
+    async def append_audio(self, pcm_bytes: bytes) -> None: ...
+
+    async def commit_audio(self) -> None: ...
+
+    async def stop(self) -> None: ...
 TRANSCRIPT_EDGE_PUNCTUATION_PATTERN = re.compile(
     r"^[\s，。！？!?；;：:、,.…~～-]+|[\s，。！？!?；;：:、,.…~～-]+$"
 )
@@ -62,6 +74,36 @@ def build_asr_session_payload(config: LiveKitAgentConfig) -> dict[str, Any]:
         },
         "turn_detection": None,
     }
+
+
+def get_authenticated_user_id(ctx: VoxFlameSessionContext) -> str | None:
+    payload_value = ctx.dispatch_payload.get("authenticated_user_id")
+    if isinstance(payload_value, str) and payload_value.strip():
+        return payload_value.strip()
+
+    payload_value = ctx.participant_payload.get("authenticated_user_id")
+    if isinstance(payload_value, str) and payload_value.strip():
+        return payload_value.strip()
+
+    attribute_value = ctx.raw_attributes.get("vox.authenticated_user_id")
+    if isinstance(attribute_value, str) and attribute_value.strip():
+        return attribute_value.strip()
+
+    return None
+
+
+def should_use_qwen_http_asr(config: LiveKitAgentConfig, ctx: VoxFlameSessionContext) -> bool:
+    if not config.qwen_http_asr_url:
+        return False
+
+    if ctx.mode != "communication":
+        return False
+
+    if not config.qwen_http_asr_user_ids:
+        return False
+
+    authenticated_user_id = get_authenticated_user_id(ctx)
+    return authenticated_user_id in config.qwen_http_asr_user_ids
 
 
 def frame_to_pcm_bytes(frame: Any) -> bytes:
@@ -109,6 +151,22 @@ def normalized_peak_level(pcm_bytes: bytes) -> float:
     return audioop.max(pcm_bytes, 2) / 32768.0
 
 
+def pcm_bytes_to_wav_bytes(
+    pcm_bytes: bytes,
+    *,
+    sample_rate: int,
+    num_channels: int = 1,
+    sample_width: int = 2,
+) -> bytes:
+    output = BytesIO()
+    with wave.open(output, "wb") as wav_file:
+        wav_file.setnchannels(num_channels)
+        wav_file.setsampwidth(sample_width)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(pcm_bytes)
+    return output.getvalue()
+
+
 def semantic_transcript_length(text: str) -> int:
     return len(TRANSCRIPT_EDGE_PUNCTUATION_PATTERN.sub("", text.strip()))
 
@@ -152,6 +210,43 @@ def build_livekit_audio_apm_options(config: LiveKitAgentConfig) -> dict[str, boo
 
 def should_enable_livekit_audio_apm(config: LiveKitAgentConfig) -> bool:
     return config.livekit_audio_apm_enabled and any(build_livekit_audio_apm_options(config).values())
+
+
+def extract_http_asr_transcript(payload: Any) -> str:
+    if isinstance(payload, str):
+        return payload.strip()
+
+    if not isinstance(payload, dict):
+        return ""
+
+    for key in (
+        "text",
+        "transcript",
+        "result",
+        "sentence",
+        "recognized_text",
+        "recognizedText",
+    ):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    for key in ("data", "output"):
+        nested = payload.get(key)
+        transcript = extract_http_asr_transcript(nested)
+        if transcript:
+            return transcript
+
+    for key in ("results", "segments"):
+        value = payload.get(key)
+        if not isinstance(value, list):
+            continue
+        texts = [extract_http_asr_transcript(item) for item in value]
+        joined = "".join(text for text in texts if text)
+        if joined:
+            return joined.strip()
+
+    return ""
 
 
 @dataclass
@@ -325,6 +420,156 @@ class QwenRealtimeASRClient:
 
 
 @dataclass
+class QwenHttpASRClient:
+    url: str
+    language: str
+    sample_rate: int
+    request_timeout_seconds: float
+    event_handler: ServerEventHandler
+    fallback_client: QwenRealtimeASRClient | None = None
+
+    _buffer: bytearray = field(default_factory=bytearray)
+    _session_payload: dict[str, Any] | None = None
+    fallback_active: bool = False
+
+    @property
+    def provider_name(self) -> str:
+        return "qwen_http_asr"
+
+    @property
+    def fallback_provider_name(self) -> str:
+        return "dashscope_realtime_asr_backup"
+
+    async def start(self, session_payload: dict[str, Any]) -> None:
+        self._session_payload = dict(session_payload)
+        await self.event_handler(
+            {
+                "type": "session.updated",
+                "provider": self.provider_name,
+                "sample_rate": session_payload.get("sample_rate", self.sample_rate),
+            }
+        )
+
+    async def append_audio(self, pcm_bytes: bytes) -> None:
+        self._buffer.extend(pcm_bytes)
+
+    async def commit_audio(self) -> None:
+        pcm_bytes = bytes(self._buffer)
+        self._buffer.clear()
+        if not pcm_bytes:
+            await self.event_handler(
+                {
+                    "type": "client.error",
+                    "error": {"message": "HTTP ASR commit requested with empty audio buffer"},
+                    "provider": self.provider_name,
+                }
+            )
+            return
+
+        await self.event_handler(
+            {
+                "type": "input_audio_buffer.committed",
+                "provider": self.provider_name,
+                "audio_ms": pcm_duration_ms(pcm_bytes, self.sample_rate),
+            }
+        )
+        self.fallback_active = False
+        try:
+            transcript = await self._transcribe(pcm_bytes)
+        except Exception as exc:
+            if await self._fallback_to_realtime(pcm_bytes, exc):
+                return
+            return
+
+        await self.event_handler(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "transcript": transcript,
+                "provider": self.provider_name,
+            }
+        )
+
+    async def stop(self) -> None:
+        self._buffer.clear()
+        if self.fallback_client is not None:
+            await self.fallback_client.stop()
+
+    async def _fallback_to_realtime(self, pcm_bytes: bytes, error: Exception) -> bool:
+        if self.fallback_client is None or self._session_payload is None:
+            await self.event_handler(
+                {
+                    "type": "client.error",
+                    "error": {"message": str(error)},
+                    "provider": self.provider_name,
+                }
+            )
+            return False
+
+        logger.warning(
+            "Qwen HTTP ASR failed, falling back to realtime provider url=%s error=%s",
+            self.url,
+            error,
+        )
+        try:
+            await self.fallback_client.start(self._session_payload)
+            await self.fallback_client.append_audio(pcm_bytes)
+            await self.fallback_client.commit_audio()
+            self.fallback_active = True
+        except Exception as fallback_error:
+            await self.event_handler(
+                {
+                    "type": "client.error",
+                    "error": {
+                        "message": (
+                            f"HTTP ASR failed ({error}); realtime fallback failed "
+                            f"({fallback_error})"
+                        )
+                    },
+                    "provider": self.fallback_provider_name,
+                }
+            )
+            return False
+
+        return True
+
+    async def _transcribe(self, pcm_bytes: bytes) -> str:
+        import httpx
+
+        wav_bytes = pcm_bytes_to_wav_bytes(
+            pcm_bytes,
+            sample_rate=self.sample_rate,
+            num_channels=1,
+            sample_width=2,
+        )
+        files = {
+            "audio": (
+                "voxflame_capture.wav",
+                wav_bytes,
+                "audio/wav",
+            )
+        }
+        data = {"language": self.language}
+
+        async with httpx.AsyncClient(timeout=self.request_timeout_seconds) as client:
+            response = await client.post(self.url, data=data, files=files)
+
+        response.raise_for_status()
+        content_type = response.headers.get("content-type", "")
+        if "application/json" in content_type:
+            payload = response.json()
+        else:
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = response.text
+
+        transcript = extract_http_asr_transcript(payload)
+        if not transcript:
+            raise RuntimeError("HTTP ASR response did not include transcript text")
+        return transcript
+
+
+@dataclass
 class LiveKitASRRuntime:
     config: LiveKitAgentConfig
     ctx: VoxFlameSessionContext
@@ -333,7 +578,7 @@ class LiveKitASRRuntime:
     on_final_transcript: FinalTranscriptHandler
     on_speech_activity: SpeechActivityHandler | None = None
     on_audio_telemetry: AudioTelemetryHandler | None = None
-    client: QwenRealtimeASRClient | None = None
+    client: ASRClient | None = None
     _stream_task: asyncio.Task[None] | None = None
     _started: bool = False
     _audio_frame_count: int = 0
@@ -359,6 +604,8 @@ class LiveKitASRRuntime:
     _pending_final_transcript_client_capture_ids: list[str] = field(default_factory=list)
     _suppress_vad_auto_finalize_until: float = 0.0
     _short_utterance_capture_expected: bool = False
+    _asr_source: str = "dashscope_realtime_asr"
+    _fallback_final_transcript_pending: bool = False
 
     async def start(self) -> None:
         if self._stream_task is not None:
@@ -366,23 +613,46 @@ class LiveKitASRRuntime:
 
         from livekit import rtc
 
-        if not self.config.dashscope_api_key:
+        use_http_asr = should_use_qwen_http_asr(self.config, self.ctx)
+        if not use_http_asr and not self.config.dashscope_api_key:
             logger.warning("DashScope ASR is disabled because DASHSCOPE_API_KEY is missing")
             return
 
         if self.client is None:
-            self.client = QwenRealtimeASRClient(
-                url=self.config.dashscope_asr_url,
-                model=self.config.dashscope_asr_model,
-                api_key=self.config.dashscope_api_key,
-                connect_timeout_seconds=self.config.dashscope_asr_connect_timeout_seconds,
-                event_handler=self._handle_server_event,
-            )
+            if use_http_asr:
+                fallback_client = None
+                if self.config.dashscope_api_key:
+                    fallback_client = QwenRealtimeASRClient(
+                        url=self.config.dashscope_asr_url,
+                        model=self.config.dashscope_asr_model,
+                        api_key=self.config.dashscope_api_key,
+                        connect_timeout_seconds=self.config.dashscope_asr_connect_timeout_seconds,
+                        event_handler=self._handle_server_event,
+                    )
+                self.client = QwenHttpASRClient(
+                    url=self.config.qwen_http_asr_url or "",
+                    language=self.config.qwen_http_asr_language,
+                    sample_rate=self.config.dashscope_asr_sample_rate,
+                    request_timeout_seconds=self.config.qwen_http_asr_timeout_seconds,
+                    event_handler=self._handle_server_event,
+                    fallback_client=fallback_client,
+                )
+                self._asr_source = "qwen_http_asr"
+            else:
+                self.client = QwenRealtimeASRClient(
+                    url=self.config.dashscope_asr_url,
+                    model=self.config.dashscope_asr_model,
+                    api_key=self.config.dashscope_api_key or "",
+                    connect_timeout_seconds=self.config.dashscope_asr_connect_timeout_seconds,
+                    event_handler=self._handle_server_event,
+                )
+                self._asr_source = "dashscope_realtime_asr"
 
         logger.info(
-            "LiveKit ASR runtime starting room=%s participant=%s model=%s sample_rate=%s interim=%s vad_threshold=%s vad_silence_ms=%s barge_in_min_speech_ms=%s",
+            "LiveKit ASR runtime starting room=%s participant=%s provider=%s model=%s sample_rate=%s interim=%s vad_threshold=%s vad_silence_ms=%s barge_in_min_speech_ms=%s",
             self.ctx.room_name,
             self.ctx.participant_identity,
+            self._asr_source,
             self.config.dashscope_asr_model,
             self.config.dashscope_asr_sample_rate,
             self.config.dashscope_asr_enable_interim,
@@ -496,7 +766,12 @@ class LiveKitASRRuntime:
             self.ctx.participant_identity,
             reason or "unknown",
         )
+        mark_after_commit = not isinstance(self.client, QwenHttpASRClient)
+        if not mark_after_commit:
+            self._mark_client_capture_committed()
         await self.client.commit_audio()
+        if isinstance(self.client, QwenHttpASRClient) and self.client.fallback_active:
+            self._fallback_final_transcript_pending = True
         self._received_voice_since_commit = False
         self._speech_ms_since_commit = 0.0
         self._barge_in_triggered_since_commit = False
@@ -506,7 +781,8 @@ class LiveKitASRRuntime:
         self._clipping_detected_since_commit = False
         self._clipping_reported_since_commit = False
         self._apm_remainder = b""
-        self._mark_client_capture_committed()
+        if mark_after_commit:
+            self._mark_client_capture_committed()
 
     async def stop(self) -> None:
         logger.info(
@@ -640,18 +916,20 @@ class LiveKitASRRuntime:
         if self.client is None:
             raise RuntimeError("LiveKit ASR client is not initialized")
         logger.info(
-            "LiveKit ASR opening realtime session room=%s participant=%s url=%s model=%s",
+            "LiveKit ASR opening session room=%s participant=%s provider=%s url=%s model=%s",
             self.ctx.room_name,
             self.ctx.participant_identity,
-            self.client.url,
+            self._asr_source,
+            getattr(self.client, "url", ""),
             self.config.dashscope_asr_model,
         )
         await self.client.start(build_asr_session_payload(self.config))
         self._started = True
         logger.info(
-            "LiveKit ASR realtime session ready room=%s participant=%s",
+            "LiveKit ASR session ready room=%s participant=%s provider=%s",
             self.ctx.room_name,
             self.ctx.participant_identity,
+            self._asr_source,
         )
 
     async def _observe_vad(self, pcm_bytes: bytes, sample_rate: int) -> bool:
@@ -816,7 +1094,7 @@ class LiveKitASRRuntime:
                     self.ctx,
                     text,
                     is_final=False,
-                    source="dashscope_realtime_asr",
+                    source=self._asr_source,
                     client_capture_id=self._client_capture_external_id,
                 )
             )
@@ -886,6 +1164,11 @@ class LiveKitASRRuntime:
                 len(transcript),
                 transcript,
             )
+            asr_source = (
+                "dashscope_realtime_asr_backup"
+                if self._fallback_final_transcript_pending
+                else self._asr_source
+            )
 
             final_capture_external_id = (
                 self._pending_final_transcript_client_capture_ids.pop(0)
@@ -899,11 +1182,12 @@ class LiveKitASRRuntime:
                     self.ctx,
                     transcript,
                     is_final=True,
-                    source="dashscope_realtime_asr",
+                    source=asr_source,
                     client_capture_id=final_capture_external_id,
                 )
             )
             await self.on_final_transcript(transcript)
+            self._fallback_final_transcript_pending = False
             self._short_utterance_capture_expected = False
             return
 

@@ -10,10 +10,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from asr_runtime import (
     LiveKitASRRuntime,
+    QwenHttpASRClient,
     RMSVoiceActivityDetector,
     build_asr_session_payload,
     build_livekit_audio_apm_options,
+    extract_http_asr_transcript,
     frame_to_pcm_bytes,
+    pcm_bytes_to_wav_bytes,
+    should_use_qwen_http_asr,
     is_repetitive_transcript_noise,
     is_filler_transcript_noise,
     normalized_rms_energy,
@@ -46,6 +50,10 @@ def create_config() -> LiveKitAgentConfig:
         dashscope_asr_language="zh",
         dashscope_asr_enable_interim=True,
         dashscope_asr_connect_timeout_seconds=15,
+        qwen_http_asr_url=None,
+        qwen_http_asr_language="Chinese",
+        qwen_http_asr_timeout_seconds=30.0,
+        qwen_http_asr_user_ids=frozenset(),
         livekit_audio_apm_enabled=True,
         livekit_audio_apm_echo_cancellation=False,
         livekit_audio_apm_noise_suppression=True,
@@ -96,6 +104,25 @@ class FakeASRClient:
         self.commit_calls += 1
 
 
+class FakeFallbackASRClient:
+    def __init__(self) -> None:
+        self.started_payloads: list[dict[str, object]] = []
+        self.appended_audio: list[bytes] = []
+        self.commit_calls = 0
+
+    async def start(self, session_payload: dict[str, object]) -> None:
+        self.started_payloads.append(session_payload)
+
+    async def append_audio(self, pcm_bytes: bytes) -> None:
+        self.appended_audio.append(pcm_bytes)
+
+    async def commit_audio(self) -> None:
+        self.commit_calls += 1
+
+    async def stop(self) -> None:
+        return
+
+
 class TestASRRuntime(unittest.TestCase):
     def test_with_model_query_appends_model_when_missing(self) -> None:
         url = with_model_query(
@@ -110,6 +137,132 @@ class TestASRRuntime(unittest.TestCase):
         self.assertEqual(payload["input_audio_format"], "pcm")
         self.assertEqual(payload["sample_rate"], 16000)
         self.assertEqual(payload["input_audio_transcription"]["language"], "zh")
+
+    def test_should_use_qwen_http_asr_only_for_configured_communication_user(self) -> None:
+        config = create_config()
+        config = type(config)(
+            **{
+                **config.__dict__,
+                "qwen_http_asr_url": "http://121.41.45.9:8080/transcribe",
+                "qwen_http_asr_user_ids": frozenset({"64758dee-5026-4b53-a063-1d02d0834f67"}),
+            }
+        )
+        matching_ctx = type(
+            "Ctx",
+            (),
+            {
+                "mode": "communication",
+                "participant_payload": {"authenticated_user_id": "64758dee-5026-4b53-a063-1d02d0834f67"},
+                "dispatch_payload": {},
+                "raw_attributes": {},
+            },
+        )()
+        other_ctx = type(
+            "Ctx",
+            (),
+            {
+                "mode": "communication",
+                "participant_payload": {"authenticated_user_id": "other-user"},
+                "dispatch_payload": {},
+                "raw_attributes": {},
+            },
+        )()
+        training_ctx = type(
+            "Ctx",
+            (),
+            {
+                "mode": "training",
+                "participant_payload": {"authenticated_user_id": "64758dee-5026-4b53-a063-1d02d0834f67"},
+                "dispatch_payload": {},
+                "raw_attributes": {},
+            },
+        )()
+
+        self.assertTrue(should_use_qwen_http_asr(config, matching_ctx))
+        self.assertFalse(should_use_qwen_http_asr(config, other_ctx))
+        self.assertFalse(should_use_qwen_http_asr(config, training_ctx))
+
+    def test_pcm_bytes_to_wav_bytes_writes_standard_wav_header(self) -> None:
+        wav_bytes = pcm_bytes_to_wav_bytes(b"\x01\x00" * 160, sample_rate=16000)
+        self.assertEqual(wav_bytes[:4], b"RIFF")
+        self.assertEqual(wav_bytes[8:12], b"WAVE")
+        self.assertIn(b"fmt ", wav_bytes[:64])
+        self.assertIn(b"data", wav_bytes[:80])
+
+    def test_extract_http_asr_transcript_accepts_common_response_shapes(self) -> None:
+        self.assertEqual(extract_http_asr_transcript({"text": "刷牙"}), "刷牙")
+        self.assertEqual(
+            extract_http_asr_transcript({"data": {"transcript": "我要喝水"}}),
+            "我要喝水",
+        )
+        self.assertEqual(
+            extract_http_asr_transcript({"segments": [{"text": "我想"}, {"text": "挂号"}]}),
+            "我想挂号",
+        )
+
+    def test_qwen_http_asr_client_emits_final_transcript_on_success(self) -> None:
+        events: list[dict[str, object]] = []
+
+        async def handle_event(payload: dict[str, object]) -> None:
+            events.append(payload)
+
+        client = QwenHttpASRClient(
+            url="http://asr.example/transcribe",
+            language="Chinese",
+            sample_rate=16000,
+            request_timeout_seconds=3,
+            event_handler=handle_event,
+        )
+
+        async def fake_transcribe(pcm_bytes: bytes) -> str:
+            self.assertGreater(len(pcm_bytes), 0)
+            return "刷牙"
+
+        client._transcribe = fake_transcribe  # type: ignore[method-assign]
+
+        async def run_client() -> None:
+            await client.start({"sample_rate": 16000})
+            await client.append_audio(b"\x01\x00" * 160)
+            await client.commit_audio()
+
+        asyncio.run(run_client())
+
+        self.assertEqual(events[-1]["type"], "conversation.item.input_audio_transcription.completed")
+        self.assertEqual(events[-1]["transcript"], "刷牙")
+        self.assertEqual(events[-1]["provider"], "qwen_http_asr")
+
+    def test_qwen_http_asr_client_falls_back_to_realtime_on_failure(self) -> None:
+        events: list[dict[str, object]] = []
+        fallback = FakeFallbackASRClient()
+
+        async def handle_event(payload: dict[str, object]) -> None:
+            events.append(payload)
+
+        client = QwenHttpASRClient(
+            url="http://asr.example/transcribe",
+            language="Chinese",
+            sample_rate=16000,
+            request_timeout_seconds=3,
+            event_handler=handle_event,
+            fallback_client=fallback,  # type: ignore[arg-type]
+        )
+
+        async def fake_transcribe(_pcm_bytes: bytes) -> str:
+            raise RuntimeError("timeout")
+
+        client._transcribe = fake_transcribe  # type: ignore[method-assign]
+
+        async def run_client() -> None:
+            await client.start({"sample_rate": 16000})
+            await client.append_audio(b"\x01\x00" * 160)
+            await client.commit_audio()
+
+        asyncio.run(run_client())
+
+        self.assertTrue(client.fallback_active)
+        self.assertEqual(fallback.commit_calls, 1)
+        self.assertEqual(fallback.appended_audio, [b"\x01\x00" * 160])
+        self.assertEqual(events[-1]["type"], "input_audio_buffer.committed")
 
     def test_livekit_audio_apm_defaults_are_conservative_for_remote_tracks(self) -> None:
         options = build_livekit_audio_apm_options(create_config())

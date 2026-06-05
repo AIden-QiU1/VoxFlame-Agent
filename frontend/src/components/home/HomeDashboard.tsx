@@ -9,6 +9,7 @@ import {
   Mic,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { IcpBeianFooter } from '@/components/legal/IcpBeianFooter'
 import { buildLoginPath } from '@/lib/auth/navigation'
 import type { StarterKitScene } from '@/lib/communication/starter-kit'
 import { UserNav } from '@/components/ui/user-nav'
@@ -128,7 +129,7 @@ export default function HomeDashboard({
   const practiceHref = isAuthenticated ? '/contribute' : buildLoginPath('/contribute')
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,_#fcf7ee_0%,_#fffdf9_42%,_#f4efe6_100%)] text-slate-950">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-[linear-gradient(180deg,_#fcf7ee_0%,_#fffdf9_42%,_#f4efe6_100%)] text-slate-950">
       <header className="sticky top-0 z-30 border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
           <div className="flex items-center gap-3">
@@ -155,7 +156,7 @@ export default function HomeDashboard({
         </div>
       </header>
 
-      <main>
+      <main className="flex-1">
         <section className="px-5 pb-12 pt-16 sm:px-8 sm:pt-24">
           <div className="mx-auto max-w-7xl">
             <div className="max-w-4xl">
@@ -253,6 +254,7 @@ export default function HomeDashboard({
           </div>
         </section>
       </main>
+      <IcpBeianFooter />
     </div>
   )
 }

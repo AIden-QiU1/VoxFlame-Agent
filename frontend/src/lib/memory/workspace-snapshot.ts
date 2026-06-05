@@ -14,7 +14,7 @@ export interface ProfileBundleItem {
   id: string
   title: string
   content: string
-  source: 'user_profile' | 'growth_profile' | 'hotword_profile' | 'memory'
+  source: 'user_profile' | 'hotword_profile' | 'memory' | 'session'
   emphasis: 'high' | 'medium' | 'low'
   tags?: string[]
   updated_at: string
@@ -132,13 +132,13 @@ export interface WorkspaceMemorySnapshot {
     }>
   }
   object_zones: Array<{
-    id: 'custom_materials' | 'scene_and_hotword_templates' | 'user_profile' | 'training_summaries'
+    id: 'custom_materials' | 'scene_and_hotword_templates' | 'user_profile'
     title: string
     description: string
     empty_state: string
     items: Array<{
       id: string
-      type: 'custom_material' | 'scene_template' | 'user_profile' | 'training_summary'
+      type: 'custom_material' | 'scene_template' | 'user_profile'
       title: string
       summary: string
       tags: string[]
@@ -151,14 +151,14 @@ export interface WorkspaceMemorySnapshot {
     recommended_mode: 'urgent' | 'long_form'
     reason: string
     sections: Array<{
-      id: 'always_on' | 'scene_pack' | 'custom_materials' | 'training_summary'
+      id: 'always_on' | 'scene_pack' | 'custom_materials'
       title: string
       description: string
       items: Array<{
         id: string
         title: string
         summary: string
-        source_type: 'custom_material' | 'scene_template' | 'user_profile' | 'training_summary'
+        source_type: 'custom_material' | 'scene_template' | 'user_profile'
         required: boolean
         default_selected?: boolean
         document_content?: string | null

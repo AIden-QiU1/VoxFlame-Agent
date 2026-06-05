@@ -24,40 +24,7 @@ import {
   type SceneTemplateLibraryItem,
 } from '@/lib/memory/workspace-client'
 
-interface TrainingSummaryWindowView {
-  summary: string
-  sampleCount: number
-  mismatchPairs: Array<{
-    target: string
-    heard: string
-    occurrenceCount: number
-  }>
-  nextFocus: string[]
-  stableWins: string[]
-  pronunciationPatterns: string[]
-  supportStrategies: string[]
-  generatedAt: string
-}
-
-interface TrainingReportsView {
-  dailySummary: TrainingSummaryWindowView | null
-  weeklySummary: TrainingSummaryWindowView | null
-}
-
-interface TrainingActivityView {
-  daily_target_count: number
-  slogan: string
-  yesterday: {
-    day_key: string
-    total_recordings: number
-    top_contributors: Array<{
-      rank: number
-      recording_count: number
-    }>
-  }
-}
-
-type MemorySectionId = 'profile' | 'custom_material' | 'training_summary' | 'scene_templates'
+type MemorySectionId = 'profile' | 'custom_material' | 'scene_templates'
 
 const PROFILE_DOCUMENT_OUTLINE = [
   '我是谁：姓名、身份、平时最常见的沟通对象。',
@@ -111,25 +78,6 @@ function renderChips(
   )
 }
 
-function renderYesterdayTopContributors(activity: TrainingActivityView | null | undefined) {
-  const topContributors = activity?.yesterday.top_contributors ?? []
-
-  if (!topContributors.length) {
-    return <p className="mt-3 text-sm text-gray-600">昨天还没有可展示的训练记录。</p>
-  }
-
-  return (
-    <div className="mt-3 grid gap-2 sm:grid-cols-3">
-      {topContributors.map((item) => (
-        <div key={item.rank} className="rounded-[18px] bg-white px-4 py-3 ring-1 ring-stone-200">
-          <p className="text-sm font-medium text-gray-900">第 {item.rank} 名</p>
-          <p className="mt-1 text-xl font-semibold text-gray-900">{item.recording_count} 句</p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function summarizeText(value: string | null | undefined, fallback: string, maxLength = 88): string {
   const normalized = value?.trim()
   if (!normalized) {
@@ -137,18 +85,6 @@ function summarizeText(value: string | null | undefined, fallback: string, maxLe
   }
 
   return normalized.length > maxLength ? `${normalized.slice(0, maxLength).trim()}...` : normalized
-}
-
-function hasTrainingReportSummary(
-  reports: {
-    daily_summary: { summary: string } | null
-    weekly_summary: { summary: string } | null
-  } | null | undefined,
-): boolean {
-  return Boolean(
-    reports?.daily_summary?.summary.trim()
-    || reports?.weekly_summary?.summary.trim(),
-  )
 }
 
 interface MemorySectionShellProps {
@@ -661,71 +597,12 @@ export default function MemoryPage() {
     setExpandedSectionId((current) => (current === sectionId ? null : sectionId))
   }
 
-  const trainingReports = useMemo<TrainingReportsView | null>(() => {
-    const assetReports = preparedExpressionAsset?.training_reports ?? null
-    const workspaceReports = workspaceSnapshot?.prepared_expression?.training_reports ?? null
-    const reports = hasTrainingReportSummary(assetReports)
-      ? assetReports
-      : workspaceReports
-
-    if (!reports) {
-      return null
-    }
-
-    const mapWindow = (
-      windowSummary: {
-        summary: string
-        sampleCount?: number
-        sample_count?: number
-        mismatchPairs?: Array<{ target: string; heard: string; occurrenceCount: number }>
-        mismatch_pairs?: Array<{ target: string; heard: string; occurrenceCount: number }>
-        nextFocus?: string[]
-        next_focus?: string[]
-        stableWins?: string[]
-        stable_wins?: string[]
-        pronunciationPatterns?: string[]
-        pronunciation_patterns?: string[]
-        supportStrategies?: string[]
-        support_strategies?: string[]
-        generated_at: string
-      } | null,
-    ): TrainingSummaryWindowView | null => {
-      if (!windowSummary) {
-        return null
-      }
-
-      return {
-        summary: windowSummary.summary,
-        sampleCount: windowSummary.sampleCount ?? windowSummary.sample_count ?? 0,
-        mismatchPairs: windowSummary.mismatchPairs ?? windowSummary.mismatch_pairs ?? [],
-        nextFocus: windowSummary.nextFocus ?? windowSummary.next_focus ?? [],
-        stableWins: windowSummary.stableWins ?? windowSummary.stable_wins ?? [],
-        pronunciationPatterns:
-          windowSummary.pronunciationPatterns ?? windowSummary.pronunciation_patterns ?? [],
-        supportStrategies:
-          windowSummary.supportStrategies ?? windowSummary.support_strategies ?? [],
-        generatedAt: windowSummary.generated_at,
-      }
-    }
-
-    return {
-      dailySummary: mapWindow(reports.daily_summary),
-      weeklySummary: mapWindow(reports.weekly_summary),
-    }
-  }, [preparedExpressionAsset, workspaceSnapshot?.prepared_expression])
-  const trainingActivity = workspaceSnapshot?.training_activity ?? null
-  const dailyPracticeSlogan = trainingActivity?.slogan ?? '每天先练 20 句'
   const preparedExpressionPreview = summarizeText(
     activePreparedExpressionAsset
       ? `${activePreparedExpressionAsset.draft.title}：${activePreparedExpressionAsset.structured.summary}`
       : null,
     '还没有参考材料。这里会按材料库管理多份文档，并明确哪一份是当前加载材料。',
     140,
-  )
-  const trainingSummaryPreview = summarizeText(
-    trainingReports?.weeklySummary?.summary
-      || trainingReports?.dailySummary?.summary,
-    '还没有训练总结。训练页有真实录音后，这里再按时间窗更新。',
   )
   if (isLoading || !userId) {
     return (
@@ -746,7 +623,7 @@ export default function MemoryPage() {
             </Link>
             <h1 className="mt-2 text-3xl font-semibold text-gray-900 text-balance">记忆与准备</h1>
             <p className="mt-1 max-w-2xl text-sm text-gray-600 text-pretty">
-              把用户画像、参考材料、场景模板和训练回流集中放在这里，下一次就不用从空白开始。
+              把用户画像、参考材料和场景模板集中放在这里，下一次沟通就不用从空白开始。
             </p>
           </div>
           <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700">
@@ -1128,7 +1005,7 @@ export default function MemoryPage() {
                     {hasSavedPreparedExpression ? '保存并更新这份材料' : '保存新材料'}
                   </button>
                   <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-600">
-                    保存后会自动设为当前加载文档，训练总结只根据真实录音结果更新
+                    保存后会自动设为当前加载文档
                   </span>
                   {hasSavedPreparedExpression ? (
                     <button
@@ -1146,80 +1023,18 @@ export default function MemoryPage() {
           </MemorySectionShell>
         </div>
 
-        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div id="memory-training-summary">
-            <MemorySectionShell
-              id="training_summary"
-              expandedSectionId={expandedSectionId}
-              onToggle={handleSectionToggle}
-              eyebrow="训练总结"
-              eyebrowTone="stone"
-              title="训练总结"
-              description="这里看训练页回流的今日总结、7 天总结和匿名训练榜。"
-              preview={trainingSummaryPreview}
-              badge={trainingReports?.weeklySummary
-                ? `最近 7 天 ${trainingReports.weeklySummary.sampleCount} 条`
-                : trainingReports?.dailySummary
-                  ? `今天 ${trainingReports.dailySummary.sampleCount} 条`
-                  : '等待回流'}
-            >
-              {trainingReports ? (
-                <div className="space-y-4">
-                <div className="rounded-[20px] bg-stone-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">今日总结</p>
-                  <p className="mt-3 text-sm leading-7 text-gray-700">
-                    {trainingReports.dailySummary?.summary ?? '今天还没有新的训练总结。'}
-                  </p>
-                </div>
-
-                <div className="rounded-[20px] bg-amber-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">最近 7 天总结</p>
-                  <p className="mt-3 text-sm leading-7 text-gray-700">
-                    {trainingReports.weeklySummary?.summary ?? '最近 7 天还没有整理出稳定总结。'}
-                  </p>
-                  {trainingReports.weeklySummary?.mismatchPairs.length ? (
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-                      {trainingReports.weeklySummary.mismatchPairs.slice(0, 6).map((pair) => (
-                        <p key={`${pair.target}-${pair.heard}`}>
-                          {pair.target}{' <- '}{pair.heard}
-                          {pair.occurrenceCount > 1 ? ` · ${pair.occurrenceCount}次` : ''}
-                        </p>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-sm text-gray-600">最近 7 天还没有稳定错配对。</p>
-                  )}
-                </div>
-
-                <div className="rounded-[20px] bg-sky-50 px-4 py-4">
-                  <p className="text-sm font-medium text-gray-900">每日练习目标</p>
-                  <p className="mt-3 text-sm leading-7 text-gray-700">
-                    {dailyPracticeSlogan}。榜单只展示匿名名次和录音条数，不展示账号信息。
-                  </p>
-                  {renderYesterdayTopContributors(trainingActivity)}
-                </div>
-
-                </div>
-              ) : (
-                <div className="rounded-[20px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm leading-6 text-gray-600">
-                  现在还没有训练总结。先去训练页按拆句开始录，这里会按时间窗回流今日总结、7 天总结和匿名训练榜。
-                </div>
-              )}
-            </MemorySectionShell>
-          </div>
-
-          <div id="memory-scene-template-selector">
-            <MemorySectionShell
-              id="scene_templates"
-              expandedSectionId={expandedSectionId}
-              onToggle={handleSectionToggle}
-              eyebrow="场景 / 热词模板"
-              eyebrowTone="stone"
-              title="场景 / 热词模板"
-              description="先看模板标题，再决定要不要加载，不把整库细节一次性摊开。"
-              preview={selectedSceneTemplateSummary}
-              badge={`已选 ${selectedSceneTemplateIds.length} 套`}
-            >
+        <div id="memory-scene-template-selector">
+          <MemorySectionShell
+            id="scene_templates"
+            expandedSectionId={expandedSectionId}
+            onToggle={handleSectionToggle}
+            eyebrow="场景 / 热词模板"
+            eyebrowTone="stone"
+            title="场景 / 热词模板"
+            description="先看模板标题，再决定要不要加载，不把整库细节一次性摊开。"
+            preview={selectedSceneTemplateSummary}
+            badge={`已选 ${selectedSceneTemplateIds.length} 套`}
+          >
               {sceneTemplateStatus ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                   {sceneTemplateStatus}
@@ -1363,9 +1178,8 @@ export default function MemoryPage() {
                   </div>
                 )}
               </div>
-            </MemorySectionShell>
-          </div>
-        </section>
+          </MemorySectionShell>
+        </div>
       </main>
     </div>
   )

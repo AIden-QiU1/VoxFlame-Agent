@@ -35,7 +35,11 @@ services:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_API_URL: ${FRONTEND_NEXT_PUBLIC_API_URL:-/api}
         NEXT_PUBLIC_RTC_EXECUTION_BACKEND: ${NEXT_PUBLIC_RTC_EXECUTION_BACKEND:-livekit}
+        NEXT_PUBLIC_ICP_BEIAN_NUMBER: ${NEXT_PUBLIC_ICP_BEIAN_NUMBER:-沪ICP备2026020229号}
+        NEXT_PUBLIC_ICP_BEIAN_URL: ${NEXT_PUBLIC_ICP_BEIAN_URL:-https://beian.miit.gov.cn/}
+        NEXT_PUBLIC_ICP_BEIAN_COMPANY_NAME: ${NEXT_PUBLIC_ICP_BEIAN_COMPANY_NAME:-上海生声不息科技有限公司}
         BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:3001}
+        VOXFLAME_PUBLIC_BASE_URL: ${VOXFLAME_PUBLIC_BASE_URL:-https://voxember.com}
         VOXFLAME_ENABLE_PWA: ${VOXFLAME_ENABLE_PWA:-1}
         <<: *npm-args
     container_name: voxflame-frontend
@@ -44,6 +48,7 @@ services:
     environment:
       - NODE_ENV=production
       - BACKEND_INTERNAL_URL=http://backend:3001
+      - VOXFLAME_PUBLIC_BASE_URL=${VOXFLAME_PUBLIC_BASE_URL:-https://voxember.com}
       - VOXFLAME_ENABLE_PWA=${VOXFLAME_ENABLE_PWA:-1}
       - NEXT_PUBLIC_RTC_EXECUTION_BACKEND=${NEXT_PUBLIC_RTC_EXECUTION_BACKEND:-livekit}
       - LIVEKIT_SIGNAL_PROXY_TARGET=${LIVEKIT_SIGNAL_PROXY_TARGET:-http://host.docker.internal:7880}
@@ -143,6 +148,10 @@ services:
       - no_proxy=127.0.0.1,localhost,livekit-server
       - DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
       - DASHSCOPE_TIMEOUT_SECONDS=15
+      - QWEN_HTTP_ASR_URL=${QWEN_HTTP_ASR_URL:-}
+      - QWEN_HTTP_ASR_LANGUAGE=${QWEN_HTTP_ASR_LANGUAGE:-Chinese}
+      - QWEN_HTTP_ASR_TIMEOUT_SECONDS=${QWEN_HTTP_ASR_TIMEOUT_SECONDS:-30}
+      - QWEN_HTTP_ASR_USER_IDS=${QWEN_HTTP_ASR_USER_IDS:-}
     depends_on:
       - livekit-server
     restart: unless-stopped
