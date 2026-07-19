@@ -27,8 +27,8 @@ export interface PreparedExpressionPracticeSummary {
 }
 
 const DEFAULT_PREPARED_EXPRESSION_CATEGORY: MandarinTrainingCategory = '现代文章朗读'
-const TARGET_SEGMENT_MIN_LENGTH = 5
-const TARGET_SEGMENT_MAX_LENGTH = 15
+const TARGET_SEGMENT_MIN_LENGTH = 10
+const TARGET_SEGMENT_MAX_LENGTH = 20
 const CLAUSE_BREAK_PUNCTUATION = new Set(['，', '、', '：', ':', '；', ';', '。', '！', '？', '!', '?'])
 const SOFT_SPLIT_HINTS = ['如果', '但是', '因为', '所以', '然后', '并且', '以及', '同时', '或者', '比如', '例如', '为了']
 const NORMALIZE_PATTERN = /[\s,.;:!?，。！？；：、"'“”‘’（）()【】[\]{}<>《》…—-]+/g
@@ -165,6 +165,14 @@ function findPreferredSplitIndex(text: string): number {
   return upperBound
 }
 
+function shouldHardSplitClause(clause: string): boolean {
+  if (measureSegmentLength(clause) <= TARGET_SEGMENT_MAX_LENGTH) {
+    return false
+  }
+
+  return !Array.from(clause).some((char) => CLAUSE_BREAK_PUNCTUATION.has(char))
+}
+
 function splitLongClause(clause: string): string[] {
   const normalized = clause.trim()
   if (!normalized) {
@@ -210,10 +218,7 @@ function mergeClausesIntoPracticeLines(clauses: string[]): string[] {
       return
     }
 
-    const segments =
-      measureSegmentLength(clause) > TARGET_SEGMENT_MAX_LENGTH
-        ? splitLongClause(clause)
-        : [clause]
+    const segments = shouldHardSplitClause(clause) ? splitLongClause(clause) : [clause]
 
     segments.forEach((segment) => {
       if (!current) {
@@ -247,6 +252,7 @@ function mergeClausesIntoPracticeLines(clauses: string[]): string[] {
   }
 
   return results
+    .flatMap((segment) => (shouldHardSplitClause(segment) ? splitLongClause(segment) : [segment]))
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0)
 }

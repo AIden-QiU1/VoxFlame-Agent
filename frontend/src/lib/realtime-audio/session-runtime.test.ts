@@ -5,6 +5,7 @@ import {
   createSessionInitAckGate,
   createDecodedRtcMessageHandler,
   publishRtcRuntimeControlMessage,
+  startRtcRuntimeConnection,
 } from './session-runtime.ts'
 import { createInitialRtcAgentState } from './session-state.ts'
 import { memoryService } from '../memory/memory-service.ts'
@@ -93,6 +94,81 @@ test('session-runtime throws when control messages are published before RTM is r
       { text: '你好' },
     ),
     /RTM 会话尚未就绪/,
+  )
+})
+
+test('session-runtime clears connecting state when session start fails', async () => {
+  const harness = createStateHarness()
+  const originalFetch = globalThis.fetch
+  const originalWindow = globalThis.window
+  const originalNavigator = globalThis.navigator
+
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      isSecureContext: true,
+    },
+  })
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {
+      mediaDevices: {},
+      onLine: true,
+    },
+  })
+  globalThis.fetch = (async () => new Response(
+    JSON.stringify({ error: '实时转录助手当前还没有准备好，请稍后再试。' }),
+    {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    },
+  )) as typeof fetch
+
+  try {
+    await assert.rejects(
+      startRtcRuntimeConnection({
+        refs: {
+          clientRef: { current: null },
+          rtmClientRef: { current: null },
+          micTrackRef: { current: null },
+          sessionRef: { current: null },
+          connectPromiseRef: { current: null },
+          inboundRtmChunksRef: { current: new Map() },
+          latestUserTranscriptRef: {
+            current: { text: '', clientCaptureId: null },
+          },
+          onDecodedEnvelopeRef: { current: null },
+        },
+        userId: 'user-1',
+        accessToken: 'access-token',
+        memoryOwnerId: null,
+        mode: 'communication',
+        connectionNotice: null,
+        setState: harness.setState,
+        clearPing: () => undefined,
+        cleanupMicrophoneResources: () => undefined,
+        pingTimerRef: { current: null },
+        handleRtmMessage: () => undefined,
+      }),
+      /实时转录助手当前还没有准备好/,
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: originalWindow,
+    })
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: originalNavigator,
+    })
+  }
+
+  assert.equal(harness.getState().isConnecting, false)
+  assert.equal(harness.getState().isConnected, false)
+  assert.equal(
+    harness.getState().error,
+    '实时转录助手当前还没有准备好，请稍后再试。',
   )
 })
 

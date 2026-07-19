@@ -23,8 +23,13 @@ declare global {
 // 初始化 Supabase 客户端（用于验证 Token）
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || ''
+const isProduction = process.env.NODE_ENV === 'production'
 
 if (!supabaseUrl || !supabaseKey) {
+  if (isProduction) {
+    throw new Error('[AuthMiddleware] Supabase credentials are required in production')
+  }
+
   console.warn('[AuthMiddleware] Supabase credentials missing. Auth middleware will be skipped.')
 }
 

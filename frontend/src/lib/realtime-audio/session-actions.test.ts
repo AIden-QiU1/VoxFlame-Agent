@@ -4,6 +4,8 @@ import {
   clearRtcMessagesAction,
   getRtcMicrophoneMediaStream,
   sendRtcTextAction,
+  startRtcRecordingAction,
+  stopRtcRecordingAction,
 } from './session-actions.ts'
 import { createInitialRtcAgentState } from './session-state.ts'
 import { memoryService } from '../memory/memory-service.ts'
@@ -20,6 +22,66 @@ function createStateHarness(initialState: RtcAgentState = createInitialRtcAgentS
     },
   }
 }
+
+test('session-actions registers capture id before enabling audio and commits the same id after disabling', async () => {
+  const harness = createStateHarness()
+  const calls: string[] = []
+  const track = {
+    setEnabled: async (enabled: boolean) => {
+      calls.push(`track:${enabled ? 'enabled' : 'disabled'}`)
+    },
+  }
+  const micTrackRef = { current: track as never }
+  const latestUserTranscriptRef = {
+    current: { text: '旧结果', clientCaptureId: 'old-capture' },
+  }
+  const sendControlMessage = async (
+    type: string,
+    payload: Record<string, unknown> = {},
+  ) => {
+    calls.push(`${type}:${String(payload.client_capture_id || '')}`)
+  }
+
+  await startRtcRecordingAction({
+    refs: {
+      micTrackRef,
+      micStreamRef: { current: null },
+      preflightMicStreamRef: { current: null },
+      sessionRef: { current: { channelName: 'training-room' } as never },
+      latestUserTranscriptRef,
+    },
+    setState: harness.setState,
+    connect: async () => undefined,
+    ensureMicrophoneTrack: async () => track as never,
+    warmUpMicrophoneStream: async () => ({}) as MediaStream,
+    sendControlMessage,
+    clientCaptureId: 'capture-1',
+    shortUtteranceExpected: true,
+  })
+
+  await stopRtcRecordingAction({
+    refs: {
+      micTrackRef,
+      latestUserTranscriptRef,
+    },
+    setState: harness.setState,
+    sendControlMessage,
+    clientCaptureId: 'capture-1',
+  })
+
+  assert.deepEqual(calls, [
+    'speech_activity:capture-1',
+    'track:enabled',
+    'track:disabled',
+    'speech_activity:capture-1',
+    'end_audio:capture-1',
+  ])
+  assert.deepEqual(latestUserTranscriptRef.current, {
+    text: '',
+    clientCaptureId: null,
+  })
+  assert.equal(harness.getState().isRecording, false)
+})
 
 test('session-actions sets a user-facing error when text is sent before the control channel is ready', async () => {
   const harness = createStateHarness()

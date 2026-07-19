@@ -28,7 +28,7 @@ from data_contract import (
     extract_caption_mode_update,
     extract_client_speech_activity,
     decode_data_packet,
-    extract_end_audio_reason,
+    extract_end_audio_request,
     extract_preparation_context_update,
     extract_user_text_input,
 )
@@ -74,7 +74,7 @@ _sanitize_proxy_env_for_local_livekit()
 # Self-hosted LiveKit worker registration should bypass shell-level HTTP proxies.
 # The default AgentServer behavior inherits HTTP_PROXY/HTTPS_PROXY, which caused
 # local `/agent` websocket registration to be routed to 127.0.0.1:7897 and fail.
-server = AgentServer(http_proxy=None)
+server = AgentServer(host="127.0.0.1", http_proxy=None)
 
 
 @server.on("worker_started")
@@ -493,15 +493,22 @@ async def entrypoint(ctx: JobContext) -> None:
             )
             return
 
-        end_audio_reason = extract_end_audio_reason(message)
-        if end_audio_reason:
+        end_audio_request = extract_end_audio_request(message)
+        if end_audio_request:
+            end_audio_reason, client_capture_id = end_audio_request
             logger.info(
-                "LiveKit end_audio received room=%s participant=%s reason=%s",
+                "LiveKit end_audio received room=%s participant=%s reason=%s client_capture_id=%s",
                 session_context.room_name,
                 session_context.participant_identity,
                 end_audio_reason,
+                client_capture_id,
             )
-            asyncio.create_task(asr_runtime.commit_audio(end_audio_reason))
+            asyncio.create_task(
+                asr_runtime.commit_audio(
+                    end_audio_reason,
+                    client_capture_id=client_capture_id,
+                )
+            )
 
     await publish_init_ack()
 

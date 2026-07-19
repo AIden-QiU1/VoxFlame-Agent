@@ -116,7 +116,6 @@ const COMMON_STOPWORDS = new Set([
 
 const TARGET_SEGMENT_MIN_LENGTH = 10;
 const TARGET_SEGMENT_MAX_LENGTH = 20;
-const HARD_SEGMENT_MAX_LENGTH = 24;
 const CLAUSE_BREAK_PUNCTUATION = new Set(['，', '、', '：', ':', '；', ';', '。', '！', '？', '!', '?']);
 const SOFT_SPLIT_HINTS = ['如果', '但是', '因为', '所以', '然后', '并且', '以及', '同时', '或者', '比如', '例如', '为了'];
 
@@ -281,6 +280,14 @@ function findPreferredSplitIndex(text: string): number {
   return upperBound;
 }
 
+function shouldHardSplitClause(clause: string): boolean {
+  if (measureSegmentLength(clause) <= TARGET_SEGMENT_MAX_LENGTH) {
+    return false;
+  }
+
+  return !Array.from(clause).some((char) => CLAUSE_BREAK_PUNCTUATION.has(char));
+}
+
 function splitLongClause(clause: string): string[] {
   const normalized = clause.trim();
   if (!normalized) {
@@ -326,10 +333,7 @@ function mergeClausesIntoPracticeLines(clauses: string[]): string[] {
       return;
     }
 
-    const segments =
-      measureSegmentLength(clause) > HARD_SEGMENT_MAX_LENGTH
-        ? splitLongClause(clause)
-        : [clause];
+    const segments = shouldHardSplitClause(clause) ? splitLongClause(clause) : [clause];
 
     segments.forEach((segment) => {
       if (!current) {
@@ -363,11 +367,7 @@ function mergeClausesIntoPracticeLines(clauses: string[]): string[] {
   }
 
   return results
-    .flatMap((segment) => (
-      measureSegmentLength(segment) > HARD_SEGMENT_MAX_LENGTH
-        ? splitLongClause(segment)
-        : [segment]
-    ))
+    .flatMap((segment) => (shouldHardSplitClause(segment) ? splitLongClause(segment) : [segment]))
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0);
 }
@@ -581,7 +581,7 @@ export function buildPreparedExpressionTemplateFromDraft(
 ): PreparedExpressionTemplate {
   const paragraphs = splitParagraphs(draft.content);
   const documentHotwords = extractHotwordCandidates(draft.content);
-  const sections = paragraphs.slice(0, 12).map((paragraph, index) => {
+  const sections = paragraphs.map((paragraph, index) => {
     const sentences = splitSentences(paragraph);
     const anchorLine = sentences[0] ?? paragraph;
     const practiceLines = dedupeStrings(

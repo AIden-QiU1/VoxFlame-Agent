@@ -1,0 +1,16 @@
+- list [ref=e3]:
+  - listitem [ref=e4]
+  - listitem [ref=e6]:
+    - paragraph [ref=e7]: "405- Method Not Allowed 规则ID :1783994296106003000141989546156 访问域名 : beian.mps.gov.cn"
+    - paragraph [ref=e8]:
+      - text: 该网站已接入
+      - strong [ref=e10]: 中国电信•网站安全防护服务
+      - text: ，由于您使用的请求方法存在潜在安全风险，被网站安全防护拦截。如果您有任何疑问或者认为这是一个误报，请您通过以下方式进行反馈：
+    - paragraph [ref=e11]:
+      - strong [ref=e13]: 在线提交（30分钟后请您刷新页面重试）：
+  - listitem [ref=e14]:
+    - textbox "请输入您的联系方式" [ref=e15]
+    - textbox "请输入您的申诉内容" [ref=e16]
+    - button "问题反馈" [ref=e17]
+    - separator [ref=e18]
+    - generic [ref=e19]: chn-bj-dx/2.0.0

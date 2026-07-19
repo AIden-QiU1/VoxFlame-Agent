@@ -35,6 +35,8 @@ class ASRClient(Protocol):
 
     async def commit_audio(self) -> None: ...
 
+    async def clear_audio(self) -> None: ...
+
     async def stop(self) -> None: ...
 TRANSCRIPT_EDGE_PUNCTUATION_PATTERN = re.compile(
     r"^[\s，。！？!?；;：:、,.…~～-]+|[\s，。！？!?；;：:、,.…~～-]+$"
@@ -42,6 +44,7 @@ TRANSCRIPT_EDGE_PUNCTUATION_PATTERN = re.compile(
 FILLER_TRANSCRIPT_PATTERN = re.compile(r"^(嗯+|呃+|啊+|哦+|喔+|额+|唔+|哼+)$")
 MANUAL_STOP_SHORT_TRANSCRIPT_GRACE_SECONDS = 2.0
 SHORT_UTTERANCE_EXTRA_FINALIZE_GRACE_SECONDS = 1.1
+HTTP_ASR_SUPPORTED_MODES = frozenset({"communication", "training"})
 
 
 class VADState(Enum):
@@ -96,7 +99,7 @@ def should_use_qwen_http_asr(config: LiveKitAgentConfig, ctx: VoxFlameSessionCon
     if not config.qwen_http_asr_url:
         return False
 
-    if ctx.mode != "communication":
+    if ctx.mode not in HTTP_ASR_SUPPORTED_MODES:
         return False
 
     if not config.qwen_http_asr_user_ids:
@@ -320,6 +323,10 @@ class QwenRealtimeASRClient:
         await self._ensure_ready()
         await self._send_json({"type": "input_audio_buffer.commit"})
 
+    async def clear_audio(self) -> None:
+        await self._ensure_ready()
+        await self._send_json({"type": "input_audio_buffer.clear"})
+
     async def stop(self) -> None:
         async with self._connect_lock:
             await self._close_current_socket()
@@ -473,6 +480,7 @@ class QwenHttpASRClient:
                 "audio_ms": pcm_duration_ms(pcm_bytes, self.sample_rate),
             }
         )
+
         self.fallback_active = False
         try:
             transcript = await self._transcribe(pcm_bytes)
@@ -488,6 +496,12 @@ class QwenHttpASRClient:
                 "provider": self.provider_name,
             }
         )
+
+    async def clear_audio(self) -> None:
+        self._buffer.clear()
+        self.fallback_active = False
+        if self.fallback_client is not None:
+            await self.fallback_client.clear_audio()
 
     async def stop(self) -> None:
         self._buffer.clear()
@@ -698,6 +712,19 @@ class LiveKitASRRuntime:
             return
 
         if normalized_state == "speech_stopped":
+            if (
+                client_capture_id
+                and self._client_capture_external_id
+                and client_capture_id != self._client_capture_external_id
+            ):
+                logger.warning(
+                    "LiveKit ASR stale client stop ignored room=%s participant=%s expected_capture_id=%s active_capture_id=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    client_capture_id,
+                    self._client_capture_external_id,
+                )
+                return
             self._client_recording_active = False
             if auto_finalize:
                 suppression_seconds = self.config.dashscope_asr_vad_silence_duration_ms / 1000.0
@@ -724,8 +751,28 @@ class LiveKitASRRuntime:
             if queue_final_transcript and self._client_capture_external_id:
                 self._pending_final_transcript_client_capture_ids.append(self._client_capture_external_id)
 
-    async def commit_audio(self, reason: str | None = None) -> None:
+    async def commit_audio(
+        self,
+        reason: str | None = None,
+        *,
+        client_capture_id: str | None = None,
+    ) -> None:
         if self.client is None or not self._started:
+            return
+
+        if (
+            client_capture_id
+            and self._client_capture_external_id
+            and client_capture_id != self._client_capture_external_id
+        ):
+            logger.warning(
+                "LiveKit ASR stale capture commit ignored room=%s participant=%s reason=%s expected_capture_id=%s active_capture_id=%s",
+                self.ctx.room_name,
+                self.ctx.participant_identity,
+                reason or "unknown",
+                client_capture_id,
+                self._client_capture_external_id,
+            )
             return
 
         if self._is_duplicate_client_capture_commit():
@@ -750,7 +797,17 @@ class LiveKitASRRuntime:
                 self._client_capture_id,
                 int(self._speech_ms_since_commit),
             )
+            await self.client.clear_audio()
             self._mark_client_capture_committed(queue_final_transcript=False)
+            self._received_voice_since_commit = False
+            self._speech_ms_since_commit = 0.0
+            self._barge_in_triggered_since_commit = False
+            self._level_sum_since_commit = 0.0
+            self._level_count_since_commit = 0
+            self._peak_level_since_commit = 0.0
+            self._clipping_detected_since_commit = False
+            self._clipping_reported_since_commit = False
+            self._apm_remainder = b""
             return
 
         self._ignore_short_transcripts_until = 0.0
@@ -987,6 +1044,15 @@ class LiveKitASRRuntime:
             return True
 
         if speech_stopped and self._received_voice_since_commit:
+            if self._client_capture_tracking_enabled and self._client_recording_active:
+                logger.info(
+                    "LiveKit ASR auto finalize deferred until client stop room=%s participant=%s capture_id=%s speech_ms=%s",
+                    self.ctx.room_name,
+                    self.ctx.participant_identity,
+                    self._client_capture_external_id,
+                    round(self._speech_ms_since_commit),
+                )
+                return False
             if (
                 not self._client_recording_active
                 and time.monotonic() < self._suppress_vad_auto_finalize_until
@@ -1101,6 +1167,12 @@ class LiveKitASRRuntime:
             return
 
         if message_type == "conversation.item.input_audio_transcription.completed":
+            final_capture_external_id = (
+                self._pending_final_transcript_client_capture_ids.pop(0)
+                if self._pending_final_transcript_client_capture_ids
+                else self._last_committed_client_capture_external_id
+                or self._client_capture_external_id
+            )
             ignore_short_transcript = time.monotonic() <= self._ignore_short_transcripts_until
             transcript = str(payload.get("transcript", "") or "").strip()
             if not transcript:
@@ -1170,13 +1242,6 @@ class LiveKitASRRuntime:
                 else self._asr_source
             )
 
-            final_capture_external_id = (
-                self._pending_final_transcript_client_capture_ids.pop(0)
-                if self._pending_final_transcript_client_capture_ids
-                else self._last_committed_client_capture_external_id
-                or self._client_capture_external_id
-            )
-
             await self.publish_payload(
                 build_user_transcript_output(
                     self.ctx,
@@ -1192,8 +1257,21 @@ class LiveKitASRRuntime:
             return
 
         if message_type in {"error", "client.error"}:
+            failed_capture_external_id = (
+                self._pending_final_transcript_client_capture_ids.pop(0)
+                if self._pending_final_transcript_client_capture_ids
+                else self._last_committed_client_capture_external_id
+                or self._client_capture_external_id
+            )
             error_info = payload.get("error", {})
             error_message = str(error_info.get("message", "unknown error"))
-            logger.warning("LiveKit ASR error room=%s error=%s", self.ctx.room_name, error_message)
+            logger.warning(
+                "LiveKit ASR error room=%s capture_id=%s error=%s",
+                self.ctx.room_name,
+                failed_capture_external_id,
+                error_message,
+            )
+            self._fallback_final_transcript_pending = False
+            self._short_utterance_capture_expected = False
             await self.publish_payload(build_error_output(error_message))
             return

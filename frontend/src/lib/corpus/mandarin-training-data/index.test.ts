@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import {
+  MANDARIN_TRAINING_CATEGORIES,
   MANDARIN_TRAINING_EXERCISES,
 } from './index'
 import type { MandarinTrainingExercise } from './index'
@@ -31,23 +32,67 @@ const MODERN_READING_WEB_NOISE = [
   'app下载',
 ]
 
+const LOW_QUALITY_TERMS = [
+  '女尸',
+  '尸体',
+  '自杀',
+  '死亡',
+  '杀人',
+  '毒品',
+  '战争',
+  '总统',
+  '汤姆',
+  '玛丽',
+  '上帝',
+  '维基',
+  '版权',
+  '隐私',
+  '协议',
+  '我要听',
+  '给我听',
+  '我想听',
+  '支持文章',
+  '月经',
+  '谋杀',
+  '癌细胞',
+  '手足口病',
+]
+
+function repeatSignature(text: string): string {
+  return text
+    .replace(/[零一二三四五六七八九十百千万亿两幺]+/g, '数')
+    .replace(/第[数]+/g, '第数')
+    .replace(/[年月日号点分秒周星期公里元块楼层号]/g, '量')
+    .replace(/(我|你|您|他|她|我们|你们|他们|大家)/g, '人')
+    .replace(/(医生|护士|老师|同学|妈妈|爸爸|朋友|同事|客服|司机|乘务员)/g, '角色')
+}
+
 test('Mandarin training corpus stays within the guided prompt size', () => {
   const nonAssessmentPrompts = MANDARIN_TRAINING_EXERCISES.filter(
     (exercise: MandarinTrainingExercise) => exercise.category !== '评估筛查',
   )
 
   assert.ok(
-    nonAssessmentPrompts.length >= 1_000 && nonAssessmentPrompts.length <= 2_000,
-    `expected 1000-2000 trainable prompts, got ${nonAssessmentPrompts.length}`,
+    nonAssessmentPrompts.length >= 8_000,
+    `expected at least 8000 trainable prompts, got ${nonAssessmentPrompts.length}`,
   )
 
   for (const exercise of nonAssessmentPrompts) {
     const length = visibleChineseLength(exercise.text)
     assert.ok(
-      length >= 6 && length <= 16,
-      `${exercise.id} should be 6-16 chars, got ${length}: ${exercise.text}`,
+      length >= 7 && length <= 18,
+      `${exercise.id} should be 7-18 chars, got ${length}: ${exercise.text}`,
     )
   }
+})
+
+test('Mandarin training corpus removes the classical Chinese category', () => {
+  assert.equal((MANDARIN_TRAINING_CATEGORIES as readonly string[]).includes('文言文节奏'), false)
+  assert.equal(MANDARIN_TRAINING_CATEGORIES.includes('音系强化'), true)
+  assert.equal(
+    MANDARIN_TRAINING_EXERCISES.some((exercise) => String(exercise.category) === '文言文节奏'),
+    false,
+  )
 })
 
 test('Mandarin training corpus target text is Simplified Chinese only', () => {
@@ -70,12 +115,35 @@ test('Modern article reading corpus excludes page and training-site noise', () =
   }
 })
 
+test('Mandarin training corpus excludes low-quality and sensitive fragments', () => {
+  for (const exercise of MANDARIN_TRAINING_EXERCISES) {
+    const leaked = LOW_QUALITY_TERMS.filter((term) => exercise.text.includes(term))
+    assert.deepEqual(leaked, [], `${exercise.id} contains low-quality term: ${exercise.text}`)
+  }
+})
+
 test('Mandarin training corpus has no duplicate target text per category', () => {
   const seen = new Set<string>()
 
   for (const exercise of MANDARIN_TRAINING_EXERCISES) {
-    const key = `${exercise.category}:${exercise.text}`
+    const key = exercise.text
     assert.equal(seen.has(key), false, `duplicate target text: ${key}`)
     seen.add(key)
   }
+})
+
+test('Mandarin training corpus limits near-duplicate sentence structures', () => {
+  const counts = new Map<string, number>()
+
+  for (const exercise of MANDARIN_TRAINING_EXERCISES) {
+    if (exercise.category === '评估筛查') {
+      continue
+    }
+
+    const key = `${exercise.category}:${repeatSignature(exercise.text)}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+
+  const overLimit = Array.from(counts.entries()).filter(([, count]) => count > 8)
+  assert.deepEqual(overLimit, [], `near-duplicate structures exceeded limit: ${JSON.stringify(overLimit.slice(0, 5))}`)
 })

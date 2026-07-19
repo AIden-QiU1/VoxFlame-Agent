@@ -5,7 +5,10 @@ import {
   LiveKitConfigService,
 } from './livekit-config.service'
 import { LiveKitSessionService } from './livekit-session.service'
-import { deriveRtcBrowserWebSocketUrl } from './rtc-orchestration.service'
+import {
+  deriveRtcBrowserWebSocketUrl,
+  RtcOrchestrationService,
+} from './rtc-orchestration.service'
 
 function withEnv(
   values: Record<string, string | undefined>,
@@ -24,6 +27,34 @@ function withEnv(
 
   try {
     fn()
+  } finally {
+    for (const [key, value] of previous.entries()) {
+      if (value === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    }
+  }
+}
+
+async function withEnvAsync(
+  values: Record<string, string | undefined>,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const previous = new Map<string, string | undefined>()
+
+  for (const [key, value] of Object.entries(values)) {
+    previous.set(key, process.env[key])
+    if (value === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = value
+    }
+  }
+
+  try {
+    await fn()
   } finally {
     for (const [key, value] of previous.entries()) {
       if (value === undefined) {
@@ -201,6 +232,54 @@ async function runLiveKitConfigTests(): Promise<void> {
   assert.equal(grants.attributes?.['vox.surface'], 'communication_workspace')
 
   console.log('livekit-session.service tests passed')
+
+  await withEnvAsync(
+    {
+      LIVEKIT_URL: 'ws://127.0.0.1:7880',
+      LIVEKIT_BROWSER_URL: 'wss://voxember.com',
+      LIVEKIT_API_KEY: 'test_api_key',
+      LIVEKIT_API_SECRET: 'test_api_secret',
+      LIVEKIT_AGENT_NAME: 'voxflame-agent',
+      RTC_ENABLE_LIVEKIT_EXPERIMENT: '1',
+      SUPABASE_URL: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+    },
+    async () => {
+      const originalFetch = globalThis.fetch
+      let fetchCalls = 0
+      globalThis.fetch = (async () => {
+        fetchCalls += 1
+        throw new Error('unexpected HTTP health probe')
+      }) as typeof fetch
+
+      try {
+        const orchestration = new RtcOrchestrationService()
+        const result = await orchestration.startSession({
+          mode: 'communication',
+          intent: {
+            surface: 'communication_workspace',
+            mode: 'communication',
+            sessionStrategy: 'heavy_realtime',
+            requestedCapabilities: ['transport_send_control'],
+            deviceContext: {
+              secureContext: true,
+              mediaDevicesSupported: true,
+              microphoneStatus: 'available',
+              networkOnline: true,
+            },
+          },
+        })
+
+        assert.equal(result.executionBackend, 'livekit')
+        assert.equal(result.transport.agentDispatch?.agentName, 'voxflame-agent')
+        assert.equal(fetchCalls, 0)
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+    },
+  )
+
+  console.log('rtc-orchestration.service tests passed')
 
   console.log('livekit-config.service tests passed')
 }

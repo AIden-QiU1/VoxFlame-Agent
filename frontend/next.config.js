@@ -24,6 +24,7 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 const nextConfig = {
   // Generate standalone output for Docker runtime
   output: 'standalone',
+  poweredByHeader: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -52,6 +53,37 @@ const nextConfig = {
         source: '/rtc/:path*',
         destination: 'http://livekit-server:7880/rtc/:path*',
       }
+    ]
+  },
+  async headers() {
+    const securityHeaders = [
+      {
+        key: 'X-Content-Type-Options',
+        value: 'nosniff',
+      },
+      {
+        key: 'X-Frame-Options',
+        value: 'DENY',
+      },
+      {
+        key: 'Referrer-Policy',
+        value: 'strict-origin-when-cross-origin',
+      },
+      {
+        key: 'Content-Security-Policy',
+        value: "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: blob: https:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; media-src 'self' blob: data:; manifest-src 'self'; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+      },
+      {
+        key: 'Permissions-Policy',
+        value: 'camera=(), display-capture=(), geolocation=(), payment=(), usb=(), microphone=(self)',
+      },
+    ]
+
+    return [
+      {
+        source: '/:path*',
+        headers: securityHeaders,
+      },
     ]
   }
 };

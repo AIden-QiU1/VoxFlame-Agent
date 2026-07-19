@@ -553,20 +553,24 @@ export async function startRtcRuntimeConnection({
   let lastError: Error | null = null
 
   for (let attempt = 1; attempt <= SESSION_INIT_ACK_MAX_ATTEMPTS; attempt += 1) {
-    const session = await startRtcSession(mode, sessionIntent, {
-      executionBackend: executionBackend ?? config.rtc.executionBackend,
-      accessToken,
-      timeoutSeconds,
-    })
+    let session: StartRtcSessionResponse | null = null
     let client: SessionExecutionClient | null = null
     let rtmClient: SessionControlClient | null = null
-    const initAckGate = createSessionInitAckGate(session.requestId)
-    refs.onDecodedEnvelopeRef.current = initAckGate.handleDecodedMessage
+    let initAckGate: ReturnType<typeof createSessionInitAckGate> | null = null
 
     try {
+      const activeSession = await startRtcSession(mode, sessionIntent, {
+        executionBackend: executionBackend ?? config.rtc.executionBackend,
+        accessToken,
+        timeoutSeconds,
+      })
+      session = activeSession
+      initAckGate = createSessionInitAckGate(activeSession.requestId)
+      refs.onDecodedEnvelopeRef.current = initAckGate.handleDecodedMessage
+
       const transportEventHandlers = createSessionTransportEventHandlers(setState)
       const transport = await connectSessionExecution({
-        session,
+        session: activeSession,
         onRtmMessage: handleRtmMessage,
         ...transportEventHandlers,
       })
@@ -575,19 +579,19 @@ export async function startRtcRuntimeConnection({
 
       refs.clientRef.current = client
       refs.rtmClientRef.current = rtmClient
-      refs.sessionRef.current = session
+      refs.sessionRef.current = activeSession
 
       await initAckGate.waitForReady()
 
       if (memoryOwnerId) {
         memoryService.updateCurrentSessionMetadata({
-          kind: session.intent.mode === 'training' ? 'training' : 'communication',
+          kind: activeSession.intent.mode === 'training' ? 'training' : 'communication',
           source: 'rtc_agent',
-          surface: session.intent.surface,
-          scene: session.intent.scene,
-          sessionStrategy: session.intent.sessionStrategy,
-          executionBackend: session.executionBackend,
-          transportProvider: session.transport.provider,
+          surface: activeSession.intent.surface,
+          scene: activeSession.intent.scene,
+          sessionStrategy: activeSession.intent.sessionStrategy,
+          executionBackend: activeSession.executionBackend,
+          transportProvider: activeSession.transport.provider,
         })
       }
 
@@ -597,14 +601,14 @@ export async function startRtcRuntimeConnection({
       ) => {
         await publishSessionControlMessage({
           rtmClient: rtmClient!,
-          session,
+          session: activeSession,
           type,
           payload,
         })
       }
 
       await syncRtcSessionProfile({
-        session,
+        session: activeSession,
         userId,
         suppressGreeting,
         sendControl: bootstrapSendControlMessage,
@@ -617,12 +621,12 @@ export async function startRtcRuntimeConnection({
 
       refs.onDecodedEnvelopeRef.current = null
       initAckGate.cleanup()
-      setState((prev) => applyConnectedRtcSession(prev, session, connectionNotice))
+      setState((prev) => applyConnectedRtcSession(prev, activeSession, connectionNotice))
       return
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
       refs.onDecodedEnvelopeRef.current = null
-      initAckGate.cleanup()
+      initAckGate?.cleanup()
 
       try {
         refs.micTrackRef.current?.stop()
@@ -639,10 +643,12 @@ export async function startRtcRuntimeConnection({
       cleanupMicrophoneResources()
       resetRuntimeRefs(refs)
 
-      try {
-        await stopRtcSession(session.channelName, accessToken)
-      } catch {
-        // ignore cleanup error
+      if (session) {
+        try {
+          await stopRtcSession(session.channelName, accessToken)
+        } catch {
+          // ignore cleanup error
+        }
       }
 
       if (

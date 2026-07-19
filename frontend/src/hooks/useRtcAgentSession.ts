@@ -70,6 +70,11 @@ interface ConnectRtcOptions {
 
 interface StartRecordingOptions extends ConnectRtcOptions { }
 
+interface CaptureBoundRecordingOptions extends StartRecordingOptions {
+  clientCaptureId?: string
+  shortUtteranceExpected?: boolean
+}
+
 export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
   const {
     userId,
@@ -313,7 +318,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
     userId,
   ])
 
-  const startRecording = useCallback(async (recordingOptions: StartRecordingOptions = {}) => {
+  const startRecording = useCallback(async (recordingOptions: CaptureBoundRecordingOptions = {}) => {
     await startRtcRecordingAction({
       refs: {
         micTrackRef,
@@ -326,11 +331,14 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
       connect,
       ensureMicrophoneTrack,
       warmUpMicrophoneStream,
+      sendControlMessage,
       connectOptions: recordingOptions,
+      clientCaptureId: recordingOptions.clientCaptureId,
+      shortUtteranceExpected: recordingOptions.shortUtteranceExpected,
     })
-  }, [connect, ensureMicrophoneTrack, warmUpMicrophoneStream])
+  }, [connect, ensureMicrophoneTrack, sendControlMessage, warmUpMicrophoneStream])
 
-  const stopRecording = useCallback(async () => {
+  const stopRecording = useCallback(async (clientCaptureId?: string) => {
     await stopRtcRecordingAction({
       refs: {
         micTrackRef,
@@ -338,6 +346,7 @@ export function useRtcAgentSession(options: UseRtcAgentSessionOptions = {}) {
       },
       setState,
       sendControlMessage,
+      clientCaptureId,
     })
   }, [sendControlMessage])
 

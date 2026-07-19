@@ -213,13 +213,6 @@ export class RtcOrchestrationService {
   private readonly liveKitConfig = new LiveKitConfigService()
   private readonly liveKitSessionService = new LiveKitSessionService()
   private readonly supabaseService = createSupabaseService()
-  private readonly liveKitAgentHealthUrl =
-    normalizeOptionalUrl(process.env.LIVEKIT_AGENT_HEALTH_URL) ??
-    'http://livekit-agent:8081/'
-  private readonly liveKitAgentHealthTimeoutMs = this.parseTimeout(
-    process.env.LIVEKIT_AGENT_HEALTH_TIMEOUT_MS,
-    2000,
-  )
   private readonly defaultGraph =
     (process.env.RTC_DEFAULT_GRAPH || 'voxflame_livekit_agent').trim()
   private readonly defaultTimeoutSeconds = this.parseTimeout(
@@ -290,7 +283,6 @@ export class RtcOrchestrationService {
       normalizePositiveInt(input.timeoutSeconds) ?? this.defaultTimeoutSeconds
 
     const liveKitStatus = this.assertLiveKitCanStart()
-    await this.assertLiveKitAgentCanAcceptJobs()
     const browserServerUrl =
       liveKitStatus.browserUrl ??
       deriveRtcBrowserWebSocketUrl(
@@ -358,31 +350,6 @@ export class RtcOrchestrationService {
   private parseTimeout(value: string | undefined, fallback: number): number {
     const parsed = Number.parseInt(value || '', 10)
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-  }
-
-  private async assertLiveKitAgentCanAcceptJobs(): Promise<void> {
-    const controller = new AbortController()
-    const timeout = globalThis.setTimeout(() => {
-      controller.abort()
-    }, this.liveKitAgentHealthTimeoutMs)
-
-    try {
-      const response = await fetch(this.liveKitAgentHealthUrl, {
-        signal: controller.signal,
-      })
-
-      if (!response.ok) {
-        throw new Error(`Unexpected livekit-agent health status: ${response.status}`)
-      }
-    } catch (error) {
-      console.warn('[RTC] LiveKit agent health probe failed:', error)
-      throw new RtcOrchestrationError(
-        '实时转录助手当前还没有准备好，请稍后再试。',
-        503,
-      )
-    } finally {
-      globalThis.clearTimeout(timeout)
-    }
   }
 
   private assertLiveKitCanStart(): ReturnType<LiveKitConfigService['getStatus']> {

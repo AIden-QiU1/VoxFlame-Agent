@@ -5,7 +5,9 @@ export const MANDARIN_TRAINING_CATEGORY_ORDER = [
   '人群与角色',
   '设备与数字',
   '现代文章朗读',
-  '文言文节奏',
+  '会议与协作',
+  '车载与导航',
+  '音系强化',
 ] as const
 
 export type MandarinTrainingCategory =

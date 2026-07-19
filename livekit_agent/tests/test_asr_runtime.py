@@ -99,9 +99,13 @@ class FakeMonoFrame:
 class FakeASRClient:
     def __init__(self) -> None:
         self.commit_calls = 0
+        self.clear_calls = 0
 
     async def commit_audio(self) -> None:
         self.commit_calls += 1
+
+    async def clear_audio(self) -> None:
+        self.clear_calls += 1
 
 
 class FakeFallbackASRClient:
@@ -109,6 +113,7 @@ class FakeFallbackASRClient:
         self.started_payloads: list[dict[str, object]] = []
         self.appended_audio: list[bytes] = []
         self.commit_calls = 0
+        self.clear_calls = 0
 
     async def start(self, session_payload: dict[str, object]) -> None:
         self.started_payloads.append(session_payload)
@@ -118,6 +123,9 @@ class FakeFallbackASRClient:
 
     async def commit_audio(self) -> None:
         self.commit_calls += 1
+
+    async def clear_audio(self) -> None:
+        self.clear_calls += 1
 
     async def stop(self) -> None:
         return
@@ -138,12 +146,12 @@ class TestASRRuntime(unittest.TestCase):
         self.assertEqual(payload["sample_rate"], 16000)
         self.assertEqual(payload["input_audio_transcription"]["language"], "zh")
 
-    def test_should_use_qwen_http_asr_only_for_configured_communication_user(self) -> None:
+    def test_should_use_qwen_http_asr_for_configured_communication_and_training_user(self) -> None:
         config = create_config()
         config = type(config)(
             **{
                 **config.__dict__,
-                "qwen_http_asr_url": "http://121.41.45.9:8080/transcribe",
+                "qwen_http_asr_url": "http://127.0.0.1:18000/transcribe",
                 "qwen_http_asr_user_ids": frozenset({"64758dee-5026-4b53-a063-1d02d0834f67"}),
             }
         )
@@ -177,10 +185,21 @@ class TestASRRuntime(unittest.TestCase):
                 "raw_attributes": {},
             },
         )()
+        quick_talk_ctx = type(
+            "Ctx",
+            (),
+            {
+                "mode": "quick_talk",
+                "participant_payload": {"authenticated_user_id": "64758dee-5026-4b53-a063-1d02d0834f67"},
+                "dispatch_payload": {},
+                "raw_attributes": {},
+            },
+        )()
 
         self.assertTrue(should_use_qwen_http_asr(config, matching_ctx))
+        self.assertTrue(should_use_qwen_http_asr(config, training_ctx))
         self.assertFalse(should_use_qwen_http_asr(config, other_ctx))
-        self.assertFalse(should_use_qwen_http_asr(config, training_ctx))
+        self.assertFalse(should_use_qwen_http_asr(config, quick_talk_ctx))
 
     def test_pcm_bytes_to_wav_bytes_writes_standard_wav_header(self) -> None:
         wav_bytes = pcm_bytes_to_wav_bytes(b"\x01\x00" * 160, sample_rate=16000)
@@ -528,12 +547,14 @@ class TestASRRuntime(unittest.TestCase):
         asyncio.run(runtime.commit_audio("manual_stop"))
 
         self.assertEqual(runtime.client.commit_calls, 0)
+        self.assertEqual(runtime.client.clear_calls, 1)
         self.assertEqual(runtime._last_committed_client_capture_id, runtime._client_capture_id)
         self.assertEqual(
             runtime._last_committed_client_capture_external_id,
             "capture-empty",
         )
         self.assertEqual(runtime._pending_final_transcript_client_capture_ids, [])
+        self.assertEqual(runtime._speech_ms_since_commit, 0.0)
 
     def test_commit_audio_allows_new_client_capture_after_restart(self) -> None:
         runtime = LiveKitASRRuntime(
@@ -610,6 +631,104 @@ class TestASRRuntime(unittest.TestCase):
             [payload["client_capture_id"] for payload in published_payloads],
             ["capture-1", "capture-2"],
         )
+
+    def test_filtered_final_consumes_its_capture_binding_before_next_final(self) -> None:
+        published_payloads: list[dict[str, object]] = []
+
+        async def publish_payload(payload: dict[str, object]) -> None:
+            published_payloads.append(payload)
+
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type(
+                "Ctx",
+                (),
+                {"room_name": "room", "participant_identity": "user", "request_id": "req-1"},
+            )(),
+            participant=None,
+            publish_payload=publish_payload,
+            on_final_transcript=lambda _text: asyncio.sleep(0),
+        )
+        runtime.client = FakeASRClient()
+        runtime._started = True
+
+        runtime.note_client_recording_event("speech_started", False, client_capture_id="capture-1")
+        runtime._speech_ms_since_commit = 520
+        asyncio.run(runtime.commit_audio("manual_stop", client_capture_id="capture-1"))
+        runtime.note_client_recording_event("speech_started", False, client_capture_id="capture-2")
+        runtime._speech_ms_since_commit = 520
+        asyncio.run(runtime.commit_audio("manual_stop", client_capture_id="capture-2"))
+
+        asyncio.run(runtime._handle_server_event({
+            "type": "conversation.item.input_audio_transcription.completed",
+            "transcript": "我我我我我我我我我我我我我我我我",
+        }))
+        asyncio.run(runtime._handle_server_event({
+            "type": "conversation.item.input_audio_transcription.completed",
+            "transcript": "妈妈",
+        }))
+
+        self.assertEqual(len(published_payloads), 1)
+        self.assertEqual(published_payloads[0]["text"], "妈妈")
+        self.assertEqual(published_payloads[0]["client_capture_id"], "capture-2")
+
+    def test_vad_does_not_commit_while_client_capture_is_active(self) -> None:
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type("Ctx", (), {"room_name": "room", "participant_identity": "user"})(),
+            participant=None,
+            publish_payload=None,
+            on_final_transcript=None,
+        )
+        runtime.client = FakeASRClient()
+        runtime._started = True
+        runtime._vad = RMSVoiceActivityDetector(threshold=0.01, silence_duration_ms=20)
+        runtime.note_client_recording_event(
+            "speech_started",
+            False,
+            short_utterance_expected=True,
+            client_capture_id="capture-1",
+        )
+        speech_frame = (1000).to_bytes(2, byteorder="little", signed=True) * 160
+        silence_frame = b"\x00\x00" * 160
+
+        asyncio.run(runtime._observe_vad(speech_frame, 16000))
+        asyncio.run(runtime._observe_vad(silence_frame, 16000))
+        asyncio.run(runtime._observe_vad(silence_frame, 16000))
+
+        self.assertEqual(runtime.client.commit_calls, 0)
+        self.assertTrue(runtime._received_voice_since_commit)
+
+        runtime._speech_ms_since_commit = 520
+        runtime.note_client_recording_event(
+            "speech_stopped",
+            True,
+            client_capture_id="capture-1",
+        )
+        asyncio.run(runtime.commit_audio("manual_stop", client_capture_id="capture-1"))
+        self.assertEqual(runtime.client.commit_calls, 1)
+
+    def test_stale_end_audio_capture_id_cannot_commit_active_capture(self) -> None:
+        runtime = LiveKitASRRuntime(
+            config=create_config(),
+            ctx=type("Ctx", (), {"room_name": "room", "participant_identity": "user"})(),
+            participant=None,
+            publish_payload=None,
+            on_final_transcript=None,
+        )
+        runtime.client = FakeASRClient()
+        runtime._started = True
+        runtime.note_client_recording_event(
+            "speech_started",
+            False,
+            client_capture_id="capture-2",
+        )
+        runtime._speech_ms_since_commit = 520
+
+        asyncio.run(runtime.commit_audio("manual_stop", client_capture_id="capture-1"))
+
+        self.assertEqual(runtime.client.commit_calls, 0)
+        self.assertEqual(runtime._pending_final_transcript_client_capture_ids, [])
 
     def test_manual_stop_does_not_enable_short_tail_ignore_for_short_utterance_capture(self) -> None:
         runtime = LiveKitASRRuntime(

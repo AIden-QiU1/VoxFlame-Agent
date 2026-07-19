@@ -236,6 +236,7 @@ export async function ensurePublishedMicrophoneTrack(
       true,
       audioContext,
     )
+    await localAudioTrack.mute()
     const publication = await client.room.localParticipant.publishTrack(localAudioTrack, {
       source: LiveKitModule.Track.Source.Microphone,
     })

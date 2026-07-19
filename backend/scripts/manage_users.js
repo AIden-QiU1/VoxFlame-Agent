@@ -3,10 +3,30 @@
  * 用户管理脚本 - 查询和管理 Supabase 用户
  */
 
+const path = require('path');
+const dotenv = require('dotenv');
 const { createClient } = require('@supabase/supabase-js');
 
-const SUPABASE_URL = 'https://dhrobrmaktietyinlluv.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRocm9icm1ha3RpZXR5aW5sbHV2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NzA4NDE1MCwiZXhwIjoyMDgyNjYwMTUwfQ.7nloquj_x_m8gweqrcpKIt1BUvQwa93TedVpgNfTB5E';
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+function requireEnv(name) {
+  const value = process.env[name] && process.env[name].trim();
+
+  if (!value) {
+    throw new Error(`缺少环境变量: ${name}`);
+  }
+
+  return value;
+}
+
+const SUPABASE_URL = requireEnv('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+  process.env.SUPABASE_ROLE_KEY?.trim();
+
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('缺少环境变量: SUPABASE_SERVICE_ROLE_KEY');
+}
 
 // 创建 Admin Client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);

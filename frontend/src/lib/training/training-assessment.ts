@@ -119,11 +119,26 @@ export function summarizeAssessmentAttempts(
     }
   }
 
+  if (!isComplete) {
+    return {
+      completedCount,
+      totalExerciseCount,
+      remainingCount,
+      matchedChars,
+      totalChars,
+      accuracyRatio,
+      severityBand: 'insufficient',
+      severityLabel: '评估中',
+      severitySummary: `当前已完成 ${completedCount}/${totalExerciseCount} 条，还差 ${remainingCount} 条。整组完成前不生成轻、中、重等级。`,
+      isComplete: false,
+      weakestExercises: exerciseScores
+        .slice()
+        .sort((left, right) => left.accuracyRatio - right.accuracyRatio)
+        .slice(0, 3),
+    }
+  }
+
   const severity = resolveSeverityBand(accuracyRatio)
-  const prefix = isComplete ? '本轮筛查完成后' : '当前只根据已完成的筛查词'
-  const suffix = isComplete
-    ? '这只是训练用分层，不替代医学评估。'
-    : `还差 ${remainingCount} 条，录完这一组后结果会更稳。`
 
   return {
     completedCount,
@@ -134,7 +149,7 @@ export function summarizeAssessmentAttempts(
     accuracyRatio,
     severityBand: severity.severityBand,
     severityLabel: severity.severityLabel,
-    severitySummary: `${prefix}，字符准确率约 ${roundToWholePercent(accuracyRatio)}%，当前落在“${severity.severityLabel}”。${suffix}`,
+    severitySummary: `本轮筛查完成后，字符准确率约 ${roundToWholePercent(accuracyRatio)}%，当前落在“${severity.severityLabel}”。这只是训练用分层，不替代医学评估。`,
     isComplete,
     weakestExercises: exerciseScores
       .slice()

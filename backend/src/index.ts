@@ -28,9 +28,43 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 3001
 const trainingReportMaintenanceService = new TrainingReportMaintenanceService()
+
+const isProduction = process.env.NODE_ENV === 'production'
+const publicBaseUrl = (process.env.VOXFLAME_PUBLIC_BASE_URL || '').trim()
+const allowedCorsOrigins = new Set(
+  [
+    publicBaseUrl,
+    ...(process.env.VOXFLAME_ALLOWED_ORIGINS || '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+    ...(isProduction ? [] : ['http://localhost:3000', 'http://127.0.0.1:3000']),
+  ].filter(Boolean),
+)
+
+function isAllowedCorsOrigin(origin: string): boolean {
+  return allowedCorsOrigins.has(origin)
+}
+
 // 中间件
-app.use(cors())
-app.use(express.json())
+app.disable('x-powered-by')
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  next()
+})
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || isAllowedCorsOrigin(origin)) {
+      callback(null, true)
+      return
+    }
+
+    callback(new Error('Origin is not allowed by CORS'))
+  },
+}))
+app.use(express.json({ limit: process.env.VOXFLAME_JSON_BODY_LIMIT || '1mb' }))
 
 // 健康检查
 app.get('/health', (req, res) => {
@@ -90,8 +124,19 @@ app.use('/api/phrases', phrasesRouter)
 // Upload API 路由 (OSS 签名)
 app.use('/api/upload', authMiddleware, uploadRouter)
 
-// Webhook 端点 - 预留给后续外部异步回调
+// Webhook 端点 - 预留给后续外部异步回调；生产默认关闭，显式启用后要求共享密钥。
 app.post('/api/webhook/conversation', (req, res) => {
+  if (process.env.VOXFLAME_WEBHOOK_CONVERSATION_ENABLED !== '1') {
+    return res.status(404).json({ error: 'Not found' })
+  }
+
+  const expectedSecret = process.env.VOXFLAME_WEBHOOK_CONVERSATION_SECRET || ''
+  const providedSecret = req.headers['x-voxflame-webhook-secret']
+
+  if (!expectedSecret || providedSecret !== expectedSecret) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+
   const { text, is_final, data_type, conversation_id, message_id } = req.body
   console.log('[Webhook] ' + (data_type || 'message') + ': ' + (text?.substring(0, 50) || '') + '...')
   res.json({ success: true, received: true })

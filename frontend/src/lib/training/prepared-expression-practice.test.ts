@@ -91,27 +91,48 @@ const PREPARED_EXPRESSION_FIXTURE: PreparedExpressionSnapshot = {
   updated_at: '2026-04-07T10:00:00.000Z',
 }
 
-test('buildPreparedExpressionPracticeExercises covers the full document in punctuation-aware 5-15 char chunks', () => {
+test('buildPreparedExpressionPracticeExercises covers the full document in punctuation-aware 10-20 char chunks', () => {
   const exercises = buildPreparedExpressionPracticeExercises(PREPARED_EXPRESSION_FIXTURE)
 
   assert.deepEqual(
     exercises.map((exercise) => exercise.text),
     [
-      '现在屏幕上的文字，',
-      '就是燃言实时转写的结果。',
+      '现在屏幕上的文字，就是燃言实时转写的结果。',
       '燃言最核心做三件事：实时辅助沟通、',
       '语句训练反馈、个人记忆管理。',
-      '最后我想特别谢谢邱生峰，',
-      '一直支持我们。',
+      '最后我想特别谢谢邱生峰，一直支持我们。',
     ],
   )
   assert.equal(
     normalizeDocumentForAssertion(exercises.map((exercise) => exercise.text).join('')),
     normalizeDocumentForAssertion(PREPARED_EXPRESSION_FIXTURE.document_content),
   )
-  assert.ok(exercises.every((exercise) => {
+  assert.ok(exercises.every((exercise) => measurePracticeLength(exercise.text) >= 10))
+  assert.ok(exercises.every((exercise) => measurePracticeLength(exercise.text) <= 20))
+})
+
+test('buildPreparedExpressionPracticeExercises hard-splits only unpunctuated overlong material', () => {
+  const exercises = buildPreparedExpressionPracticeExercises({
+    ...PREPARED_EXPRESSION_FIXTURE,
+    document_content: '这是一个没有任何标点的超长训练材料需要被切成自然长度',
+    sections: [],
+  })
+
+  assert.deepEqual(
+    exercises.map((exercise) => exercise.text),
+    [
+      '这是一个没有任何标点的超长训练材料需要被',
+      '切成自然长度',
+    ],
+  )
+  assert.equal(
+    normalizeDocumentForAssertion(exercises.map((exercise) => exercise.text).join('')),
+    '这是一个没有任何标点的超长训练材料需要被切成自然长度',
+  )
+  assert.ok(exercises.every((exercise, index) => {
     const length = measurePracticeLength(exercise.text)
-    return length >= 5 && length <= 15
+    const isLastShortRemainder = index === exercises.length - 1 && length < 10
+    return (length >= 10 || isLastShortRemainder) && length <= 20
   }))
 })
 
@@ -125,9 +146,9 @@ test('buildPreparedExpressionPracticeExercises keeps section metadata when a lin
     exercises[2].preparedExpressionHighRiskPhrases,
     ['实时辅助沟通', '个人记忆管理'],
   )
-  assert.equal(exercises[4].preparedExpressionSectionId, 'document-paragraph-3')
-  assert.equal(exercises[4].preparedExpressionAnchorLine, '最后我想特别谢谢邱生峰，一直支持我们。')
-  assert.deepEqual(exercises[4].preparedExpressionKeywords, ['邱生峰', '燃言', '构音障碍'])
+  assert.equal(exercises[3].preparedExpressionSectionId, 'document-paragraph-3')
+  assert.equal(exercises[3].preparedExpressionAnchorLine, '最后我想特别谢谢邱生峰，一直支持我们。')
+  assert.deepEqual(exercises[3].preparedExpressionKeywords, ['邱生峰', '燃言', '构音障碍'])
 })
 
 test('buildPreparedExpressionPracticeExercises falls back to section lines when document_content is missing', () => {

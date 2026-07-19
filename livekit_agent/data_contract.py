@@ -256,12 +256,23 @@ def extract_user_text_input(message: dict[str, Any]) -> str | None:
     return text.strip() if isinstance(text, str) and text.strip() else None
 
 
-def extract_end_audio_reason(message: dict[str, Any]) -> str | None:
+def extract_end_audio_request(message: dict[str, Any]) -> tuple[str, str | None] | None:
     if message.get("type") != "end_audio":
         return None
 
     reason = message.get("reason")
-    return reason.strip() if isinstance(reason, str) and reason.strip() else "unknown"
+    client_capture_id = message.get("client_capture_id")
+    return (
+        reason.strip() if isinstance(reason, str) and reason.strip() else "unknown",
+        client_capture_id.strip()
+        if isinstance(client_capture_id, str) and client_capture_id.strip()
+        else None,
+    )
+
+
+def extract_end_audio_reason(message: dict[str, Any]) -> str | None:
+    request = extract_end_audio_request(message)
+    return request[0] if request is not None else None
 
 
 def extract_client_speech_activity(

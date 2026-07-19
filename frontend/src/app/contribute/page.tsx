@@ -85,6 +85,7 @@ interface TrainingUploadLabels {
 
 interface PracticeAttempt {
   createdAt: number
+  clientCaptureId: string
   exercise: PracticeExercise
   transcript: string
   transcriptLatencyMs: number
@@ -219,12 +220,14 @@ function buildUploadMetadata(
   feedback: MandarinTrainingFeedback,
   sampleQuality: TrainingSampleQuality,
   saveTrigger: AttemptSaveTrigger,
+  clientCaptureId: string,
   uploadLabels?: TrainingUploadLabels | null,
 ): Record<string, unknown> {
   const lineage = buildTrainingSampleLineage(exercise, recording)
   const isAssessmentExercise = exercise.category === '评估筛查'
   const metadata: Record<string, unknown> = {
     kind: 'training_result',
+    client_capture_id: clientCaptureId,
     exercise_id: exercise.id,
     exercise_text: exercise.text,
     exercise_category: exercise.category,
@@ -810,6 +813,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const disconnectRef = useRef(disconnect)
   disconnectRef.current = disconnect
   const discardedAttemptIdsRef = useRef<Set<number>>(new Set())
+  const recordingExerciseRef = useRef<PracticeExercise | null>(null)
 
   const canSaveTrainingSample = hasRequiredLegalConsent(user)
   const preparedExpression = workspaceSnapshot?.prepared_expression ?? null
@@ -949,13 +953,21 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     ),
     [assessmentSummary],
   )
-  const trainingUploadLabels = useMemo<TrainingUploadLabels>(() => ({
-    etiology: trainingEtiology,
-    severity:
-      assessedSeverity !== DEFAULT_TRAINING_GUIDANCE_PROFILE.severity
+  const trainingUploadLabels = useMemo<TrainingUploadLabels>(() => {
+    const completedAssessmentSeverity =
+      isAssessmentTopic && assessmentSummary?.isComplete
         ? assessedSeverity
+        : null
+
+    return {
+      etiology: trainingEtiology,
+      severity: isAssessmentTopic
+        ? completedAssessmentSeverity && completedAssessmentSeverity !== 'unsure'
+          ? completedAssessmentSeverity
+          : undefined
         : workspaceSnapshot?.user_profile_memory?.severity as TrainingSeverity | undefined,
-  }), [assessedSeverity, trainingEtiology, workspaceSnapshot?.user_profile_memory?.severity])
+    }
+  }, [assessedSeverity, assessmentSummary?.isComplete, isAssessmentTopic, trainingEtiology, workspaceSnapshot?.user_profile_memory?.severity])
   const recorderStatus = getRecorderStatusCopy(status, sessionError, isAssessmentTopic)
   const currentAttemptCharacterAccuracy = useMemo(() => {
     if (!attempt || !isAssessmentTopic || attempt.feedback.normalizedTarget.length === 0) {
@@ -1157,7 +1169,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   }, [attempt?.recording?.audio.blob])
 
   const moveExercise = useCallback((offset: number) => {
-    if (!visibleExercises.length || !currentExercise) {
+    if (isRecording || isProcessing || !visibleExercises.length || !currentExercise) {
       return
     }
 
@@ -1169,12 +1181,15 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     const nextIndex = (currentIndex + offset + visibleExercises.length) % visibleExercises.length
     setSelectedExerciseId(visibleExercises[nextIndex].id)
     setAttempt(null)
-  }, [currentExercise, visibleExercises])
+  }, [currentExercise, isProcessing, isRecording, visibleExercises])
 
   const handleSelectExercise = useCallback((exerciseId: string) => {
+    if (isRecording || isProcessing) {
+      return
+    }
     setSelectedExerciseId(exerciseId)
     setAttempt(null)
-  }, [])
+  }, [isProcessing, isRecording])
 
   const handleStartRecording = useCallback(async () => {
     if (!currentExercise || isUploading || isProcessing) {
@@ -1183,10 +1198,12 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
     setAttempt(null)
     setNotice(null)
+    recordingExerciseRef.current = currentExercise
 
     try {
       await startRecording()
     } catch (error) {
+      recordingExerciseRef.current = null
       console.error('[contribute] start recording failed:', error)
       setNotice({
         tone: 'error',
@@ -1228,12 +1245,16 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       await saveWorkspaceUserProfileMemory(userId, {
         document: workspaceSnapshot?.user_profile_memory.document ?? undefined,
         etiology: trainingEtiology,
-        severity: assessedSeverity,
+        ...(assessmentSummary?.isComplete && assessedSeverity !== 'unsure'
+          ? { severity: assessedSeverity }
+          : {}),
       })
       await refreshWorkspaceSnapshot()
       setNotice({
         tone: 'success',
-        message: '训练资料标签已保存，后续上传样本会自动带上疾病种类和评测严重程度。',
+        message: assessmentSummary?.isComplete
+          ? '训练资料标签已保存，后续上传样本会带上疾病种类和整组评测严重程度。'
+          : '疾病种类已保存；严重程度要等 20 条筛查全部完成后才会生成和保存。',
       })
     } catch (error) {
       console.error('[contribute] save training labels failed:', error)
@@ -1246,6 +1267,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     }
   }, [
     assessedSeverity,
+    assessmentSummary?.isComplete,
     isAuthenticated,
     refreshWorkspaceSnapshot,
     trainingEtiology,
@@ -1310,6 +1332,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         attemptToPersist.feedback,
         attemptToPersist.sampleQuality,
         saveTrigger,
+        attemptToPersist.clientCaptureId,
         trainingUploadLabels,
       ),
     })
@@ -1472,14 +1495,19 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   }, [attempt, discardUploadedRecording, isAssessmentTopic, userId])
 
   const handleStopRecording = useCallback(async () => {
-    if (!currentExercise) {
+    const recordedExercise = recordingExerciseRef.current
+    if (!recordedExercise) {
+      setNotice({
+        tone: 'error',
+        message: '这次录音缺少开始时的题目标识，系统已阻止评分和上传，请重新录制。',
+      })
       return
     }
 
     try {
       const result = await stopRecording()
       const transcript = result.transcript.trim()
-      const feedback = analyzeMandarinAttempt(currentExercise, transcript)
+      const feedback = analyzeMandarinAttempt(recordedExercise, transcript)
       const sampleQuality = assessTrainingSampleQuality({
         feedback,
         recording: result.recording,
@@ -1487,7 +1515,8 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       })
       const nextAttempt: PracticeAttempt = {
         createdAt: Date.now(),
-        exercise: currentExercise,
+        clientCaptureId: result.clientCaptureId,
+        exercise: recordedExercise,
         transcript,
         transcriptLatencyMs: result.transcriptLatencyMs,
         feedback,
@@ -1504,19 +1533,19 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
       if (hasUsableAssessmentTranscript) {
         setSessionPracticedExerciseIds((currentIds) => (
-          currentIds.includes(currentExercise.id)
+          currentIds.includes(recordedExercise.id)
             ? currentIds
-            : [...currentIds, currentExercise.id]
+            : [...currentIds, recordedExercise.id]
         ))
       }
       setAttempt(nextAttempt)
       if (isAssessmentTopic && hasUsableAssessmentTranscript) {
         setAssessmentAttemptsByExercise((current) => ({
           ...current,
-          [currentExercise.id]: nextAttempt,
+          [recordedExercise.id]: nextAttempt,
         }))
       }
-      const currentIndex = visibleExercises.findIndex((exercise) => exercise.id === currentExercise.id)
+      const currentIndex = visibleExercises.findIndex((exercise) => exercise.id === recordedExercise.id)
       const shouldAutoAdvance = isAssessmentTopic
         ? hasUsableAssessmentTranscript && visibleExercises.length > 1 && currentIndex >= 0
         : (
@@ -1528,7 +1557,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         ? visibleExercises[(currentIndex + 1) % visibleExercises.length]
         : null
 
-      if (nextExercise && nextExercise.id !== currentExercise.id) {
+      if (nextExercise && nextExercise.id !== recordedExercise.id) {
         setSelectedExerciseId(nextExercise.id)
       }
 
@@ -1558,10 +1587,11 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         tone: 'error',
         message: error instanceof Error ? error.message : '录音结束失败，请重新尝试。',
       })
+    } finally {
+      recordingExerciseRef.current = null
     }
   }, [
     canSaveTrainingSample,
-    currentExercise,
     isAssessmentTopic,
     persistTrainingAttempt,
     stopRecording,
@@ -1902,6 +1932,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                         key={exercise.id}
                         type="button"
                         onClick={() => handleSelectExercise(exercise.id)}
+                        disabled={isRecording || isProcessing}
                         className={`w-full rounded-[20px] border px-4 py-4 text-left transition ${
                           isActive
                             ? 'border-amber-300 bg-amber-50 shadow-sm'
@@ -2003,14 +2034,16 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                     <button
                       type="button"
                       onClick={() => moveExercise(-1)}
-                      className="rounded-full border border-stone-300 px-4 py-2 text-sm text-gray-700 transition hover:border-stone-400 hover:bg-white"
+                      disabled={isRecording || isProcessing}
+                      className="rounded-full border border-stone-300 px-4 py-2 text-sm text-gray-700 transition hover:border-stone-400 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       上一句
                     </button>
                     <button
                       type="button"
                       onClick={() => moveExercise(1)}
-                      className="rounded-full border border-stone-300 px-4 py-2 text-sm text-gray-700 transition hover:border-stone-400 hover:bg-white"
+                      disabled={isRecording || isProcessing}
+                      className="rounded-full border border-stone-300 px-4 py-2 text-sm text-gray-700 transition hover:border-stone-400 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       下一句
                     </button>

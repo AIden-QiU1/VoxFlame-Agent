@@ -44,7 +44,7 @@ services:
         <<: *npm-args
     container_name: voxflame-frontend
     ports:
-      - "3000:3000"   # HTTP
+      - "127.0.0.1:3000:3000"   # Caddy-only local HTTP
     environment:
       - NODE_ENV=production
       - BACKEND_INTERNAL_URL=http://backend:3001
@@ -79,7 +79,7 @@ services:
         <<: *npm-args
     container_name: voxflame-backend
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     env_file:
       - ./backend/.env
     environment:
@@ -91,11 +91,13 @@ services:
       - LIVEKIT_URL=${LIVEKIT_INTERNAL_URL:-ws://host.docker.internal:7880}
       - LIVEKIT_BROWSER_URL=${LIVEKIT_BROWSER_URL:-ws://localhost:3000}
       - VOXFLAME_PUBLIC_BASE_URL=${VOXFLAME_PUBLIC_BASE_URL:-}
+      - VOXFLAME_ALLOWED_ORIGINS=${VOXFLAME_ALLOWED_ORIGINS:-https://voxember.com}
+      - VOXFLAME_JSON_BODY_LIMIT=${VOXFLAME_JSON_BODY_LIMIT:-1mb}
+      - VOXFLAME_WEBHOOK_CONVERSATION_ENABLED=${VOXFLAME_WEBHOOK_CONVERSATION_ENABLED:-0}
+      - VOXFLAME_WEBHOOK_CONVERSATION_SECRET=${VOXFLAME_WEBHOOK_CONVERSATION_SECRET:-}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-voxflame_livekit_dev_secret_32chars}
       - LIVEKIT_AGENT_NAME=${LIVEKIT_AGENT_NAME:-voxflame-agent}
-      - LIVEKIT_AGENT_HEALTH_URL=${LIVEKIT_AGENT_HEALTH_URL:-http://livekit-agent:8081/}
-      - LIVEKIT_AGENT_HEALTH_TIMEOUT_MS=${LIVEKIT_AGENT_HEALTH_TIMEOUT_MS:-2000}
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
       - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       - DASHSCOPE_MEMORY_MAINTENANCE_MODEL=${DASHSCOPE_MEMORY_MAINTENANCE_MODEL:-qwen3.5-plus}
@@ -132,7 +134,7 @@ services:
       - ./livekit_agent/.env
     container_name: voxflame-livekit-agent
     environment:
-      - LIVEKIT_URL=${LIVEKIT_DOCKER_URL:-ws://host.docker.internal:7880}
+      - LIVEKIT_URL=${LIVEKIT_DOCKER_URL:-ws://127.0.0.1:7880}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-voxflame_livekit_dev_secret_32chars}
       - LIVEKIT_AGENT_NAME=${LIVEKIT_AGENT_NAME:-voxflame-agent}
@@ -148,17 +150,14 @@ services:
       - no_proxy=127.0.0.1,localhost,livekit-server
       - DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
       - DASHSCOPE_TIMEOUT_SECONDS=15
-      - QWEN_HTTP_ASR_URL=${QWEN_HTTP_ASR_URL:-}
+      - QWEN_HTTP_ASR_URL=${QWEN_HTTP_ASR_URL:-http://127.0.0.1:18000/transcribe}
       - QWEN_HTTP_ASR_LANGUAGE=${QWEN_HTTP_ASR_LANGUAGE:-Chinese}
       - QWEN_HTTP_ASR_TIMEOUT_SECONDS=${QWEN_HTTP_ASR_TIMEOUT_SECONDS:-30}
-      - QWEN_HTTP_ASR_USER_IDS=${QWEN_HTTP_ASR_USER_IDS:-}
+      - QWEN_HTTP_ASR_USER_IDS=${QWEN_HTTP_ASR_USER_IDS:-64758dee-5026-4b53-a063-1d02d0834f67}
     depends_on:
       - livekit-server
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - voxflame-network
+    network_mode: host
 
   caddy:
     image: docker.m.daocloud.io/library/caddy:2.10.2-alpine

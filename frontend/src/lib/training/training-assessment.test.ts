@@ -42,5 +42,7 @@ test('summarizeAssessmentAttempts keeps incomplete screening results provisional
   assert.equal(summary.completedCount, 1)
   assert.equal(summary.remainingCount, 19)
   assert.equal(summary.isComplete, false)
-  assert.equal(summary.severityLabel, '重度')
+  assert.equal(summary.severityBand, 'insufficient')
+  assert.equal(summary.severityLabel, '评估中')
+  assert.match(summary.severitySummary, /不生成轻、中、重等级/)
 })

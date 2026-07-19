@@ -5,7 +5,7 @@
 ## 设计原则
 
 - 训练页只消费筛好的标准句库。
-- 句长默认控制在 `6-16` 个汉字。这个范围优先服务“看提示录一句”的 supervised recording：足够短，能降低构音障碍用户的呼吸、注意和运动负担；又比单字/双字更能覆盖连续语流、停顿和真实沟通句式。`1-5` 字材料仍可作为音系筛查和最小对立练习，但不作为主功能句池主体。
+- 句长默认控制在 `7-18` 个汉字。这个范围优先服务“看提示录一句”的 supervised recording：足够短，能降低构音障碍用户的呼吸、注意和运动负担；又比单字/双字更能覆盖连续语流、停顿和真实沟通句式。`1-6` 字材料仍可作为音系筛查和最小对立练习，但不作为主功能句池主体。
 - 句库来源必须可追溯，但来源信息只保留在离线产物里，不展示给用户。
 - 如果环境里有 `pypinyin`，脚本会额外按声母 / 韵母 / 声调做覆盖度打分；没有的话也能跑，只是不会做音系均衡评分。
 - 网页来源会先做文章打散、子句拆分和页面噪声过滤，尽量剔除导航、按钮、面包屑等无效文本。
@@ -18,7 +18,7 @@
 - `真实生活文本`：Apple 支持、12306、医保/政务办事指南、医院就诊流程、急救科普等公开页面。适合补贴近日常的设备、办事、就医、求助场景。
 - `特殊人群口语`：SeniorTalk、构音障碍/老年语音相关公开数据。适合做口语风格和说话负担校准。
 - `现代文章朗读`：普通话水平测试朗读作品这类现代白话短文优先。适合补连续语流、停连、轻重音和现代汉语自然语序，是朗读训练默认入口。
-- `文言文节奏`：声律启蒙、笠翁对韵、木兰诗、岳阳楼记、滕王阁序等公开经典文章。适合拆成 `5-20` 字句子，补声韵调和节奏覆盖，但应作为进阶入口，不和现代文章混在默认训练流里。
+- `音系强化`：从 AISHELL / WenetSpeech / 普通话现代朗读等真实现代中文候选中二次挑选，补声母、韵母、声调、连续语流和短句节奏覆盖。不使用古文分区，不用模板造句。
 - `日常与出行来源`：AAC 中文沟通板、12306、Apple 信息/通话/CarPlay/驾驶帮助页。适合补 `日常与出行` 这一类高频短句。
 - `人群与角色来源`：SeniorTalk、ChildMandarin、养老服务/护理标准、老年友善礼貌用语、课堂互动应用、护士礼仪、客服常用语等。适合补 `老人 / 学生 / 课堂 / 照护者 / 服务岗位` 方向的真实表达。
 - `专业精选短句`：对高风险或高价值场景，不直接把网页正文全量灌进前端；先从官方 / 高可信来源抽象成短、清楚、可录音的 curated 目标句。当前覆盖急救与康复就医、重点旅客与无障碍出行、窗口 / 照护 / 课堂角色、实时语音 / 字幕 / 辅助功能设备操作。
@@ -31,8 +31,8 @@
 默认路线是“先抓公开/本地来源快照，再从来源文本切分、过滤、去重、导出”。不要用模板批量造句。当前前端扩充池来自：
 
 - 普通话水平测试朗读作品 60 篇页面。
-- Tatoeba 派生中文例句 TSV。
-- 公版/公开经典朗读与音韵材料。
+- AISHELL-1 / AISHELL-3 转写文本、AISHELL-4 TextGrid 会议转写。
+- WenetSpeech 修正版文本可用片段；脚本按行流式解析，完整 `text.fix` 到位后可直接重刷。
 
 先抓取公开网页或文本来源：
 
@@ -56,10 +56,21 @@ python3 scripts/corpus/build_phonology_article_corpus.py \
   --output /tmp/voxflame-phonology-corpus.json
 
 python3 scripts/corpus/export_frontend_source_corpus.py \
-  --phonology-corpus /tmp/voxflame-phonology-corpus.json \
-  --manifest /tmp/voxflame-putonghua-reading-fetch/_local_manifest.json \
-  --manifest /tmp/voxflame-open-example-sentences-fetch/_local_manifest.json \
-  --output frontend/src/lib/corpus/generated/mandarin-training-real.json
+  --manifest scripts/corpus/seed_modern_scene_sentences_2026.json \
+  --manifest /tmp/voxflame-corpus-20260714/native-corpus-manifest.json \
+  --manifest /tmp/voxflame-corpus-20260714/putonghua-reading/_local_manifest.json \
+  --manifest /tmp/voxflame-corpus-20260714/daily-outing/_local_manifest.json \
+  --output frontend/src/lib/corpus/generated/mandarin-training-real.json \
+  --per-source-cap 14000 \
+  --signature-cap 4 \
+  --cap 日常与出行=0 \
+  --cap 看病与求助=0 \
+  --cap 人群与角色=0 \
+  --cap 设备与数字=0 \
+  --cap 现代文章朗读=5000 \
+  --cap 会议与协作=900 \
+  --cap 车载与导航=80 \
+  --cap 音系强化=3000
 ```
 
 如果本机已经下载了 AISHELL-1 / AISHELL-2 / 其他转写文本，不要把大数据集提交进仓库，直接把本地 transcript 放进 manifest，再交给 `build_mandarin_scene_corpus.py` 或 `export_frontend_source_corpus.py` 抽取。

@@ -259,7 +259,7 @@ export default function ChatInterface({
   })
 
   const [textInput, setTextInput] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesScrollRef = useRef<HTMLElement | null>(null)
   const lastPreparationSyncKeyRef = useRef<string | null>(null)
   const pendingPreparationSyncKeyRef = useRef<string | null>(null)
   const [showPhrasesPanel, setShowPhrasesPanel] = useState(false)
@@ -282,10 +282,31 @@ export default function ChatInterface({
     sceneId: activeStarterSceneId,
   })
 
-  // Auto scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, currentResponseText])
+    const scrollElement = messagesScrollRef.current
+    if (!scrollElement) {
+      return
+    }
+
+    scrollElement.scrollTop = scrollElement.scrollHeight
+  }, [messages, currentASRText, currentResponseText, isRecording, isThinking])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    const previousBodyOverflow = document.body.style.overflow
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    window.scrollTo({ top: 0, left: 0 })
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow
+      document.body.style.overflow = previousBodyOverflow
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -486,7 +507,8 @@ export default function ChatInterface({
   const captionText = currentResponseText
     || latestAssistantText
     || (isThinking ? '正在整理本句...' : '正在等待语音输入...')
-  const hasConversationStarted = messages.length > 0 || Boolean(currentResponseText) || Boolean(currentASRText) || isRecording
+  const hasConversationStarted = messages.length > 0 || Boolean(currentResponseText) || Boolean(currentASRText)
+  const hasMessageThreadActivity = hasConversationStarted || isRecording
   const statusText = isRecording
     ? '正在听你说话'
     : isConnecting
@@ -647,7 +669,7 @@ export default function ChatInterface({
   }), [runtimeScene])
 
   return (
-    <div className="flex h-dvh bg-[linear-gradient(180deg,_#fcf7ee_0%,_#fffdf9_42%,_#f4efe6_100%)]">
+    <div className="flex h-dvh overflow-hidden bg-[linear-gradient(180deg,_#fcf7ee_0%,_#fffdf9_42%,_#f4efe6_100%)]">
       {showPhrasesPanel ? (
         <button
           type="button"
@@ -685,9 +707,9 @@ export default function ChatInterface({
       </aside>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
-      <header className="border-b border-stone-200 bg-white px-4 py-4 sm:px-6">
+      <header className="shrink-0 border-b border-stone-200 bg-white px-4 py-4 sm:px-6">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
@@ -768,7 +790,7 @@ export default function ChatInterface({
       </header>
 
       {/* Messages Area */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+      <main ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
         <div className="mx-auto max-w-6xl space-y-6">
           <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
@@ -947,7 +969,7 @@ export default function ChatInterface({
           ) : null}
 
           {/* Welcome message */}
-          {!hasConversationStarted && (
+          {!hasMessageThreadActivity && (
             <div className="space-y-4">
               <CommunicationStarterKit
                 disabled={isLaunchingStarter}
@@ -985,7 +1007,7 @@ export default function ChatInterface({
             </section>
           ) : null}
 
-          {hasConversationStarted || hasConfirmedOutput ? (
+          {latestAssistantMessage || hasConfirmedOutput ? (
             <section className="rounded-[32px] border border-stone-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -1070,30 +1092,23 @@ export default function ChatInterface({
           ) : null}
 
           {/* Message list */}
-          {hasConversationStarted ? (
+          {hasMessageThreadActivity ? (
             <section className="rounded-[32px] border border-stone-200 bg-white px-4 py-5 shadow-sm sm:px-6">
               <div className="space-y-4">
                 {messages.map((message) => (
                   <MessageBubble key={message.id} message={message} />
                 ))}
 
-                {/* Current ASR text (partial) */}
-                {currentASRText && (
+                {(isRecording || currentASRText) ? (
                   <div className="flex justify-end">
-                    <div className="max-w-[80%] rounded-2xl rounded-br-md bg-amber-100 px-4 py-3 text-amber-900">
-                      {currentASRText}
-                      <span className="ml-1 inline-block h-4 w-1.5 bg-amber-500 animate-blink"></span>
-                    </div>
-                  </div>
-                )}
-
-                {isRecording ? (
-                  <div className="flex justify-end">
-                    <div className="w-full max-w-2xl rounded-[28px] border border-red-100 bg-white p-3 shadow-sm">
-                      <WaveformVisualizer analyser={analyser} isRecording={isRecording} />
-                      <div className="mt-2 text-right text-xs font-medium text-red-500">
-                        正在录音... 再次点击或按空格停止
-                      </div>
+                    <div className="max-w-[80%] rounded-2xl rounded-br-md bg-amber-50 px-4 py-3 text-amber-950 ring-1 ring-amber-100">
+                      <div className="mb-1 text-xs font-medium text-amber-700">实时转写</div>
+                      <p className="whitespace-pre-wrap text-base leading-7">
+                        {currentASRText || '正在听你说话，文字会出现在这里。'}
+                        {isRecording ? (
+                          <span className="ml-1 inline-block h-4 w-1.5 bg-amber-500 animate-blink" />
+                        ) : null}
+                      </p>
                     </div>
                   </div>
                 ) : null}
@@ -1123,15 +1138,10 @@ export default function ChatInterface({
                     </div>
                   </div>
                 )}
-
-                <div ref={messagesEndRef} />
               </div>
             </section>
           ) : null}
 
-          {!hasConversationStarted && (
-            <div ref={messagesEndRef} />
-          )}
         </div>
       </main>
 
@@ -1143,8 +1153,18 @@ export default function ChatInterface({
       )}
 
       {/* Input Area */}
-      <footer className="border-t border-stone-200 bg-white px-4 py-4 sm:px-6">
+      <footer className="shrink-0 border-t border-stone-200 bg-white px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-6xl">
+          {isRecording ? (
+            <div className="mb-3 flex items-center gap-3 rounded-[22px] border border-red-100 bg-red-50 px-4 py-2 shadow-sm">
+              <span className="shrink-0 text-xs font-medium text-red-600">实时收音</span>
+              <WaveformVisualizer
+                analyser={analyser}
+                isRecording={isRecording}
+                className="min-w-0 flex-1 !h-12 !rounded-2xl !bg-transparent sm:!h-14"
+              />
+            </div>
+          ) : null}
           <div className="flex items-center gap-4">
             {/* Voice button */}
             <button

@@ -60,13 +60,29 @@ function mergeExercises(
 const CATEGORY_EXERCISE_MAP = MANDARIN_TRAINING_CATEGORIES.reduce(
   (accumulator, category) => {
     const generated = REAL_CORPUS.categories[category]?.items ?? []
-    accumulator[category] =
-      category === '评估筛查'
-        ? ASSESSMENT_SCREENING_EXERCISES
-        : mergeExercises(category, CURATED_TOPIC_EXERCISES[category] ?? [], generated)
+    if (category === '评估筛查') {
+      accumulator[category] = ASSESSMENT_SCREENING_EXERCISES
+      return accumulator
+    }
+
+    accumulator[category] = mergeExercises(
+      category,
+      CURATED_TOPIC_EXERCISES[category] ?? [],
+      generated,
+    ).filter((exercise) => {
+      if (accumulator.__seenTexts.has(exercise.text)) {
+        return false
+      }
+
+      accumulator.__seenTexts.add(exercise.text)
+      return true
+    })
     return accumulator
   },
-  {} as Record<MandarinTrainingCategory, MandarinTrainingExercise[]>,
+  { __seenTexts: new Set<string>() } as Record<
+    MandarinTrainingCategory,
+    MandarinTrainingExercise[]
+  > & { __seenTexts: Set<string> },
 )
 
 export const MANDARIN_TRAINING_EXERCISES: MandarinTrainingExercise[] =
@@ -124,20 +140,38 @@ export const MANDARIN_TRAINING_CATEGORY_META: Record<
   '现代文章朗读': {
     label: '现代文章朗读',
     shortLabel: '现代短文',
-    description: '以普通话水平测试现代白话朗读作品为主，练连续语流、停连、轻重音和自然语调。',
-    examples: ['仿佛是风筝的歌唱', '我喜欢出发', '清塘荷韵'],
-    helper: '这组是朗读训练的默认入口，优先使用现代白话短文片段，降低理解负担。',
+    description: '以普通话现代白话、公开转写句和朗读作品为主，练连续语流、停连、轻重音和自然语调。',
+    examples: ['尊重科学规律的要求', '每个人都有自己的路', '清晨的空气很新鲜'],
+    helper: '这组是朗读训练的默认入口，优先使用现代中文片段，降低理解负担。',
     trainingTips: ['先按现代汉语语序自然断句。', '注意停连、轻重音和整句流畅度，不用故意读成播音腔。'],
     corpusCount: CATEGORY_EXERCISE_MAP['现代文章朗读'].length,
   },
-  '文言文节奏': {
-    label: '文言文节奏',
-    shortLabel: '文言进阶',
-    description: '保留经典文言和声律材料，用作进阶节奏、声调、对偶和长短句控制训练。',
-    examples: ['不宜妄自菲薄', '仰观宇宙之大', '木兰当户织'],
-    helper: '这组认知负担更高，适合作为进阶节奏训练，不作为默认朗读主入口。',
-    trainingTips: ['先慢读，把停顿位置放稳。', '遇到文言句不要抢速度，先保证每个字清楚。'],
-    corpusCount: CATEGORY_EXERCISE_MAP['文言文节奏'].length,
+  '会议与协作': {
+    label: '会议与协作',
+    shortLabel: '会议协作',
+    description: '覆盖开会、汇报、确认、协商、补充观点和工作沟通里的短句，练真实协作场景中的表达权。',
+    examples: ['请先听我补充', '这个风险要确认', '我们再对一下时间'],
+    helper: '这组句子专门补工作和会议里的轮次、确认和补充表达。',
+    trainingTips: ['先把“请听我补充”“我想确认”这类起手结构说稳。', '遇到观点句，先说关键动词，再补对象。'],
+    corpusCount: CATEGORY_EXERCISE_MAP['会议与协作'].length,
+  },
+  '车载与导航': {
+    label: '车载与导航',
+    shortLabel: '车内导航',
+    description: '覆盖车内沟通、导航、停车、转向、空调、加油充电和出行路况短句，补移动环境里的高频表达。',
+    examples: ['前面路口右转', '请打开车内空调', '先找地方停车'],
+    helper: '这组句子面向车内和路上场景，重点练方向、动作、设备和安全提醒。',
+    trainingTips: ['方向和动作要分开说清。', '车内噪声大时，先把最关键的地点或动作词说稳。'],
+    corpusCount: CATEGORY_EXERCISE_MAP['车载与导航'].length,
+  },
+  '音系强化': {
+    label: '音系强化',
+    shortLabel: '声韵声调',
+    description: '从真实现代中文转写和朗读材料中挑选声母、韵母、声调覆盖更密的短句，专门练连续音系稳定性。',
+    examples: ['清晨的空气很新鲜', '群众生活更加便利', '声音变化比较明显'],
+    helper: '这组不是古文进阶，也不是绕口令；它用真实来源句补声韵调覆盖，适合做专项稳定练习。',
+    trainingTips: ['先慢读，确保每个音节都站稳。', '遇到声调变化密集的句子，先分两拍读，再连起来。'],
+    corpusCount: CATEGORY_EXERCISE_MAP['音系强化'].length,
   },
 }
 

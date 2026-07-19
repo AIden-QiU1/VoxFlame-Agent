@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-06-05
+> 最后更新: 2026-07-15
 
 ## 当前主线
 
@@ -19,13 +19,80 @@
 
 ## 最新收口
 
-0. 2026-06-05 已定位并修复沟通页录音时出现大面积空白的问题
-   - 根因：`WaveformVisualizer` 录音波形组件使用 `fixed bottom-0 left-0 right-0 h-screen z-20`，并在底部渲染 `h-[400px]` 波形层；录音开始后它脱离消息流覆盖整屏，视觉上把对话文字流和输入栏之间撑成一大片空白
-   - 线上 `https://voxember.com` 当前 page chunk 已确认仍包含这组全屏 fixed 波形类名，所以线上截图不是单独的部署环境问题；本地当前源码同样会复现，属于前端组件布局问题
-   - [WaveformVisualizer](/home/ubuntu/VoxFlame-Agent/frontend/src/components/WaveformVisualizer.tsx) 已改为行内容器：`relative h-20 / sm:h-24`，不再全屏 fixed；同时 resize 时重置 canvas transform，避免重复 scale
-   - [ChatInterface](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx) 已把录音状态加入 `hasConversationStarted`，录音开始后直接在消息列表里展示行内波形和“正在录音”提示
+0. 2026-07-15 已完成普通话训练语料重构到 7-18 字、8000+ 条
+   - 已删除前端训练分类里的 `文言文节奏`，新增 `会议与协作`、`车载与导航`、`音系强化`
+   - [export_frontend_source_corpus.py](/home/ubuntu/VoxFlame-Agent/scripts/corpus/export_frontend_source_corpus.py) 已支持 AISHELL-1 spaced transcript、AISHELL-3 `汉字 拼音` content、AISHELL-4 TextGrid、WenetSpeech id-prefixed transcript 的本地解析；WenetSpeech 解析按行流式处理，完整 `text.fix` 到位后可直接重刷
+   - 最终生成池 [mandarin-training-real.json](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/corpus/generated/mandarin-training-real.json) 为 `8980` 条：`现代文章朗读 5000 / 会议与协作 900 / 车载与导航 80 / 音系强化 3000`
+   - 前端合并 curated 与 generated 后总训练项为 `9316` 条，其中 `评估筛查 20`、非评估训练句 `9296` 条；当前生成来源不再使用 Tatoeba / 翻译例句
+   - 生成规则已收紧为：只收 `7-18` 个可见汉字，拒绝 ASCII/数字、网页 UI 噪声、古文/旧式语料、敏感新闻/政治/宗教/暴力/影视点歌/POI 片段、悬空虚词开头结尾、全局重复和高频近重复结构
+   - [index.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/corpus/mandarin-training-data/index.ts) 已在前端合并层做全局 target text 去重，避免 curated 与 generated 跨分区重复
+   - [training-topic-route.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/training-topic-route.ts) 和 [training-scenes.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/training-scenes.ts) 已接入新增分区
+   - [README.md](/home/ubuntu/VoxFlame-Agent/scripts/corpus/README.md) 已更新新的来源分层、导出命令和“音系强化不用古文、不模板造句”的口径
+   - 已验证：
+   - `python3 -m py_compile scripts/corpus/export_frontend_source_corpus.py`
+   - `cd frontend && npm test -- src/lib/corpus/mandarin-training-data/index.test.ts`，实际按当前 npm script 跑了 `55` 个前端测试，全部通过
+   - `cd frontend && npx tsc --noEmit`
+   - `bash scripts/check_ai_docs.sh`
+
+0. 2026-07-14 已修复 `backend/scripts/manage_users.js` 中硬编码 Supabase service role key 的问题
+   - 该脚本现在通过 `dotenv` 从 `backend/.env` 读取 `SUPABASE_URL` 和 `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ROLE_KEY`
+   - 源码中的固定 `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` 常量已删除，避免把管理密钥留在仓库里
+   - 已验证：`node backend/scripts/manage_users.js`
+
+0. 2026-07-08 已完成 WAIC / 公安检查前的 Web 服务器侧安全收口，并完成 EdgeOne/WAF 待切 NS 前配置
+   - 文档：[docs/WAIC_SECURITY_CHECKLIST_2026-07-08.md](/home/ubuntu/VoxFlame-Agent/docs/WAIC_SECURITY_CHECKLIST_2026-07-08.md)
+   - 服务器运行态已实测：`3000`、`3001`、`8081` 均只监听 `127.0.0.1`；公网只保留 Caddy `80/443`、SSH `22` 和 LiveKit `7880/7881`
+   - `livekit_agent/app.py` 已把 LiveKit Agents SDK 的健康 HTTP 服务绑定到 `127.0.0.1`；当前容器也已热补 `/app/app.py` 并重启，`curl http://127.0.0.1:8081/` 返回 `OK`
+   - 线上 `curl -I --noproxy '*' https://voxember.com` 已确认安全头存在，且不再看到 `X-Powered-By: Next.js / Express`
+   - EdgeOne 当前配置：ZoneId `zone-3sacn5q6g224`，加速域名 `voxember.com`，DomainId `edge-3sacy37kmnbh`，CNAME `voxember.com.eo.dnse2.com`，源站 `111.230.35.89`，HTTPS 回源，回源 Host `voxember.com`
+   - EdgeOne DNS 当前为根域 CNAME enabled，根域 A/CAA disabled；这是为了让切 NS 后走 EdgeOne 加速/WAF，避免继续直连源站。DNSPod 侧 CAA 仍存在，但切 NS 后根域同名 CNAME 与 CAA 不能共存
+   - EdgeOne 安全策略已配置为 WAF 托管规则拦截：`ManagedRules.Enabled=on`、`DetectionOnly=off`、`wafgroup-free Action=Deny`；CC/DDoS、WebSocket、HTTPS 强跳、HSTS 已开启。Bot 当前仍是 off，不应作为已完成证据
+   - 当前阻塞项：权威 NS 仍是 `eleven.dnspod.net`、`rich.dnspod.net`，公网 A 仍解析到 `111.230.35.89`；CAM 子账号缺腾讯云 Domain 权限，无法代改注册商 NS。需要用户在腾讯云域名控制台把 NS 改为 `ns1.qeodns.com`、`ns2.qeodns.com`
+   - NS 生效后再继续：启用 EdgeOne HTTPS 证书，验证 EdgeOne 响应头，定位源站实例 / Lighthouse 防火墙并限制源站直连
+
+0. 2026-06-28 已把 `2307294809@qq.com` 的沟通页与训练 / 评测页 ASR 路由接到 cpu1 本机 HTTP ASR 服务
+   - 账号 userId：`64758dee-5026-4b53-a063-1d02d0834f67`
+   - [livekit_agent/asr_runtime.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/asr_runtime.py) 的 `QWEN_HTTP_ASR_*` 命中范围已从仅 `communication` 放开到 `communication + training`，因此沟通页和训练评测页共用同一条账号级 HTTP ASR 路由
+   - [docker-compose.yml](/home/ubuntu/VoxFlame-Agent/docker-compose.yml) 中 `livekit-agent` 改为 `network_mode: host`，默认 `QWEN_HTTP_ASR_URL=http://127.0.0.1:18000/transcribe`，默认 `QWEN_HTTP_ASR_USER_IDS=64758dee-5026-4b53-a063-1d02d0834f67`
+   - 因为 `environment` 会覆盖 `livekit_agent/.env`，compose 默认白名单也必须保留该 userId；只改 `livekit_agent/.env` 不足以让容器命中账号路由
+   - `backend` 默认 `LIVEKIT_AGENT_HEALTH_URL` 已改为 `http://host.docker.internal:8081/`，以便 backend 仍在 bridge 网络时检查 host-network 的 livekit-agent
+   - 重启后本机 ASR health 一度返回 `{"status":"ok","backend":"transformers"}`，3 秒评估筛查 WAV 单次转写返回 `发扬`，成功样本耗时约 `0.639s` 和 `1.850s`
+   - 但 `127.0.0.1:18000/transcribe` 连续请求测试出现过瞬时 `connection refused`，随后 `/health` 又恢复；这更像 ASR 服务自身的连续请求 / worker 稳定性问题，不是 VoxFlame 路由逻辑问题。HTTP ASR 失败时 livekit_agent 会按已有逻辑回退 DashScope realtime ASR
+   - 已验证：`python3 -m unittest livekit_agent.tests.test_asr_runtime`、`docker compose config | rg -n "QWEN_HTTP_ASR|network_mode|LIVEKIT_AGENT_HEALTH_URL|LIVEKIT_URL"`、本机 `curl /health` 与单条 `/transcribe`
+
+0. 2026-06-14 已重新拉取 2026-05-24 之后的 OSS 训练数据增量
+   - 使用脚本 [download_oss_by_account.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/download_oss_by_account.ts) 按 `--since 2026-05-24T00:00:00+08:00` 拉取，不覆盖旧目录
+   - 输出目录：[artifacts/oss-by-account-after-20260524-refresh-20260614](/home/ubuntu/VoxFlame-Agent/artifacts/oss-by-account-after-20260524-refresh-20260614)
+   - dry-run 与真实下载结果一致：`objects=720`、`listed=1216`、`bytes=221.6 MB`；本地目录体积约 `225M`
+   - 账号分布：`2187054680__0983a35e` 517 个对象、`2307294809__64758dee` 195 个对象、`2440571672__77cab18e` 8 个对象
+   - `_objects.jsonl` 共 `720` 行；匹配对象 lastModified 范围为 `2026-05-31T03:22:41.000Z` 到 `2026-06-14T06:20:53.000Z`
+   - 已验证：`wc -l`、`du -sh`、账号目录枚举、`_objects.jsonl` 时间范围与账号计数
+
+0. 2026-06-14 已把自定义材料训练语料切分规则收口到“10-20 字优先、标点边界优先、全文不丢”
+   - 后端 [prepared-expression.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/prepared-expression.service.ts) 生成结构化 prepared expression 时不再只取前 12 段；所有材料段落都会进入 sections
+   - 后端和前端训练页都统一为 10-20 字目标长度；特别常用或剩余短句可保留，不为凑长度强行拼错上下文
+   - 带标点或自然停顿的句子优先在开头 / 标点边界收口，不再为了长度把一句话中间硬断开；只有无标点超长文本才按 20 字左右硬切
+   - 前端 [prepared-expression-practice.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/prepared-expression-practice.ts) 继续用 `document_content` 全量生成训练 exercises，保证训练页可练句拼回去等于原材料全文
+   - 新增 [prepared-expression.service.test.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/prepared-expression.service.test.ts) 和更新 [prepared-expression-practice.test.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/prepared-expression-practice.test.ts) 覆盖全文不丢、无标点长句硬切和 section metadata 保留
+   - 当前运行中的 `livekit-agent` 容器里 `QWEN_HTTP_ASR_URL` 与 `QWEN_HTTP_ASR_USER_IDS` 均为空；`2307294809@qq.com` 对应 userId `64758dee-5026-4b53-a063-1d02d0834f67` 的私有 HTTP ASR 云部署路由当前没有启用
+   - 已验证：
+   - `cd frontend && npm run build`
+   - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --experimental-strip-types -e "import('./src/lib/training/prepared-expression-practice.test.ts').catch((error) => { console.error(error); process.exit(1); })"`
+   - `cd backend && ./node_modules/.bin/ts-node src/services/prepared-expression.service.test.ts`
+   - `cd backend && npm run build`
+   - `bash scripts/check_ai_docs.sh`
+
+0. 2026-06-05 已定位并修复沟通页录音 / 录音结束后出现大面积空白的问题
+   - 最终根因：`ChatInterface` 自动滚动使用 `messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })`，录音、实时转写和 assistant streaming 更新时会触发该 effect；浏览器可能滚动 document/body 而不是只滚动消息面板，导致 footer/input 区被滚到视口中部，下面露出大块空白
+   - 之前把问题归到波形组件过大 / fixed overlay 只是局部表象；真正要修的是滚动容器和页面高度状态机
+   - [ChatInterface](/home/ubuntu/VoxFlame-Agent/frontend/src/components/chat/ChatInterface.tsx) 已把消息框自动滚动改为 `messagesScrollRef.current.scrollTop = scrollHeight`；文字流会随实时转写贴底滚动，但只滚消息 `main`，不再调用 `scrollIntoView` 或滚动 document/body
+   - 沟通页外层已锁成 `h-dvh overflow-hidden`，主列 `min-h-0 flex-1 flex-col`，header/footer `shrink-0`，消息区 `min-h-0 flex-1 overflow-y-auto`，只允许消息区滚动
+   - 进入沟通页期间会把 `html/body` 的 `overflow` 临时锁为 `hidden`，离开沟通页时恢复，确保输入栏以下没有任何可滚动空白区域
+   - 进入沟通页时会重置 `window.scrollTo({ top: 0, left: 0 })`，避免从首页或旧状态带入 document scroll
+   - 录音时消息流保留实时转写文字气泡；footer 内已恢复收音波形展示，波形只作为输入区上方轻量状态条，不再作为消息内容或页面滚动驱动
+   - 第一轮把波形放回消息内容里的方案已回收；当前复用 `WaveformVisualizer`，但只作为 footer 收音状态条的一部分，不参与消息流高度
    - 已验证：`cd frontend && npm run build`
-   - Playwright 打开本地 `http://127.0.0.1:3220/?mode=communicate` 时按现有鉴权跳转登录页，未登录浏览器无法直接做录音 UI smoke；已用线上 chunk 与本地源码确认 root cause
+   - Playwright 打开本地 `http://127.0.0.1:3220/?mode=communicate` 时按现有鉴权跳转登录页，未登录浏览器无法直接做录音 UI smoke；代码层已确认 `scrollIntoView / messagesEndRef` 均已移除
 
 0. 2026-05-30 已清理 `oss-by-account-after-20260524` 对应的云端 OSS 对象
    - 已把 [artifacts/oss-by-account-after-20260524](/home/ubuntu/VoxFlame-Agent/artifacts/oss-by-account-after-20260524) 加入 `.gitignore`

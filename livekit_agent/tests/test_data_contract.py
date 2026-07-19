@@ -18,6 +18,7 @@ from data_contract import (
     build_voice_profile_updated_output,
     decode_data_packet,
     extract_end_audio_reason,
+    extract_end_audio_request,
     extract_preparation_context_update,
     extract_user_text_input,
 )
@@ -58,6 +59,14 @@ class DataContractTests(unittest.TestCase):
         self.assertEqual(extract_user_text_input(message), "请帮我说慢一点")
         self.assertIsNone(extract_user_text_input({"type": "end_audio"}))
         self.assertEqual(extract_end_audio_reason({"type": "end_audio", "reason": "manual_stop"}), "manual_stop")
+        self.assertEqual(
+            extract_end_audio_request({
+                "type": "end_audio",
+                "reason": "manual_stop",
+                "client_capture_id": "capture-2",
+            }),
+            ("manual_stop", "capture-2"),
+        )
 
     def test_extract_preparation_context_update_reads_payload(self) -> None:
         message = {

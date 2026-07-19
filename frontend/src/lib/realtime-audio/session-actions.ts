@@ -34,13 +34,17 @@ interface StartRtcRecordingActionOptions {
   connect: (options?: { suppressGreeting?: boolean }) => Promise<void>
   ensureMicrophoneTrack: () => Promise<SessionMicrophoneTrack>
   warmUpMicrophoneStream: () => Promise<MediaStream>
+  sendControlMessage: (type: string, payload?: Record<string, unknown>) => Promise<void>
   connectOptions?: { suppressGreeting?: boolean }
+  clientCaptureId?: string
+  shortUtteranceExpected?: boolean
 }
 
 interface StopRtcRecordingActionOptions {
   refs: Pick<SessionActionRefs, 'micTrackRef' | 'latestUserTranscriptRef'>
   setState: Dispatch<SetStateAction<RtcAgentState>>
   sendControlMessage: (type: string, payload?: Record<string, unknown>) => Promise<void>
+  clientCaptureId?: string
 }
 
 interface SendRtcTextActionOptions {
@@ -58,7 +62,10 @@ export async function startRtcRecordingAction({
   connect,
   ensureMicrophoneTrack,
   warmUpMicrophoneStream,
+  sendControlMessage,
   connectOptions,
+  clientCaptureId,
+  shortUtteranceExpected = false,
 }: StartRtcRecordingActionOptions): Promise<void> {
   if (!refs.micTrackRef.current) {
     await warmUpMicrophoneStream()
@@ -69,6 +76,15 @@ export async function startRtcRecordingAction({
   }
 
   const micTrack = await ensureMicrophoneTrack()
+  if (clientCaptureId) {
+    await sendControlMessage('speech_activity', {
+      state: 'speech_started',
+      auto_finalize: false,
+      short_utterance_expected: shortUtteranceExpected,
+      client_capture_id: clientCaptureId,
+      detected_at: Date.now(),
+    })
+  }
   await micTrack.setEnabled(true)
   refs.latestUserTranscriptRef.current = { text: '', clientCaptureId: null }
   setState((prev) => applyRecordingStarted(prev))
@@ -78,6 +94,7 @@ export async function stopRtcRecordingAction({
   refs,
   setState,
   sendControlMessage,
+  clientCaptureId,
 }: StopRtcRecordingActionOptions): Promise<void> {
   const micTrack = refs.micTrackRef.current
   if (!micTrack) {
@@ -85,7 +102,18 @@ export async function stopRtcRecordingAction({
   }
 
   await micTrack.setEnabled(false)
-  await sendControlMessage('end_audio', { reason: 'manual_stop' })
+  if (clientCaptureId) {
+    await sendControlMessage('speech_activity', {
+      state: 'speech_stopped',
+      auto_finalize: true,
+      client_capture_id: clientCaptureId,
+      detected_at: Date.now(),
+    })
+  }
+  await sendControlMessage('end_audio', {
+    reason: 'manual_stop',
+    ...(clientCaptureId ? { client_capture_id: clientCaptureId } : {}),
+  })
   setState((prev) => applyRecordingStopped(prev))
 }
 
