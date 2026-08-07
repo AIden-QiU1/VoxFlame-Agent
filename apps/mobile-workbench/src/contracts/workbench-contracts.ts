@@ -45,6 +45,21 @@ export interface MobileWorkbenchRtcSessionIntent {
   deviceContext?: MobileWorkbenchDeviceContext
 }
 
+export interface MobileWorkbenchResolvedRtcSessionIntent
+  extends Omit<MobileWorkbenchRtcSessionIntent, 'scene'> {
+  grantedCapabilities: MobileWorkbenchCapabilityId[]
+  scene?: MobileWorkbenchScene | null
+}
+
+export interface MobileWorkbenchRtcReadinessSummary {
+  status: 'needs_attention' | 'can_start' | 'ready'
+  label: string
+  detail: string
+  nextAction: string
+  blockerSummary: string | null
+  warningSummary: string | null
+}
+
 export interface MobileWorkbenchLiveKitRuntime {
   provider: 'livekit'
   serverUrl: string
@@ -63,13 +78,19 @@ export interface MobileWorkbenchLiveKitRuntime {
 export interface MobileWorkbenchRtcSessionResponse {
   requestId: string
   channelName: string
+  graphName: string
   executionBackend: 'livekit'
   transport: MobileWorkbenchLiveKitRuntime
-  intent: MobileWorkbenchRtcSessionIntent
+  intent: MobileWorkbenchResolvedRtcSessionIntent
   readiness: {
     canStart: boolean
+    requestedStrategy: MobileWorkbenchSessionStrategy
+    resolvedStrategy: MobileWorkbenchSessionStrategy
+    recommendedStrategy: MobileWorkbenchSessionStrategy
+    microphoneRequired: boolean
     blockers: string[]
     warnings: string[]
+    summary: MobileWorkbenchRtcReadinessSummary
   }
 }
 

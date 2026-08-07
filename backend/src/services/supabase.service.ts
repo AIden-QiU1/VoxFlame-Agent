@@ -584,29 +584,22 @@ function normalizeSceneTemplateCatalog(
 }
 
 export class SupabaseService {
-  private client: SupabaseClient;
   private adminClient: SupabaseClient; // service_role client for system operations
   private static instance: SupabaseService;
   private readonly preparedExpressionSummaryService = new PreparedExpressionSummaryService();
 
   private constructor() {
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Missing Supabase environment variables: SUPABASE_URL, SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      throw new Error(
+        'Missing Supabase environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY',
+      );
     }
 
-    this.client = createClient(supabaseUrl, supabaseAnonKey);
-
-    // Create admin client with service_role key (bypasses RLS)
-    if (supabaseServiceRoleKey) {
-      this.adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
-    } else {
-      console.warn('SUPABASE_SERVICE_ROLE_KEY not set, some admin operations may fail');
-      this.adminClient = this.client; // Fallback to anon key
-    }
+    // Backend-owned data must never silently fall back to a browser-facing key.
+    this.adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
   }
 
   public static getInstance(): SupabaseService {
@@ -2785,7 +2778,7 @@ export class SupabaseService {
    * 从系统预设表获取所有预设短语
    */
   async getPresetPhrases(): Promise<Array<{ text: string; category: PhraseCategory }>> {
-    const { data, error } = await this.client
+    const { data, error } = await this.adminClient
       .from('preset_phrases')
       .select('text, category, order_index')
       .eq('is_active', true)

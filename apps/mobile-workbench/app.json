@@ -1,25 +1,42 @@
 {
   "expo": {
-    "name": "VoxFlame Workbench",
+    "name": "VoxFlame",
+    "owner": "qiuds-team",
     "slug": "voxflame-mobile-workbench",
-    "version": "0.0.1",
+    "version": "0.1.2",
     "orientation": "portrait",
     "scheme": "voxflame",
+    "icon": "../../frontend/public/icons/icon-512x512.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.voxflame.mobileworkbench",
+      "buildNumber": "3",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "VoxFlame 需要麦克风权限用于沟通、练习录音和用户确认后的训练样本采集。"
+        "NSMicrophoneUsageDescription": "VoxFlame 需要麦克风权限用于沟通、练习录音和用户确认后的训练样本采集。",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "org.voxflame.mobileworkbench",
+      "versionCode": 3,
+      "adaptiveIcon": {
+        "foregroundImage": "../../frontend/public/icons/icon-maskable-512x512.png",
+        "backgroundColor": "#F5F1EA"
+      },
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ],
+      "blockedPermissions": [
+        "android.permission.CAMERA",
+        "android.permission.SYSTEM_ALERT_WINDOW"
       ]
     },
     "plugins": [
@@ -40,7 +57,10 @@
     ],
     "extra": {
       "runtimeBoundary": "backend-orchestrated",
-      "rtcSurface": "mobile_workbench"
+      "rtcSurface": "mobile_workbench",
+      "eas": {
+        "projectId": "4bf9376c-31f6-4b58-b7b7-61d6969ccdcd"
+      }
     }
   }
 }

@@ -29,5 +29,13 @@
     @livekit path /rtc /rtc/*
     reverse_proxy @livekit 127.0.0.1:7880
 
+    handle /download/android {
+        rewrite * /VoxFlame-Android.apk
+        root * /srv/releases/android
+        header Content-Disposition "attachment; filename=VoxFlame-Android.apk"
+        header Content-Type "application/vnd.android.package-archive"
+        file_server
+    }
+
     reverse_proxy 127.0.0.1:3000
 }

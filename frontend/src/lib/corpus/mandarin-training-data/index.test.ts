@@ -32,30 +32,12 @@ const MODERN_READING_WEB_NOISE = [
   'app下载',
 ]
 
-const LOW_QUALITY_TERMS = [
-  '女尸',
-  '尸体',
-  '自杀',
-  '死亡',
-  '杀人',
-  '毒品',
-  '战争',
-  '总统',
-  '汤姆',
-  '玛丽',
-  '上帝',
-  '维基',
-  '版权',
-  '隐私',
-  '协议',
-  '我要听',
-  '给我听',
-  '我想听',
-  '支持文章',
-  '月经',
-  '谋杀',
-  '癌细胞',
-  '手足口病',
+const SEVERE_POLLUTION_PATTERNS = [
+  /发生性关系|色情|强奸|猥亵|嫖娼|卖淫|妓女|裸照|裸体|性爱|性交|性交易|自慰|约炮|一夜情|黄片|援交|新世界阴道|生活在精囊|性生活的基础|享受合理的性生活婚后/,
+  /劫持|绑架|掐死|砍死|砸死|撞死|枪杀|捅死|毒死|打死|勒死|烧死|服毒身亡|被炸身亡|遇害|殴打|砍伤|捅伤|谋杀|凶杀|女尸|男尸|尸体/,
+  /一键领取.{0,8}大礼包|考试真题|模拟试题|高频考点|直播课堂|精讲班视频教程|客户端下载|客户端订阅|订阅节目|订阅收听|入群二维码|下载到.{0,8}客户端|促销方案|促销等方案|优惠活动.{0,8}拉客户|奖励赠礼品|引流儿|培训中心$|点个赞|留个言|历年真题|考试题型|资格考试采取闭卷|考试时请以试卷|每次考试考场|护理职称.{0,12}考试重点|锁定.{0,4}核心考点|读者订阅学习/,
+  /[呃嗯]|客户儿|部门儿|为为什么|客客户|项项目|进进行|世世界|整整个|线线上|一一堆|咱咱|你你|我我|这这|那那|女女|喝喝|左左|他他们|这这些|那那些|抓抓住|采采购|使只能|拉到拉过来|怎么怎么|觉得觉得|能能解决|啊啊|老老客户|今今天|都都知道|到到时候|重重视|大大堂|客户端客户端|有有希望|出出门|能够能够|就就崩|就就要|就是是|是是关于/,
+  /(希望达成的是|没有想到的是|自我成长能够|工作和呃|孩子说呃|科学的呃|短信呃|方案是)$/,
 ]
 
 function repeatSignature(text: string): string {
@@ -115,11 +97,17 @@ test('Modern article reading corpus excludes page and training-site noise', () =
   }
 })
 
-test('Mandarin training corpus excludes low-quality and sensitive fragments', () => {
+test('Mandarin training corpus excludes confirmed severe pollution', () => {
   for (const exercise of MANDARIN_TRAINING_EXERCISES) {
-    const leaked = LOW_QUALITY_TERMS.filter((term) => exercise.text.includes(term))
-    assert.deepEqual(leaked, [], `${exercise.id} contains low-quality term: ${exercise.text}`)
+    const leaked = SEVERE_POLLUTION_PATTERNS.filter((pattern) => pattern.test(exercise.text))
+    assert.deepEqual(leaked, [], `${exercise.id} contains severe pollution: ${exercise.text}`)
   }
+})
+
+test('Mandarin training corpus retains valid news, finance, dialogue, and medical topics', () => {
+  const texts = new Set(MANDARIN_TRAINING_EXERCISES.map((exercise) => exercise.text))
+  assert.equal(texts.has('孕期减少性生活'), true)
+  assert.equal(texts.has('乳房肿胀的疼痛可以通过冷敷'), true)
 })
 
 test('Mandarin training corpus has no duplicate target text per category', () => {

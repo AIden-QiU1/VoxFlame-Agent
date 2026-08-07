@@ -36,6 +36,7 @@ ten_agent/bin/
 ten_agent/ten_packages/system/
 ten_agent/ten_packages/addon_loader/
 logs/
+releases/
 
 # Compiled manifest lock (generated)
 ten_agent/manifest-lock.json

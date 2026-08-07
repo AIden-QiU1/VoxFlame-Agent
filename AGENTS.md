@@ -129,6 +129,8 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 - 迁移 / 重构 / 收口任务：至少验证唯一事实源、旧入口封口情况和旁路系统依赖。
 - Docker / 部署改动：至少验证相关 compose 命令或构建步骤。
 - 在这个仓库里，容器验证默认先按文档使用 `docker compose`；如果当前机器的 Docker 需要 root 权限或普通命令失败，明确回退到 `sudo docker compose build ...`、`sudo docker compose up -d ...`、`sudo docker compose logs ...`，并在结论里说明使用了 sudo 路径。
+- Docker 部署默认使用 `scripts/docker-rebuild-core-fast.sh` 的最小影响模式：仅环境变量变化用 `env-backend`，单服务代码变化用 `backend` / `frontend`，核心链路共同变化才用 `core`；不要把 `docker compose down` 作为部署前置步骤。
+- Docker 磁盘清理先运行 `scripts/docker_disk_maintenance.sh status`，再使用 `prune-safe`；保留运行镜像、卷、`latest` 与 `pre-*` 回滚镜像，禁止默认使用会扩大删除范围的 `docker system prune -af`。
 - 麦克风 / 语音权限验证时，优先使用 VSCode/SSH 端口转发后的 `http://localhost:3000`；`localhost` 属于 secure context，不要长期依赖 `--unsafely-treat-insecure-origin-as-secure=...` 之类浏览器 flag。若必须从公网地址验证麦克风权限，应提供 HTTPS 与证书。
 - 纯文档改动：运行 `bash scripts/check_ai_docs.sh`。
 

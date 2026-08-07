@@ -359,11 +359,15 @@ compat 层必须同时具备：
 - `scripts/check_ai_docs.sh`：校验入口规则和深文档没有漂移
 - `scripts/check_ai_governance.sh`：阻止 compat 路径和旧页面入口重新被新代码引用
 - `.github/workflows/ai-doc-guard.yml`：在 CI 中同时执行文档 harness 与治理守卫
+- `scripts/docker-rebuild-core-fast.sh`：生产 Docker 部署 harness；环境变量更新使用 `env-backend` 只重建 backend，单服务代码改动使用 `backend` / `frontend`，只有核心链路共同变化才使用默认 `core`，不先执行 `docker compose down`
+- `scripts/docker_disk_maintenance.sh`：Docker 磁盘维护 harness；`status` 先盘点，`prune-safe` 只清理 7 天前的 dangling images 与 build cache，保留运行容器、卷、`latest` 和 `pre-*` 回滚镜像
 
 另外，仓库级 instructions 至少要明确：
 
 - 当前环境常用 build / test / smoke 命令
 - 如果 `docker compose` 在当前机器权限不足，何时回退到 `sudo docker compose`
+- Docker 部署遵循最小影响面：环境变量更新只 recreate 目标服务，单服务代码更新只 build/up 目标服务，不把 `docker compose down` 作为默认前置步骤
+- Docker 清理先保留运行镜像与显式回滚标签；默认禁止用 `docker system prune -af` 代替精确的 dangling image / 过期 build cache 清理
 - 哪些验证必须在浏览器、哪些验证必须在容器、哪些验证必须在脚本
 - 哪些工具 / skill / MCP 是默认入口，哪些只在特定条件下启用
 

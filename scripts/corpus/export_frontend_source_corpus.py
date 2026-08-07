@@ -573,115 +573,51 @@ PHONOLOGY_SOURCE_MARKERS = (
 )
 
 COMMERCIAL_ADVERTISING_RE = re.compile(
-    r"(优惠券|优惠价|优惠活动|大礼包|促销|秒杀|折扣|特价|招商|加盟|引流|赠礼|推销|带货|"
-    r"直播间|直播课堂|主播|粉丝|客户端下载|下载到.{0,6}客户端|点赞|留言|"
-    r"关注.{0,4}公众号|考试真题|模拟试题|高频考点|考试题型|试卷|闭卷|"
-    r"资格考试|精讲班|培训中心|培训班|培训机构|辅导班|视频教程|基金从业|"
-    r"教师资格|职称考试|考试重点|题库|备考|招生|报名咨询|代理孕母)"
+    r"(一键领取.{0,8}大礼包|考试真题|模拟试题|高频考点|直播课堂|"
+    r"精讲班视频教程|客户端下载|客户端订阅|订阅节目|订阅收听|入群二维码|"
+    r"下载到.{0,8}客户端|促销方案|促销等方案|优惠活动.{0,8}拉客户|"
+    r"奖励赠礼品|引流儿|培训中心$|点个赞|留个言|历年真题|"
+    r"考试题型|资格考试采取闭卷|考试时请以试卷|每次考试考场|"
+    r"护理职称.{0,12}考试重点|锁定.{0,4}核心考点|读者订阅学习)"
 )
 ADULT_OR_SEXUAL_RE = re.compile(
-    r"(性生活|性交|性爱|性欲|情欲|阴道|阴茎|乳房|精囊|裸体|裸照|黄片|"
-    r"色情|嫖娼|卖淫|妓女|强奸|猥亵|自慰|约炮|一夜情|发生性关系|性交易|"
-    r"包养|援交|成人用品)"
+    r"(发生性关系|色情|强奸|猥亵|嫖娼|卖淫|妓女|裸照|裸体|性爱|性交|"
+    r"性交易|自慰|约炮|一夜情|黄片|援交|新世界阴道|生活在精囊|"
+    r"性生活的基础|享受合理的性生活婚后)"
 )
 CRIME_VIOLENCE_ACCIDENT_RE = re.compile(
-    r"(诈骗|遇害|死者|警方|秘密警察|监狱|盗窃|抢劫|劫持|拘留|被拘|"
-    r"犯罪|凶杀|谋杀|杀人|自杀|尸体|枪杀|毒品|吸毒|贩毒|赌博|"
-    r"犯罪嫌疑人|交通事故|安全事故|环境污染事故|事故现场|事故发生|"
-    r"轻生|跳河|跳楼|猝死|砸死|撞死|伤者|报警|报案|殴打|打伤|砍伤|"
-    r"捅伤|身亡|不治身亡|抢救无效|火灾|车祸|坠亡|失踪|拐卖)"
-)
-NEWS_MEDIA_FRAGMENT_RE = re.compile(
-    r"(记者|新华社|中新社|中新网|华商报|日报记者|晨报记者|晚报记者|"
-    r"新文化讯|日讯|文摄|专访时说|消息称|据.{0,8}报道|报道后|"
-    r"告诉.{0,8}记者|对.{0,8}记者说|向.{0,8}记者表示|本报讯|本台消息|"
-    r"新闻发布会|新闻报道|媒体报道|媒体采访|接受采访|我们报道了|"
-    r"报道了一位|最新消息|消息人士|获悉|通讯员)"
-)
-FINANCE_REAL_ESTATE_RE = re.compile(
-    r"(房价|房企|豪宅|楼盘|楼市|地产|房产|购房|买房|卖房|住房市场|"
-    r"融资|债券|股价|证券|基金经理|投资基金|封闭式基金|开放式基金|基金估值|"
-    r"私募|净利润|营收|投资者|成交量|限购|去库存|收益率|利率|"
-    r"公积金|保险基金|股票|期货|信托|理财产品|资产管理|房地产|"
-    r"阳光城|万科|万达|三四线城市|售楼处|开发商|住宅项目|商业项目)"
-)
-ENTERTAINMENT_PROMO_RE = re.compile(
-    r"(明星大咖|女明星|男明星|艺人|首播|巡演|演唱会|娱乐节目|综艺节目|"
-    r"本期节目|我们的节目|听我节目|节目能够|节目对你|影视剧|票房|"
-    r"世界冠军|全国冠军|冠军|亚军|季军|锦标赛|联赛|运动会|田径|赛事|"
-    r"球员|球队|教练员|运动员|足球|篮球|排球|网球|羽毛球|乒乓球|"
-    r"观众|粉丝|颁奖|夺冠|晋级|决赛|半决赛)"
-)
-ORGANIZATION_OR_POI_FRAGMENT_RE = re.compile(
-    r"(有限公司|集团副总裁|集团总裁|证券事务部|公关部|销售中心|"
-    r"项目负责人|项目某管理人士|有关负责人对记者|某管理人士对记者|"
-    r"支行的客户经理|研究所副所长|协会会长|协会秘书长|委员会主任|"
-    r"办公室主任|相关负责人|公司负责人|公司董事|公司高管|某公司|"
-    r"某集团|研究院院长|研究中心主任)"
+    r"(劫持|绑架|掐死|砍死|砸死|撞死|枪杀|捅死|毒死|打死|勒死|烧死|"
+    r"服毒身亡|被炸身亡|遇害|殴打|砍伤|捅伤|谋杀|凶杀|女尸|男尸|尸体)"
 )
 ASR_DISFLUENCY_RE = re.compile(
-    r"(客户儿|部门儿|为为什么|客客户|项项目|世世界|整整个|线线上|"
-    r"一一堆|你你们|我我觉得|女女客户|这个这个|那个那个|这这个|"
-    r"那个那个那|能能解决|能够能够|就是就是说|所以就是说)"
+    r"([呃嗯]|客户儿|部门儿|为为什么|客客户|项项目|进进行|世世界|整整个|线线上|"
+    r"一一堆|咱咱|你你|我我|这这|那那|女女|喝喝|左左|他他们|这这些|那那些|"
+    r"抓抓住|采采购|使只能|拉到拉过来|怎么怎么|觉得觉得|能能解决|啊啊|"
+    r"老老客户|今今天|都都知道|到到时候|重重视|大大堂|客户端客户端|"
+    r"有有希望|出出门|能够能够|就就崩|就就要|就是是|是是关于)"
 )
-DISCOURSE_FRAGMENT_PREFIX_RE = re.compile(
-    r"^(所以说|就是说|然后就是|那么就是|那个就是|这个就是|"
-    r"我觉得就是|我觉得这个|我觉得那个|其实就是|第二个就是说)"
+SEVERE_BROKEN_FRAGMENT_RE = re.compile(
+    r"(希望达成的是|没有想到的是|自我成长能够|工作和呃|孩子说呃|"
+    r"科学的呃|短信呃|方案是)$"
 )
-BROKEN_FRAGMENT_SUFFIXES = (
-    "的话",
-    "的是",
-    "方面",
-    "情况",
-    "问题",
-    "东西",
-    "这个",
-    "那个",
-    "进行",
-    "属于",
-    "为主",
-    "之一",
-    "以来",
-    "来看",
-    "来说",
-    "来讲",
-    "能够",
-    "取决于",
-    "希望达成的是",
-)
-
-# Only substantive content defects count toward the source-level 20% gate.
-# Technical exclusions such as length, unsupported characters and duplicates
-# are still removed sentence by sentence, but do not make a source "low
-# quality" because they say nothing about the semantic value of that source.
-CONTENT_QUALITY_REJECTION_REASONS = frozenset(
+SEVERE_REJECTION_REASONS = frozenset(
     {
         "web_or_navigation_noise",
-        "sensitive_or_low_value",
-        "classical_or_old_style",
         "commercial_or_advertising",
         "adult_or_sexual",
         "crime_violence_or_accident",
-        "news_or_media_fragment",
-        "finance_or_real_estate",
-        "entertainment_or_program_promo",
-        "organization_or_proper_name_fragment",
         "asr_disfluency_or_duplication",
-        "spoken_discourse_fragment",
-        "broken_sentence_fragment",
-        "repetitive_pronoun",
+        "severe_broken_fragment",
         "low_character_diversity",
         "repetitive_character",
-        "numeric_only_or_low_context",
         "filler_heavy",
-        "low_context_spoken_fragment",
-        "unframed_question_fragment",
-        "repetitive_question_fragment",
         "filler_prefix",
-        "poi_or_business_listing",
     }
 )
-
+WEB_OR_NAVIGATION_NOISE_RE = re.compile(
+    r"(当前位置|上一篇|下一篇|相关阅读|推荐阅读|阅读全文|阅读更多|"
+    r"版权所有|隐私政策|用户协议|点击查看|立即下载|正在加载|无法加载)"
+)
 TRADITIONAL_MAP = str.maketrans(
     {
         "國": "国",
@@ -921,7 +857,6 @@ class RejectionAudit:
     source_counts: dict[str, Counter[str]] = field(default_factory=lambda: defaultdict(Counter))
     category_counts: dict[str, Counter[str]] = field(default_factory=lambda: defaultdict(Counter))
     examples: dict[str, list[dict[str, str]]] = field(default_factory=lambda: defaultdict(list))
-    source_quality_decisions: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def record(
         self,
@@ -941,27 +876,6 @@ class RejectionAudit:
                 "category": category,
             })
 
-    def record_source_quality_decision(
-        self,
-        *,
-        source_id: str,
-        reviewed_count: int,
-        low_quality_count: int,
-        threshold: float,
-        excluded: bool,
-        accepted_before_source_gate: int,
-    ) -> None:
-        ratio = low_quality_count / reviewed_count if reviewed_count else 0.0
-        self.source_quality_decisions[source_id] = {
-            "reviewed_content_count": reviewed_count,
-            "low_quality_count": low_quality_count,
-            "low_quality_ratio": round(ratio, 6),
-            "threshold": threshold,
-            "decision": "excluded" if excluded else "accepted",
-            "accepted_before_source_gate": accepted_before_source_gate,
-            "accepted_after_source_gate": 0 if excluded else accepted_before_source_gate,
-        }
-
     def to_payload(self) -> dict[str, Any]:
         return {
             "rejected_total": sum(self.counts.values()),
@@ -974,7 +888,6 @@ class RejectionAudit:
                 category: dict(sorted(counts.items()))
                 for category, counts in sorted(self.category_counts.items())
             },
-            "source_quality_decisions": dict(sorted(self.source_quality_decisions.items())),
             "examples": dict(sorted(self.examples.items())),
         }
 
@@ -989,12 +902,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-length", type=int, default=18)
     parser.add_argument("--per-source-cap", type=int, default=3000)
     parser.add_argument("--signature-cap", type=int, default=4)
-    parser.add_argument(
-        "--max-source-low-quality-ratio",
-        type=float,
-        default=0.20,
-        help="实质低质量句占已评审内容的比例超过该值时整源退出，默认 0.20",
-    )
     parser.add_argument("--audit-output", type=Path, default=None)
     parser.add_argument("--cap", action="append", default=[], help="分类上限，如 现代文章朗读=560")
     return parser.parse_args()
@@ -1025,31 +932,18 @@ def visible_text(raw: str) -> str:
 def rejection_reason(text: str, min_length: int = 7, max_length: int = 18) -> str | None:
     if not text:
         return "empty"
-    lowered = text.lower()
-    if any(pattern in lowered for pattern in BLOCK_PATTERNS):
+    if WEB_OR_NAVIGATION_NOISE_RE.search(text):
         return "web_or_navigation_noise"
-    if any(pattern in text for pattern in SENSITIVE_OR_LOW_VALUE_PATTERNS):
-        return "sensitive_or_low_value"
-    if any(pattern in text for pattern in CLASSICAL_OR_OLD_STYLE_PATTERNS):
-        return "classical_or_old_style"
     if COMMERCIAL_ADVERTISING_RE.search(text):
         return "commercial_or_advertising"
     if ADULT_OR_SEXUAL_RE.search(text):
         return "adult_or_sexual"
     if CRIME_VIOLENCE_ACCIDENT_RE.search(text):
         return "crime_violence_or_accident"
-    if NEWS_MEDIA_FRAGMENT_RE.search(text):
-        return "news_or_media_fragment"
-    if FINANCE_REAL_ESTATE_RE.search(text):
-        return "finance_or_real_estate"
-    if ENTERTAINMENT_PROMO_RE.search(text):
-        return "entertainment_or_program_promo"
-    if ORGANIZATION_OR_POI_FRAGMENT_RE.search(text):
-        return "organization_or_proper_name_fragment"
     if ASR_DISFLUENCY_RE.search(text):
         return "asr_disfluency_or_duplication"
-    if DISCOURSE_FRAGMENT_PREFIX_RE.search(text):
-        return "spoken_discourse_fragment"
+    if SEVERE_BROKEN_FRAGMENT_RE.search(text):
+        return "severe_broken_fragment"
     if re.search(r"[A-Za-z0-9]", text):
         return "ascii_or_digit"
     if re.search(r"[^\u4e00-\u9fff]", text):
@@ -1059,12 +953,6 @@ def rejection_reason(text: str, min_length: int = 7, max_length: int = 18) -> st
     length = chinese_length(text)
     if length < min_length or length > max_length:
         return "length_out_of_range"
-    if text.startswith(BAD_PREFIXES) or text.endswith(BAD_SUFFIXES):
-        return "dangling_function_word"
-    if text.endswith(BROKEN_FRAGMENT_SUFFIXES):
-        return "broken_sentence_fragment"
-    if text.count("我") >= 3 or text.count("你") >= 3:
-        return "repetitive_pronoun"
     if len(set(text)) <= 3:
         return "low_character_diversity"
     if max(Counter(text).values()) > max(3, length // 3):
@@ -1075,26 +963,10 @@ def rejection_reason(text: str, min_length: int = 7, max_length: int = 18) -> st
         return "filler_heavy"
     if re.search(r"(.)\1\1", text):
         return "repetitive_character"
-    if re.search(r"(就是|这个|那个|然后|对对|嗯嗯)", text) and length <= 10:
-        return "low_context_spoken_fragment"
-    if text.endswith(("有什么", "是什么", "在哪儿", "在哪里")) and not any(
-        term in text for term in ("请问", "告诉", "知道", "可以", "需要", "我想", "帮我")
-    ):
-        return "unframed_question_fragment"
-    if text.count("什么") >= 2:
-        return "repetitive_question_fragment"
-    if text.endswith(("方面", "情况", "问题", "东西", "这个", "那个", "一些", "进行", "属于")):
-        return "broken_sentence_fragment"
     if text.startswith(("呃", "嗯", "啊", "哦", "零")):
         return "filler_prefix"
     if re.search(r"(.)\1.*\1\1", text):
         return "repetitive_character"
-    if text.startswith(("据了解", "据报道", "报道称", "记者", "搜狐", "中新网", "新华社")):
-        return "news_or_media_fragment"
-    if any(suffix in text for suffix in ("大酒店", "酒店", "旅行社", "总医院", "停车场", "加油站")) and not any(
-        term in text for term in ("请", "我", "我们", "去", "到", "找", "停车", "加油")
-    ):
-        return "poi_or_business_listing"
     return None
 
 
@@ -1251,8 +1123,7 @@ def content_quality_score(source_id: str, text: str, category: str) -> float:
 
 
 def fits_category(category: str, text: str) -> bool:
-    lowered = text.lower()
-    if any(pattern in lowered for pattern in BLOCK_PATTERNS):
+    if WEB_OR_NAVIGATION_NOISE_RE.search(text):
         return False
     if category == "车载与导航":
         has_anchor = any(
@@ -1429,7 +1300,6 @@ def load_manifest(
     per_source_cap: int,
     min_length: int,
     max_length: int,
-    max_source_low_quality_ratio: float,
     audit: RejectionAudit,
 ) -> list[SourceItem]:
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1445,8 +1315,6 @@ def load_manifest(
 
         source_rows: list[SourceItem] = []
         seen: set[str] = set()
-        reviewed_content_count = 0
-        low_quality_count = 0
         for unit in units:
             visible = visible_text(unit)
             length = chinese_length(visible)
@@ -1460,9 +1328,6 @@ def load_manifest(
                 continue
             reason = rejection_reason(visible, min_length, max_length)
             if reason:
-                if reason in CONTENT_QUALITY_REJECTION_REASONS:
-                    reviewed_content_count += 1
-                    low_quality_count += 1
                 audit.record(
                     reason,
                     text=visible,
@@ -1487,7 +1352,6 @@ def load_manifest(
                 )
                 continue
             seen.add(visible)
-            reviewed_content_count += 1
             category = str(category_hint) if category_hint in CATEGORY_ORDER else category_for_source(spec.id, visible)
             if not fits_category(category, visible):
                 audit.record(
@@ -1508,35 +1372,6 @@ def load_manifest(
                     length=length,
                 )
             )
-        low_quality_ratio = (
-            low_quality_count / reviewed_content_count if reviewed_content_count else 0.0
-        )
-        excluded = low_quality_ratio > max_source_low_quality_ratio
-        audit.record_source_quality_decision(
-            source_id=spec.id,
-            reviewed_count=reviewed_content_count,
-            low_quality_count=low_quality_count,
-            threshold=max_source_low_quality_ratio,
-            excluded=excluded,
-            accepted_before_source_gate=len(source_rows),
-        )
-        if excluded:
-            audit.record(
-                "source_excluded_low_quality_ratio",
-                text=(
-                    f"source:{spec.id};low_quality={low_quality_count};"
-                    f"reviewed={reviewed_content_count};ratio={low_quality_ratio:.4f}"
-                ),
-                source_id=spec.id,
-                category=str(category_hint or "unclassified"),
-            )
-            print(
-                f"[source-quality] 退出 {spec.id}: "
-                f"{low_quality_count}/{reviewed_content_count}={low_quality_ratio:.2%} > "
-                f"{max_source_low_quality_ratio:.2%}"
-            )
-            continue
-
         rows.extend(
             sorted(
                 source_rows,
@@ -1937,15 +1772,14 @@ def frontend_payload(
             "filters": [
                 "target 7-18 visible Chinese characters",
                 "reject ASCII/digits in frontend prompts",
-                "reject page/navigation/metadata fragments and app-store boilerplate",
-                "reject classical/old-style fragments after removing the classical category",
-                "reject sensitive news crime/death/political/religious fragments",
-                "reject advertising, exam-prep, livestream and commercial promotion fragments",
-                "reject adult/sexual anatomy fragments not designed as reviewed clinical prompts",
-                "reject finance, real-estate, entertainment and organization-name fragments",
-                "reject ASR disfluency, duplicated syllables and incomplete spoken fragments",
-                "review every source sentence and exclude a source when substantive low-quality content exceeds 20%",
-                "reject dangling Chinese function-word prefixes/suffixes",
+                "reject confirmed page and navigation boilerplate",
+                "reject explicit sexual content while retaining reviewed medical expressions",
+                "reject direct violent or graphic fragments while retaining ordinary news and help-seeking expressions",
+                "reject direct advertising, exam-site and subscription calls to action",
+                "reject clear ASR corruption, duplicated syllables and filler-contaminated fragments",
+                "retain normal news, finance, entertainment and dialogue content",
+                "evaluate and reject sentence by sentence; never exclude a whole source by topic or ratio",
+                "reject only confirmed severe broken fragments, not ordinary spoken connectors",
                 "dedupe globally by target text before frontend merge",
                 "limit near-duplicate structural signatures per category",
                 "select phonology reinforcement only from modern source transcripts",
@@ -1973,7 +1807,6 @@ def main() -> int:
                 args.per_source_cap,
                 args.min_length,
                 args.max_length,
-                args.max_source_low_quality_ratio,
                 audit,
             )
         )

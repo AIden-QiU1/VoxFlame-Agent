@@ -25,6 +25,9 @@ export type MobileAuthStatus =
   | 'signed_out'
   | 'signed_in'
   | 'signing_in'
+  | 'sending_code'
+  | 'verifying_code'
+  | 'binding_phone'
   | 'signing_out'
   | 'error'
 
@@ -40,6 +43,10 @@ export interface MobileAuthState {
     email: string
     password: string
   }): Promise<boolean>
+  requestPhoneLoginCode(phone: string, shouldCreateUser?: boolean): Promise<boolean>
+  verifyPhoneLoginCode(params: { phone: string; otp: string }): Promise<boolean>
+  requestPhoneBindingCode(phone: string): Promise<boolean>
+  verifyPhoneBindingCode(params: { phone: string; otp: string }): Promise<boolean>
   signOut(): Promise<void>
 }
 
@@ -165,6 +172,133 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
     }
   }, [client])
 
+  const requestPhoneLoginCode = useCallback(async (
+    phone: string,
+    shouldCreateUser = false,
+  ): Promise<boolean> => {
+    if (!client) {
+      setStatus('config_missing')
+      setErrorMessage('missing_mobile_supabase_config')
+      return false
+    }
+
+    setStatus('sending_code')
+    setErrorMessage(null)
+    try {
+      const { error } = await client.auth.signInWithOtp({
+        phone,
+        options: { shouldCreateUser },
+      })
+      setStatus('signed_out')
+      if (error) {
+        setErrorMessage(error.message)
+        return false
+      }
+      return true
+    } catch (error) {
+      setStatus('error')
+      setErrorMessage(getErrorMessage(error, 'mobile_phone_code_request_failed'))
+      return false
+    }
+  }, [client])
+
+  const verifyPhoneLoginCode = useCallback(async (
+    params: { phone: string; otp: string },
+  ): Promise<boolean> => {
+    if (!client) {
+      setStatus('config_missing')
+      setErrorMessage('missing_mobile_supabase_config')
+      return false
+    }
+
+    setStatus('verifying_code')
+    setErrorMessage(null)
+    try {
+      const { data, error } = await client.auth.verifyOtp({
+        phone: params.phone,
+        token: params.otp,
+        type: 'sms',
+      })
+      if (error || !data.session || !data.user) {
+        setStatus('signed_out')
+        setErrorMessage(error?.message || 'mobile_phone_verification_failed')
+        return false
+      }
+
+      setSession(data.session)
+      setUser(data.user)
+      setStatus('signed_in')
+      return true
+    } catch (error) {
+      setStatus('error')
+      setErrorMessage(getErrorMessage(error, 'mobile_phone_verification_failed'))
+      return false
+    }
+  }, [client])
+
+  const requestPhoneBindingCode = useCallback(async (phone: string): Promise<boolean> => {
+    if (!client || !user) {
+      setErrorMessage('auth_required')
+      return false
+    }
+
+    setStatus('binding_phone')
+    setErrorMessage(null)
+    try {
+      const { error } = await client.auth.updateUser({ phone })
+      setStatus('signed_in')
+      if (error) {
+        setErrorMessage(error.message)
+        return false
+      }
+      return true
+    } catch (error) {
+      setStatus('signed_in')
+      setErrorMessage(getErrorMessage(error, 'mobile_phone_binding_request_failed'))
+      return false
+    }
+  }, [client, user])
+
+  const verifyPhoneBindingCode = useCallback(async (
+    params: { phone: string; otp: string },
+  ): Promise<boolean> => {
+    if (!client || !user) {
+      setErrorMessage('auth_required')
+      return false
+    }
+
+    const originalUserId = user.id
+    setStatus('binding_phone')
+    setErrorMessage(null)
+    try {
+      const { error } = await client.auth.verifyOtp({
+        phone: params.phone,
+        token: params.otp,
+        type: 'phone_change',
+      })
+      if (error) {
+        setStatus('signed_in')
+        setErrorMessage(error.message)
+        return false
+      }
+
+      const { data, error: refreshError } = await client.auth.getUser()
+      if (refreshError || !data.user || data.user.id !== originalUserId) {
+        setStatus('signed_in')
+        setErrorMessage('mobile_phone_binding_identity_mismatch')
+        return false
+      }
+
+      setUser(data.user)
+      setStatus('signed_in')
+      return true
+    } catch (error) {
+      setStatus('signed_in')
+      setErrorMessage(getErrorMessage(error, 'mobile_phone_binding_failed'))
+      return false
+    }
+  }, [client, user])
+
   const signOut = useCallback(async (): Promise<void> => {
     if (!client) {
       setStatus('config_missing')
@@ -211,6 +345,10 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
     lastEmail,
     tokenProvider,
     signInWithPassword,
+    requestPhoneLoginCode,
+    verifyPhoneLoginCode,
+    requestPhoneBindingCode,
+    verifyPhoneBindingCode,
     signOut,
   }
 }

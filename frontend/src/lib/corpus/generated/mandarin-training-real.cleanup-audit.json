@@ -1,0 +1,1248 @@
+{
+  "kind": "targeted_severe_training_corpus_cleanup",
+  "removed_count": 204,
+  "reason_counts": {
+    "adult_or_sexual": 5,
+    "asr_disfluency_or_duplication": 152,
+    "commercial_or_advertising": 38,
+    "crime_violence_or_accident": 6,
+    "severe_broken_fragment": 3
+  },
+  "category_counts": {
+    "会议与协作": 129,
+    "现代文章朗读": 48,
+    "音系强化": 27
+  },
+  "policy": {
+    "sentence_level_only": true,
+    "source_level_exclusion": false,
+    "fixed_removal_target": false,
+    "normal_news_finance_entertainment_and_medical_content_retained": true
+  },
+  "removed_items": [
+    {
+      "id": "现代文章朗读_source_0429",
+      "category": "现代文章朗读",
+      "text": "精讲班视频教程",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0879",
+      "category": "现代文章朗读",
+      "text": "一键领取新人专享大礼包",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0886",
+      "category": "现代文章朗读",
+      "text": "基金从业考试真题",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0900",
+      "category": "现代文章朗读",
+      "text": "基金从业考试模拟试题及答案",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0903",
+      "category": "现代文章朗读",
+      "text": "基金从业考试真题选自考友分享",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0905",
+      "category": "现代文章朗读",
+      "text": "基金从业考试科目二高频考点汇总",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0911",
+      "category": "现代文章朗读",
+      "text": "初级护师直播课堂",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0912",
+      "category": "现代文章朗读",
+      "text": "主管护师直播课堂",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0914",
+      "category": "现代文章朗读",
+      "text": "中医护师直播课堂",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0916",
+      "category": "现代文章朗读",
+      "text": "主管中医护师直播课堂",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_1087",
+      "category": "现代文章朗读",
+      "text": "北京迎来最重要的世世界级体育赛事之一",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_1174",
+      "category": "现代文章朗读",
+      "text": "这这是心里咋想",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_1463",
+      "category": "现代文章朗读",
+      "text": "那如果说是呃进入世界之内了",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_1603",
+      "category": "现代文章朗读",
+      "text": "那个那个那那个整个的呃环境来讲",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_1655",
+      "category": "现代文章朗读",
+      "text": "可以说嗯也得到了一些社会的一些认可",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_1760",
+      "category": "现代文章朗读",
+      "text": "希望你理解我我",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_1969",
+      "category": "现代文章朗读",
+      "text": "所以我还是希望二师兄嗯",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_2036",
+      "category": "现代文章朗读",
+      "text": "我们组里就是整整个工作",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_2047",
+      "category": "现代文章朗读",
+      "text": "他来到了一个新世界阴道",
+      "reason": "adult_or_sexual"
+    },
+    {
+      "id": "现代文章朗读_source_2108",
+      "category": "现代文章朗读",
+      "text": "这这就是我们的说生活习惯",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_2114",
+      "category": "现代文章朗读",
+      "text": "我说我们嗯虽然成长得很快",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_2155",
+      "category": "现代文章朗读",
+      "text": "过早地来到了他的呃工作中",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_2267",
+      "category": "现代文章朗读",
+      "text": "我我觉得觉得可能有很大的变化",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_2296",
+      "category": "现代文章朗读",
+      "text": "大家可以一起探讨自我成长能够",
+      "reason": "severe_broken_fragment"
+    },
+    {
+      "id": "现代文章朗读_source_2330",
+      "category": "现代文章朗读",
+      "text": "社会人初学指南给你自己点个赞",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_2512",
+      "category": "现代文章朗读",
+      "text": "希望大家听我节目的时候可以点个赞",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_2513",
+      "category": "现代文章朗读",
+      "text": "希望大家听我节目的时候可以留个言",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_2846",
+      "category": "现代文章朗读",
+      "text": "结果令工作人员没有想到的是",
+      "reason": "severe_broken_fragment"
+    },
+    {
+      "id": "现代文章朗读_source_3203",
+      "category": "现代文章朗读",
+      "text": "我们希望达成的是",
+      "reason": "severe_broken_fragment"
+    },
+    {
+      "id": "现代文章朗读_source_3434",
+      "category": "现代文章朗读",
+      "text": "性生活的基础嘛",
+      "reason": "adult_or_sexual"
+    },
+    {
+      "id": "现代文章朗读_source_4290",
+      "category": "现代文章朗读",
+      "text": "绑架的故事在社会上这么流行",
+      "reason": "crime_violence_or_accident"
+    },
+    {
+      "id": "现代文章朗读_source_4520",
+      "category": "现代文章朗读",
+      "text": "柳蒿泉子村农民科技文化培训中心",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0003",
+      "category": "会议与协作",
+      "text": "安排些那个呃学习的时间吧",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0004",
+      "category": "会议与协作",
+      "text": "促销方案来吸引来吸引孩子",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0008",
+      "category": "会议与协作",
+      "text": "一一堆的工作回家可能要开个视频会议",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0014",
+      "category": "会议与协作",
+      "text": "我们得问客户儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0016",
+      "category": "会议与协作",
+      "text": "给客户儿说一下",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0018",
+      "category": "会议与协作",
+      "text": "你说让客户儿的话",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0022",
+      "category": "会议与协作",
+      "text": "一定要客户儿来了",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0026",
+      "category": "会议与协作",
+      "text": "你你们问客户儿吧",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0027",
+      "category": "会议与协作",
+      "text": "我这客户儿留下来",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0028",
+      "category": "会议与协作",
+      "text": "给你推销给客户儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0032",
+      "category": "会议与协作",
+      "text": "还要服务于客户儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0037",
+      "category": "会议与协作",
+      "text": "那你这是拒绝客户儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0039",
+      "category": "会议与协作",
+      "text": "做一个呃方案发出来",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0042",
+      "category": "会议与协作",
+      "text": "开始抢你的客户儿了",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0045",
+      "category": "会议与协作",
+      "text": "才能给客户儿沟通去",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0050",
+      "category": "会议与协作",
+      "text": "那客户儿来的时候儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0051",
+      "category": "会议与协作",
+      "text": "客户儿问你起价来的话",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0053",
+      "category": "会议与协作",
+      "text": "你劝退分走人家客户儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0054",
+      "category": "会议与协作",
+      "text": "促销等方案来吸引顾客",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0057",
+      "category": "会议与协作",
+      "text": "人流量客户儿也起来了",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0059",
+      "category": "会议与协作",
+      "text": "客户儿如果想租赁的话",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0061",
+      "category": "会议与协作",
+      "text": "你这对客户儿不负责任",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0071",
+      "category": "会议与协作",
+      "text": "所以嗯这样儿要提前安排",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0075",
+      "category": "会议与协作",
+      "text": "比如说他带一个老老客户",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0081",
+      "category": "会议与协作",
+      "text": "给客户儿进行推销你们咱",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0098",
+      "category": "会议与协作",
+      "text": "合理的安排一下那个呃时间",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0106",
+      "category": "会议与协作",
+      "text": "你要抓住这个客客户儿心理",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0110",
+      "category": "会议与协作",
+      "text": "我们可以给客户儿想买的话",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0113",
+      "category": "会议与协作",
+      "text": "先把这这个客户儿引流儿过来",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0115",
+      "category": "会议与协作",
+      "text": "那个看客户儿需求什么样房子",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0117",
+      "category": "会议与协作",
+      "text": "客户儿来了一看想买高档产品",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0124",
+      "category": "会议与协作",
+      "text": "可以找时间老客户儿过来是吧",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0127",
+      "category": "会议与协作",
+      "text": "所以今今天会上咱们主动讨论",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0130",
+      "category": "会议与协作",
+      "text": "安排好休息呃告知客人要等待",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0135",
+      "category": "会议与协作",
+      "text": "女女客户儿过来以后买了衣服",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0138",
+      "category": "会议与协作",
+      "text": "你对客户儿不负责任客户儿还会",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0139",
+      "category": "会议与协作",
+      "text": "给客户儿解释一下就是你给他说",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0142",
+      "category": "会议与协作",
+      "text": "那客户儿来的时候儿他喜欢的是",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0150",
+      "category": "会议与协作",
+      "text": "因为经常来超市的这这些客户呢",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0153",
+      "category": "会议与协作",
+      "text": "所以呃啊下面大家伙儿再讨论一下",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0154",
+      "category": "会议与协作",
+      "text": "带过哪些客户儿对吧看过哪些房子",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0156",
+      "category": "会议与协作",
+      "text": "来店儿的客户儿都是有奖励赠礼品",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0157",
+      "category": "会议与协作",
+      "text": "这东西他就给你介绍个新客户儿去",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0159",
+      "category": "会议与协作",
+      "text": "你不能跟客户儿硬气怼过去了一句",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0160",
+      "category": "会议与协作",
+      "text": "客户儿来了一看想买高档产品没有",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0168",
+      "category": "会议与协作",
+      "text": "咱咱刚才他他们需要多大的会议室",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0169",
+      "category": "会议与协作",
+      "text": "一句话就过去了你说让客户儿的话",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0172",
+      "category": "会议与协作",
+      "text": "自个要先会了才能给客户儿沟通去",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0176",
+      "category": "会议与协作",
+      "text": "场地呃你们需要进行设备以及安排",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0179",
+      "category": "会议与协作",
+      "text": "哪个这个销售能把客户儿拉到拉过来",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0180",
+      "category": "会议与协作",
+      "text": "咱们这次只是讨论一下这个咱们呃学",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0182",
+      "category": "会议与协作",
+      "text": "可以找时间老客户儿过来是吧就是说",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0184",
+      "category": "会议与协作",
+      "text": "咱要呃这个达到客户儿的需求啊对吧",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0189",
+      "category": "会议与协作",
+      "text": "可以让大大堂在会议前两天进行联系",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0192",
+      "category": "会议与协作",
+      "text": "主要咱讨论一下咱那个呃咱这个小区",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0194",
+      "category": "会议与协作",
+      "text": "要不都都知道客户来啦服务好态度好",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0200",
+      "category": "会议与协作",
+      "text": "然后给客户儿说每人只使只能使用一次",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0201",
+      "category": "会议与协作",
+      "text": "那客户儿主要是针对哪一种烟销售的快",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0202",
+      "category": "会议与协作",
+      "text": "然后呃这个担心他们会不服从我们安排",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0204",
+      "category": "会议与协作",
+      "text": "我觉得应该安排一下儿到到时候儿怎么",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0206",
+      "category": "会议与协作",
+      "text": "下去安排一下那个保洁部门儿先把咱们",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0216",
+      "category": "会议与协作",
+      "text": "所以一定要重重视起来这次比较大的会议",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0217",
+      "category": "会议与协作",
+      "text": "今天的会议主题让你们积极呃积极一点儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0218",
+      "category": "会议与协作",
+      "text": "哪个品牌基本上有些客户儿都不来询问呀",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0219",
+      "category": "会议与协作",
+      "text": "你才能根据客户儿指示去怎么说东西儿呢",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0220",
+      "category": "会议与协作",
+      "text": "是吧客户儿就可以打六折或者七折的活动",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0229",
+      "category": "会议与协作",
+      "text": "客户儿的需求嘛",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0242",
+      "category": "会议与协作",
+      "text": "给客户儿打电话",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0250",
+      "category": "会议与协作",
+      "text": "给客户儿进行推销",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0253",
+      "category": "会议与协作",
+      "text": "这样的呃活动方案",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0254",
+      "category": "会议与协作",
+      "text": "让客户儿比较满意",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0259",
+      "category": "会议与协作",
+      "text": "客户儿都不能享受到",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0263",
+      "category": "会议与协作",
+      "text": "客户儿喜欢哪些品牌",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0266",
+      "category": "会议与协作",
+      "text": "商务会议呃历时几天",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0268",
+      "category": "会议与协作",
+      "text": "那客户儿怎么怎么没有",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0271",
+      "category": "会议与协作",
+      "text": "哎客客户在那儿试衣服",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0273",
+      "category": "会议与协作",
+      "text": "客户儿存放车辆的时候",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0279",
+      "category": "会议与协作",
+      "text": "年底返一千嗯这样方案是",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0281",
+      "category": "会议与协作",
+      "text": "如何给记客户儿进行沟通",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0287",
+      "category": "会议与协作",
+      "text": "这个和呃客户他们沟通好",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0288",
+      "category": "会议与协作",
+      "text": "然后呃进行了不同的方案",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0289",
+      "category": "会议与协作",
+      "text": "多打电话给客户儿打电话",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0291",
+      "category": "会议与协作",
+      "text": "客户儿一句这个五证不全",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0294",
+      "category": "会议与协作",
+      "text": "怎么留住并吸纳新客户儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0295",
+      "category": "会议与协作",
+      "text": "抓抓住客户儿的那个需求",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0296",
+      "category": "会议与协作",
+      "text": "然后就吸引大量的客户儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0301",
+      "category": "会议与协作",
+      "text": "怎么留住然后吸纳新客户儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0306",
+      "category": "会议与协作",
+      "text": "线下客户呃线线上的话呃也",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0308",
+      "category": "会议与协作",
+      "text": "会有把那个客户儿就拉里头",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0316",
+      "category": "会议与协作",
+      "text": "像小狗狗见了哪些客户儿啦",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0321",
+      "category": "会议与协作",
+      "text": "第一次那个客户儿才能享受到",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0327",
+      "category": "会议与协作",
+      "text": "具体能出一个好的方案能能解决",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0328",
+      "category": "会议与协作",
+      "text": "包括就是客户儿企业的一些培训",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0330",
+      "category": "会议与协作",
+      "text": "客户儿的一些基本安全都没保障",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0334",
+      "category": "会议与协作",
+      "text": "然后进行对客户儿的满意度调查",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0335",
+      "category": "会议与协作",
+      "text": "所以呃这是这次会议的安全主题",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0337",
+      "category": "会议与协作",
+      "text": "客户儿付不起咱那个人工费的对吧",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0340",
+      "category": "会议与协作",
+      "text": "比如客户儿有的就是玩儿了一天啦",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0341",
+      "category": "会议与协作",
+      "text": "让客户儿比较满意还有个服务态度",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0343",
+      "category": "会议与协作",
+      "text": "客户儿遇到的一些咱这没有的产品",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0345",
+      "category": "会议与协作",
+      "text": "客客户儿就对咱们物业进进行褒奖",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0348",
+      "category": "会议与协作",
+      "text": "出一些优惠活动再一方面就是拉客户",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0351",
+      "category": "会议与协作",
+      "text": "咱们这个顾客咱们客户儿会按时交费",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0353",
+      "category": "会议与协作",
+      "text": "怎样把呃客户源留到咱们北商北商城",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0355",
+      "category": "会议与协作",
+      "text": "那客户儿怎么怎么没有进行采采购呢",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0356",
+      "category": "会议与协作",
+      "text": "走了以后这个咱那个客户儿就流失啦",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0365",
+      "category": "会议与协作",
+      "text": "市场调研然后进行对客户儿的满意度调查",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0368",
+      "category": "会议与协作",
+      "text": "给留住把客户儿这个产品给推销给客户儿",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0371",
+      "category": "会议与协作",
+      "text": "还有就是一些呃那个客户投诉的赔偿损失",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0373",
+      "category": "会议与协作",
+      "text": "客户那就是一些咱每层都有这个呃烟灰缸",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0374",
+      "category": "会议与协作",
+      "text": "像老客拉一些客户儿优惠活动都往里头发",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0408",
+      "category": "会议与协作",
+      "text": "然后我们嗯给大家做一个汇报",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0416",
+      "category": "会议与协作",
+      "text": "所以我们的嗯这个风险其实还有很大",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0418",
+      "category": "会议与协作",
+      "text": "然后就是嗯对一下儿看一下儿这个预算",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0550",
+      "category": "会议与协作",
+      "text": "劫持我们的客户",
+      "reason": "crime_violence_or_accident"
+    },
+    {
+      "id": "会议与协作_source_0612",
+      "category": "会议与协作",
+      "text": "我们来呃讨论一下经常呢",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0688",
+      "category": "会议与协作",
+      "text": "那么请使用博客客户端订阅节目",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0709",
+      "category": "会议与协作",
+      "text": "那现在就是说市场对这种项项目呢",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0752",
+      "category": "会议与协作",
+      "text": "请大家使用泛用型博客客户端订阅收听",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0757",
+      "category": "会议与协作",
+      "text": "更多内容欢迎您下载到掌门客户端应用",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0758",
+      "category": "会议与协作",
+      "text": "边儿我我想扯到一个更更高潮的讨论中",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0766",
+      "category": "会议与协作",
+      "text": "推荐大家使用泛用型博客客户端订阅收听",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "会议与协作_source_0769",
+      "category": "会议与协作",
+      "text": "我们刚好是在一起做圆桌的这个讨论啊啊",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0788",
+      "category": "会议与协作",
+      "text": "确认田有金服毒身亡",
+      "reason": "crime_violence_or_accident"
+    },
+    {
+      "id": "会议与协作_source_0841",
+      "category": "会议与协作",
+      "text": "警方也确认了吕某遇害的消息",
+      "reason": "crime_violence_or_accident"
+    },
+    {
+      "id": "音系强化_source_0053",
+      "category": "音系强化",
+      "text": "我说咱俩离得挺远的呢你你打电话",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0073",
+      "category": "音系强化",
+      "text": "我我敢说你打开你的手机",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0104",
+      "category": "音系强化",
+      "text": "所以即使是孩子说呃",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0306",
+      "category": "音系强化",
+      "text": "入群二维码就在本期节目的声音简介中",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "音系强化_source_0344",
+      "category": "音系强化",
+      "text": "比如说孩子说我今天明呃做了计划",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0366",
+      "category": "音系强化",
+      "text": "然后孩子说了我我要去西安",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0577",
+      "category": "音系强化",
+      "text": "我的是电话和短信呃",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0586",
+      "category": "音系强化",
+      "text": "隔着电话你就想掐死他",
+      "reason": "crime_violence_or_accident"
+    },
+    {
+      "id": "音系强化_source_0597",
+      "category": "音系强化",
+      "text": "我们嗯翻开手机的时候",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0735",
+      "category": "音系强化",
+      "text": "那么我我们再说这些这些孩子",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0757",
+      "category": "音系强化",
+      "text": "你如果嗯坐看手机最好的时间是坐在车上",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0851",
+      "category": "音系强化",
+      "text": "我直接把车里那个喝喝光了",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0859",
+      "category": "音系强化",
+      "text": "让你觉得嗯我我是在开车",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0982",
+      "category": "音系强化",
+      "text": "你是的并到左左边车道",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0984",
+      "category": "音系强化",
+      "text": "我们为为什么要用药呢",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0990",
+      "category": "音系强化",
+      "text": "你你当那手机换电池呢",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0998",
+      "category": "音系强化",
+      "text": "我我没有买别的手机",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_1001",
+      "category": "音系强化",
+      "text": "我我建议咱们再停五分钟以后再测一遍",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_1040",
+      "category": "音系强化",
+      "text": "我我那天也是拐的那个车道",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_1105",
+      "category": "音系强化",
+      "text": "基本上也把工作和呃",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_1165",
+      "category": "音系强化",
+      "text": "这是一个很科学的呃",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_1200",
+      "category": "音系强化",
+      "text": "它本身生活在精囊当中",
+      "reason": "adult_or_sexual"
+    },
+    {
+      "id": "音系强化_source_1338",
+      "category": "音系强化",
+      "text": "享受合理的性生活婚后啊",
+      "reason": "adult_or_sexual"
+    },
+    {
+      "id": "音系强化_source_1762",
+      "category": "音系强化",
+      "text": "确认嫌疑人韦银勇在案发现场被炸身亡",
+      "reason": "crime_violence_or_accident"
+    },
+    {
+      "id": "音系强化_source_1827",
+      "category": "音系强化",
+      "text": "安排女明星女模特与他发生性关系",
+      "reason": "adult_or_sexual"
+    },
+    {
+      "id": "音系强化_source_1874",
+      "category": "音系强化",
+      "text": "华山论剑客户端下载",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0085",
+      "category": "现代文章朗读",
+      "text": "考试时请以试卷印刷为准",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0207",
+      "category": "现代文章朗读",
+      "text": "初级护士考试题型有哪些",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0453",
+      "category": "现代文章朗读",
+      "text": "历年真题在线演练",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0881",
+      "category": "现代文章朗读",
+      "text": "软考各科历年真题答案解析汇总",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0882",
+      "category": "现代文章朗读",
+      "text": "软考各科历年真题在线答题练习",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0885",
+      "category": "现代文章朗读",
+      "text": "锁定九成核心考点",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0887",
+      "category": "现代文章朗读",
+      "text": "考试题型均为单选题",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0891",
+      "category": "现代文章朗读",
+      "text": "基金从业考试历年真题",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0894",
+      "category": "现代文章朗读",
+      "text": "基金从业资格考试采取闭卷",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0897",
+      "category": "现代文章朗读",
+      "text": "每次考试考场存在多套试卷",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0908",
+      "category": "现代文章朗读",
+      "text": "每次考试考场存在多套试卷且题序不一",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0922",
+      "category": "现代文章朗读",
+      "text": "护理职称医疗废物处理新规及考试重点",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_2134",
+      "category": "现代文章朗读",
+      "text": "所以你转型升级有有希望吗",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_2299",
+      "category": "现代文章朗读",
+      "text": "所以你看这是出出门就是在学习",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_2499",
+      "category": "现代文章朗读",
+      "text": "我也希望这个节目能够能够成为一个",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "现代文章朗读_source_3594",
+      "category": "现代文章朗读",
+      "text": "一谈学习就就崩了",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0049",
+      "category": "会议与协作",
+      "text": "我们就就要确认一下",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0317",
+      "category": "会议与协作",
+      "text": "还有一个方案就是是两千四",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0324",
+      "category": "会议与协作",
+      "text": "是是关于这个游乐场这个项目",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "会议与协作_source_0744",
+      "category": "会议与协作",
+      "text": "如果您不知道该使用什么客户端客户端",
+      "reason": "asr_disfluency_or_duplication"
+    },
+    {
+      "id": "音系强化_source_0273",
+      "category": "音系强化",
+      "text": "建议感兴趣的读者订阅学习",
+      "reason": "commercial_or_advertising"
+    }
+  ]
+}

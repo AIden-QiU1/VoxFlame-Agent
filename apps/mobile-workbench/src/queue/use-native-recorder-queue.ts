@@ -53,6 +53,7 @@ export interface NativeRecorderQueueState {
   requestPermission(): Promise<boolean>
   startRecording(text: string): Promise<void>
   stopRecording(): Promise<MobileWorkbenchRecorderQueueItem | null>
+  playRecording(recordingId: string): void
   playLatest(): void
   discard(recordingId: string): Promise<void>
   markUploadPending(recordingId: string): Promise<void>
@@ -250,15 +251,22 @@ export function useNativeRecorderQueue(params: {
     recordingText,
   ])
 
-  const playLatest = useCallback((): void => {
-    const latestItem = items[0]
-    if (!latestItem) {
+  const playRecording = useCallback((recordingId: string): void => {
+    const item = items.find((queueItem) => queueItem.recordingId === recordingId)
+    if (!item) {
       return
     }
 
-    latestPlayer.replace({ uri: latestItem.recording.audio.uri })
+    latestPlayer.replace({ uri: item.recording.audio.uri })
     latestPlayer.play()
   }, [items, latestPlayer])
+
+  const playLatest = useCallback((): void => {
+    const latestItem = items[0]
+    if (latestItem) {
+      playRecording(latestItem.recordingId)
+    }
+  }, [items, playRecording])
 
   const discard = useCallback(async (recordingId: string): Promise<void> => {
     setItems(await removeNativeRecorderQueueItem(recordingId))
@@ -348,6 +356,7 @@ export function useNativeRecorderQueue(params: {
     requestPermission,
     startRecording,
     stopRecording,
+    playRecording,
     playLatest,
     discard,
     markUploadPending,

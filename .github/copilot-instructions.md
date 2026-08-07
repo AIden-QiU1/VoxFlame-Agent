@@ -23,6 +23,7 @@
 - 采用最小可运行切片，避免一次性大重构。
 - 所有改动都必须带验证；纯文档改动至少运行 `bash scripts/check_ai_docs.sh`。
 - 容器相关验证默认使用 `docker compose`；若当前机器权限要求更高或命令失败，可回退到 `sudo docker compose build/up -d/logs`。
+- Docker 部署优先使用 `../scripts/docker-rebuild-core-fast.sh` 的最小影响模式，不默认先执行 `docker compose down`；清理先运行 `../scripts/docker_disk_maintenance.sh status`，只用 `prune-safe` 保留运行与 `pre-*` 回滚镜像。
 - 任务完成后，同步更新 `../.claude-summary.md` 和 `../.tasks/current.md`。
 
 ## Tool Routing

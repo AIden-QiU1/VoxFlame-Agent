@@ -1,0 +1,149 @@
+- generic [active] [ref=e1]:
+  - heading "Directory listing for /" [level=1] [ref=e2]
+  - separator [ref=e3]
+  - list [ref=e4]:
+    - listitem [ref=e5]:
+      - link ".agents/" [ref=e6] [cursor=pointer]:
+        - /url: .agents/
+    - listitem [ref=e7]:
+      - link ".claude/" [ref=e8] [cursor=pointer]:
+        - /url: .claude/
+    - listitem [ref=e9]:
+      - link ".claude-summary.md" [ref=e10] [cursor=pointer]:
+        - /url: .claude-summary.md
+    - listitem [ref=e11]:
+      - link ".codex" [ref=e12] [cursor=pointer]:
+        - /url: .codex
+    - listitem [ref=e13]:
+      - link ".dockerignore" [ref=e14] [cursor=pointer]:
+        - /url: .dockerignore
+    - listitem [ref=e15]:
+      - link ".env" [ref=e16] [cursor=pointer]:
+        - /url: .env
+    - listitem [ref=e17]:
+      - link ".env.dnspod" [ref=e18] [cursor=pointer]:
+        - /url: .env.dnspod
+    - listitem [ref=e19]:
+      - link ".env.example" [ref=e20] [cursor=pointer]:
+        - /url: .env.example
+    - listitem [ref=e21]:
+      - link ".git/" [ref=e22] [cursor=pointer]:
+        - /url: .git/
+    - listitem [ref=e23]:
+      - link ".github/" [ref=e24] [cursor=pointer]:
+        - /url: .github/
+    - listitem [ref=e25]:
+      - link ".gitignore" [ref=e26] [cursor=pointer]:
+        - /url: .gitignore
+    - listitem [ref=e27]:
+      - link ".playwright-cli/" [ref=e28] [cursor=pointer]:
+        - /url: .playwright-cli/
+    - listitem [ref=e29]:
+      - link ".playwright-mcp/" [ref=e30] [cursor=pointer]:
+        - /url: .playwright-mcp/
+    - listitem [ref=e31]:
+      - link ".serena/" [ref=e32] [cursor=pointer]:
+        - /url: .serena/
+    - listitem [ref=e33]:
+      - link ".tasks/" [ref=e34] [cursor=pointer]:
+        - /url: .tasks/
+    - listitem [ref=e35]:
+      - link "AGENTS.md" [ref=e36] [cursor=pointer]:
+        - /url: AGENTS.md
+    - listitem [ref=e37]:
+      - link "app.json" [ref=e38] [cursor=pointer]:
+        - /url: app.json
+    - listitem [ref=e39]:
+      - link "apps/" [ref=e40] [cursor=pointer]:
+        - /url: apps/
+    - listitem [ref=e41]:
+      - link "artifacts/" [ref=e42] [cursor=pointer]:
+        - /url: artifacts/
+    - listitem [ref=e43]:
+      - link "assessment-mobile-after-layout.png" [ref=e44] [cursor=pointer]:
+        - /url: assessment-mobile-after-layout.png
+    - listitem [ref=e45]:
+      - link "assessment-mobile-recorder-first.png" [ref=e46] [cursor=pointer]:
+        - /url: assessment-mobile-recorder-first.png
+    - listitem [ref=e47]:
+      - link "backend/" [ref=e48] [cursor=pointer]:
+        - /url: backend/
+    - listitem [ref=e49]:
+      - link "CLAUDE.md" [ref=e50] [cursor=pointer]:
+        - /url: CLAUDE.md
+    - listitem [ref=e51]:
+      - link "data/" [ref=e52] [cursor=pointer]:
+        - /url: data/
+    - listitem [ref=e53]:
+      - link "dataset/" [ref=e54] [cursor=pointer]:
+        - /url: dataset/
+    - listitem [ref=e55]:
+      - link "docker-compose.yml" [ref=e56] [cursor=pointer]:
+        - /url: docker-compose.yml
+    - listitem [ref=e57]:
+      - link "docs/" [ref=e58] [cursor=pointer]:
+        - /url: docs/
+    - listitem [ref=e59]:
+      - link "frontend/" [ref=e60] [cursor=pointer]:
+        - /url: frontend/
+    - listitem [ref=e61]:
+      - link "ideas/" [ref=e62] [cursor=pointer]:
+        - /url: ideas/
+    - listitem [ref=e63]:
+      - link "infra/" [ref=e64] [cursor=pointer]:
+        - /url: infra/
+    - listitem [ref=e65]:
+      - link "LICENSE" [ref=e66] [cursor=pointer]:
+        - /url: LICENSE
+    - listitem [ref=e67]:
+      - link "livekit_agent/" [ref=e68] [cursor=pointer]:
+        - /url: livekit_agent/
+    - listitem [ref=e69]:
+      - link "logs/" [ref=e70] [cursor=pointer]:
+        - /url: logs/
+    - listitem [ref=e71]:
+      - link "nginx/" [ref=e72] [cursor=pointer]:
+        - /url: nginx/
+    - listitem [ref=e73]:
+      - link "node_modules/" [ref=e74] [cursor=pointer]:
+        - /url: node_modules/
+    - listitem [ref=e75]:
+      - link "output/" [ref=e76] [cursor=pointer]:
+        - /url: output/
+    - listitem [ref=e77]:
+      - link "package-lock.json" [ref=e78] [cursor=pointer]:
+        - /url: package-lock.json
+    - listitem [ref=e79]:
+      - link "package.json" [ref=e80] [cursor=pointer]:
+        - /url: package.json
+    - listitem [ref=e81]:
+      - link "qdrant/" [ref=e82] [cursor=pointer]:
+        - /url: qdrant/
+    - listitem [ref=e83]:
+      - link "README.md" [ref=e84] [cursor=pointer]:
+        - /url: README.md
+    - listitem [ref=e85]:
+      - link "references/" [ref=e86] [cursor=pointer]:
+        - /url: references/
+    - listitem [ref=e87]:
+      - link "releases/" [ref=e88] [cursor=pointer]:
+        - /url: releases/
+    - listitem [ref=e89]:
+      - link "scripts/" [ref=e90] [cursor=pointer]:
+        - /url: scripts/
+    - listitem [ref=e91]:
+      - link "supabase/" [ref=e92] [cursor=pointer]:
+        - /url: supabase/
+    - listitem [ref=e93]:
+      - link "ten-framework/" [ref=e94] [cursor=pointer]:
+        - /url: ten-framework/
+    - listitem [ref=e95]:
+      - link "tests/" [ref=e96] [cursor=pointer]:
+        - /url: tests/
+    - listitem [ref=e97]:
+      - link "tmp/" [ref=e98] [cursor=pointer]:
+        - /url: tmp/
+    - listitem [ref=e99]:
+      - link "关于落实网络安全隐患整改的通知2026第267期——上海生声不息科技有限公司.pdf" [ref=e100] [cursor=pointer]:
+        - /url: "%E5%85%B3%E4%BA%8E%E8%90%BD%E5%AE%9E%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8%E9%9A%90%E6%82%A3%E6%95%B4%E6%94%B9%E7%9A%84%E9%80%9A%E7%9F%A52026%E7%AC%AC267%E6%9C%9F%E2%80%94%E2%80%94%E4%B8%8A%E6%B5%B7%E7%94%9F%E5%A3%B0%E4%B8%8D%E6%81%AF%E7%A7%91%E6%8A%80%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8.pdf"
+  - separator [ref=e101]

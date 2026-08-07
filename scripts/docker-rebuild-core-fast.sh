@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+MODE="${1:-core}"
+
 if [[ -n "${VOXFLAME_DOCKER_PREFIX:-}" ]]; then
   # shellcheck disable=SC2206
   DOCKER_PREFIX=( ${VOXFLAME_DOCKER_PREFIX} )
@@ -32,6 +34,52 @@ compose_cmd_with_env() {
     env "${env_args[@]}" docker compose "$@"
   fi
 }
+
+wait_for_health() {
+  local service="$1"
+  local container_id
+  container_id="$(compose_cmd ps -q "$service")"
+  if [[ -z "$container_id" ]]; then
+    echo "[voxflame] No container found for service: $service" >&2
+    return 1
+  fi
+
+  for _ in {1..12}; do
+    local health
+    health="$(docker_cmd inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+    if [[ "$health" == "healthy" || "$health" == "running" ]]; then
+      echo "[voxflame] $service is $health"
+      return 0
+    fi
+    sleep 5
+  done
+
+  echo "[voxflame] $service did not become healthy in time" >&2
+  compose_cmd logs --tail=100 "$service" >&2
+  return 1
+}
+
+case "$MODE" in
+  env-backend)
+    echo "[voxflame] Recreating backend only; image and other core services are preserved."
+    compose_cmd up -d --no-deps --force-recreate backend
+    wait_for_health backend
+    exit 0
+    ;;
+  backend|frontend)
+    echo "[voxflame] Building and recreating $MODE only."
+    compose_cmd build "$MODE"
+    compose_cmd up -d --no-deps "$MODE"
+    wait_for_health "$MODE"
+    exit 0
+    ;;
+  core)
+    ;;
+  *)
+    echo "Usage: $0 [core|backend|frontend|env-backend]" >&2
+    exit 1
+    ;;
+esac
 
 LIVEKIT_AGENT_IMAGE="${LIVEKIT_AGENT_IMAGE:-voxflame-agent-livekit-agent:latest}"
 LIVEKIT_AGENT_BASE_IMAGE="${LIVEKIT_AGENT_BASE_IMAGE:-docker.m.daocloud.io/library/python:3.10-slim}"
@@ -64,5 +112,8 @@ compose_cmd_with_env \
 
 echo "[voxflame] Recreating core services..."
 compose_cmd up -d --force-recreate livekit-server backend frontend livekit-agent
+
+wait_for_health backend
+wait_for_health frontend
 
 echo "[voxflame] Done."

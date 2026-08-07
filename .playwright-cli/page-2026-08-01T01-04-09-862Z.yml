@@ -1,0 +1,53 @@
+- generic [active] [ref=e1]:
+  - link "跳转到主要内容" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading "燃言" [level=1] [ref=e7]
+      - generic [ref=e8]: 创建账户
+      - generic [ref=e9]: 注册以保存您的个人偏好
+    - generic [ref=e10]:
+      - tablist [ref=e12]:
+        - tab "邮箱注册" [ref=e47] [cursor=pointer]
+        - tab "手机注册" [selected] [ref=e48] [cursor=pointer]
+      - generic [ref=e15]:
+        - generic [ref=e49]:
+          - text: 昵称
+          - textbox "昵称" [ref=e54]:
+            - /placeholder: 您的昵称
+        - generic [ref=e16]:
+          - text: 中国大陆手机号
+          - textbox "中国大陆手机号" [ref=e59]:
+            - /placeholder: 138 1234 5678
+            - text: "18306020481"
+        - paragraph [ref=e60]: 验证手机号后将创建新的 VoxFlame 账号。
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - checkbox "我已阅读《用户隐私》 了解燃言会保存哪些账号信息、训练数据如何隔离，以及你能如何停止使用或删除数据。 查看用户隐私" [checked] [ref=e30]
+            - generic [ref=e31]:
+              - generic [ref=e32]: 我已阅读《用户隐私》
+              - generic [ref=e33]: 了解燃言会保存哪些账号信息、训练数据如何隔离，以及你能如何停止使用或删除数据。
+              - link "查看用户隐私" [ref=e34] [cursor=pointer]:
+                - /url: /privacy
+          - generic [ref=e35]:
+            - checkbox "我已阅读《数据采集说明》 了解录音样本如何进入训练语料、哪些字段会进入 manifest，以及本地待同步队列的行为边界。 查看数据采集说明" [checked] [ref=e36]
+            - generic [ref=e37]:
+              - generic [ref=e38]: 我已阅读《数据采集说明》
+              - generic [ref=e39]: 了解录音样本如何进入训练语料、哪些字段会进入 manifest，以及本地待同步队列的行为边界。
+              - link "查看数据采集说明" [ref=e40] [cursor=pointer]:
+                - /url: /data-collection
+        - button "发送验证码" [ref=e61] [cursor=pointer]
+    - generic [ref=e42]:
+      - paragraph [ref=e43]:
+        - text: 已有账户？
+        - button "直接登录" [ref=e56] [cursor=pointer]
+      - paragraph [ref=e45]: 登录完成后，训练页不再重复弹出授权勾选；录音、训练和反馈会直接围绕主任务展开。
+  - region "Notifications (F8)":
+    - list [ref=e63]:
+      - listitem [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66]: 验证码发送失败
+          - generic [ref=e67]: "Unexpected status code returned from hook: 502"
+        - button [ref=e68] [cursor=pointer]
+  - alert [ref=e46]
+  - status [ref=e73]: "Notification 验证码发送失败Unexpected status code returned from hook: 502"

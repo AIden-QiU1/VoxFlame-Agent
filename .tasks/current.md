@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-07-15
+> 最后更新: 2026-08-05
 
 ## 当前主线
 
@@ -18,6 +18,103 @@
   - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-08-05 已完成沪浦网信安通〔2026〕267号正式整改报告与当日生产复测
+   - 按通知附件 2 的三段式公文结构生成 A4 Word / PDF，法定代表人和网络安全主要负责人为邱生峰
+   - 当日两套生产权限回归再次通过：五张用户数据表 anon 为 `401`，活动系统预设只读为 `200`，service role 正常
+   - 当日公网 smoke：`/`、`/api/rtc/health` 为 `200`，未登录 workspace 为 `401`；生产容器正常
+   - `test1@poc.com` 仍长期停用；当前 Auth 仍为公开注册、邮箱自动确认、未观察到 CAPTCHA 开启
+   - 报告对外口径为“通报所述越权读取路径已完成技术整改并复测通过”，不声称日志尚不能证明的“绝无数据访问”
+   - 后续计划依据现行《网络安全法》第二十三、第二十四、第二十七条，覆盖等保、六个月日志、漏洞闭环、密钥治理、注册安全、WAF/源站、数据分类、供应链和应急演练
+
+0. 2026-08-01 独立手机号注册 / 登录已完成 Web 与 Mobile 部署，真实短信只剩腾讯云签名配置阻塞
+   - Supabase Auth 继续是身份事实源；邮箱和手机号是并列选择，手机号可直接创建独立 phone-only 用户，不要求绑定邮箱账号或共用 UUID
+   - Web 与 Mobile 在注册模式使用 `shouldCreateUser: true`、登录模式使用 `false`；邮箱密码注册 / 登录完整保留
+   - backend 新增 Supabase Send SMS Hook 与腾讯云 SMS adapter：校验 Standard Webhooks 签名、仅接受中国大陆 E.164 号码和 6 位 OTP、同 webhook id 幂等、单号码 60 秒 / 小时 / 日限流
+   - 腾讯云调用固定使用已审核签名、模板与单个 `{1}` OTP 参数；日志不记录 OTP 或完整手机号，只保留掩码号码、provider code 与 RequestId
+   - Web 登录 / 注册页与 Mobile Workbench 登录 / 注册页均提供邮箱、手机两种入口；`/settings/account` 的绑定入口仅作为可选能力保留
+   - Supabase Phone provider 与 HTTPS Send SMS Hook 已开启；backend 为 `PHONE_AUTH_ENABLED=1`、`TENCENT_SMS_DRY_RUN=0`，Web 与 EAS development/preview/production 手机入口均已开启
+   - CAM 最小权限编程访问子用户凭据已保存到 `backend/.env`（文件 `600`）；误建的 CVM 角色不进入轻量应用服务器运行链路
+   - 已提供两个隐藏输入脚本：`scripts/ops/save_tencent_sms_credentials.sh` 与 `scripts/ops/save_supabase_sms_hook_secret.sh`，密钥不进入聊天、命令历史或源码
+   - Supabase 生产 Hook 实际会传入无加号的 `861...` 号码；backend 已兼容 `+861... / 861... / 1...` 并统一规范化为 E.164，相关回归通过
+   - 真实短信请求已到达腾讯云，但返回 `FailedOperation.SignatureIncorrectOrUnapproved`；当前 `TENCENT_SMS_SIGN_NAME` 与原计划的公司全称一致，需从腾讯云“国内短信 -> 签名管理”核对实际签名内容、审核 / 运营商报备状态和应用关联后完成 smoke
+   - 部署后验证：backend/frontend 容器均 healthy；`/`、`/login`、`/api/rtc/health` 均为 `200`；Playwright 已验证登录与注册状态下邮箱 / 手机标签及手机号注册表单
+   - 回滚镜像标签：`voxflame-agent-backend:pre-phone-auth-20260801`、`voxflame-agent-frontend:pre-phone-auth-20260801`
+   - Android `0.1.2`（build 3）EAS preview 已完成：`b47cd371-ef9f-409f-a45d-1e1d180a26dd`；`https://voxember.com/download` 已部署该构建入口
+   - 下一步人工边界：提供腾讯云审核通过的准确“签名内容”；更新后用负责人手机号完成一次真实注册和再次登录，并做 Android 真机 smoke
+   - CAPTCHA 继续等 Web 与 Mobile 都接好 token 后再全局开启，避免提前中断任一现有邮箱登录入口
+
+0. 2026-08-01 Docker 部署与磁盘维护经验已写入工程 harness
+   - `scripts/docker-rebuild-core-fast.sh` 新增 `env-backend / backend / frontend / core` 最小影响模式；环境变量更新不再先 `docker compose down`，只 recreate backend
+   - `scripts/docker_disk_maintenance.sh prune-safe` 只清理 7 天前 dangling images 与 build cache，保留运行容器、卷、`latest` 和 `pre-*` 回滚镜像
+   - 本次清理后根盘占用从 `87%` 降到 `65%`，可用空间从 `7.8GB` 增至 `21GB`；5 个生产容器继续运行，backend/frontend healthy，RTC health 为 `200`
+
+0. 2026-07-30 已完成沪浦网信安通〔2026〕267号所述 Supabase 未授权读取问题的生产封堵
+   - 整改记录：[docs/NETWORK_SECURITY_REMEDIATION_2026_267.md](/home/ubuntu/VoxFlame-Agent/docs/NETWORK_SECURITY_REMEDIATION_2026_267.md)
+   - 生产 `user_profiles / sessions / memories / voice_contributions / quick_phrases` 已启用并强制 RLS，`anon / authenticated` 已撤销全部直接权限
+   - `preset_phrases` 仅保留活动系统文案的匿名只读兼容策略，无公开写权限
+   - `service_role` 仅保留 `SELECT / INSERT / UPDATE / DELETE`，无 `TRUNCATE`
+   - 已撤销 public schema 新表、新序列默认授予浏览器角色的权限
+   - 通知中的 `test1@poc.com` 已长期停用，业务表记录均为 `0`；负责人已明确决定保留 `2` 条 Auth session 供取证，不执行撤销
+   - 前端已删除未使用的 Supabase 数据直连旧入口；后端不再把 service role 缺失降级成 anon key
+   - 生产公网复测：五张用户数据表 anon 均为 `401`；系统预设只读为 `200`；service role 正常；站点与 `/api/rtc/health` 为 `200`；未登录 workspace 为 `401`
+   - 已验证：`cd backend && npm run build`、`cd frontend && npm run build`、两套 Supabase 权限回归脚本
+   - 负责人已选择保留公开注册，并要求启用邮箱验证、CAPTCHA 与速率限制；正式切换前需配置生产 SMTP、Turnstile site/secret key，补齐 Web 与 Mobile CAPTCHA 流程，并提供可用的 Supabase 管理权限
+   - 当前生产仍为邮箱自动确认、未开启 CAPTCHA；现有 `SUPABASE_ACCESS_TOKEN` 访问 Management API 返回 `403`，为避免中断 Web / App 登录尚未强行切换
+
+0. 2026-07-24 已交付 Mobile Workbench `0.1.0` 双平台可打包测试版与前端下载入口
+   - `apps/mobile-workbench` 已从工程控制台式单页收成四个用户任务页：`沟通 / 练习 / 准备 / 我的`
+   - 登录页与主界面已移除 `RTC strategy / Backend / Room / participant token / contract status` 等工程说明，只保留用户当前动作与就地错误
+   - 沟通链路已对齐 backend `/api/rtc/session/start|ping|stop`；进入 LiveKit room 后每 25 秒保活，结束、切页或退出账户时显式停止后端 session
+   - 练习页已从“只操作最新一条”升级为完整本机队列，可逐条回放、上传、重试和经系统确认后删除
+   - 移动端 RTC response contract 已补齐 backend 现役 `resolved intent / readiness summary / strategy / graphName` 字段，静态守卫会同时核对 backend route 与关键 contract token
+   - Android / iOS 已补对等 `export`、EAS development / preview build 命令，版本为 `0.1.0`，包名保持 `org.voxflame.mobileworkbench`，共享正式图标与麦克风权限说明
+   - Web 首页已去除重复的新手说明和多层渐变，只保留主动作、三个任务入口和 App 内测入口
+   - 新增公开 `/download` 页面；`NEXT_PUBLIC_ANDROID_APP_DOWNLOAD_URL` 接 APK/EAS/商店，`NEXT_PUBLIC_IOS_APP_DOWNLOAD_URL` 接 TestFlight/EAS/商店，未配置时明确显示“准备中”
+   - 已验证：
+   - `cd apps/mobile-workbench && npm run typecheck && npm run check`
+   - `npx expo config --type public`
+   - Android production Metro export：`898 modules / 4.9 MB Hermes bundle`
+   - iOS production Metro export：`900 modules / 4.9 MB Hermes bundle`
+   - `cd frontend && npm run build`，`/` 与 `/download` 均静态生成
+   - `/download` HTTP smoke 返回 `200`，包含 Android、iPhone、准备中和隐私入口
+   - 尚未完成：EAS/Apple 账户绑定、可安装 APK/TestFlight build、Android/iPhone 真机录音/上传/LiveKit smoke；Playwright 因当前机器 Chrome 启动 `SIGSEGV` 未生成截图
+   - EAS 登录命令已修正：提供 executable 的 npm 包是 `eas-cli`，不是 `eas`；仓库统一使用 `npm run eas:login` 与 `npx --yes eas-cli@latest ...`
+   - 当前服务器失效的 `HTTP_PROXY / HTTPS_PROXY` 会让 npm 下载卡住，且存在不安全的 `NODE_TLS_REJECT_UNAUTHORIZED`；所有 EAS 登录与构建脚本会自动 unset 这些变量
+   - 已验证：`eas-cli/21.1.0 linux-x64 node-v25.2.0` 可在服务器正常启动，错误的 `npx eas ...` 已由移动端守卫禁止回流
+   - VS Code / SSH 下 browser login 的 OAuth callback 会错误落到开发者电脑的 `localhost:<random-port>`；`npm run eas:login` 已固定使用 `--no-browser` 终端登录
+   - Expo 账户已通过 Personal Access Token 验证为 `qiud`，并拥有 `qiud / qiuds-team` Owner 权限；App owner 已固定为 `qiuds-team`
+   - 新增 `npm run eas:configure`：在当前终端持有 `EXPO_TOKEN` 时自动创建/绑定团队 EAS 项目，并从现有前端配置读取 Supabase 公共值，将其与 `https://voxember.com/api` 同步到 development/preview/production；不会读取或上传服务端 secrets
+   - EAS 长期认证已改为项目外凭据文件：根目录运行 `npm run eas:save-token` 后隐藏写入 `~/.config/voxflame/expo-token`（目录 `700`、文件 `600`），后续 EAS/Android/iOS 构建命令跨终端与服务器重启自动读取；根目录也已补齐 Android/iOS preview 构建入口
+   - Android preview APK 已构建成功：`50814787-79bf-44aa-a8d5-1bb0296aa59a`；首次失败由 AsyncStorage `3.0.2` 的不存在 Maven 依赖导致，已按 Expo SDK 55 兼容矩阵锁定到 `2.2.0` 并增加静态守卫，第二次 Gradle release 构建通过
+   - Android 权限已按能力矩阵修正：保留实时音频稳定性与蓝牙耳机所需权限，Android 12+ 在开始沟通时按需申请 `BLUETOOTH_CONNECT`，相机与悬浮窗继续从最终 Manifest 移除
+   - `https://voxember.com/download` 已部署 Android 开放内测入口；Dockerfile/Compose 已接通 Android/iOS 下载 URL build args，本次用 `sudo docker compose build/up frontend` 完成前端单服务重建，未重启 backend/LiveKit
+   - 下一步：Android 真机安装并完成登录/档案同步/麦克风/录音回放/上传回执/LiveKit/蓝牙耳机 smoke；完成 iOS Apple 签名、EAS build 与 TestFlight/登记设备内测入口
+   - iOS 最新 production Metro export 已通过（`902 modules / 4.9 MB`），并补齐 `ITSAppUsesNonExemptEncryption=false`；EAS preview 已验证公共环境加载正常，当前仅因首次 Apple signing credentials / internal distribution provisioning 无法在 token 非交互模式自动创建而停止
+
+0. 2026-07-19 已把“音系强化”落成真实音系二级小组
+   - 主分类仍为 `音系强化`，没有新增平级训练入口，也没有改变录音、RTC、评估或上传 schema
+   - 二级小组为：`双唇与唇齿音 / 舌尖中音 / 舌根音 / 舌面音 / 平舌与翘舌音 / 前后鼻韵母 / 复韵母 / 声调与变调`，另保留“全部音系句”
+   - [build-phonology-index.mjs](/home/ubuntu/VoxFlame-Agent/frontend/scripts/build-phonology-index.mjs) 使用本地 `pinyin-pro` 对清理后的 `2973` 条音系句离线建立声母、韵母、声调与变调索引，不依赖运行时外部服务
+   - 声母 / 韵母小组至少命中 2 个目标音节；声调组只收四声覆盖、三声连读或“一 / 不”变调；一句可进入多个专项，但最多保留得分最高的 3 个小组
+   - 没有命中专项的句子仍保留在“全部音系句”，不会为了分类数量把无关语料硬塞进某个小组
+   - 训练页现在可切换小组并显示每句真实命中的音位重点；录音中和处理中禁止切换，避免当前句与录音状态错位
+   - 当前索引覆盖 `2973/2973` 条；各专项数量为 `252 / 725 / 196 / 518 / 1445 / 2041 / 1472 / 2235`
+   - 已验证：音系索引 4 项回归、前端 61 项测试、`npx tsc --noEmit`、Next 生产构建；浏览器未登录访问训练页按现有鉴权重定向到登录页
+
+0. 2026-07-19 已完成训练区第一轮“只清真正严重污染”的逐句清理
+   - 不再使用“固定清 500 条”或“低质量超过 20% 整源退出”的策略；WenetSpeech、AISHELL 等来源继续逐句评审，不因来源或题材整体退出
+   - 清理边界只包括：明确色情、直接暴力 / 血腥残片、明确广告 / 考试站 / 订阅导流、确定的 ASR 重复 / 错误儿化 / 填充词污染和严重悬空句
+   - 普通新闻、财经 / 地产、影视对话、有效医疗与求助表达明确保留；例如 `孕期减少性生活`、`乳房肿胀的疼痛可以通过冷敷` 不会因敏感词误删
+   - [clean_generated_training_corpus.py](/home/ubuntu/VoxFlame-Agent/scripts/corpus/clean_generated_training_corpus.py) 以现有正式池为基线做最小差异清理，不补位、不重排未命中句
+   - 正式生成池由 `8980` 条降为 `8776` 条，共逐句退出 `204` 条：`ASR 破损 152 / 广告导流 38 / 直接暴力 6 / 色情 5 / 严重悬空句 3`
+   - 前端合并 curated 后总训练项为 `9112` 条，其中评估 `20`、非评估训练句 `9092`，仍保持 `8000+`
+   - 完整逐句审计见 [mandarin-training-real.cleanup-audit.json](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/corpus/generated/mandarin-training-real.cleanup-audit.json)，当前严重规则残留扫描为 `0`
+   - 已新增 Python 回归，前端语料测试也增加严重污染拦截与正常医疗表达保留断言
+   - 已验证：
+   - `python3 -m unittest scripts.corpus.test_export_frontend_source_corpus`（4 项通过）
+   - `cd frontend && npm test -- src/lib/corpus/mandarin-training-data/index.test.ts`（实际 58 项全部通过）
+   - `cd frontend && npx tsc --noEmit`
 
 0. 2026-07-15 已完成普通话训练语料重构到 7-18 字、8000+ 条
    - 已删除前端训练分类里的 `文言文节奏`，新增 `会议与协作`、`车载与导航`、`音系强化`

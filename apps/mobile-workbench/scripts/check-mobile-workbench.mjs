@@ -38,6 +38,10 @@ function assert(condition, message) {
 
 const packageJson = readJson('package.json')
 const appJson = readJson('app.json')
+const mobileConfigSource = readFileSync(
+  path.join(appRoot, 'src/api/mobile-config.ts'),
+  'utf8',
+)
 const sourceFiles = walkFiles(appRoot).filter((file) => (
   file.endsWith('.ts')
   || file.endsWith('.tsx')
@@ -49,13 +53,64 @@ const sourceText = sourceFiles
   .join('\n')
 
 assert(packageJson.name === '@voxflame/mobile-workbench', 'package name must stay scoped to mobile workbench')
+assert(packageJson.version === appJson.expo?.version, 'package and Expo versions must match')
+assert(packageJson.dependencies?.['@react-native-async-storage/async-storage'] === '2.2.0', 'AsyncStorage must stay on the Expo SDK 55 compatible version')
 assert(packageJson.scripts?.check === 'node scripts/check-mobile-workbench.mjs', 'mobile check script is missing')
 assert(packageJson.scripts?.web === undefined, 'web script must stay disabled until web dependencies are explicit')
 assert(packageJson.scripts?.['export:android'] === 'expo export --platform android', 'android export smoke script is missing')
+assert(packageJson.scripts?.['export:ios'] === 'expo export --platform ios', 'ios export smoke script is missing')
+assert(packageJson.scripts?.['eas:login']?.endsWith('npx --yes eas-cli@latest login --no-browser'), 'EAS login must use SSH-safe terminal authentication')
+assert(packageJson.scripts?.['eas:save-token'] === 'bash scripts/save-expo-token.sh', 'persistent Expo token setup script is missing')
+assert(packageJson.scripts?.['eas:whoami']?.endsWith('npx --yes eas-cli@latest whoami'), 'EAS account check must use the eas-cli package')
+assert(packageJson.scripts?.['eas:init']?.includes('eas-cli@latest init --force --non-interactive'), 'EAS project init script is missing')
+assert(packageJson.scripts?.['eas:configure']?.endsWith('node scripts/configure-eas-project.mjs'), 'EAS environment setup script is missing')
+assert(packageJson.scripts?.['eas:credentials:ios']?.endsWith('eas-cli@latest credentials --platform ios'), 'interactive iOS credentials setup script is missing')
+assert(packageJson.scripts?.['build:android:development']?.includes('--platform android'), 'android development build script is missing')
+assert(packageJson.scripts?.['build:ios:development']?.includes('--platform ios'), 'ios development build script is missing')
+assert(packageJson.scripts?.['build:android:preview']?.includes('--platform android'), 'android preview build script is missing')
+assert(packageJson.scripts?.['build:ios:preview']?.includes('--platform ios'), 'ios preview build script is missing')
+for (const [scriptName, scriptValue] of Object.entries(packageJson.scripts ?? {})) {
+  if (
+    (scriptName.startsWith('build:') || scriptName.startsWith('eas:'))
+    && scriptValue.includes('eas-cli@latest')
+  ) {
+    assert(!scriptValue.includes('npx eas '), `${scriptName} must not resolve the wrong npm package named eas`)
+    const sanitizesEnvironment = scriptValue.includes('scripts/with-expo-token.sh') || (
+      scriptValue.includes('-u HTTP_PROXY -u HTTPS_PROXY')
+      && scriptValue.includes('-u NODE_TLS_REJECT_UNAUTHORIZED')
+    )
+    assert(sanitizesEnvironment, `${scriptName} must load persistent authentication and restore safe network settings`)
+  }
+}
 assert(packageJson.scripts?.['smoke:real-workspace'] === 'node scripts/smoke-real-workspace.mjs', 'real workspace smoke script is missing')
 assert(packageJson.scripts?.['smoke:device-env'] === 'node scripts/smoke-device-env.mjs', 'device env smoke script is missing')
 assert(appJson.expo?.slug === 'voxflame-mobile-workbench', 'expo slug must be stable')
+assert(appJson.expo?.owner === 'qiuds-team', 'Expo owner must stay on the qiuds-team account')
 assert(appJson.expo?.extra?.rtcSurface === 'mobile_workbench', 'expo extra.rtcSurface must be mobile_workbench')
+assert(appJson.expo?.icon, 'shared app icon is required')
+assert(appJson.expo?.ios?.bundleIdentifier === 'org.voxflame.mobileworkbench', 'iOS bundle identifier must stay stable')
+assert(appJson.expo?.ios?.infoPlist?.NSMicrophoneUsageDescription, 'iOS microphone purpose string is required')
+assert(appJson.expo?.ios?.infoPlist?.ITSAppUsesNonExemptEncryption === false, 'iOS export-compliance declaration is required')
+assert(appJson.expo?.android?.package === 'org.voxflame.mobileworkbench', 'Android package must stay stable')
+assert(appJson.expo?.android?.adaptiveIcon?.foregroundImage, 'Android adaptive icon is required')
+assert(Number.isInteger(appJson.expo?.android?.versionCode), 'Android versionCode is required')
+assert(typeof appJson.expo?.ios?.buildNumber === 'string', 'iOS buildNumber is required')
+for (const publicEnvName of [
+  'EXPO_PUBLIC_API_BASE_URL',
+  'EXPO_PUBLIC_SUPABASE_URL',
+  'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+  'EXPO_PUBLIC_PHONE_AUTH_ENABLED',
+]) {
+  assert(
+    mobileConfigSource.includes(`process.env.${publicEnvName}`),
+    `${publicEnvName} must use Expo-compatible static property access`,
+  )
+}
+assert(
+  !mobileConfigSource.includes('process?.env?.[name]')
+  && !mobileConfigSource.includes('process.env[name]'),
+  'dynamic Expo public env access must not return to release builds',
+)
 
 const plugins = JSON.stringify(appJson.expo?.plugins ?? [])
 assert(plugins.includes('@livekit/react-native-expo-plugin'), 'LiveKit Expo plugin must be configured')
@@ -64,6 +119,30 @@ assert(plugins.includes('@config-plugins/react-native-webrtc'), 'react-native-we
 const androidPermissions = appJson.expo?.android?.permissions ?? []
 assert(androidPermissions.includes('android.permission.RECORD_AUDIO'), 'Android RECORD_AUDIO permission is required')
 assert(androidPermissions.includes('android.permission.MODIFY_AUDIO_SETTINGS'), 'Android audio settings permission is required')
+for (const requiredAudioPermission of [
+  'android.permission.WAKE_LOCK',
+  'android.permission.BLUETOOTH',
+  'android.permission.BLUETOOTH_ADMIN',
+  'android.permission.BLUETOOTH_CONNECT',
+]) {
+  assert(androidPermissions.includes(requiredAudioPermission), `required Android audio permission missing: ${requiredAudioPermission}`)
+}
+const blockedAndroidPermissions = appJson.expo?.android?.blockedPermissions ?? []
+for (const blockedPermission of [
+  'android.permission.CAMERA',
+  'android.permission.SYSTEM_ALERT_WINDOW',
+]) {
+  assert(blockedAndroidPermissions.includes(blockedPermission), `Android permission must stay blocked: ${blockedPermission}`)
+}
+for (const requiredAudioPermission of [
+  'android.permission.WAKE_LOCK',
+  'android.permission.BLUETOOTH',
+  'android.permission.BLUETOOTH_ADMIN',
+  'android.permission.BLUETOOTH_CONNECT',
+]) {
+  assert(!blockedAndroidPermissions.includes(requiredAudioPermission), `required Android audio permission must not be blocked: ${requiredAudioPermission}`)
+}
+assert(sourceText.includes('PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT'), 'Android 12+ Bluetooth audio permission request is missing')
 
 for (const requiredFile of [
   'src/auth/mobile-supabase-client.ts',
@@ -72,9 +151,13 @@ for (const requiredFile of [
   'src/api/mobile-upload-client.ts',
   'src/realtime/use-mobile-rtc-session.ts',
   'src/realtime/use-livekit-room-connection.ts',
+  'src/diagnostics/use-mobile-diagnostics.ts',
   'src/queue/native-recorder-storage.ts',
   'src/queue/use-native-recorder-queue.ts',
   'scripts/smoke-device-env.mjs',
+  'scripts/configure-eas-project.mjs',
+  'scripts/save-expo-token.sh',
+  'scripts/with-expo-token.sh',
 ]) {
   assert(existsSync(path.join(appRoot, requiredFile)), `missing required mobile file: ${requiredFile}`)
 }
@@ -89,11 +172,16 @@ for (const requiredToken of [
   '/upload/complete',
   'uploadReceipt',
   '/rtc/session/start',
+  "'ping' | 'stop'",
+  '`/rtc/session/${action}`',
   'participantToken',
   'registerGlobals',
   'AudioSession.startAudioSession',
   'setMicrophoneEnabled',
   'EXPO_PUBLIC_API_BASE_URL',
+  '/mobile/diagnostics',
+  'MAX_QUEUED_REPORTS',
+  'manual_diagnostic_report',
 ]) {
   assert(sourceText.includes(requiredToken), `missing recorder queue token: ${requiredToken}`)
 }
@@ -117,5 +205,61 @@ assert(
   existsSync(path.join(repoRoot, 'backend/src/controllers/rtc.controller.ts')),
   'repo root detection failed',
 )
+
+const backendRtcController = readFileSync(
+  path.join(repoRoot, 'backend/src/controllers/rtc.controller.ts'),
+  'utf8',
+)
+const backendRtcService = readFileSync(
+  path.join(repoRoot, 'backend/src/services/rtc-orchestration.service.ts'),
+  'utf8',
+)
+const backendIndex = readFileSync(
+  path.join(repoRoot, 'backend/src/index.ts'),
+  'utf8',
+)
+
+const backendMobileDiagnosticsController = readFileSync(
+  path.join(repoRoot, 'backend/src/controllers/mobile-diagnostics.controller.ts'),
+  'utf8',
+)
+
+for (const route of ["router.post('/session/start'", "router.post('/session/ping'", "router.post('/session/stop'"]) {
+  assert(backendRtcController.includes(route), `backend RTC route missing: ${route}`)
+}
+
+for (const contractToken of [
+  "| 'mobile_workbench'",
+  'participantToken: string',
+  'requestedStrategy: RtcSessionStrategy',
+  'recommendedStrategy: RtcSessionStrategy',
+  'grantedCapabilities: RtcCapabilityId[]',
+]) {
+  assert(backendRtcService.includes(contractToken), `backend RTC contract drift: ${contractToken}`)
+}
+
+for (const workspaceRoute of [
+  "memoryRouter.get('/workspace/:userId'",
+  "memoryRouter.get('/workspace/:userId/prepared-expressions'",
+]) {
+  assert(backendIndex.includes(workspaceRoute), `backend workspace route missing: ${workspaceRoute}`)
+}
+
+assert(
+  backendIndex.includes("app.use('/api/mobile/diagnostics', authMiddleware, mobileDiagnosticsRouter)"),
+  'authenticated mobile diagnostics route is missing',
+)
+for (const privacyGuard of [
+  'MAX_REPORTS_PER_REQUEST',
+  'MAX_BREADCRUMBS_PER_REPORT',
+  'sanitizeEndpoint',
+  'sanitizeStack',
+  'userFingerprint',
+]) {
+  assert(
+    backendMobileDiagnosticsController.includes(privacyGuard),
+    `mobile diagnostics privacy guard missing: ${privacyGuard}`,
+  )
+}
 
 console.log('mobile workbench check passed')

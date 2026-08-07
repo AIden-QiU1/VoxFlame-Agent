@@ -13,3 +13,4 @@
 
 - 工具和 skill 选择拿不准时，按 `本地代码/文档 -> 官方文档 -> skill -> 验证 -> web` 升级。
 - 容器验证默认先用 `docker compose`；若当前机器权限要求更高或普通命令失败，再回退到 `sudo docker compose ...`。
+- Docker 部署优先使用 `scripts/docker-rebuild-core-fast.sh` 的 `env-backend` / `backend` / `frontend` / `core` 最小影响模式，不默认先执行 `docker compose down`；磁盘清理使用 `scripts/docker_disk_maintenance.sh status|prune-safe` 并保留回滚镜像。

@@ -74,6 +74,7 @@ export function UserNav() {
     const avatarUrl = typeof user.user_metadata?.avatar_url === 'string'
         ? user.user_metadata.avatar_url
         : null
+    const accountIdentifier = user.email || user.phone || 'VoxFlame 用户'
 
     return (
         <DropdownMenu>
@@ -81,9 +82,9 @@ export function UserNav() {
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
                         {avatarUrl ? (
-                            <AvatarImage src={avatarUrl} alt={user.email || ""} />
+                            <AvatarImage src={avatarUrl} alt={accountIdentifier} />
                         ) : null}
-                        <AvatarFallback>{user.email?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>{accountIdentifier.slice(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                 </Button>
             </DropdownMenuTrigger>
@@ -92,15 +93,17 @@ export function UserNav() {
                     <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || "用户"}</p>
                         <p className="text-xs leading-none text-muted-foreground">
-                            {user.email}
+                            {accountIdentifier}
                         </p>
                     </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                    <DropdownMenuItem>
-                        个人资料
-                        <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+                    <DropdownMenuItem asChild>
+                        <Link href="/settings/account" className="flex w-full items-center justify-between">
+                            账号与登录
+                            <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+                        </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                         <Link href="/settings/audio" className="flex w-full items-center justify-between">

@@ -1,25 +1,23 @@
-type ExpoProcess = {
-  env?: Record<string, string | undefined>
-}
-
-declare const process: ExpoProcess | undefined
-
 export interface MobileRuntimeConfig {
   apiBaseUrl: string | null
   supabaseUrl: string | null
   supabaseAnonKey: string | null
+  phoneAuthEnabled: boolean
 }
 
-function readPublicEnv(name: string): string | null {
-  const value = process?.env?.[name]?.trim()
-  return value || null
+function normalizePublicEnv(value: string | undefined): string | null {
+  const normalized = value?.trim()
+  return normalized || null
 }
 
 export function getMobileRuntimeConfig(): MobileRuntimeConfig {
   return {
-    apiBaseUrl: readPublicEnv('EXPO_PUBLIC_API_BASE_URL'),
-    supabaseUrl: readPublicEnv('EXPO_PUBLIC_SUPABASE_URL'),
-    supabaseAnonKey: readPublicEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
+    // Expo only inlines EXPO_PUBLIC values when each property is accessed
+    // statically. Computed-key environment reads leave release builds empty.
+    apiBaseUrl: normalizePublicEnv(process.env.EXPO_PUBLIC_API_BASE_URL),
+    supabaseUrl: normalizePublicEnv(process.env.EXPO_PUBLIC_SUPABASE_URL),
+    supabaseAnonKey: normalizePublicEnv(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY),
+    phoneAuthEnabled: process.env.EXPO_PUBLIC_PHONE_AUTH_ENABLED === '1',
   }
 }
 

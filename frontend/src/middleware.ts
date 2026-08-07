@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { buildLoginPath, resolveExternalOrigin } from '@/lib/auth/navigation'
 
-const PROTECTED_PATH_PREFIXES = ['/contribute', '/memory', '/chat']
+const PROTECTED_PATH_PREFIXES = ['/contribute', '/memory', '/chat', '/settings']
 
 function requiresAuth(request: NextRequest): boolean {
     const { pathname, searchParams } = request.nextUrl

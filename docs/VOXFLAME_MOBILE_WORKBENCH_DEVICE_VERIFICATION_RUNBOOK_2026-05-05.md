@@ -40,6 +40,7 @@ cd apps/mobile-workbench
 npm run check
 npm run typecheck
 HOME=/tmp/voxflame-expo-home EXPO_NO_TELEMETRY=1 npm run export:android -- --output-dir /tmp/voxflame-mobile-workbench-device-export
+HOME=/tmp/voxflame-expo-home EXPO_NO_TELEMETRY=1 npm run export:ios -- --output-dir /tmp/voxflame-mobile-workbench-ios-export
 ```
 
 当前状态：已通过多轮。
@@ -73,15 +74,35 @@ VoxFlame 当前已经接入：
 
 当前仓库已提供 Android EAS 配置：
 
+首次绑定团队项目时，先在已经设置 `EXPO_TOKEN` 的同一个终端执行：
+
 ```bash
 cd apps/mobile-workbench
-npx eas login
-npx eas env:create --environment development --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value http://<your-lan-ip>:3001/api
-npx eas env:create --environment development --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
-npx eas env:create --environment development --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
+npm run eas:whoami
+npm run eas:configure
+```
+
+该命令固定创建或绑定 `qiuds-team/voxflame-mobile-workbench`，并同步三套公共客户端环境。后续不再需要手工重复创建每个 EAS 环境变量。
+
+```bash
+cd apps/mobile-workbench
+npm run eas:login
+npx --yes eas-cli@latest env:create --environment development --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value http://<your-lan-ip>:3001/api
+npx --yes eas-cli@latest env:create --environment development --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
+npx --yes eas-cli@latest env:create --environment development --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
 npm run smoke:device-env
 npm run build:android:development
 ```
+
+iPhone development build 使用同一组 `EXPO_PUBLIC_*` 公开客户端配置：
+
+```bash
+cd apps/mobile-workbench
+npm run eas:login
+npm run build:ios:development
+```
+
+iOS 真机 build 需要 Apple Developer 凭据。Linux 可以验证 iOS Metro bundle，但不能在本机生成或签名 IPA；EAS cloud build 会完成原生构建与签名。
 
 EAS 构建完成后会给出 build 页面。Android 手机上通常直接用系统相机扫 Expo 页面里的二维码；相机会打开浏览器下载 APK。下载后如果系统提示“禁止从此来源安装”，允许浏览器安装未知应用，再回到下载页安装。
 
@@ -89,16 +110,24 @@ EAS 构建完成后会给出 build 页面。Android 手机上通常直接用系�
 
 ```bash
 cd apps/mobile-workbench
-npx eas login
-npx eas env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value http://<reachable-api-host>:3001/api
-npx eas env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
-npx eas env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
+npm run eas:login
+npx --yes eas-cli@latest env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value http://<reachable-api-host>:3001/api
+npx --yes eas-cli@latest env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
+npx --yes eas-cli@latest env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
 npm run smoke:device-env
 npm run build:android:preview
 ```
 
 `development` 和 `preview` 都不是应用商店版本；它们是内部测试安装包。
 EAS 云端构建不会自动读取你本机未提交的 `.env`，所以云端打包前要用 `eas env:create` 或 Expo dashboard 配好 `EXPO_PUBLIC_*` 公共客户端配置。不要把 service role key、LiveKit API secret、DashScope key 或 OSS secret 放进 EAS 客户端环境。
+
+当前服务器存在失效的 `HTTP_PROXY / HTTPS_PROXY` 与不安全的 `NODE_TLS_REJECT_UNAUTHORIZED` 全局环境。仓库 `eas:* / build:*` 脚本会自动移除这些变量；手动执行 EAS CLI 时也应使用：
+
+```bash
+env -u HTTP_PROXY -u HTTPS_PROXY -u NODE_TLS_REJECT_UNAUTHORIZED npx --yes eas-cli@latest <command>
+```
+
+登录默认使用 `npm run eas:login`（内部带 `--no-browser`）。不要在 SSH 会话中使用 browser login：浏览器回调里的 `localhost:<random-port>` 指向开发者电脑，不是运行 CLI 的远程服务器。
 
 ### Level 2：真机业务 smoke
 
@@ -206,7 +235,8 @@ EXPO_PUBLIC_API_BASE_URL=http://<your-lan-ip>:3001/api
 
 1. 用 `npm run build:android:development` 或 `npm run build:android:preview` 生成 Android APK 安装链接。
 2. 用一台 Android 手机验证登录、workspace read、录音、回放。
-3. 再验证上传 receipt。
-4. 最后验证 LiveKit quick talk room。
+3. 用 `npm run build:ios:development` 或 `npm run build:ios:preview` 生成 iPhone 内测安装链接，并在真机重复相同链路。
+4. 再验证上传 receipt。
+5. 最后验证 LiveKit quick talk room。
 
 在这四步跑通前，不进入正式商店上架准备。

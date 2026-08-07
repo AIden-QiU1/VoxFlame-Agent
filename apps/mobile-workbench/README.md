@@ -1,6 +1,17 @@
 # VoxFlame Mobile Workbench
 
-Expo / React Native shell for the full mobile workbench.
+VoxFlame 的 Expo / React Native 移动端，Android 与 iOS 共用一套产品和接口实现。
+
+## V1 Testable Slice
+
+`0.1.0` 第一版包含四个可测试页面：
+
+1. `沟通`：通过 backend 创建、保活和结束 RTC session，再连接 LiveKit 麦克风。
+2. `练习`：原生录音、本机队列、逐条回放、确认删除、上传和 receipt。
+3. `准备`：读取与 Web 相同的 workspace snapshot、准备材料和常用短句。
+4. `我的`：账户、麦克风权限、资料同步和待上传状态。
+
+App 不显示 participant token、RTC 策略或后端状态码等工程信息；这些由日志和静态守卫负责。
 
 ## Direction
 
@@ -52,21 +63,55 @@ npm run check
 npm run typecheck
 npm run start
 npm run export:android
+npm run export:ios
 npm run build:android:development
+npm run build:ios:development
 npm run build:android:preview
+npm run build:ios:preview
+npm run build:all:preview
 npm run build:android:china-store
 npm run smoke:device-env
+```
+
+The first iOS device build also needs Apple signing credentials and an internal-distribution provisioning profile. Complete that one-time interactive setup in your own SSH terminal (enter Apple password and verification code only there), then rebuild:
+
+```bash
+cd /home/ubuntu/VoxFlame-Agent
+npm run eas:credentials:ios
+npm run build:ios:preview
+```
+
+## First EAS Setup
+
+Google 登录创建的 Expo 账户在远程 SSH 构建机上推荐使用 Personal Access Token。第一次通过隐藏输入保存到当前 Linux 用户的 `~/.config/voxflame/expo-token`；文件权限为 `600`，不进入仓库，也不要放入项目 `.env` 或截图：
+
+```bash
+npm run eas:save-token
+npm run eas:whoami
+npm run eas:configure
+```
+
+项目的 `eas:*` 与 `build:*` 命令会自动加载该文件。重新 SSH、重开终端或重启服务器后无需重复输入；只有 Token 被 Expo 吊销或主动更换时才需再次运行 `npm run eas:save-token`。
+
+`eas:configure` 会把项目创建在 `qiuds-team` 下，并将现有 Supabase 公共客户端配置与 `https://voxember.com/api` 同步到 EAS 的 `development / preview / production` 环境。它不会读取或上传 service role、LiveKit secret、模型密钥或 OSS secret。
+
+完成后生成 Android 内测 APK：
+
+```bash
+npm run build:android:preview
 ```
 
 The LiveKit React Native SDK requires a development build or prebuild path once the real room view is enabled.
 Web export is not part of the current smoke path; add `react-dom` and `react-native-web` explicitly if browser preview becomes a product requirement.
 
+Android V1 keeps only permissions tied to the audio product path: microphone, network/audio routing, wake lock for stable real-time communication, and Bluetooth/Nearby devices for headset routing. Camera, overlay, screen sharing, background camera, and background recording are not V1 capabilities. On Android 12+, Nearby devices is requested when communication starts; denying it falls back to the phone microphone/speaker instead of blocking communication.
+
 ## Device Verification
 
 Early app verification does not require App Store or Google Play release. The current order is:
 
-1. Static checks and Android bundle export.
-2. Development build on a physical Android phone first, then iPhone.
+1. Static checks and Android/iOS bundle export.
+2. Development build on a physical Android phone and iPhone.
 3. Real-device smoke for login, workspace read, recording, playback, upload receipt, and LiveKit quick talk.
 4. Small tester distribution through EAS internal distribution, TestFlight, or Google Play internal testing.
 5. Formal store release only after privacy, deletion, medical wording, permission copy, and beta feedback are ready.
@@ -124,10 +169,10 @@ Use a development build when you want to connect the phone to your local Expo se
 
 ```bash
 cd apps/mobile-workbench
-npx eas login
-npx eas env:create --environment development --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value http://<your-lan-ip>:3001/api
-npx eas env:create --environment development --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
-npx eas env:create --environment development --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
+npm run eas:login
+npx --yes eas-cli@latest env:create --environment development --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value http://<your-lan-ip>:3001/api
+npx --yes eas-cli@latest env:create --environment development --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
+npx --yes eas-cli@latest env:create --environment development --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
 npm run smoke:device-env
 npm run build:android:development
 ```
@@ -136,19 +181,25 @@ Use a preview build when you want a directly installable APK that does not need 
 
 ```bash
 cd apps/mobile-workbench
-npx eas login
-npx eas env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value http://<reachable-api-host>:3001/api
-npx eas env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
-npx eas env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
+npm run eas:login
+npx --yes eas-cli@latest env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value http://<reachable-api-host>:3001/api
+npx --yes eas-cli@latest env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
+npx --yes eas-cli@latest env:create --environment preview --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
 npm run smoke:device-env
 npm run build:android:preview
 ```
 
 After EAS finishes, open the build page and tap **Install**, or scan the QR code shown by Expo. On Android, the normal phone Camera app usually works: scan the QR code, open the link in the browser, download the APK, allow installation from the browser if Android asks, then install.
 
+Current Android `0.1.0` preview build: `https://expo.dev/accounts/qiuds-team/projects/voxflame-mobile-workbench/builds/50814787-79bf-44aa-a8d5-1bb0296aa59a`. This internal build is for real-device verification; the permanent public entry is `https://voxember.com/download`, which can later switch to a store URL without changing the page.
+
 The app environment is public-client only. Before building for a real phone, set `EXPO_PUBLIC_API_BASE_URL` to the computer or server address the phone can reach, such as `http://192.168.1.23:3001/api`. Do not use `127.0.0.1` for a physical phone.
 
 Remote EAS builds do not automatically receive your uncommitted local `.env`, so configure the `EXPO_PUBLIC_*` values in EAS before cloud builds. These values are public client configuration; never add service role keys, LiveKit API secrets, DashScope keys, or OSS secrets.
+
+This server currently has stale `HTTP_PROXY / HTTPS_PROXY` values and an unsafe `NODE_TLS_REJECT_UNAUTHORIZED` override. The repository's `eas:*` and `build:*` scripts unset them automatically. If you run EAS manually, prefix the command with `env -u HTTP_PROXY -u HTTPS_PROXY -u NODE_TLS_REJECT_UNAUTHORIZED`.
+
+`npm run eas:login` also uses `--no-browser` because this app is developed over VS Code / SSH. Browser login would send the callback to the developer computer's `localhost`, while EAS CLI is listening on the remote server.
 
 ## China App Stores
 
@@ -156,10 +207,10 @@ Domestic Android stores need a release APK, not a development build. Use:
 
 ```bash
 cd apps/mobile-workbench
-npx eas login
-npx eas env:create --environment production --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value https://<production-api-host>/api
-npx eas env:create --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
-npx eas env:create --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
+npm run eas:login
+npx --yes eas-cli@latest env:create --environment production --visibility plaintext --name EXPO_PUBLIC_API_BASE_URL --value https://<production-api-host>/api
+npx --yes eas-cli@latest env:create --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
+npx --yes eas-cli@latest env:create --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <supabase-anon-key>
 npm run build:android:china-store
 ```
 

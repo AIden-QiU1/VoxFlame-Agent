@@ -21,6 +21,20 @@
       "android": {
         "buildType": "apk"
       },
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_NO_TELEMETRY": "1"
+      }
+    },
+    "e2eTest": {
+      "distribution": "internal",
+      "environment": "preview",
+      "withoutCredentials": true,
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_NO_TELEMETRY": "1"
       }

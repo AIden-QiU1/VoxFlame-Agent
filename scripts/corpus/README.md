@@ -10,6 +10,7 @@
 - 如果环境里有 `pypinyin`，脚本会额外按声母 / 韵母 / 声调做覆盖度打分；没有的话也能跑，只是不会做音系均衡评分。
 - 网页来源会先做文章打散、子句拆分和页面噪声过滤，尽量剔除导航、按钮、面包屑等无效文本。
 - 前端训练目标句必须统一简体中文。推荐在导出环境安装 `opencc-python-reimplemented`，`export_frontend_source_corpus.py` 会优先使用 OpenCC `t2s` 做繁转简；未安装时才使用脚本内置兜底表。
+- 严重污染按句子清理，不按来源或固定数量清理。明确色情、直接暴力、广告导流、确定的 ASR 重复 / 填充 / 拼接残片退出；普通新闻、财经、影视对话和有效医疗表达不因题材退出。
 
 ## 推荐来源分层
 
@@ -71,7 +72,24 @@ python3 scripts/corpus/export_frontend_source_corpus.py \
   --cap 会议与协作=900 \
   --cap 车载与导航=80 \
   --cap 音系强化=3000
+
+python3 scripts/corpus/clean_generated_training_corpus.py \
+  --input frontend/src/lib/corpus/generated/mandarin-training-real.json \
+  --output frontend/src/lib/corpus/generated/mandarin-training-real.json \
+  --audit-output frontend/src/lib/corpus/generated/mandarin-training-real.cleanup-audit.json
 ```
+
+第二条命令是最终的逐句严重污染门。审计文件会保存每条退出句、原分类和退出原因；重复执行时会追加新发现并按文本去重。不要为达到一个预设数字扩大删除范围，也不要用某个来源的低质量比例整源退出。
+
+清理或重新导出音系强化语料后，需要重建并验证前端使用的离线音系索引：
+
+```bash
+cd frontend
+npm run build:phonology-index
+npm run test:phonology-index
+```
+
+索引产物为 `frontend/src/lib/corpus/generated/mandarin-phonology-index.json`。它在构建期使用 `pinyin-pro` 计算声母、韵母、声调和变调，前端运行时只读取索引，不调用外部拼音服务。声母 / 韵母专项至少命中两个目标音节；声调专项只收四声覆盖、三声连读或“一 / 不”变调；每句最多进入三个最相关专项，未命中专项的句子仍保留在“全部音系句”。
 
 如果本机已经下载了 AISHELL-1 / AISHELL-2 / 其他转写文本，不要把大数据集提交进仓库，直接把本地 transcript 放进 manifest，再交给 `build_mandarin_scene_corpus.py` 或 `export_frontend_source_corpus.py` 抽取。
 

@@ -25,6 +25,7 @@ import {
   type MandarinTrainingExercise,
   getExercisesByCategory,
 } from '@/lib/corpus/mandarin-training'
+import { cn } from '@/lib/utils'
 import type {
   VoxFlameConsentScope,
   VoxFlameRecordingEnvelope,
@@ -61,6 +62,14 @@ import {
 } from '@/lib/training/training-guidance-profile'
 import { buildTrainingSampleLineage } from '@/lib/training/training-sample-lineage'
 import { selectTrainingExercises } from '@/lib/training/training-exercise-selection'
+import {
+  PHONOLOGY_GROUPS,
+  filterExercisesByPhonologyGroup,
+  getPhonologyExerciseTargets,
+  getPhonologyFocusForGroup,
+  getPhonologyGroupMeta,
+  type PhonologyGroupId,
+} from '@/lib/training/phonology-groups'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
 
 type AttemptUploadStatus =
@@ -797,6 +806,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const [selectedExerciseId, setSelectedExerciseId] = useState(
     '',
   )
+  const [selectedPhonologyGroupId, setSelectedPhonologyGroupId] = useState<PhonologyGroupId>('all')
   const [exerciseQuery, setExerciseQuery] = useState('')
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [sessionPracticedExerciseIds, setSessionPracticedExerciseIds] = useState<string[]>([])
@@ -841,8 +851,10 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const practiceMode: PracticeSourceMode = topicSelection.practiceMode
   const isAssessmentTopic =
     practiceMode === 'sentence_corpus' && selectedCategory === '评估筛查'
+  const isPhonologyTopic =
+    practiceMode === 'sentence_corpus' && selectedCategory === '音系强化'
 
-  const categoryExercises = useMemo(
+  const baseCategoryExercises = useMemo(
     () => (
       practiceMode === 'prepared_content'
         ? preparedExpressionExercises
@@ -850,6 +862,32 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     ),
     [practiceMode, preparedExpressionExercises, selectedCategory],
   )
+  const categoryExercises = useMemo(
+    () => (
+      isPhonologyTopic
+        ? filterExercisesByPhonologyGroup(
+            baseCategoryExercises as MandarinTrainingExercise[],
+            selectedPhonologyGroupId,
+          )
+        : baseCategoryExercises
+    ),
+    [baseCategoryExercises, isPhonologyTopic, selectedPhonologyGroupId],
+  )
+  const phonologyGroupOptions = useMemo(
+    () => (
+      isPhonologyTopic
+        ? PHONOLOGY_GROUPS.map((group) => ({
+            ...group,
+            count: filterExercisesByPhonologyGroup(
+              baseCategoryExercises as MandarinTrainingExercise[],
+              group.id,
+            ).length,
+          }))
+        : []
+    ),
+    [baseCategoryExercises, isPhonologyTopic],
+  )
+  const activePhonologyGroup = getPhonologyGroupMeta(selectedPhonologyGroupId)
 
   const recordedExerciseIds = useMemo(() => {
     const persistedExerciseIds = userId ? getUploadedTrainingExerciseIds(userId) : []
@@ -905,6 +943,19 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     ),
     [currentExercise],
   )
+  const currentPhonologyTarget = useMemo(() => {
+    if (!isPhonologyTopic || !currentExercise) {
+      return null
+    }
+
+    const targets = getPhonologyExerciseTargets(currentExercise.id)
+    return selectedPhonologyGroupId === 'all'
+      ? targets[0] ?? null
+      : targets.find((target) => target.id === selectedPhonologyGroupId) ?? null
+  }, [currentExercise, isPhonologyTopic, selectedPhonologyGroupId])
+  const currentPhonologyTargetMeta = currentPhonologyTarget
+    ? getPhonologyGroupMeta(currentPhonologyTarget.id)
+    : null
 
   const currentExerciseTags = useMemo(
     () => dedupeStrings(
@@ -916,10 +967,15 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
           ]
         : isAssessmentTopic
           ? [currentExercise?.category ?? null, '筛查词表']
-          : [currentExercise?.category ?? null],
+          : isPhonologyTopic && currentExercise
+            ? [
+                currentPhonologyTargetMeta?.label ?? activePhonologyGroup.label,
+                currentPhonologyTarget?.focus ?? getPhonologyFocusForGroup(currentExercise.id, selectedPhonologyGroupId),
+              ]
+            : [currentExercise?.category ?? null],
       8,
     ),
-    [currentExercise, isAssessmentTopic],
+    [activePhonologyGroup.label, currentExercise, currentPhonologyTarget?.focus, currentPhonologyTargetMeta?.label, isAssessmentTopic, isPhonologyTopic, selectedPhonologyGroupId],
   )
 
   const trainingReports = useMemo(
@@ -1095,6 +1151,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
     setSessionPracticedExerciseIds([])
     setAssessmentAttemptsByExercise({})
+    setSelectedPhonologyGroupId('all')
     void refreshLocalQueueCount()
   }, [refreshLocalQueueCount, topicId, userId])
 
@@ -1190,6 +1247,17 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     setSelectedExerciseId(exerciseId)
     setAttempt(null)
   }, [isProcessing, isRecording])
+
+  const handleSelectPhonologyGroup = useCallback((groupId: PhonologyGroupId) => {
+    if (isRecording || isProcessing || groupId === selectedPhonologyGroupId) {
+      return
+    }
+
+    setSelectedPhonologyGroupId(groupId)
+    setSelectedExerciseId('')
+    setExerciseQuery('')
+    setAttempt(null)
+  }, [isProcessing, isRecording, selectedPhonologyGroupId])
 
   const handleStartRecording = useCallback(async () => {
     if (!currentExercise || isUploading || isProcessing) {
@@ -1907,6 +1975,61 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 <p className="mt-4 text-sm text-gray-600">{exerciseSelectionHint}</p>
               ) : (
                 <>
+                  {isPhonologyTopic ? (
+                    <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-stone-950 text-balance">选择音系小组</p>
+                          <p className="mt-1 text-sm leading-6 text-stone-600 text-pretty">
+                            每句按真实拼音标注，可以同时属于多个专项；这里选择本轮主要练什么。
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700 tabular-nums">
+                          {categoryExercises.length} 句
+                        </span>
+                      </div>
+                      <div
+                        className="mt-4 grid gap-2 sm:grid-cols-2"
+                        role="group"
+                        aria-label="选择音系训练小组"
+                      >
+                        {phonologyGroupOptions.map((group) => {
+                          const isActive = group.id === selectedPhonologyGroupId
+                          return (
+                            <button
+                              key={group.id}
+                              type="button"
+                              aria-pressed={isActive}
+                              onClick={() => handleSelectPhonologyGroup(group.id)}
+                              disabled={isRecording || isProcessing}
+                              className={cn(
+                                'rounded-2xl border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
+                                isActive
+                                  ? 'border-amber-400 bg-amber-50 text-stone-950'
+                                  : 'border-stone-200 bg-white text-stone-700 hover:border-amber-300 hover:bg-amber-50',
+                              )}
+                            >
+                              <span className="flex items-center justify-between gap-3">
+                                <span className="text-sm font-semibold">{group.label}</span>
+                                <span className="text-xs tabular-nums text-stone-500">{group.count}</span>
+                              </span>
+                              <span className="mt-1 block text-xs leading-5 text-stone-600 text-pretty">
+                                {group.shortLabel}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="mt-3 rounded-2xl bg-white px-4 py-3">
+                        <p className="text-sm font-medium text-stone-900">
+                          当前：{activePhonologyGroup.label} · {activePhonologyGroup.shortLabel}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-stone-600 text-pretty">
+                          {activePhonologyGroup.description}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="mt-4 flex flex-wrap items-center gap-3">
                     <input
                       value={exerciseQuery}
@@ -1927,6 +2050,9 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 <div className="space-y-3">
                   {visibleExercises.map((exercise) => {
                     const isActive = currentExercise.id === exercise.id
+                    const phonologyFocus = isPhonologyTopic
+                      ? getPhonologyFocusForGroup(exercise.id, selectedPhonologyGroupId)
+                      : null
                     return (
                       <button
                         key={exercise.id}
@@ -1954,6 +2080,11 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                           </span>
                         </div>
                         <p className="mt-3 text-base font-semibold leading-7 text-gray-900">{exercise.text}</p>
+                        {phonologyFocus ? (
+                          <p className="mt-2 text-sm text-amber-800 text-pretty">
+                            本句重点：{phonologyFocus}
+                          </p>
+                        ) : null}
                       </button>
                     )
                   })}
@@ -2055,6 +2186,17 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 {currentExerciseTags.length > 0 ? (
                   <div className="mt-4">
                     {renderChips(currentExerciseTags, 'amber')}
+                  </div>
+                ) : null}
+
+                {currentPhonologyTarget && currentPhonologyTargetMeta ? (
+                  <div className="mt-4 rounded-2xl bg-white px-4 py-4">
+                    <p className="text-sm font-medium text-stone-950">
+                      本句音系重点：{currentPhonologyTargetMeta.label} · {currentPhonologyTarget.focus}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-stone-600 text-pretty">
+                      {currentPhonologyTargetMeta.description}
+                    </p>
                   </div>
                 ) : null}
 

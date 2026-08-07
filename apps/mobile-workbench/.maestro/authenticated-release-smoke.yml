@@ -1,0 +1,22 @@
+appId: org.voxflame.mobileworkbench
+---
+- launchApp:
+    clearState: true
+- tapOn: '邮箱'
+- inputText: ${MAESTRO_TEST_EMAIL}
+- tapOn: '密码'
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- hideKeyboard
+- tapOn: '登录'
+- extendedWaitUntil:
+    visible: '现在沟通'
+    timeout: 30000
+- assertVisible: '先把关键一句说清楚'
+- tapOn: '练习'
+- assertVisible: '一次只练一句'
+- tapOn: '准备'
+- assertVisible: '把要说的话放在手边'
+- tapOn: '我的'
+- assertVisible: '账户与设备'
+- assertVisible: '自动诊断'
+- takeScreenshot: authenticated-surfaces-ready

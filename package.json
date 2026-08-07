@@ -1,6 +1,11 @@
 {
   "scripts": {
-    "check:mobile-workbench": "node apps/mobile-workbench/scripts/check-mobile-workbench.mjs"
+    "check:mobile-workbench": "node apps/mobile-workbench/scripts/check-mobile-workbench.mjs",
+    "eas:save-token": "npm --prefix apps/mobile-workbench run eas:save-token",
+    "eas:whoami": "npm --prefix apps/mobile-workbench run eas:whoami",
+    "eas:credentials:ios": "npm --prefix apps/mobile-workbench run eas:credentials:ios",
+    "build:android:preview": "npm --prefix apps/mobile-workbench run build:android:preview",
+    "build:ios:preview": "npm --prefix apps/mobile-workbench run build:ios:preview"
   },
   "devDependencies": {
     "js-sha256": "^0.11.1"

@@ -4,6 +4,10 @@ import {
   useRef,
   useState,
 } from 'react'
+import {
+  PermissionsAndroid,
+  Platform,
+} from 'react-native'
 import { AudioSession } from '@livekit/react-native'
 import {
   ConnectionState,
@@ -59,6 +63,19 @@ function mapConnectionState(state: ConnectionState): MobileLiveKitConnectionStat
   }
 
   return 'disconnected'
+}
+
+async function requestBluetoothAudioPermission(): Promise<void> {
+  if (Platform.OS !== 'android' || Platform.Version < 31) {
+    return
+  }
+
+  const permission = PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
+  const alreadyGranted = await PermissionsAndroid.check(permission)
+
+  if (!alreadyGranted) {
+    await PermissionsAndroid.request(permission)
+  }
 }
 
 export function useLiveKitRoomConnection(): MobileLiveKitRoomConnectionState {
@@ -140,6 +157,13 @@ export function useLiveKitRoomConnection(): MobileLiveKitRoomConnectionState {
       })
 
     try {
+      // Android 12+ protects Bluetooth headset routing behind Nearby devices.
+      // Denial does not block communication; the phone mic/speaker still works.
+      try {
+        await requestBluetoothAudioPermission()
+      } catch {
+        // AudioSession can continue with the built-in audio route.
+      }
       await AudioSession.startAudioSession()
       setAudioSessionStarted(true)
       await room.connect(

@@ -10,14 +10,21 @@ import {
     persistLocalLegalConsent,
 } from '@/lib/auth/legal-consent'
 import { createClient, getFreshSession } from '@/lib/supabase/client'
+import {
+    displayMainlandPhone,
+    normalizeMainlandPhone,
+    shouldCreatePhoneUser,
+} from '@/lib/auth/phone'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Mail, Lock, User } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Loader2, Mail, Lock, Smartphone, User } from 'lucide-react'
 
 type Mode = 'login' | 'register'
+type LoginMethod = 'email' | 'phone'
 
 /**
  * 友好的错误提示映射
@@ -26,11 +33,11 @@ function getErrorMessage(error: { message: string }, mode: Mode): string {
     const msg = error.message.toLowerCase()
 
     if (mode === 'login') {
-        if (msg.includes('invalid login credentials') || msg.includes('email not confirmed')) {
-            return '邮箱或密码错误，请检查后重试'
-        }
         if (msg.includes('email not confirmed')) {
             return '请先验证您的邮箱'
+        }
+        if (msg.includes('invalid login credentials')) {
+            return '邮箱或密码错误，请检查后重试'
         }
         if (msg.includes('too many requests')) {
             return '请求过于频繁，请稍后再试'
@@ -47,6 +54,12 @@ function getErrorMessage(error: { message: string }, mode: Mode): string {
         if (msg.includes('invalid email')) {
             return '请输入有效的邮箱地址'
         }
+        if (msg.includes('captcha')) {
+            return '人机验证失败，请重新完成验证'
+        }
+        if (msg.includes('too many requests') || msg.includes('rate limit')) {
+            return '注册请求过于频繁，请稍后再试'
+        }
     }
 
     // 网络错误
@@ -58,11 +71,38 @@ function getErrorMessage(error: { message: string }, mode: Mode): string {
     return error.message
 }
 
+function getPhoneErrorMessage(error: { message: string }, mode: Mode): string {
+    const msg = error.message.toLowerCase()
+    if (msg.includes('otp') && (msg.includes('expired') || msg.includes('invalid'))) {
+        return '验证码错误或已过期，请重新获取'
+    }
+    if (msg.includes('signup') || msg.includes('user not found')) {
+        return mode === 'login'
+            ? '这个手机号尚未注册，请切换到手机号注册'
+            : '手机号注册暂时不可用，请稍后再试'
+    }
+    if (msg.includes('rate') || msg.includes('too many')) {
+        return '请求过于频繁，请稍后再试'
+    }
+    if (msg.includes('phone provider') || msg.includes('unsupported phone')) {
+        return '手机号登录正在准备中，请暂时使用邮箱登录'
+    }
+    if (msg.includes('network') || msg.includes('fetch') || msg.includes('connection')) {
+        return '网络连接失败，请检查您的网络'
+    }
+    return error.message
+}
+
 export default function LoginPage() {
     const [mode, setMode] = useState<Mode>('login')
+    const [loginMethod, setLoginMethod] = useState<LoginMethod>('email')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [name, setName] = useState('')
+    const [phone, setPhone] = useState('')
+    const [otp, setOtp] = useState('')
+    const [phoneOtpSent, setPhoneOtpSent] = useState(false)
+    const [resendSeconds, setResendSeconds] = useState(0)
     const [isLoading, setIsLoading] = useState(false)
     const [privacyAccepted, setPrivacyAccepted] = useState(true)
     const [dataCollectionAccepted, setDataCollectionAccepted] = useState(true)
@@ -71,6 +111,17 @@ export default function LoginPage() {
     const router = useRouter()
     const supabase = useMemo(() => createClient(), [])
     const [nextPath, setNextPath] = useState('/')
+    const phoneAuthEnabled = process.env.NEXT_PUBLIC_PHONE_AUTH_ENABLED === '1'
+
+    useEffect(() => {
+        if (resendSeconds <= 0) {
+            return
+        }
+        const timer = window.setInterval(() => {
+            setResendSeconds((seconds) => Math.max(0, seconds - 1))
+        }, 1000)
+        return () => window.clearInterval(timer)
+    }, [resendSeconds])
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -193,10 +244,121 @@ export default function LoginPage() {
         setIsLoading(false)
     }
 
-    const handleSubmit = mode === 'login' ? handleLogin : handleRegister
+    const requestPhoneOtp = async () => {
+        if (!ensureLegalConsent()) {
+            return
+        }
+
+        let normalizedPhone: string
+        try {
+            normalizedPhone = normalizeMainlandPhone(phone)
+        } catch (error: unknown) {
+            toast({
+                variant: 'destructive',
+                title: '手机号有误',
+                description: error instanceof Error ? error.message : '请输入正确的手机号',
+            })
+            return
+        }
+
+        setIsLoading(true)
+        const { error } = await supabase.auth.signInWithOtp({
+            phone: normalizedPhone,
+            options: {
+                shouldCreateUser: shouldCreatePhoneUser(mode),
+                data: mode === 'register' && name.trim()
+                    ? { full_name: name.trim() }
+                    : undefined,
+            },
+        })
+        setIsLoading(false)
+
+        if (error) {
+            toast({
+                variant: 'destructive',
+                title: '验证码发送失败',
+                description: getPhoneErrorMessage(error, mode),
+            })
+            return
+        }
+
+        setPhoneOtpSent(true)
+        setResendSeconds(60)
+        toast({
+            title: '验证码已发送',
+            description: `请查看 ${displayMainlandPhone(normalizedPhone)} 收到的短信`,
+        })
+    }
+
+    const handlePhoneSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!phoneOtpSent) {
+            await requestPhoneOtp()
+            return
+        }
+        if (!ensureLegalConsent()) {
+            return
+        }
+
+        let normalizedPhone: string
+        try {
+            normalizedPhone = normalizeMainlandPhone(phone)
+        } catch (error: unknown) {
+            toast({
+                variant: 'destructive',
+                title: '手机号有误',
+                description: error instanceof Error ? error.message : '请输入正确的手机号',
+            })
+            return
+        }
+        if (!/^\d{6}$/.test(otp)) {
+            toast({
+                variant: 'destructive',
+                title: '验证码有误',
+                description: '请输入短信中的 6 位验证码',
+            })
+            return
+        }
+
+        setIsLoading(true)
+        const consentSnapshot = buildLegalConsentSnapshot()
+        const { error } = await supabase.auth.verifyOtp({
+            phone: normalizedPhone,
+            token: otp,
+            type: 'sms',
+        })
+
+        if (error) {
+            toast({
+                variant: 'destructive',
+                title: mode === 'register' ? '注册失败' : '登录失败',
+                description: getPhoneErrorMessage(error, mode),
+            })
+            setIsLoading(false)
+            return
+        }
+
+        persistLocalLegalConsent(consentSnapshot)
+        void supabase.auth.updateUser({
+            data: {
+                ...(mode === 'register' && name.trim() ? { full_name: name.trim() } : {}),
+                ...buildLegalConsentUserData(consentSnapshot),
+            },
+        }).catch((updateError) => {
+            console.warn('[login] updateUser skipped after phone sign-in:', updateError)
+        })
+        await getFreshSession()
+        window.location.replace(nextPath)
+    }
+
+    const handleSubmit = loginMethod === 'phone'
+        ? handlePhoneSubmit
+        : mode === 'register'
+            ? handleRegister
+            : handleLogin
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.14),_transparent_36%),linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_54%,_#f8f7f4_100%)] p-4">
+        <div className="flex min-h-dvh items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.14),_transparent_36%),linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_54%,_#f8f7f4_100%)] p-4">
             <Card className="w-full max-w-md border border-amber-100 bg-white shadow-[0_24px_80px_rgba(120,53,15,0.10)]">
                 <CardHeader className="space-y-1">
                     <div className="flex justify-center mb-4">
@@ -215,6 +377,26 @@ export default function LoginPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
+                    {phoneAuthEnabled ? (
+                        <Tabs
+                            value={loginMethod}
+                            onValueChange={(value) => {
+                                setLoginMethod(value as LoginMethod)
+                                setPhoneOtpSent(false)
+                                setOtp('')
+                            }}
+                            className="mb-5"
+                        >
+                            <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-stone-100 p-1">
+                                <TabsTrigger value="email" className="h-9 rounded-lg">
+                                    {mode === 'login' ? '邮箱登录' : '邮箱注册'}
+                                </TabsTrigger>
+                                <TabsTrigger value="phone" className="h-9 rounded-lg">
+                                    {mode === 'login' ? '手机登录' : '手机注册'}
+                                </TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    ) : null}
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {mode === 'register' && (
                             <div className="space-y-2">
@@ -231,37 +413,107 @@ export default function LoginPage() {
                                 </div>
                             </div>
                         )}
-                        <div className="space-y-2">
-                            <Label htmlFor="email">邮箱地址</Label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="name@example.com"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="pl-9 h-11"
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="password">密码</Label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    placeholder="••••••••"
-                                    required
-                                    minLength={6}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="pl-9 h-11"
-                                />
-                            </div>
-                        </div>
+                        {loginMethod === 'email' ? (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">邮箱地址</Label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            autoComplete="email"
+                                            placeholder="name@example.com"
+                                            required
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            className="pl-9 h-11"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="password">密码</Label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                                            placeholder="••••••••"
+                                            required
+                                            minLength={6}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="pl-9 h-11"
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="phone">中国大陆手机号</Label>
+                                    <div className="relative">
+                                        <Smartphone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                        <Input
+                                            id="phone"
+                                            type="tel"
+                                            inputMode="tel"
+                                            autoComplete="tel"
+                                            placeholder="138 1234 5678"
+                                            required
+                                            disabled={phoneOtpSent}
+                                            value={phone}
+                                            onChange={(e) => setPhone(e.target.value)}
+                                            className="pl-9 h-11"
+                                        />
+                                    </div>
+                                </div>
+                                {phoneOtpSent ? (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <Label htmlFor="otp">6 位验证码</Label>
+                                            <button
+                                                type="button"
+                                                className="text-xs font-medium text-amber-700 hover:text-amber-800 disabled:text-stone-400"
+                                                disabled={isLoading || resendSeconds > 0}
+                                                onClick={() => void requestPhoneOtp()}
+                                            >
+                                                {resendSeconds > 0 ? `${resendSeconds} 秒后重发` : '重新发送'}
+                                            </button>
+                                        </div>
+                                        <Input
+                                            id="otp"
+                                            inputMode="numeric"
+                                            autoComplete="one-time-code"
+                                            pattern="[0-9]{6}"
+                                            maxLength={6}
+                                            placeholder="请输入短信验证码"
+                                            required
+                                            value={otp}
+                                            onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                                            className="h-11 text-center text-lg tracking-[0.3em]"
+                                        />
+                                        <button
+                                            type="button"
+                                            className="text-xs text-stone-500 underline underline-offset-4 hover:text-stone-700"
+                                            onClick={() => {
+                                                setPhoneOtpSent(false)
+                                                setOtp('')
+                                            }}
+                                        >
+                                            修改手机号
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                                        {mode === 'login'
+                                            ? '使用已经注册的手机号登录；未注册号码不会自动创建账号。'
+                                            : '验证手机号后将创建新的 VoxFlame 账号。'}
+                                    </p>
+                                )}
+                            </>
+                        )}
                         <div className="rounded-3xl border border-stone-200 bg-stone-50 px-4 py-4">
                             <div className="flex items-start gap-3">
                                 <input
@@ -310,11 +562,11 @@ export default function LoginPage() {
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     处理中...
                                 </>
-                            ) : mode === 'login' ? (
-                                '登录'
-                            ) : (
-                                '注册'
-                            )}
+                            ) : loginMethod === 'phone' ? (
+                                phoneOtpSent
+                                    ? mode === 'register' ? '验证并注册' : '验证并登录'
+                                    : '发送验证码'
+                            ) : mode === 'login' ? '登录' : '注册'}
                         </Button>
                     </form>
                 </CardContent>
@@ -323,7 +575,13 @@ export default function LoginPage() {
                         {mode === 'login' ? '还没有账户？' : '已有账户？'}
                         <button
                             type="button"
-                            onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                            onClick={() => {
+                                const nextMode = mode === 'login' ? 'register' : 'login'
+                                setMode(nextMode)
+                                setLoginMethod('email')
+                                setPhoneOtpSent(false)
+                                setOtp('')
+                            }}
                             className="ml-1 text-amber-600 hover:text-amber-700 font-medium underline"
                         >
                             {mode === 'login' ? '立即注册' : '直接登录'}

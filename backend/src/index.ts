@@ -18,6 +18,8 @@ import rtcRouter from './controllers/rtc.controller'
 import { memoryController } from './controllers/memory.controller'
 import { uploadRouter } from './controllers/upload.controller'
 import { phrasesController } from './controllers/phrases.controller'
+import { mobileDiagnosticsRouter } from './controllers/mobile-diagnostics.controller'
+import { handleSupabaseSendSmsHook } from './controllers/auth-hook.controller'
 import { errorHandler } from './middlewares/error.middleware'
 import { authMiddleware, validateUserId } from './middlewares/auth.middleware'
 import { TrainingReportMaintenanceService } from './services/training-report-maintenance.service'
@@ -64,6 +66,13 @@ app.use(cors({
     callback(new Error('Origin is not allowed by CORS'))
   },
 }))
+
+// Supabase Send SMS Hook must receive the exact raw body used for Standard Webhooks signing.
+app.post(
+  '/api/auth/hooks/send-sms',
+  express.raw({ type: 'application/json', limit: '64kb' }),
+  handleSupabaseSendSmsHook,
+)
 app.use(express.json({ limit: process.env.VOXFLAME_JSON_BODY_LIMIT || '1mb' }))
 
 // 健康检查
@@ -123,6 +132,9 @@ app.use('/api/phrases', phrasesRouter)
 
 // Upload API 路由 (OSS 签名)
 app.use('/api/upload', authMiddleware, uploadRouter)
+
+// Mobile release diagnostics: authenticated, strictly allow-listed, and text/audio-free.
+app.use('/api/mobile/diagnostics', authMiddleware, mobileDiagnosticsRouter)
 
 // Webhook 端点 - 预留给后续外部异步回调；生产默认关闭，显式启用后要求共享密钥。
 app.post('/api/webhook/conversation', (req, res) => {
