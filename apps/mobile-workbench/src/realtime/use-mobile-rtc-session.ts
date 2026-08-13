@@ -16,6 +16,7 @@ import type {
   MobileWorkbenchRtcSessionIntent,
   MobileWorkbenchRtcSessionResponse,
 } from '../contracts/workbench-contracts'
+import { toMobileProductMessage } from '../ui/product-message'
 
 export type MobileRtcSessionStatus =
   | 'idle'
@@ -33,14 +34,6 @@ export interface MobileRtcSessionState {
   ping(): Promise<boolean>
   stop(): Promise<boolean>
   clear(): void
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message
-  }
-
-  return fallback
 }
 
 export function useMobileRtcSession(params: {
@@ -61,13 +54,13 @@ export function useMobileRtcSession(params: {
 
     if (!params.apiBaseUrl) {
       setStatus('error')
-      setErrorMessage('缺少后端 API 配置')
+      setErrorMessage('服务暂不可用，请稍后再试。')
       return null
     }
 
     if (!params.enabled) {
       setStatus('error')
-      setErrorMessage('请先登录再开始沟通会话')
+      setErrorMessage('请先登录。')
       return null
     }
 
@@ -84,7 +77,7 @@ export function useMobileRtcSession(params: {
     } catch (error) {
       setSession(null)
       setStatus('error')
-      setErrorMessage(getErrorMessage(error, 'mobile_rtc_session_start_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'realtime'))
       return null
     }
   }, [params.apiBaseUrl, params.enabled, params.tokenProvider])
@@ -101,7 +94,7 @@ export function useMobileRtcSession(params: {
       })
       return true
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'mobile_rtc_session_ping_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'realtime'))
       return false
     }
   }, [params.apiBaseUrl, params.tokenProvider, session])
@@ -114,7 +107,7 @@ export function useMobileRtcSession(params: {
 
     if (!params.apiBaseUrl) {
       setStatus('error')
-      setErrorMessage('缺少后端 API 配置')
+      setErrorMessage('服务暂不可用，请稍后再试。')
       return false
     }
 
@@ -131,7 +124,7 @@ export function useMobileRtcSession(params: {
       return true
     } catch (error) {
       setStatus('error')
-      setErrorMessage(getErrorMessage(error, 'mobile_rtc_session_stop_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'realtime'))
       return false
     }
   }, [params.apiBaseUrl, params.tokenProvider, session])

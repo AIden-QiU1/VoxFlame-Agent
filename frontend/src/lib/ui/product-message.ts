@@ -83,6 +83,10 @@ export function toProductMessage(
     return '该账号已注册，请直接登录。'
   }
 
+  if (context === 'phone' && (diagnostic.includes('already') || diagnostic.includes('duplicate'))) {
+    return '该手机号已绑定其他账号。'
+  }
+
   if (diagnostic.includes('invalid email')) {
     return '邮箱格式不正确。'
   }

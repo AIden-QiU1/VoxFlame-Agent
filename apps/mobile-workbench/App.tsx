@@ -39,6 +39,7 @@ import { useLiveKitRoomConnection } from './src/realtime/use-livekit-room-connec
 import { buildMobileWorkbenchRtcSessionIntent } from './src/realtime/rtc-session-intent'
 import { useMobileRtcSession } from './src/realtime/use-mobile-rtc-session'
 import { useMobileWorkspaceSnapshot } from './src/workspace/use-mobile-workspace'
+import { toMobileProductMessage } from './src/ui/product-message'
 
 const LOCAL_PREPARED_LINES = [
   '请等我说完，我会用手机把重点给你看。',
@@ -80,47 +81,7 @@ function friendlyError(message: string | null): string | null {
   if (!message) {
     return null
   }
-
-  if (message.includes('401') || message.includes('auth_required')) {
-    return '登录已过期，请重新登录。'
-  }
-  if (message.includes('permission') || message.includes('麦克风')) {
-    return '麦克风没有准备好，请到系统设置中允许访问。'
-  }
-  if (message.includes('network') || message.includes('fetch')) {
-    return '网络连接失败，请检查网络后重试。'
-  }
-  if (message.includes('signup') || message.includes('user not found')) {
-    return '这个手机号尚未注册，请切换到手机号注册。'
-  }
-  if (
-    message.includes('signatureincorrectorunapproved')
-    || message.includes('sms provider')
-    || message.includes('unable to send verification code')
-    || message.includes('provider rejected')
-  ) {
-    return '短信服务暂时不可用，请稍后再试；如果持续失败，请联系管理员。'
-  }
-  if (message.includes('hook_not_configured') || message.includes('sms service is not configured')) {
-    return '短信服务尚未完成配置，请联系管理员。'
-  }
-  if (message.includes('otp') && (message.includes('invalid') || message.includes('expired'))) {
-    return '验证码错误或已过期，请重新获取。'
-  }
-  if (message.includes('rate') || message.includes('too many')) {
-    return '请求过于频繁，请稍后再试。'
-  }
-  if (message.includes('phone provider') || message.includes('unsupported phone')) {
-    return '手机号登录正在准备中，请暂时使用邮箱登录。'
-  }
-  if (message.includes('identity_mismatch')) {
-    return '账号身份校验失败，请退出后重新登录。'
-  }
-  if (message.includes('config') || message.includes('API')) {
-    return 'App 尚未连接到服务，请检查构建环境配置。'
-  }
-
-  return message.replaceAll('_', ' ')
+  return toMobileProductMessage(message)
 }
 
 function connectionLabel(status: string): string {
@@ -498,8 +459,8 @@ function LoginScreen({
     let normalizedPhone: string
     try {
       normalizedPhone = normalizeMainlandPhone(phone)
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : '请输入正确的手机号。')
+    } catch {
+      setLocalError('手机号格式不正确。')
       return
     }
 
@@ -518,8 +479,8 @@ function LoginScreen({
     let normalizedPhone: string
     try {
       normalizedPhone = normalizeMainlandPhone(phone)
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : '请输入正确的手机号。')
+    } catch {
+      setLocalError('手机号格式不正确。')
       return
     }
     if (!/^\d{6}$/.test(otp)) {
@@ -669,7 +630,7 @@ function LoginScreen({
             <InlineMessage tone="danger" text={localError ?? friendlyError(auth.errorMessage) ?? ''} />
           ) : null}
           {!apiConfigured || auth.status === 'config_missing' ? (
-            <InlineMessage tone="danger" text="这个测试包尚未配置服务地址，请重新构建。" />
+            <InlineMessage tone="danger" text="服务暂不可用，请稍后再试。" />
           ) : null}
           <PrimaryButton
             disabled={isBusy || !apiConfigured || auth.status === 'config_missing'}
@@ -1037,8 +998,8 @@ function AccountScreen({
     let normalizedPhone: string
     try {
       normalizedPhone = normalizeMainlandPhone(phone)
-    } catch (error) {
-      setBindingMessage(error instanceof Error ? error.message : '请输入正确的手机号。')
+    } catch {
+      setBindingMessage('手机号格式不正确。')
       return
     }
 
@@ -1053,8 +1014,8 @@ function AccountScreen({
     let normalizedPhone: string
     try {
       normalizedPhone = normalizeMainlandPhone(phone)
-    } catch (error) {
-      setBindingMessage(error instanceof Error ? error.message : '请输入正确的手机号。')
+    } catch {
+      setBindingMessage('手机号格式不正确。')
       return
     }
     if (!/^\d{6}$/.test(otp)) {
@@ -1179,8 +1140,8 @@ function AccountScreen({
           value={`${queueCount} 条`}
         />
         <SettingRow
-          label="服务连接"
-          value={apiConfigured ? '正常' : '未配置'}
+          label="在线服务"
+          value={apiConfigured ? '可用' : '暂不可用'}
         />
         <SettingRow
           action="发送"

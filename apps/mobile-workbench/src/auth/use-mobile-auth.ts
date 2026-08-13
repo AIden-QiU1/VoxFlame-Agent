@@ -18,6 +18,7 @@ import {
   rememberLastAuthEmail,
 } from './mobile-auth-hint-storage'
 import { createMobileSupabaseClient } from './mobile-supabase-client'
+import { toMobileProductMessage } from '../ui/product-message'
 
 export type MobileAuthStatus =
   | 'config_missing'
@@ -48,14 +49,6 @@ export interface MobileAuthState {
   requestPhoneBindingCode(phone: string): Promise<boolean>
   verifyPhoneBindingCode(params: { phone: string; otp: string }): Promise<boolean>
   signOut(): Promise<void>
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message
-  }
-
-  return fallback
 }
 
 export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
@@ -103,7 +96,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
       }
 
       if (error) {
-        setErrorMessage(error.message)
+        setErrorMessage(toMobileProductMessage(error, 'auth'))
         setStatus('error')
         return
       }
@@ -132,7 +125,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
   ): Promise<boolean> => {
     if (!client) {
       setStatus('config_missing')
-      setErrorMessage('missing_mobile_supabase_config')
+      setErrorMessage('服务暂不可用，请稍后再试。')
       return false
     }
 
@@ -140,7 +133,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
     const password = params.password
     if (!email || !password) {
       setStatus('signed_out')
-      setErrorMessage('email_and_password_required')
+      setErrorMessage('请输入邮箱和密码。')
       return false
     }
 
@@ -155,7 +148,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
 
       if (error) {
         setStatus('signed_out')
-        setErrorMessage(error.message)
+        setErrorMessage(toMobileProductMessage(error, 'auth'))
         return false
       }
 
@@ -167,7 +160,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
       return Boolean(data.session)
     } catch (error) {
       setStatus('error')
-      setErrorMessage(getErrorMessage(error, 'mobile_sign_in_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'auth'))
       return false
     }
   }, [client])
@@ -178,7 +171,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
   ): Promise<boolean> => {
     if (!client) {
       setStatus('config_missing')
-      setErrorMessage('missing_mobile_supabase_config')
+      setErrorMessage('服务暂不可用，请稍后再试。')
       return false
     }
 
@@ -191,13 +184,13 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
       })
       setStatus('signed_out')
       if (error) {
-        setErrorMessage(error.message)
+        setErrorMessage(toMobileProductMessage(error, 'phone'))
         return false
       }
       return true
     } catch (error) {
       setStatus('error')
-      setErrorMessage(getErrorMessage(error, 'mobile_phone_code_request_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'phone'))
       return false
     }
   }, [client])
@@ -207,7 +200,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
   ): Promise<boolean> => {
     if (!client) {
       setStatus('config_missing')
-      setErrorMessage('missing_mobile_supabase_config')
+      setErrorMessage('服务暂不可用，请稍后再试。')
       return false
     }
 
@@ -221,7 +214,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
       })
       if (error || !data.session || !data.user) {
         setStatus('signed_out')
-        setErrorMessage(error?.message || 'mobile_phone_verification_failed')
+        setErrorMessage(toMobileProductMessage(error, 'phone'))
         return false
       }
 
@@ -231,14 +224,14 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
       return true
     } catch (error) {
       setStatus('error')
-      setErrorMessage(getErrorMessage(error, 'mobile_phone_verification_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'phone'))
       return false
     }
   }, [client])
 
   const requestPhoneBindingCode = useCallback(async (phone: string): Promise<boolean> => {
     if (!client || !user) {
-      setErrorMessage('auth_required')
+      setErrorMessage('请先登录。')
       return false
     }
 
@@ -248,13 +241,13 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
       const { error } = await client.auth.updateUser({ phone })
       setStatus('signed_in')
       if (error) {
-        setErrorMessage(error.message)
+        setErrorMessage(toMobileProductMessage(error, 'phone'))
         return false
       }
       return true
     } catch (error) {
       setStatus('signed_in')
-      setErrorMessage(getErrorMessage(error, 'mobile_phone_binding_request_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'phone'))
       return false
     }
   }, [client, user])
@@ -263,7 +256,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
     params: { phone: string; otp: string },
   ): Promise<boolean> => {
     if (!client || !user) {
-      setErrorMessage('auth_required')
+      setErrorMessage('请先登录。')
       return false
     }
 
@@ -278,14 +271,14 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
       })
       if (error) {
         setStatus('signed_in')
-        setErrorMessage(error.message)
+        setErrorMessage(toMobileProductMessage(error, 'phone'))
         return false
       }
 
       const { data, error: refreshError } = await client.auth.getUser()
       if (refreshError || !data.user || data.user.id !== originalUserId) {
         setStatus('signed_in')
-        setErrorMessage('mobile_phone_binding_identity_mismatch')
+        setErrorMessage('账号验证失败，请重新登录。')
         return false
       }
 
@@ -294,7 +287,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
       return true
     } catch (error) {
       setStatus('signed_in')
-      setErrorMessage(getErrorMessage(error, 'mobile_phone_binding_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'phone'))
       return false
     }
   }, [client, user])
@@ -317,7 +310,7 @@ export function useMobileAuth(config: MobileRuntimeConfig): MobileAuthState {
       setStatus('signed_out')
     } catch (error) {
       setStatus('error')
-      setErrorMessage(getErrorMessage(error, 'mobile_sign_out_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'auth'))
     }
   }, [client])
 

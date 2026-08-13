@@ -62,6 +62,16 @@ const sourceText = sourceFiles
   .map((file) => readFileSync(file, 'utf8'))
   .join('\n')
 
+const rawUserErrorPatterns = [
+  /set(?:ErrorMessage|LocalError|BindingMessage)\([^)]*\.message/,
+  /return\s+error\.message/,
+  /readiness\.blockers\.join/,
+]
+
+for (const pattern of rawUserErrorPatterns) {
+  assert(!pattern.test(sourceText), `raw user error pattern found: ${pattern}`)
+}
+
 assert(packageJson.name === '@voxflame/mobile-workbench', 'package name must stay scoped to mobile workbench')
 assert(packageJson.version === appJson.expo?.version, 'package and Expo versions must match')
 assert(packageJson.dependencies?.['@react-native-async-storage/async-storage'] === '2.2.0', 'AsyncStorage must stay on the Expo SDK 55 compatible version')

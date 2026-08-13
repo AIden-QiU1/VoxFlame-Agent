@@ -16,6 +16,7 @@ import {
 } from 'livekit-client'
 
 import type { MobileWorkbenchRtcSessionResponse } from '../contracts/workbench-contracts'
+import { toMobileProductMessage } from '../ui/product-message'
 
 export type MobileLiveKitConnectionStatus =
   | 'idle'
@@ -36,14 +37,6 @@ export interface MobileLiveKitRoomConnectionState {
   canConnect: boolean
   connect(session: MobileWorkbenchRtcSessionResponse): Promise<boolean>
   disconnect(): Promise<void>
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message
-  }
-
-  return fallback
 }
 
 function mapConnectionState(state: ConnectionState): MobileLiveKitConnectionStatus {
@@ -126,7 +119,7 @@ export function useLiveKitRoomConnection(): MobileLiveKitRoomConnectionState {
 
     if (!session.readiness.canStart) {
       setStatus('error')
-      setErrorMessage(session.readiness.blockers.join(' / ') || 'rtc_session_not_ready')
+      setErrorMessage('连接失败，请重试。')
       return false
     }
 
@@ -175,7 +168,7 @@ export function useLiveKitRoomConnection(): MobileLiveKitRoomConnectionState {
       setStatus('connected')
       return true
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'mobile_livekit_connect_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'realtime'))
       setStatus('error')
       try {
         await room.disconnect()

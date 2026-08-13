@@ -30,6 +30,7 @@ import {
 } from './native-recorder-storage'
 import { assessMobileRecordingQuality } from './recording-quality'
 import { summarizeRecorderQueue } from './recorder-queue-policy'
+import { toMobileProductMessage } from '../ui/product-message'
 
 export type NativeRecorderPermissionStatus =
   | 'unknown'
@@ -64,14 +65,6 @@ function createRecordingId(): string {
   const timestamp = Date.now().toString(36)
   const randomSuffix = Math.random().toString(36).slice(2, 10)
   return `mobile-rec-${timestamp}-${randomSuffix}`
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message
-  }
-
-  return fallback
 }
 
 function normalizePermissionStatus(status: string): NativeRecorderPermissionStatus {
@@ -131,7 +124,7 @@ export function useNativeRecorderQueue(params: {
       setPermissionStatus(normalizePermissionStatus(requestedPermission.status))
       return requestedPermission.granted
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'microphone_permission_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'microphone'))
       return false
     }
   }, [])
@@ -140,13 +133,13 @@ export function useNativeRecorderQueue(params: {
     setErrorMessage(null)
 
     if (!params.contributorId) {
-      setErrorMessage('请先登录再录制练习样本')
+      setErrorMessage('请先登录。')
       return
     }
 
     const hasPermission = await requestPermission()
     if (!hasPermission) {
-      setErrorMessage('麦克风权限未开启')
+      setErrorMessage('请允许麦克风权限后重试。')
       return
     }
 
@@ -160,7 +153,7 @@ export function useNativeRecorderQueue(params: {
       setRecordingStartedAt(new Date().toISOString())
       setRecordingText(text.trim() || '移动端练习样本')
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'recording_start_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'recording'))
     }
   }, [params.contributorId, recorder, requestPermission])
 
@@ -168,7 +161,7 @@ export function useNativeRecorderQueue(params: {
     setErrorMessage(null)
 
     if (!params.contributorId) {
-      setErrorMessage('请先登录再保存录音')
+      setErrorMessage('请先登录。')
       return null
     }
 
@@ -238,7 +231,7 @@ export function useNativeRecorderQueue(params: {
       setRecordingText('')
       return item
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'recording_stop_failed'))
+      setErrorMessage(toMobileProductMessage(error, 'recording'))
       return null
     }
   }, [
@@ -288,7 +281,7 @@ export function useNativeRecorderQueue(params: {
     setLastUploadReceipt(null)
 
     if (!params.apiBaseUrl) {
-      setErrorMessage('缺少后端 API 配置')
+      setErrorMessage('服务暂不可用，请稍后再试。')
       return null
     }
 
@@ -298,7 +291,7 @@ export function useNativeRecorderQueue(params: {
     ))
 
     if (!item) {
-      setErrorMessage('未找到这条本地录音')
+      setErrorMessage('未找到这条录音。')
       return null
     }
 
@@ -324,7 +317,7 @@ export function useNativeRecorderQueue(params: {
       setLastUploadReceipt(receipt)
       return receipt
     } catch (error) {
-      const message = getErrorMessage(error, 'mobile_upload_failed')
+      const message = toMobileProductMessage(error, 'upload')
       setItems(await updateNativeRecorderQueueItemStatus(
         recordingId,
         'failed',

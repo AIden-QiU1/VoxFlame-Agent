@@ -12,6 +12,7 @@ import {
   type MobileWorkspaceReadModel,
   type MobileWorkspaceSnapshotContract,
 } from '../contracts/workspace-read-model'
+import { toMobileProductMessage } from '../ui/product-message'
 
 export type MobileWorkspaceStatus =
   | 'config_missing'
@@ -36,14 +37,6 @@ export interface UseMobileWorkspaceSnapshotOptions {
   enabled: boolean
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message
-  }
-
-  return fallback
-}
-
 export function useMobileWorkspaceSnapshot(
   options: UseMobileWorkspaceSnapshotOptions,
 ): MobileWorkspaceState {
@@ -63,7 +56,7 @@ export function useMobileWorkspaceSnapshot(
     if (!options.apiBaseUrl) {
       setSnapshot(null)
       setStatus('config_missing')
-      setErrorMessage('missing_EXPO_PUBLIC_API_BASE_URL')
+      setErrorMessage('服务暂不可用，请稍后再试。')
       return undefined
     }
 
@@ -97,7 +90,7 @@ export function useMobileWorkspaceSnapshot(
 
         setSnapshot(null)
         setStatus('error')
-        setErrorMessage(getErrorMessage(error, 'workspace_snapshot_failed'))
+        setErrorMessage(toMobileProductMessage(error, 'workspace'))
       })
 
     return () => {

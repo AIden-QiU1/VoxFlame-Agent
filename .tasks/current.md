@@ -19,6 +19,14 @@
 
 ## 最新收口
 
+0. 2026-08-13 Web 与 Mobile 前端用户提示已统一收口为简短产品文案
+   - Web 与 Mobile 分别建立受控 `product-message` 转换层，后端、第三方 SDK、实时消息和异常对象的原始 `error / message / reason / code` 不再直接进入用户界面；Mobile 不跨目录导入 Next 模块
+   - 登录 / 注册 / 短信 / 账号绑定 / 连接 / 麦克风 / 训练录音 / 上传 / 短语 / 记忆快照均迁移到白名单中文提示；默认一句话，只说明问题和下一步
+   - 新增页面级与全局错误页；手机端沟通错误提示避开底部浏览器工具栏和安全区；准备状态页移除 Surface / Strategy / Capability 等技术细节
+   - Mobile 登录、沟通连接、工作区同步、录音队列和上传均经过统一转换；服务异常不再显示测试包、构建、配置或服务地址等工程信息
+   - `scripts/check_frontend_product_messages.sh` 已覆盖 Web 与 Mobile 并接入 `frontend npm test`，Mobile 自检也阻止原始信息回流
+   - 已验证：Web product-message 回归 5 项、全量 71 项、`npx tsc --noEmit`、Next production build、Playwright 390×844 登录错误 smoke；Mobile check、TypeScript、Android 与 iOS production export
+
 0. 2026-08-13 Android 官网下载与 App 包发布已收口为本站稳定直链和单一自动发布事务
    - 根因确认：生产下载页仍注入 Expo build 详情页 URL，Caddy 虽已有 `/download/android` 规则，但旧容器没有挂载 `releases/android`；页面文案“本站直下”与真实发布链漂移
    - 已生成并发布 Android `0.1.3`（build `4`），EAS build `b1874d89-afe4-4238-acf4-cc13c3b0080f`，本站 APK 为 `114244393` bytes，SHA-256 `b24368571a2592fd57a539d2b894e191cf140df7b67200dca646ceebee1c7c05`

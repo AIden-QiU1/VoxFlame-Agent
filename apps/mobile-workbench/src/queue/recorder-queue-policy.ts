@@ -47,7 +47,7 @@ export function summarizeRecorderQueue(
     failed,
     uploaded,
     nextAction: failed > 0
-      ? '查看失败原因'
+      ? '稍后重试上传'
       : uploadPending > 0 || localOnly > 0
         ? '网络恢复后补传'
         : '清理已同步缓存',
