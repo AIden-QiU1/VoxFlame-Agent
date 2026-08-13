@@ -7,6 +7,7 @@ import {
   applyRtcError,
   applyVoiceProfileSync,
 } from './session-state'
+import { toProductMessage } from '@/lib/ui/product-message'
 import type {
   ConversationMessage,
   RtcAgentState,
@@ -240,7 +241,7 @@ export function reduceRtcEnvelope(
   }
 
   if (message.type === 'error' || message.error) {
-    return applyRtcError(prev, message.error || message.message || 'RTC 会话出现错误')
+    return applyRtcError(prev, toProductMessage(message, 'realtime'))
   }
 
   if (message.type === 'transcript' && message.text) {

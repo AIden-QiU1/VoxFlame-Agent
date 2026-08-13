@@ -23,7 +23,7 @@ export function createSessionTransportEventHandlers(
         setState((prev) => ({
           ...prev,
           isConnected: false,
-          error: event.reason || 'RTM 控制通道已断开',
+          error: '连接已断开，请重新连接。',
         }))
       }
     },

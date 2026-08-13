@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-08-05
+> 最后更新: 2026-08-13
 
 ## 当前主线
 
@@ -18,6 +18,22 @@
   - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-08-13 Android 官网下载与 App 包发布已收口为本站稳定直链和单一自动发布事务
+   - 根因确认：生产下载页仍注入 Expo build 详情页 URL，Caddy 虽已有 `/download/android` 规则，但旧容器没有挂载 `releases/android`；页面文案“本站直下”与真实发布链漂移
+   - 已生成并发布 Android `0.1.3`（build `4`），EAS build `b1874d89-afe4-4238-acf4-cc13c3b0080f`，本站 APK 为 `114244393` bytes，SHA-256 `b24368571a2592fd57a539d2b894e191cf140df7b67200dca646ceebee1c7c05`
+   - `https://voxember.com/download` 的 Android 按钮固定使用同域 `/download/android`，不再暴露或跳转 Expo；线上 APK 响应为 `200/206 + application/vnd.android.package-archive + attachment`，并禁用缓存
+   - 新增 `npm run release:android:preview`：校验 Mobile、按最新 EAS build 递增版本、云构建、下载校验、原子替换、保留上一版、仅重建 Caddy、验证公网直链；`npm run sync:android:latest` 可在发布后半程中断时只同步最新成品，不重复云构建
+   - App 包不会随源码保存自动变化；当前正确触发点是 Mobile 改动通过检查并进入 `main` 后执行上述发布事务。已安装 App 的 JS/资源 OTA 仍未启用，原生依赖、权限和 Expo SDK 变化始终必须重建 APK
+   - 已验证：Mobile check/typecheck、EAS build、APK ZIP、版本 metadata、Caddy release mount、frontend 单服务生产构建/health、官网 HTML 无 Expo URL、APK Range 下载
+
+0. 2026-08-12 腾讯云短信签名已完成报备，短信登录进入真实发送与端到端验收阶段
+   - 签名管理已确认：ID `713027`，签名内容为“上海生声不息科技有限公司”，用途为验证码/通知，状态可用（正常），报备成功；营销用途仍未报备，不用于登录短信
+   - 生产 backend 已保持 `PHONE_AUTH_ENABLED=1`、`TENCENT_SMS_DRY_RUN=0`，签名 `上海生声不息科技有限公司`、模板 `2702800`、SDK AppID `1401169029` 与报备记录一致
+   - Web、Mobile 的手机号注册 / 登录仍使用 Supabase Phone Auth + HTTPS Send SMS Hook；注册 `shouldCreateUser=true`，登录 `false`，邮箱登录不受影响
+   - 已补齐 Web 登录、账号绑定和 Mobile 的腾讯云签名/供应商错误中文提示，避免把底层英文错误直接暴露给用户
+   - 已通过 backend SMS Hook 回归、backend build、frontend test/build、Mobile check/typecheck、AI docs harness
+   - 当前只需用负责人手机号完成一条真实注册短信、验证码确认、退出后再次手机登录，并在 Android 预览包做同样 smoke；本环境无法直接访问生产 DNS / Docker socket，部署与真机需在生产机/设备侧执行
 
 0. 2026-08-05 已完成沪浦网信安通〔2026〕267号正式整改报告与当日生产复测
    - 按通知附件 2 的三段式公文结构生成 A4 Word / PDF，法定代表人和网络安全主要负责人为邱生峰

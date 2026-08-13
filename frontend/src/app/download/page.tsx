@@ -8,7 +8,9 @@ import {
   Smartphone,
 } from 'lucide-react'
 
-const androidDownloadUrl = process.env.NEXT_PUBLIC_ANDROID_APP_DOWNLOAD_URL?.trim() || ''
+// Android releases always use the permanent first-party endpoint. Caddy owns
+// whether that endpoint serves an APK now or redirects to a store later.
+const androidDownloadUrl = '/download/android'
 const iosDownloadUrl = process.env.NEXT_PUBLIC_IOS_APP_DOWNLOAD_URL?.trim() || ''
 
 interface DownloadCardProps {

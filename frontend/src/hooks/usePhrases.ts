@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient, getValidToken } from '@/lib/supabase/client'
 import { config } from '@/lib/config'
+import { reportFrontendDiagnostic, toProductMessage } from '@/lib/ui/product-message'
 import type {
   QuickPhrase,
   CreatePhraseDTO,
@@ -52,7 +53,7 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
   const apiRequest = useCallback(async (
     endpoint: string,
     options: RequestInit = {}
-  ): Promise<any> => {
+  ): Promise<unknown> => {
     const token = await getValidToken()
     const url = `${config.api.baseUrl}${endpoint}`
 
@@ -71,8 +72,7 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: '请求失败' }))
-      throw new Error(error.error || error.message || '请求失败')
+      throw new Error(`phrases_request_${response.status}`)
     }
 
     return response.json()
@@ -97,7 +97,9 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
       }
 
       const categoryParam = category && category !== 'all' ? `?category=${category}` : ''
-      const data = await apiRequest(`/phrases/user/${currentUserId}${categoryParam}`)
+      const data = await apiRequest(`/phrases/user/${currentUserId}${categoryParam}`) as {
+        phrases?: QuickPhrase[]
+      }
 
       setState(prev => ({
         ...prev,
@@ -107,12 +109,12 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
         selectedCategory: category || 'all'
       }))
     } catch (error) {
-      console.error('Failed to load phrases:', error)
+      reportFrontendDiagnostic('phrases-load', error)
       setState(prev => ({
         ...prev,
         isLoading: false,
         requiresAuth: false,
-        error: error instanceof Error ? error.message : '加载失败'
+        error: toProductMessage(error, 'phrases')
       }))
     }
   }, [apiRequest, getCurrentUserId])
@@ -133,18 +135,18 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
           user_id: currentUserId,
           ...dto
         })
-      })
+      }) as QuickPhrase
 
       // 刷新列表
       await loadPhrases(state.selectedCategory)
 
       return data
     } catch (error) {
-      console.error('Failed to create phrase:', error)
+      reportFrontendDiagnostic('phrases-create', error)
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : '创建失败'
+        error: toProductMessage(error, 'phrases')
       }))
       return null
     }
@@ -161,7 +163,7 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
       const data = await apiRequest(`/phrases/${phraseId}`, {
         method: 'PUT',
         body: JSON.stringify(dto)
-      })
+      }) as QuickPhrase
 
       // 更新本地状态
       setState(prev => ({
@@ -174,11 +176,11 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
 
       return data
     } catch (error) {
-      console.error('Failed to update phrase:', error)
+      reportFrontendDiagnostic('phrases-update', error)
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : '更新失败'
+        error: toProductMessage(error, 'phrases')
       }))
       return null
     }
@@ -202,11 +204,11 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
 
       return true
     } catch (error) {
-      console.error('Failed to delete phrase:', error)
+      reportFrontendDiagnostic('phrases-delete', error)
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : '删除失败'
+        error: toProductMessage(error, 'phrases')
       }))
       return false
     }
@@ -271,11 +273,11 @@ export function usePhrases(options: UsePhrasesOptions = {}) {
 
       return true
     } catch (error) {
-      console.error('Failed to initialize presets:', error)
+      reportFrontendDiagnostic('phrases-initialize', error)
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : '初始化失败'
+        error: toProductMessage(error, 'phrases')
       }))
       return false
     }

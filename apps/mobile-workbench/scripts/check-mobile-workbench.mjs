@@ -42,6 +42,16 @@ const mobileConfigSource = readFileSync(
   path.join(appRoot, 'src/api/mobile-config.ts'),
   'utf8',
 )
+const androidReleaseScript = readFileSync(
+  path.join(repoRoot, 'scripts/release-android-preview.sh'),
+  'utf8',
+)
+const downloadPageSource = readFileSync(
+  path.join(repoRoot, 'frontend/src/app/download/page.tsx'),
+  'utf8',
+)
+const composeSource = readFileSync(path.join(repoRoot, 'docker-compose.yml'), 'utf8')
+const caddySource = readFileSync(path.join(repoRoot, 'infra/caddy/Caddyfile'), 'utf8')
 const sourceFiles = walkFiles(appRoot).filter((file) => (
   file.endsWith('.ts')
   || file.endsWith('.tsx')
@@ -68,6 +78,14 @@ assert(packageJson.scripts?.['eas:credentials:ios']?.endsWith('eas-cli@latest cr
 assert(packageJson.scripts?.['build:android:development']?.includes('--platform android'), 'android development build script is missing')
 assert(packageJson.scripts?.['build:ios:development']?.includes('--platform ios'), 'ios development build script is missing')
 assert(packageJson.scripts?.['build:android:preview']?.includes('--platform android'), 'android preview build script is missing')
+assert(packageJson.scripts?.['release:android:preview'] === 'bash ../../scripts/release-android-preview.sh', 'android website release script is missing')
+assert(packageJson.scripts?.['sync:android:latest'] === 'bash ../../scripts/release-android-preview.sh publish-latest', 'android website artifact recovery script is missing')
+assert(androidReleaseScript.includes('eas-cli@latest build'), 'android website release must run EAS Build')
+assert(androidReleaseScript.includes('VoxFlame-Android.apk'), 'android website release must publish the stable APK name')
+assert(androidReleaseScript.includes('VoxFlame-Android.previous.apk'), 'android website release must retain a rollback APK')
+assert(downloadPageSource.includes("const androidDownloadUrl = '/download/android'"), 'website Android download must use the permanent first-party URL')
+assert(composeSource.includes('./releases/android:/srv/releases/android:ro'), 'Caddy must mount the Android release directory')
+assert(caddySource.includes('handle /download/android'), 'Caddy must own the permanent Android download route')
 assert(packageJson.scripts?.['build:ios:preview']?.includes('--platform ios'), 'ios preview build script is missing')
 for (const [scriptName, scriptValue] of Object.entries(packageJson.scripts ?? {})) {
   if (

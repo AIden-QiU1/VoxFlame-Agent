@@ -18,6 +18,7 @@ import {
   savePreferredMicrophoneDevice,
   type MicrophoneDeviceOption,
 } from '@/lib/audio/microphone-preferences'
+import { reportFrontendDiagnostic, toProductMessage } from '@/lib/ui/product-message'
 
 type PermissionState = 'unknown' | 'ready' | 'error'
 
@@ -101,8 +102,9 @@ export default function AudioSettingsPage() {
       setIsTesting(true)
       await refreshDevices()
     } catch (error) {
+      reportFrontendDiagnostic('microphone-test', error)
       setPermissionState('error')
-      setMessage(error instanceof Error ? error.message : '麦克风测试启动失败。')
+      setMessage(toProductMessage(error, 'microphone'))
       setActiveDeviceLabel('未连接')
       cleanupTest()
     }
@@ -235,7 +237,7 @@ export default function AudioSettingsPage() {
             <div className="rounded-2xl bg-stone-50 p-4">
               <p className="text-sm font-medium text-gray-900">沟通工作台</p>
               <p className="mt-2 text-sm leading-6 text-gray-600">
-                LiveKit 发布麦克风轨道时会优先使用这里保存的输入设备。
+                沟通时会优先使用这里保存的麦克风。
               </p>
             </div>
             <div className="rounded-2xl bg-stone-50 p-4">

@@ -13,6 +13,7 @@ import type { RtcSessionMode } from './session-contract'
 import type { SessionExecutionClient } from './session-execution'
 import type { SessionMicrophoneTrack } from './session-types'
 import { buildMicrophoneConstraints } from '@/lib/audio/microphone-preferences'
+import { ProductMessageError, toProductMessage } from '@/lib/ui/product-message'
 
 interface SessionAudioRefs {
   micTrackRef: MutableRefObject<SessionMicrophoneTrack | null>
@@ -42,51 +43,7 @@ function stopMediaStream(stream: MediaStream | null): void {
 }
 
 export function formatMicrophoneError(error: unknown): string {
-  const name =
-    typeof error === 'object' && error !== null && 'name' in error
-      ? String((error as { name?: unknown }).name || '')
-      : ''
-  const message =
-    typeof error === 'object' && error !== null && 'message' in error
-      ? String((error as { message?: unknown }).message || '')
-      : ''
-  const normalized = `${name} ${message}`.toLowerCase()
-
-  if (
-    normalized.includes('notallowed') ||
-    normalized.includes('permission denied') ||
-    normalized.includes('permission dismissed')
-  ) {
-    return '麦克风权限未开启，请在浏览器里允许后再试一次。'
-  }
-
-  if (
-    normalized.includes('notfound') ||
-    normalized.includes('found no microphone') ||
-    normalized.includes('requested device not found') ||
-    normalized.includes('devices not found')
-  ) {
-    return '当前设备未检测到可用麦克风，可先用文字或短语沟通。'
-  }
-
-  if (
-    normalized.includes('notreadable') ||
-    normalized.includes('could not start audio source') ||
-    normalized.includes('aborterror') ||
-    normalized.includes('trackstarterror')
-  ) {
-    return '麦克风暂时无法使用，可能正被其他应用占用。'
-  }
-
-  if (
-    normalized.includes('mediadevices api') ||
-    normalized.includes('secure context') ||
-    normalized.includes('https')
-  ) {
-    return '当前环境暂时无法访问麦克风，请确认使用 HTTPS 或本地地址访问。'
-  }
-
-  return '暂时无法访问麦克风，请检查浏览器权限和设备设置。'
+  return toProductMessage(error, 'microphone')
 }
 
 export function getSessionNotReadyMessage(mode: RtcSessionMode): string {
@@ -97,15 +54,15 @@ export function getSessionNotReadyMessage(mode: RtcSessionMode): string {
 
 export function assertMicrophoneEnvironment(): void {
   if (typeof window === 'undefined') {
-    throw new Error('当前环境暂时无法访问麦克风。')
+    throw new Error('麦克风不可用，请稍后再试。')
   }
 
   if (!window.isSecureContext) {
-    throw new Error('当前环境暂时无法访问麦克风，请确认使用 HTTPS 或本地地址访问。')
+    throw new Error('当前页面无法使用麦克风。')
   }
 
   if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error('当前浏览器暂时不支持麦克风访问，请换到较新的浏览器再试。')
+    throw new Error('当前浏览器不支持语音，请使用系统浏览器。')
   }
 }
 
@@ -164,7 +121,7 @@ export async function warmUpSessionMicrophone(
     preflightMicStreamRef.current = mediaStream
     return mediaStream
   } catch (error) {
-    throw new Error(formatMicrophoneError(error))
+    throw new ProductMessageError(formatMicrophoneError(error))
   }
 }
 
@@ -271,7 +228,7 @@ export async function ensurePublishedMicrophoneTrack(
       })
     }
     stopMediaStream(mediaStream)
-    throw new Error(formatMicrophoneError(error))
+    throw new ProductMessageError(formatMicrophoneError(error))
   }
 }
 

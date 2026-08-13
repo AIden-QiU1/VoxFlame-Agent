@@ -141,7 +141,7 @@ const UPLOAD_STATUS_LABELS: Record<AttemptUploadStatus, string> = {
   uploaded: '已写入训练语料',
   retrying: '正在后台自动补登',
   auth_required: '需要重新登录恢复自动保存',
-  failed: '云端登记暂时异常',
+  failed: '保存失败',
   discarding: '正在撤回收录',
   discarded: '已不收录',
 }
@@ -376,7 +376,7 @@ function getRecorderStatusCopy(
   if (status === 'processing') {
     return {
       label: '正在收结果',
-      description: '正在等最终 transcript 和录音 envelope 收齐。',
+      description: '正在整理这次录音。',
     }
   }
 
@@ -390,14 +390,14 @@ function getRecorderStatusCopy(
   if (status === 'connecting') {
     return {
       label: '正在连接',
-      description: '正在拉起训练会话和麦克风链路。',
+      description: '正在准备麦克风。',
     }
   }
 
   if (status === 'error') {
     return {
       label: '需要处理',
-      description: sessionError || '当前训练链路有异常，请先处理下面的提示。',
+      description: sessionError || '暂时无法开始，请重试。',
     }
   }
 
@@ -420,14 +420,14 @@ function getAssessmentTranscriptNotice(
   if (transcript.trim()) {
     return {
       heardText: transcript,
-      helperText: '这条已经拿到 transcript，可以继续看这一词的字准率。',
+      helperText: '识别完成，可以查看准确度。',
       tone: 'sky',
     }
   }
 
   if (hasRecording) {
     return {
-      heardText: '这次录到了音频，但短词 transcript 还没收稳。',
+      heardText: '录音已保存，但识别结果不完整。',
       helperText: '这不等于没录到声音。把词说慢一点，尾音留完整，再录一次更稳。',
       tone: 'amber',
     }
@@ -1275,7 +1275,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       console.error('[contribute] start recording failed:', error)
       setNotice({
         tone: 'error',
-        message: error instanceof Error ? error.message : '录音启动失败，请再试一次。',
+        message: '录音失败，请重试。',
       })
     }
   }, [currentExercise, isProcessing, isUploading, startRecording])
@@ -1458,7 +1458,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     if (result.status === 'retrying') {
       setNotice({
         tone: 'info',
-        message: '音频已经收下了，云端登记会在后台自动补齐。',
+        message: '录音已保存，稍后会自动同步。',
       })
       return
     }
@@ -1636,7 +1636,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
             ? 'info'
             : 'success',
         message: isAssessmentTopic && !hasUsableAssessmentTranscript
-          ? '这次录到了音频，但短词 transcript 还没收稳；先把词说慢一点、尾音留完整，再录一次。'
+          ? '识别结果不完整，请放慢一点再录一次。'
           : canSaveTrainingSample && result.recording
           ? nextExercise
             ? '录音已经收下，正在自动保存这条样本，并且已经切到下一句。'
@@ -1653,7 +1653,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       console.error('[contribute] stop recording failed:', error)
       setNotice({
         tone: 'error',
-        message: error instanceof Error ? error.message : '录音结束失败，请重新尝试。',
+        message: '录音失败，请重试。',
       })
     } finally {
       recordingExerciseRef.current = null
@@ -2145,7 +2145,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                   </h2>
                   <p className="mt-1 text-sm text-gray-600">
                     {isAssessmentTopic
-                      ? '录稳再切下一条。空 transcript 会停在当前词，不会误跳。'
+                      ? '识别完整后再进入下一条。'
                       : '句子准备在左边，录音和结果固定在右边；一条录稳后会默认自动切到下一句。'}
                   </p>
                 </div>
@@ -2248,7 +2248,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
               <div className="mt-6 rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-5">
                 <p className="text-sm font-medium text-gray-900">
-                  {isAssessmentTopic ? '实时 transcript' : '实时识别'}
+                  实时识别
                 </p>
                 <p className="mt-3 min-h-16 text-base leading-7 text-gray-700">
                   {interimText || (
@@ -2337,7 +2337,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                     <p className="max-w-xl text-sm leading-6 text-gray-700">
                       {isAssessmentTopic && !attempt.transcript
-                        ? '当前词建议重录，不把空 transcript 算进评估。'
+                        ? '识别结果为空，请重新录制。'
                         : isAssessmentTopic
                           ? assessmentTranscriptNotice?.helperText
                           : attempt.sampleQuality.summary}

@@ -72,6 +72,13 @@ test('formatRtcConnectionError rewrites pc connection failures into actionable g
     new Error('ConnectionError: could not establish pc connection'),
   )
 
-  assert.match(message, /实时语音连接/)
-  assert.match(message, /手机热点/)
+  assert.equal(message, '网络异常，请检查后重试。')
+})
+
+test('formatRtcConnectionError hides third-party browser details', () => {
+  const raw = "LiveKit doesn't seem to be supported on this browser. webRTC is disabled."
+  const message = formatRtcConnectionError(new Error(raw))
+
+  assert.equal(message, '当前浏览器不支持语音，请使用系统浏览器。')
+  assert.doesNotMatch(message, /livekit|webrtc/i)
 })

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { StarterKitScene } from '@/lib/communication/starter-kit'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
 import { fetchWorkspaceSnapshot } from '@/lib/memory/workspace-client'
+import { reportFrontendDiagnostic, toProductMessage } from '@/lib/ui/product-message'
 
 interface UseWorkspaceMemorySnapshotOptions {
   userId?: string | null
@@ -51,8 +52,9 @@ export function useWorkspaceMemorySnapshot({
       }
       return data
     } catch (fetchError) {
+      reportFrontendDiagnostic('workspace-snapshot', fetchError)
       if (requestSequenceRef.current === requestId) {
-        setError(fetchError instanceof Error ? fetchError.message : 'workspace_snapshot_failed')
+        setError(toProductMessage(fetchError, 'memory'))
         setIsLoading(false)
       }
       return null

@@ -93,6 +93,17 @@ function friendlyError(message: string | null): string | null {
   if (message.includes('signup') || message.includes('user not found')) {
     return '这个手机号尚未注册，请切换到手机号注册。'
   }
+  if (
+    message.includes('signatureincorrectorunapproved')
+    || message.includes('sms provider')
+    || message.includes('unable to send verification code')
+    || message.includes('provider rejected')
+  ) {
+    return '短信服务暂时不可用，请稍后再试；如果持续失败，请联系管理员。'
+  }
+  if (message.includes('hook_not_configured') || message.includes('sms service is not configured')) {
+    return '短信服务尚未完成配置，请联系管理员。'
+  }
   if (message.includes('otp') && (message.includes('invalid') || message.includes('expired'))) {
     return '验证码错误或已过期，请重新获取。'
   }

@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Loader2, Mail, Lock, Smartphone, User } from 'lucide-react'
+import { toProductMessage } from '@/lib/ui/product-message'
 
 type Mode = 'login' | 'register'
 type LoginMethod = 'email' | 'phone'
@@ -30,67 +31,11 @@ type LoginMethod = 'email' | 'phone'
  * 友好的错误提示映射
  */
 function getErrorMessage(error: { message: string }, mode: Mode): string {
-    const msg = error.message.toLowerCase()
-
-    if (mode === 'login') {
-        if (msg.includes('email not confirmed')) {
-            return '请先验证您的邮箱'
-        }
-        if (msg.includes('invalid login credentials')) {
-            return '邮箱或密码错误，请检查后重试'
-        }
-        if (msg.includes('too many requests')) {
-            return '请求过于频繁，请稍后再试'
-        }
-    }
-
-    if (mode === 'register') {
-        if (msg.includes('user already exists') || msg.includes('already registered')) {
-            return '该邮箱已被注册，请直接登录'
-        }
-        if (msg.includes('password') && msg.includes('character')) {
-            return '密码长度至少需要 6 个字符'
-        }
-        if (msg.includes('invalid email')) {
-            return '请输入有效的邮箱地址'
-        }
-        if (msg.includes('captcha')) {
-            return '人机验证失败，请重新完成验证'
-        }
-        if (msg.includes('too many requests') || msg.includes('rate limit')) {
-            return '注册请求过于频繁，请稍后再试'
-        }
-    }
-
-    // 网络错误
-    if (msg.includes('network') || msg.includes('fetch') || msg.includes('connection')) {
-        return '网络连接失败，请检查您的网络'
-    }
-
-    // 默认返回原始错误信息
-    return error.message
+    return toProductMessage(error, mode)
 }
 
 function getPhoneErrorMessage(error: { message: string }, mode: Mode): string {
-    const msg = error.message.toLowerCase()
-    if (msg.includes('otp') && (msg.includes('expired') || msg.includes('invalid'))) {
-        return '验证码错误或已过期，请重新获取'
-    }
-    if (msg.includes('signup') || msg.includes('user not found')) {
-        return mode === 'login'
-            ? '这个手机号尚未注册，请切换到手机号注册'
-            : '手机号注册暂时不可用，请稍后再试'
-    }
-    if (msg.includes('rate') || msg.includes('too many')) {
-        return '请求过于频繁，请稍后再试'
-    }
-    if (msg.includes('phone provider') || msg.includes('unsupported phone')) {
-        return '手机号登录正在准备中，请暂时使用邮箱登录'
-    }
-    if (msg.includes('network') || msg.includes('fetch') || msg.includes('connection')) {
-        return '网络连接失败，请检查您的网络'
-    }
-    return error.message
+    return toProductMessage(error, mode === 'login' ? 'login' : 'phone')
 }
 
 export default function LoginPage() {
@@ -256,7 +201,7 @@ export default function LoginPage() {
             toast({
                 variant: 'destructive',
                 title: '手机号有误',
-                description: error instanceof Error ? error.message : '请输入正确的手机号',
+                description: '手机号格式不正确。',
             })
             return
         }
@@ -307,7 +252,7 @@ export default function LoginPage() {
             toast({
                 variant: 'destructive',
                 title: '手机号有误',
-                description: error instanceof Error ? error.message : '请输入正确的手机号',
+                description: '手机号格式不正确。',
             })
             return
         }
@@ -544,7 +489,7 @@ export default function LoginPage() {
                                 <Label htmlFor="data-consent" className="space-y-1 text-sm font-normal leading-6 text-gray-700">
                                     <span className="block font-medium text-gray-900">我已阅读《数据采集说明》</span>
                                     <span className="block text-pretty text-gray-600">
-                                        了解录音样本如何进入训练语料、哪些字段会进入 manifest，以及本地待同步队列的行为边界。
+                                        了解录音会保存哪些内容，以及何时上传。
                                     </span>
                                     <Link href="/data-collection" className="inline-flex text-amber-700 underline underline-offset-4">
                                         查看数据采集说明

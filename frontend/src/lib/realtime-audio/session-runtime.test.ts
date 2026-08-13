@@ -150,7 +150,7 @@ test('session-runtime clears connecting state when session start fails', async (
         pingTimerRef: { current: null },
         handleRtmMessage: () => undefined,
       }),
-      /实时转录助手当前还没有准备好/,
+      /连接失败，请重试/,
     )
   } finally {
     globalThis.fetch = originalFetch
@@ -168,7 +168,7 @@ test('session-runtime clears connecting state when session start fails', async (
   assert.equal(harness.getState().isConnected, false)
   assert.equal(
     harness.getState().error,
-    '实时转录助手当前还没有准备好，请稍后再试。',
+    '连接失败，请重试。',
   )
 })
 

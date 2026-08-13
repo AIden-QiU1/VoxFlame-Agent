@@ -53,6 +53,7 @@ import type {
   StartRtcSessionResponse,
 } from './session-types'
 import { memoryService } from '@/lib/memory/memory-service'
+import { reportFrontendDiagnostic, toProductMessage } from '@/lib/ui/product-message'
 
 export interface SessionRuntimeRefs {
   clientRef: MutableRefObject<SessionExecutionClient | null>
@@ -656,7 +657,7 @@ export async function startRtcRuntimeConnection({
         attempt < SESSION_INIT_ACK_MAX_ATTEMPTS
       ) {
         console.warn(
-          '[useRtcAgentSession] agent bootstrap timed out, retrying session connect once',
+          '[useRtcAgentSession] connection retry started',
         )
         setState((prev) => applyConnectingState(prev))
         await waitForDelay(SESSION_INIT_ACK_RETRY_DELAY_MS)
@@ -669,11 +670,10 @@ export async function startRtcRuntimeConnection({
 
   const connectionError =
     lastError instanceof SessionBootstrapTimeoutError
-      ? new Error(
-          '助手没有真正进入房间，所以这次录音不会有转录结果。系统已自动重试一次，请再点连接；如果持续出现，请检查 livekit-agent 日志。',
-        )
-      : lastError ?? new Error('RTC 会话启动失败')
+      ? new Error('助手暂未响应，请重新连接。')
+      : new Error(toProductMessage(lastError, 'realtime'))
 
+  reportFrontendDiagnostic('rtc-connect', lastError)
   setState((prev) => applyRtcError(prev, connectionError.message))
   throw connectionError
 }

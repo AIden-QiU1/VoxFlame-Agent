@@ -11,7 +11,7 @@ test('session-audio formats missing microphone errors into user-facing guidance'
     message: 'Requested device not found',
   })
 
-  assert.equal(message, '当前设备未检测到可用麦克风，可先用文字或短语沟通。')
+  assert.equal(message, '未找到麦克风，可先使用文字沟通。')
 })
 
 test('session-audio formats insecure-context microphone errors into secure-context guidance', () => {
@@ -20,7 +20,7 @@ test('session-audio formats insecure-context microphone errors into secure-conte
     message: 'MediaDevices API is only available in secure contexts',
   })
 
-  assert.equal(message, '当前环境暂时无法访问麦克风，请确认使用 HTTPS 或本地地址访问。')
+  assert.equal(message, '当前浏览器不支持语音，请使用系统浏览器。')
 })
 
 test('session-audio returns mode-specific session not ready copy', () => {

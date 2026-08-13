@@ -10,7 +10,8 @@
     "test": "node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types \"src/**/*.test.ts\"",
     "build:phonology-index": "node scripts/build-phonology-index.mjs",
     "test:phonology-index": "node --test scripts/build-phonology-index.test.mjs",
-    "test:runtime": "node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types \"src/lib/realtime-audio/*.test.ts\""
+    "test:runtime": "node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types \"src/lib/realtime-audio/*.test.ts\"",
+    "test:product-messages": "bash ../scripts/check_frontend_product_messages.sh && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types src/lib/ui/product-message.test.ts"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^9.2.0",

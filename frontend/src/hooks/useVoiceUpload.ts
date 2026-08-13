@@ -231,7 +231,7 @@ export function useVoiceUpload() {
         normalizedRecording = await normalizeRecordingToWav(recordingForNormalization)
       } catch (error) {
         console.error('录音转 WAV 失败:', error)
-        const errorMessage = '这条录音暂时没能整理成标准 WAV，请再试一次；如果持续失败，就是当前浏览器的音频解码链还没接稳。'
+        const errorMessage = '录音处理失败，请重试。'
         setLastError(errorMessage)
         return {
           ok: false,
@@ -295,12 +295,12 @@ export function useVoiceUpload() {
         })
 
         if (!uploadRes.ok) throw new Error(`OSS上传失败: ${uploadRes.statusText}`)
-      } catch (uploadError: any) {
-        console.warn('Storage 上传失败，降级到本地:', uploadError.message)
+      } catch (uploadError: unknown) {
+        console.warn('云端保存失败，已转为本地保存。')
         return await saveLocally(
           normalizedOptions,
           userId,
-          uploadError instanceof Error ? uploadError.message : 'storage_upload_failed',
+          '云端保存失败',
         )
       }
 
@@ -400,7 +400,7 @@ export function useVoiceUpload() {
       return await saveLocally(
         effectiveOptions,
         userId || 'unknown-user',
-        err instanceof Error ? err.message : 'upload_failed',
+        '云端保存失败',
       )
     } finally {
       setIsUploading(false)
@@ -458,8 +458,7 @@ export function useVoiceUpload() {
       })
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => null) as { error?: string } | null
-        throw new Error(payload?.error || `撤回失败: ${response.status}`)
+        throw new Error(`discard_upload_${response.status}`)
       }
 
       setLastError(null)
@@ -469,7 +468,7 @@ export function useVoiceUpload() {
         status: 'discarded',
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '撤回训练样本失败，请稍后再试。'
+      const errorMessage = '撤回失败，请重试。'
       setLastError(errorMessage)
       return {
         ok: false,
@@ -562,7 +561,7 @@ export function useVoiceUpload() {
             ? {
                 ...current,
                 syncStatus: 'failed',
-                lastError: err instanceof Error ? err.message : '同步失败，请稍后重试。',
+                lastError: '同步失败，请重试。',
               }
             : current
         ))

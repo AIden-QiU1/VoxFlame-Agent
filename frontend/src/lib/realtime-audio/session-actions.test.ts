@@ -108,7 +108,7 @@ test('session-actions sets a user-facing error when text is sent before the cont
     memoryService.addTurn = originalAddTurn
   }
 
-  assert.equal(harness.getState().error, '请先连接 RTC 助手。')
+  assert.equal(harness.getState().error, '请先连接助手。')
   assert.equal(sendControlCalls.length, 0)
 })
 

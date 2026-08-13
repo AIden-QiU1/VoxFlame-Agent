@@ -163,7 +163,7 @@ Native-device smoke is still required before declaring the full recorder/upload 
 
 ## Android Install
 
-There is no App Store / Google Play download yet. Install the Android test app through an EAS build link.
+There is no App Store / Google Play download yet. The public Android test app is always installed from `https://voxember.com/download/android`; Expo remains the build service, not the user-facing download page.
 
 Use a development build when you want to connect the phone to your local Expo server:
 
@@ -189,9 +189,31 @@ npm run smoke:device-env
 npm run build:android:preview
 ```
 
-After EAS finishes, open the build page and tap **Install**, or scan the QR code shown by Expo. On Android, the normal phone Camera app usually works: scan the QR code, open the link in the browser, download the APK, allow installation from the browser if Android asks, then install.
+For a website release, run the complete build-and-publish workflow from the repository root:
 
-Current Android `0.1.0` preview build: `https://expo.dev/accounts/qiuds-team/projects/voxflame-mobile-workbench/builds/50814787-79bf-44aa-a8d5-1bb0296aa59a`. This internal build is for real-device verification; the permanent public entry is `https://voxember.com/download`, which can later switch to a store URL without changing the page.
+```bash
+npm run release:android:preview
+```
+
+It validates the Mobile Workbench, advances the installable version when needed, waits for EAS, downloads the APK, atomically replaces `releases/android/VoxFlame-Android.apk`, recreates Caddy with the release mount, and verifies the permanent website URL. Do not paste an Expo build-detail URL into the website environment.
+
+On an unstable SSH/network session, start the same transaction as a detached server process:
+
+```bash
+npm run release:android:preview:background
+```
+
+Its PID and append-only log are stored under `${XDG_STATE_HOME:-$HOME/.local/state}/voxflame/android-release/`. EAS artifact downloads retry transient failures and resume from `releases/android/.downloads/<build-id>.apk.part`; a completed cached APK is ZIP-validated before publication.
+
+If EAS finished but the local publish step was interrupted, resume without creating another cloud build:
+
+```bash
+npm run sync:android:latest
+```
+
+The recovery command also has a detached form: `npm run sync:android:latest:background`. Re-publishing the same EAS build does not overwrite the previous-version rollback slot.
+
+The permanent URL is sent with `Cache-Control: no-store`, and each successful release keeps `VoxFlame-Android.previous.apk` plus its metadata for rollback. Trigger the complete release after Mobile changes pass review and land on `main`; do not rebuild on every editor save.
 
 The app environment is public-client only. Before building for a real phone, set `EXPO_PUBLIC_API_BASE_URL` to the computer or server address the phone can reach, such as `http://192.168.1.23:3001/api`. Do not use `127.0.0.1` for a physical phone.
 

@@ -32,6 +32,7 @@
     handle /download/android {
         rewrite * /VoxFlame-Android.apk
         root * /srv/releases/android
+        header Cache-Control "no-store"
         header Content-Disposition "attachment; filename=VoxFlame-Android.apk"
         header Content-Type "application/vnd.android.package-archive"
         file_server

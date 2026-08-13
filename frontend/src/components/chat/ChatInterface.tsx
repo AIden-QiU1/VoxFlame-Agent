@@ -314,12 +314,12 @@ export default function ChatInterface({
     }
 
     if (!window.isSecureContext) {
-      setMicrophoneEnvironmentWarning('当前页面不是安全连接。麦克风只会在 HTTPS 或本机地址下可用。')
+      setMicrophoneEnvironmentWarning('当前页面无法使用麦克风。')
       return
     }
 
-    if (!navigator.mediaDevices) {
-      setMicrophoneEnvironmentWarning('当前浏览器暂时不支持麦克风访问，请换到较新的浏览器再试。')
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicrophoneEnvironmentWarning('当前浏览器不支持语音，请使用系统浏览器。')
       return
     }
 
@@ -1145,9 +1145,12 @@ export default function ChatInterface({
         </div>
       </main>
 
-      {/* Error toast */}
+      {/* Keep errors near the primary action and clear of mobile browser controls. */}
       {error && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-red-100 text-red-700 px-4 py-2 rounded-full text-sm">
+        <div
+          role="alert"
+          className="fixed inset-x-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-30 mx-auto max-w-lg rounded-2xl border border-rose-200 bg-white px-4 py-3 text-center text-sm text-pretty text-rose-700 shadow-lg sm:bottom-6"
+        >
           {error}
         </div>
       )}

@@ -131,7 +131,7 @@ export async function sendRtcTextAction({
   }
 
   if (!refs.sessionRef.current || !isControlChannelReady()) {
-    setState((prev) => applyRtcError(prev, '请先连接 RTC 助手。'))
+    setState((prev) => applyRtcError(prev, '请先连接助手。'))
     return
   }
 

@@ -9,24 +9,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import { displayMainlandPhone, normalizeMainlandPhone } from '@/lib/auth/phone'
+import { toProductMessage } from '@/lib/ui/product-message'
 
 type BindingStep = 'phone' | 'otp'
 
 function phoneAuthMessage(error: { message: string }): string {
-  const message = error.message.toLowerCase()
-  if (message.includes('already') || message.includes('duplicate')) {
-    return '这个手机号已经绑定了其他账号。'
-  }
-  if (message.includes('rate') || message.includes('too many')) {
-    return '请求过于频繁，请稍后再试。'
-  }
-  if (message.includes('otp') && (message.includes('invalid') || message.includes('expired'))) {
-    return '验证码错误或已过期，请重新获取。'
-  }
-  if (message.includes('phone provider') || message.includes('unsupported phone')) {
-    return '手机号功能尚未启用，请暂时使用邮箱登录。'
-  }
-  return error.message
+  return toProductMessage(error, 'phone')
 }
 
 export default function AccountSettingsPage() {
@@ -63,9 +51,9 @@ export default function AccountSettingsPage() {
     let normalizedPhone: string
     try {
       normalizedPhone = normalizeMainlandPhone(phone)
-    } catch (error: unknown) {
+    } catch {
       setIsError(true)
-      setMessage(error instanceof Error ? error.message : '请输入正确的手机号。')
+      setMessage('手机号格式不正确。')
       return
     }
 
@@ -88,9 +76,9 @@ export default function AccountSettingsPage() {
     let normalizedPhone: string
     try {
       normalizedPhone = normalizeMainlandPhone(phone)
-    } catch (error: unknown) {
+    } catch {
       setIsError(true)
-      setMessage(error instanceof Error ? error.message : '请输入正确的手机号。')
+      setMessage('手机号格式不正确。')
       return
     }
     if (!/^\d{6}$/.test(otp)) {
@@ -118,7 +106,7 @@ export default function AccountSettingsPage() {
     setIsSubmitting(false)
     if (refreshError || !data.user || data.user.id !== originalUserId) {
       setIsError(true)
-      setMessage('手机号已验证，但账号身份校验失败。请退出后重新登录。')
+      setMessage('验证失败，请重新登录。')
       return
     }
 

@@ -14,6 +14,7 @@ import {
 import { calculateNormalizedInputLevel } from '@/lib/audio/microphone-input-feedback'
 import { LocalPcmWavRecorder } from '@/lib/audio/local-pcm-wav-recorder'
 import { useRtcAgentSession } from './useRtcAgentSession'
+import { reportFrontendDiagnostic, toProductMessage } from '@/lib/ui/product-message'
 
 type SessionStatus = 'idle' | 'connecting' | 'ready' | 'recording' | 'processing' | 'error'
 
@@ -200,11 +201,8 @@ export function useMandarinTrainingSession(
         }
       }
 
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : '训练录音初始化失败，请再点一次；如果还是这样，就是本地 PCM 录音链路还没接稳。'
-      throw new Error(message)
+      reportFrontendDiagnostic('training-recorder-start', error)
+      throw new Error(toProductMessage(error, 'recording'))
     }
   }, [analyser, getMicrophoneMediaStream, getMicrophoneStreamTrack])
 
@@ -338,12 +336,11 @@ export function useMandarinTrainingSession(
       const recorder = await beginLocalRecording()
 
       if (!recorder) {
-        throw new Error('训练会话已连上，但录音没有真正开始。请再点一次；如果还是这样，就是代码链路还没接稳。')
+        throw new Error('录音失败，请重试。')
       }
 
     } catch (recordingError) {
-      const message =
-        recordingError instanceof Error ? recordingError.message : '录音启动失败，请检查麦克风权限。'
+      const message = toProductMessage(recordingError, 'recording')
       setError(message)
       void stopRtcRecording(activeClientCaptureIdRef.current ?? undefined).catch(() => {
         void disconnectRtc()
@@ -388,9 +385,8 @@ export function useMandarinTrainingSession(
 
   const syncVoiceProfile = useCallback((payload: Record<string, unknown>) => {
     void sendControlEvent('update_voice_profile', payload).catch((eventError: unknown) => {
-      const message =
-        eventError instanceof Error ? eventError.message : '训练画像同步失败'
-      setError(message)
+      reportFrontendDiagnostic('training-profile-sync', eventError)
+      setError('训练记录同步失败，请重试。')
     })
   }, [sendControlEvent])
 

@@ -5,6 +5,10 @@
     "eas:whoami": "npm --prefix apps/mobile-workbench run eas:whoami",
     "eas:credentials:ios": "npm --prefix apps/mobile-workbench run eas:credentials:ios",
     "build:android:preview": "npm --prefix apps/mobile-workbench run build:android:preview",
+    "release:android:preview": "bash scripts/release-android-preview.sh",
+    "release:android:preview:background": "bash scripts/start-android-preview-release-background.sh",
+    "sync:android:latest": "bash scripts/release-android-preview.sh publish-latest",
+    "sync:android:latest:background": "bash scripts/start-android-preview-release-background.sh publish-latest",
     "build:ios:preview": "npm --prefix apps/mobile-workbench run build:ios:preview"
   },
   "devDependencies": {

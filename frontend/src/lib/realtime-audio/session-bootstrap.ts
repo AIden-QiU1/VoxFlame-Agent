@@ -53,8 +53,7 @@ export async function startRtcSession(
   })
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null
-    throw new Error(payload?.error || 'RTC 会话启动失败')
+    throw new Error(`rtc_session_start_${response.status}`)
   }
 
   return response.json() as Promise<StartRtcSessionResponse>
