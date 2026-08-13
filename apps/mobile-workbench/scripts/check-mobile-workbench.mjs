@@ -94,7 +94,7 @@ assert(androidReleaseScript.includes('eas-cli@latest build'), 'android website r
 assert(androidReleaseScript.includes('VoxFlame-Android.apk'), 'android website release must publish the stable APK name')
 assert(androidReleaseScript.includes('VoxFlame-Android.previous.apk'), 'android website release must retain a rollback APK')
 assert(downloadPageSource.includes("const androidDownloadUrl = '/download/android'"), 'website Android download must use the permanent first-party URL')
-assert(composeSource.includes('./releases/android:/srv/releases/android:ro'), 'Caddy must mount the Android release directory')
+assert(composeSource.includes('VOXFLAME_ANDROID_RELEASE_DIR:-./releases/android'), 'Caddy must mount the configurable Android release directory')
 assert(caddySource.includes('handle /download/android'), 'Caddy must own the permanent Android download route')
 assert(packageJson.scripts?.['build:ios:preview']?.includes('--platform ios'), 'ios preview build script is missing')
 for (const [scriptName, scriptValue] of Object.entries(packageJson.scripts ?? {})) {

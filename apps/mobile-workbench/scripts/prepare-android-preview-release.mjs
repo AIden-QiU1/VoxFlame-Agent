@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.resolve(scriptDir, '..')
 const latestFinishedBuildCode = Number.parseInt(process.argv[2] ?? '0', 10)
+const latestFinishedVersion = process.argv[3]
 
 if (!Number.isInteger(latestFinishedBuildCode) || latestFinishedBuildCode < 0) {
   throw new Error('latest finished Android build code must be a non-negative integer')
@@ -27,6 +28,26 @@ function incrementPatch(version) {
   return `${match[1]}.${match[2]}.${Number.parseInt(match[3], 10) + 1}`
 }
 
+function compareVersions(left, right) {
+  const parse = (version) => {
+    const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
+    if (!match) {
+      throw new Error(`mobile app version must use x.y.z format: ${version}`)
+    }
+
+    return match.slice(1).map((part) => Number.parseInt(part, 10))
+  }
+
+  const leftParts = parse(left)
+  const rightParts = parse(right)
+  for (let index = 0; index < leftParts.length; index += 1) {
+    if (leftParts[index] !== rightParts[index]) {
+      return leftParts[index] - rightParts[index]
+    }
+  }
+  return 0
+}
+
 const packageJson = readJson('package.json')
 const packageLock = readJson('package-lock.json')
 const appJson = readJson('app.json')
@@ -42,7 +63,12 @@ if (localBuildCode > latestFinishedBuildCode) {
 }
 
 const nextBuildCode = latestFinishedBuildCode + 1
-const nextVersion = incrementPatch(packageJson.version)
+const versionBaseline = latestFinishedVersion && compareVersions(latestFinishedVersion, packageJson.version) >= 0
+  ? latestFinishedVersion
+  : packageJson.version
+const nextVersion = latestFinishedVersion && compareVersions(packageJson.version, latestFinishedVersion) > 0
+  ? packageJson.version
+  : incrementPatch(versionBaseline)
 
 packageJson.version = nextVersion
 packageLock.version = nextVersion

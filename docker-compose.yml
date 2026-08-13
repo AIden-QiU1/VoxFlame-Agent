@@ -172,7 +172,7 @@ services:
       - VOXFLAME_PUBLIC_HOST=${VOXFLAME_PUBLIC_HOST:-}
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./releases/android:/srv/releases/android:ro
+      - ${VOXFLAME_ANDROID_RELEASE_DIR:-./releases/android}:/srv/releases/android:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

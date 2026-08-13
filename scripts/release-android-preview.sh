@@ -10,9 +10,16 @@ DOWNLOAD_CACHE_DIR="$RELEASE_DIR/.downloads"
 PUBLIC_URL="${VOXFLAME_ANDROID_DOWNLOAD_URL:-https://voxember.com/download/android}"
 LOCK_PATH="${TMPDIR:-/tmp}/voxflame-android-preview-release.lock"
 MODE="${1:-build}"
+ARTIFACT_OUTPUT_DIR="${2:-}"
+SERVER_RECEIVER="${VOXFLAME_ANDROID_SERVER_RECEIVER:-/usr/local/libexec/voxflame-receive-android-ci-artifact}"
+SERVER_RECEIVER_USER="${VOXFLAME_ANDROID_SERVER_RECEIVER_USER:-voxflame-release}"
 
-if [[ "$MODE" != "build" && "$MODE" != "publish-latest" ]]; then
-  echo "Usage: $0 [build|publish-latest]" >&2
+if [[ "$MODE" != "build" && "$MODE" != "publish-latest" && "$MODE" != "build-artifact" ]]; then
+  echo "Usage: $0 [build|publish-latest|build-artifact <output-directory>]" >&2
+  exit 1
+fi
+if [[ "$MODE" == "build-artifact" && -z "$ARTIFACT_OUTPUT_DIR" ]]; then
+  echo "build-artifact requires an output directory" >&2
   exit 1
 fi
 
@@ -51,11 +58,13 @@ echo "[voxflame] Reading the latest finished Android preview build..."
 ) > "$work_dir/latest.json"
 
 latest_build_code="$(read_build_field "$work_dir/latest.json" appBuildVersion)"
-if [[ "$MODE" == "build" ]]; then
+latest_app_version="$(read_build_field "$work_dir/latest.json" appVersion)"
+if [[ "$MODE" == "build" || "$MODE" == "build-artifact" ]]; then
   echo "[voxflame] Validating Mobile Workbench before release..."
   npm --prefix "$APP_DIR" run check
   npm --prefix "$APP_DIR" run typecheck
-  node "$APP_DIR/scripts/prepare-android-preview-release.mjs" "$latest_build_code"
+  node "$APP_DIR/scripts/prepare-android-preview-release.mjs" \
+    "$latest_build_code" "$latest_app_version"
 
   echo "[voxflame] Starting EAS Android preview build..."
   (
@@ -124,6 +133,28 @@ writeFileSync(outputPath, `${JSON.stringify({
   publishedAt: new Date().toISOString(),
 }, null, 2)}\n`)
 NODE
+
+if [[ "$MODE" == "build-artifact" ]]; then
+  mkdir -p "$ARTIFACT_OUTPUT_DIR"
+  mv -f "$work_dir/VoxFlame-Android.apk" "$ARTIFACT_OUTPUT_DIR/VoxFlame-Android.apk"
+  mv -f "$work_dir/metadata.json" "$ARTIFACT_OUTPUT_DIR/VoxFlame-Android.json"
+  echo "[voxflame] Android preview artifact ready"
+  echo "  version: $app_version ($app_build_version)"
+  echo "  build:   $build_id"
+  echo "  sha256:  $apk_sha256"
+  echo "  bytes:   $apk_size"
+  echo "  path:    $ARTIFACT_OUTPUT_DIR"
+  exit 0
+fi
+
+if [[ "$MODE" == "build" && -x "$SERVER_RECEIVER" ]] \
+  && id -u "$SERVER_RECEIVER_USER" >/dev/null 2>&1; then
+  echo "[voxflame] Publishing through the production Android receiver..."
+  cp "$work_dir/metadata.json" "$work_dir/VoxFlame-Android.json"
+  tar -C "$work_dir" -cf - VoxFlame-Android.apk VoxFlame-Android.json \
+    | sudo -n -u "$SERVER_RECEIVER_USER" "$SERVER_RECEIVER"
+  exit 0
+fi
 
 current_build_id=""
 if [[ -f "$METADATA_PATH" ]]; then

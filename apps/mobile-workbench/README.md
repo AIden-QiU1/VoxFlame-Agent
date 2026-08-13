@@ -197,6 +197,8 @@ npm run release:android:preview
 
 It validates the Mobile Workbench, advances the installable version when needed, waits for EAS, downloads the APK, atomically replaces `releases/android/VoxFlame-Android.apk`, recreates Caddy with the release mount, and verifies the permanent website URL. Do not paste an Expo build-detail URL into the website environment.
 
+On the production host, the same command detects the installed restricted receiver and publishes into `/srv/voxflame/android`, which is Caddy's live read-only mount. On development hosts without that receiver, it keeps the repository-local release behavior.
+
 On an unstable SSH/network session, start the same transaction as a detached server process:
 
 ```bash
@@ -212,6 +214,17 @@ npm run sync:android:latest
 ```
 
 The recovery command also has a detached form: `npm run sync:android:latest:background`. Re-publishing the same EAS build does not overwrite the previous-version rollback slot.
+
+Production automation uses `.github/workflows/android-preview-release.yml`. Mobile changes merged into `main` are checked and built on GitHub Actions; the validated APK and metadata are then streamed through a dedicated SSH key whose server-side forced command accepts only those two files and can update only `/srv/voxflame/android`. Caddy reads that directory directly, so CI cannot run arbitrary server commands and does not need repository, Docker, or application-secret access. Configure the `production` GitHub environment with `EXPO_TOKEN`, `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, and `DEPLOY_KNOWN_HOSTS`; `DEPLOY_PORT` is optional and defaults to `22`.
+
+On the production server, authenticate GitHub CLI once and load those environment secrets without printing them. The setup script also enables the repository-level `ANDROID_AUTO_RELEASE_ENABLED` gate; until then, push-triggered release jobs stay skipped instead of failing for missing secrets:
+
+```bash
+gh auth login
+bash scripts/ops/configure-android-release-github.sh
+```
+
+After the workflow commit reaches `main`, run `Android Preview Release` once with `workflow_dispatch`. Later Mobile changes under `apps/mobile-workbench/**` publish automatically after they are pushed to `main`.
 
 The permanent URL is sent with `Cache-Control: no-store`, and each successful release keeps `VoxFlame-Android.previous.apk` plus its metadata for rollback. Trigger the complete release after Mobile changes pass review and land on `main`; do not rebuild on every editor save.
 

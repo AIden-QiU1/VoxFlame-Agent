@@ -1,0 +1,89 @@
+name: Android Preview Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile-workbench/**'
+      - 'scripts/release-android-preview.sh'
+      - 'scripts/publish-android-artifact.sh'
+      - '.github/workflows/android-preview-release.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-preview-production
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    if: github.event_name == 'workflow_dispatch' || vars.ANDROID_AUTO_RELEASE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    environment: production
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      PUBLIC_URL: https://voxember.com/download/android
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/mobile-workbench/package-lock.json
+
+      - name: Install Mobile Workbench dependencies
+        working-directory: apps/mobile-workbench
+        run: npm ci
+
+      - name: Validate deployment configuration
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$EXPO_TOKEN"
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+
+      - name: Build and validate EAS preview APK
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: bash scripts/release-android-preview.sh build-artifact "$RUNNER_TEMP/android-release"
+
+      - name: Configure production SSH identity
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/voxflame_deploy"
+          chmod 600 "$HOME/.ssh/voxflame_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Upload and atomically publish APK
+        run: |
+          ssh_args=(-i "$HOME/.ssh/voxflame_deploy" -p "$DEPLOY_PORT" -o BatchMode=yes)
+          tar -C "$RUNNER_TEMP/android-release" -cf - \
+            VoxFlame-Android.apk VoxFlame-Android.json \
+            | ssh "${ssh_args[@]}" "$DEPLOY_USER@$DEPLOY_HOST"
+
+      - name: Verify public Android download
+        run: |
+          headers="$RUNNER_TEMP/android-download-headers.txt"
+          curl --fail --silent --show-error --location \
+            --range 0-0 --dump-header "$headers" --output /dev/null "$PUBLIC_URL"
+          grep -iq '^content-type: application/vnd.android.package-archive' "$headers"
+          grep -iq '^cache-control: no-store' "$headers"
