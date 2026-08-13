@@ -1,6 +1,0 @@
-- generic [active] [ref=e1]:
-  - link "跳转到主要内容" [ref=e2] [cursor=pointer]:
-    - /url: "#main-content"
-  - paragraph [ref=e6]: 正在准备燃言首页...
-  - region "Notifications (F8)":
-    - list

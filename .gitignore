@@ -13,6 +13,8 @@ dist/
 build/
 *.egg-info/
 coverage/
+.playwright-cli/
+output/playwright/
 ten-framework/
 # TEN Framework (large external dependency)
 ten-framework/
