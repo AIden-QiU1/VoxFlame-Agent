@@ -41,8 +41,12 @@ Frontend LiveKit RTC/Data
    - 支持用户画像、场景 / 热词模板、多份自定义材料库、当前 active material、材料摘要和编辑删除。
 6. Web 音频设置已经落地：
    - `/settings/audio` 支持麦克风授权、设备列表、首选麦克风保存和现场电平测试。
-7. Mobile Workbench skeleton 已经存在：
-   - `apps/mobile-workbench` 已有 `communication / practice / memory / device` 四个 surface、登录态、workspace snapshot 读取、native recorder queue 和 RTC session intent 雏形。
+7. Mobile Workbench 已进入 Web/App 能力对齐阶段：
+   - `communication / practice / memory / device` 四个 surface 继续复用同一 backend owner，不通过 WebView 复制页面。
+   - 沟通页已消费 LiveKit user/assistant transcript，并提供可编辑 confirmed output、给对方看、原生朗读、复制和文本发送。
+   - 沟通场景在进入实时工作台前选择，场景仍进入 RTC intent，不在工作台里占据主视觉。
+   - 练习页已把 `20 词能力筛查` 与 `训练收集` 拆成两条路径，并从 Web 正在使用的正式题库目录读取 sentence id、分类和题目；录音自动上传，失败保留本地重试。
+   - 当前仍未达到 App 完全替代 Web：移动端尚缺训练实时识别/评分/总结、完整自定义材料训练，以及沟通档案的完整增删改；在这些 parity 项和真机 smoke 完成前，App 不能再标为“完整替代版”。
 8. `dataset != memory` 仍是硬边界：
    - 训练样本上传进入 dataset / review / export 路线。
    - workspace snapshot 是 durable owner。
@@ -323,3 +327,9 @@ Voiceitt 对标与设置启发：
 录音、上传与训练资产 contract：
 
 - [VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
+## 2026-08-13 UI/UX parity 收口补充
+
+- Web 与 Mobile 共享同一业务能力和后端事实源，但按设备优化交互，不要求桌面布局像素级复制。
+- Web 首页负责任务入口；沟通页负责实时沟通；训练页先区分能力筛查与训练收集，再进入单句工作台；训练回顾与沟通档案不抢占首屏主动作。
+- Mobile 继续保持 `沟通 / 练习 / 记忆 / 设备` 四个一级 surface。档案编辑支持材料、画像和短句 CRUD；训练页支持筛查、公共题库、自定义材料、真实识别反馈、自动收集和撤回。
+- 当前 parity 验收口径是：功能链路、权限和数据事实源一致，界面针对触控和窄屏重排；在 Android/iOS 真机完成 RTC、原生录音并行、上传撤回、TTS/复制和 CRUD smoke 前，不宣称 100% 替代 Web。

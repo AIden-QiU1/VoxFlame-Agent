@@ -13,7 +13,10 @@ import {
   useAudioRecorderState,
 } from 'expo-audio'
 
-import { uploadMobileRecorderQueueItem } from '../api/mobile-upload-client'
+import {
+  discardMobileRecorderQueueItem,
+  uploadMobileRecorderQueueItem,
+} from '../api/mobile-upload-client'
 import type { MobileAuthTokenProvider } from '../api/mobile-workbench-client'
 import type { MobileWorkbenchSurfaceId } from '../constants/surfaces'
 import type {
@@ -26,6 +29,7 @@ import {
   loadNativeRecorderQueue,
   persistNativeRecordingFile,
   removeNativeRecorderQueueItem,
+  updateNativeRecorderQueueItemRecognition,
   updateNativeRecorderQueueItemStatus,
 } from './native-recorder-storage'
 import { assessMobileRecordingQuality } from './recording-quality'
@@ -52,13 +56,28 @@ export interface NativeRecorderQueueState {
   errorMessage: string | null
   refreshQueue(): Promise<void>
   requestPermission(): Promise<boolean>
-  startRecording(text: string): Promise<void>
+  startRecording(
+    text: string,
+    context?: {
+      sentenceId?: string
+      source?: string
+      metadata?: Record<string, unknown>
+    },
+  ): Promise<void>
   stopRecording(): Promise<MobileWorkbenchRecorderQueueItem | null>
   playRecording(recordingId: string): void
   playLatest(): void
-  discard(recordingId: string): Promise<void>
+  discard(recordingId: string): Promise<boolean>
+  attachRecognition(
+    recordingId: string,
+    recognizedText: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<MobileWorkbenchRecorderQueueItem | null>
   markUploadPending(recordingId: string): Promise<void>
-  uploadRecording(recordingId: string): Promise<MobileWorkbenchUploadReceipt | null>
+  uploadRecording(
+    recordingId: string,
+    itemOverride?: MobileWorkbenchRecorderQueueItem,
+  ): Promise<MobileWorkbenchUploadReceipt | null>
 }
 
 function createRecordingId(): string {
@@ -90,6 +109,11 @@ export function useNativeRecorderQueue(params: {
     useState<NativeRecorderPermissionStatus>('unknown')
   const [recordingStartedAt, setRecordingStartedAt] = useState<string | null>(null)
   const [recordingText, setRecordingText] = useState('')
+  const [recordingContext, setRecordingContext] = useState<{
+    sentenceId?: string
+    source?: string
+    metadata?: Record<string, unknown>
+  } | null>(null)
   const [uploadingRecordingId, setUploadingRecordingId] = useState<string | null>(null)
   const [lastUploadReceipt, setLastUploadReceipt] =
     useState<MobileWorkbenchUploadReceipt | null>(null)
@@ -129,7 +153,14 @@ export function useNativeRecorderQueue(params: {
     }
   }, [])
 
-  const startRecording = useCallback(async (text: string): Promise<void> => {
+  const startRecording = useCallback(async (
+    text: string,
+    context?: {
+      sentenceId?: string
+      source?: string
+      metadata?: Record<string, unknown>
+    },
+  ): Promise<void> => {
     setErrorMessage(null)
 
     if (!params.contributorId) {
@@ -152,6 +183,7 @@ export function useNativeRecorderQueue(params: {
       recorder.record()
       setRecordingStartedAt(new Date().toISOString())
       setRecordingText(text.trim() || '移动端练习样本')
+      setRecordingContext(context ?? null)
     } catch (error) {
       setErrorMessage(toMobileProductMessage(error, 'recording'))
     }
@@ -191,6 +223,8 @@ export function useNativeRecorderQueue(params: {
         recordingId,
         contributorId: params.contributorId,
         text: recordingText.trim() || '移动端练习样本',
+        sentenceId: recordingContext?.sentenceId,
+        source: recordingContext?.source,
         surface: params.surface,
         metadata: {
           app_surface: 'mobile_workbench',
@@ -198,6 +232,7 @@ export function useNativeRecorderQueue(params: {
           queue_owner: 'mobile_cache',
           audio_quality_disposition: quality.disposition,
           audio_quality_reasons: quality.reasons,
+          ...recordingContext?.metadata,
         },
         consentScope: 'training_only',
         syncStatus: 'local_only',
@@ -229,6 +264,7 @@ export function useNativeRecorderQueue(params: {
       setItems(await appendNativeRecorderQueueItem(item))
       setRecordingStartedAt(null)
       setRecordingText('')
+      setRecordingContext(null)
       return item
     } catch (error) {
       setErrorMessage(toMobileProductMessage(error, 'recording'))
@@ -241,6 +277,7 @@ export function useNativeRecorderQueue(params: {
     recorder,
     recorderState.durationMillis,
     recordingStartedAt,
+    recordingContext,
     recordingText,
   ])
 
@@ -261,8 +298,47 @@ export function useNativeRecorderQueue(params: {
     }
   }, [items, playRecording])
 
-  const discard = useCallback(async (recordingId: string): Promise<void> => {
+  const discard = useCallback(async (recordingId: string): Promise<boolean> => {
+    setErrorMessage(null)
+    const currentItems = await loadNativeRecorderQueue()
+    const item = currentItems.find((entry) => entry.recordingId === recordingId)
+    if (!item) {
+      return true
+    }
+
+    const uploaded = item.syncStatus === 'uploaded' || item.syncStatus === 'indexed'
+    if (uploaded) {
+      if (!params.apiBaseUrl) {
+        setErrorMessage('暂时无法撤回这条录音，请恢复网络后重试。')
+        return false
+      }
+      try {
+        await discardMobileRecorderQueueItem(item, {
+          apiBaseUrl: params.apiBaseUrl,
+          tokenProvider: params.tokenProvider,
+        })
+      } catch (error) {
+        setErrorMessage(toMobileProductMessage(error, 'upload'))
+        return false
+      }
+    }
+
     setItems(await removeNativeRecorderQueueItem(recordingId))
+    return true
+  }, [params.apiBaseUrl, params.tokenProvider])
+
+  const attachRecognition = useCallback(async (
+    recordingId: string,
+    recognizedText: string,
+    metadata: Record<string, unknown> = {},
+  ): Promise<MobileWorkbenchRecorderQueueItem | null> => {
+    const nextItems = await updateNativeRecorderQueueItemRecognition(
+      recordingId,
+      recognizedText,
+      metadata,
+    )
+    setItems(nextItems)
+    return nextItems.find((item) => item.recordingId === recordingId) ?? null
   }, [])
 
   const markUploadPending = useCallback(async (
@@ -276,6 +352,7 @@ export function useNativeRecorderQueue(params: {
 
   const uploadRecording = useCallback(async (
     recordingId: string,
+    itemOverride?: MobileWorkbenchRecorderQueueItem,
   ): Promise<MobileWorkbenchUploadReceipt | null> => {
     setErrorMessage(null)
     setLastUploadReceipt(null)
@@ -285,8 +362,8 @@ export function useNativeRecorderQueue(params: {
       return null
     }
 
-    const currentItems = await loadNativeRecorderQueue()
-    const item = currentItems.find((queueItem) => (
+    const currentItems = itemOverride ? [] : await loadNativeRecorderQueue()
+    const item = itemOverride ?? currentItems.find((queueItem) => (
       queueItem.recordingId === recordingId
     ))
 
@@ -352,6 +429,7 @@ export function useNativeRecorderQueue(params: {
     playRecording,
     playLatest,
     discard,
+    attachRecognition,
     markUploadPending,
     uploadRecording,
   }

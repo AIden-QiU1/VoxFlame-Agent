@@ -1,0 +1,173 @@
+import type { MobileTrainingExercise } from './training-catalog'
+
+export type MobileTrainingFeedbackStatus = 'excellent' | 'close' | 'retry' | 'unclear'
+
+export interface MobileTrainingFeedback {
+  status: MobileTrainingFeedbackStatus
+  normalizedTarget: string
+  normalizedHeard: string
+  missingChars: string[]
+  extraChars: string[]
+  summary: string
+  suggestion: string
+}
+
+export interface MobileAssessmentAttempt {
+  exerciseId: string
+  targetText: string
+  heardText: string
+  normalizedTarget: string
+  missingChars: string[]
+}
+
+export interface MobileAssessmentSummary {
+  completedCount: number
+  totalCount: number
+  remainingCount: number
+  accuracyPercent: number
+  label: string
+  summary: string
+  isComplete: boolean
+}
+
+const PUNCTUATION_PATTERN = /[，。！？、；：“”‘’（）()\s]/g
+
+function normalizeChineseText(text: string): string {
+  return text.replace(PUNCTUATION_PATTERN, '').trim()
+}
+
+function buildLcsTable(target: string[], heard: string[]): number[][] {
+  const table = Array.from(
+    { length: target.length + 1 },
+    () => Array(heard.length + 1).fill(0) as number[],
+  )
+  for (let row = 1; row <= target.length; row += 1) {
+    for (let column = 1; column <= heard.length; column += 1) {
+      table[row][column] = target[row - 1] === heard[column - 1]
+        ? table[row - 1][column - 1] + 1
+        : Math.max(table[row - 1][column], table[row][column - 1])
+    }
+  }
+  return table
+}
+
+function diffChars(target: string, heard: string): { missingChars: string[]; extraChars: string[] } {
+  const targetChars = Array.from(target)
+  const heardChars = Array.from(heard)
+  const table = buildLcsTable(targetChars, heardChars)
+  const missingChars: string[] = []
+  const extraChars: string[] = []
+  let row = targetChars.length
+  let column = heardChars.length
+
+  while (row > 0 && column > 0) {
+    if (targetChars[row - 1] === heardChars[column - 1]) {
+      row -= 1
+      column -= 1
+    } else if (table[row - 1][column] >= table[row][column - 1]) {
+      missingChars.unshift(targetChars[row - 1])
+      row -= 1
+    } else {
+      extraChars.unshift(heardChars[column - 1])
+      column -= 1
+    }
+  }
+  while (row > 0) {
+    missingChars.unshift(targetChars[row - 1])
+    row -= 1
+  }
+  while (column > 0) {
+    extraChars.unshift(heardChars[column - 1])
+    column -= 1
+  }
+  return { missingChars, extraChars }
+}
+
+export function analyzeMobileTrainingAttempt(
+  exercise: MobileTrainingExercise,
+  heardText: string,
+): MobileTrainingFeedback {
+  const normalizedTarget = normalizeChineseText(exercise.text)
+  const normalizedHeard = normalizeChineseText(heardText)
+  if (!normalizedHeard) {
+    return {
+      status: 'unclear',
+      normalizedTarget,
+      normalizedHeard,
+      missingChars: Array.from(normalizedTarget),
+      extraChars: [],
+      summary: '这次系统还没稳定听清。',
+      suggestion: '换安静一点的位置，放慢一点再说一次。',
+    }
+  }
+
+  const { missingChars, extraChars } = diffChars(normalizedTarget, normalizedHeard)
+  const gapCount = missingChars.length + extraChars.length
+  const status: MobileTrainingFeedbackStatus = normalizedTarget === normalizedHeard
+    ? 'excellent'
+    : gapCount <= 2 ? 'close' : 'retry'
+  const summary = status === 'excellent'
+    ? '系统听到的内容和目标句一致。'
+    : status === 'close'
+      ? '已经很接近，只有少量字符差异。'
+      : '这次和目标句还有明显差异。'
+  const suggestion = missingChars.length > 0
+    ? `下一次先把“${missingChars.slice(0, 3).join('、')}”说稳，再回到整句。`
+    : extraChars.length > 0
+      ? `下一次在“${extraChars.slice(0, 3).join('、')}”附近留半拍。`
+      : '保持现在的速度和张口幅度。'
+
+  return {
+    status,
+    normalizedTarget,
+    normalizedHeard,
+    missingChars,
+    extraChars,
+    summary,
+    suggestion,
+  }
+}
+
+export function summarizeMobileAssessment(
+  attempts: MobileAssessmentAttempt[],
+  totalCount: number,
+): MobileAssessmentSummary {
+  const completedCount = attempts.length
+  const remainingCount = Math.max(0, totalCount - completedCount)
+  const totalChars = attempts.reduce((sum, attempt) => sum + attempt.normalizedTarget.length, 0)
+  const matchedChars = attempts.reduce(
+    (sum, attempt) => sum + Math.max(0, attempt.normalizedTarget.length - attempt.missingChars.length),
+    0,
+  )
+  const accuracyPercent = totalChars > 0 ? Math.round((matchedChars / totalChars) * 100) : 0
+  const isComplete = totalCount > 0 && completedCount >= totalCount
+
+  if (!isComplete) {
+    return {
+      completedCount,
+      totalCount,
+      remainingCount,
+      accuracyPercent,
+      label: completedCount > 0 ? '筛查进行中' : '还未开始',
+      summary: completedCount > 0
+        ? `已经完成 ${completedCount}/${totalCount} 个词。整组完成前不生成等级。`
+        : '完成整组后再看字符准确率和训练分层。',
+      isComplete: false,
+    }
+  }
+
+  const label = accuracyPercent < 30
+    ? '重度'
+    : accuracyPercent < 50
+      ? '中度'
+      : accuracyPercent < 80 ? '轻度' : '待观察'
+  return {
+    completedCount,
+    totalCount,
+    remainingCount,
+    accuracyPercent,
+    label,
+    summary: `字符准确率约 ${accuracyPercent}%，当前训练分层为“${label}”。这不替代医学评估。`,
+    isComplete: true,
+  }
+}

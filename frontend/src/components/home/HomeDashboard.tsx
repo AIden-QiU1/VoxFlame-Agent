@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { IcpBeianFooter } from '@/components/legal/IcpBeianFooter'
 import { buildLoginPath } from '@/lib/auth/navigation'
 import type { StarterKitScene } from '@/lib/communication/starter-kit'
+import { STARTER_KIT_SCENES } from '@/lib/communication/starter-kit'
 import { UserNav } from '@/components/ui/user-nav'
 
 interface HomeDashboardProps {
@@ -34,7 +35,7 @@ const CAPABILITY_CARDS: CapabilityCard[] = [
     id: 'communicate',
     title: '现在沟通',
     summary: '把最重要的一句话放在前面，随时停下或重说。',
-    actionLabel: '进入沟通',
+    actionLabel: '直接进入',
     icon: MessageSquareText,
   },
   {
@@ -62,7 +63,7 @@ function CapabilityCardView({
 }: {
   card: CapabilityCard
   isAuthenticated: boolean
-  onStartCommunicate: () => void
+  onStartCommunicate: (sceneId?: StarterKitScene['id']) => void
 }) {
   const Icon = card.icon
   const href = card.href
@@ -70,12 +71,26 @@ function CapabilityCardView({
     : undefined
 
   return (
-    <article className="flex h-full flex-col rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+    <article className="flex h-full flex-col rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex size-11 items-center justify-center rounded-2xl bg-orange-50 text-orange-700">
         <Icon className="size-5" aria-hidden="true" />
       </div>
-      <h2 className="mt-6 text-balance text-2xl font-semibold text-stone-950">{card.title}</h2>
+      <h2 className="mt-5 text-balance text-2xl font-semibold text-stone-950">{card.title}</h2>
       <p className="mt-3 text-pretty text-sm leading-7 text-stone-600">{card.summary}</p>
+      {card.id === 'communicate' ? (
+        <div className="mt-5 grid grid-cols-2 gap-2" aria-label="沟通场景">
+          {STARTER_KIT_SCENES.slice(0, 6).map((scene) => (
+            <button
+              key={scene.id}
+              className="min-h-11 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-left text-sm font-medium text-stone-800 transition-colors hover:border-orange-300 hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+              onClick={() => onStartCommunicate(scene.id)}
+              type="button"
+            >
+              {scene.title}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-auto pt-7">
         {card.id === 'communicate' ? (
           <Button
@@ -145,20 +160,20 @@ export default function HomeDashboard({
       </header>
 
       <main className="flex-1" id="main-content">
-        <section className="px-5 pb-12 pt-14 sm:px-8 sm:pb-16 sm:pt-20">
+        <section className="px-5 pb-10 pt-10 sm:px-8 sm:pb-16 sm:pt-20">
           <div className="mx-auto max-w-7xl">
             <div className="max-w-3xl">
               <p className="text-sm font-semibold text-orange-700">让系统理解你真正想说的话</p>
-              <h1 className="mt-4 text-balance text-4xl font-semibold leading-tight text-stone-950 sm:text-5xl">
+              <h1 className="mt-3 text-balance text-4xl font-semibold leading-tight text-stone-950 sm:mt-4 sm:text-5xl">
                 先把重要的话，说出去。
               </h1>
               <p className="mt-5 max-w-2xl text-pretty text-base leading-8 text-stone-600 sm:text-lg">
                 沟通、练习和准备在同一条路上。你始终可以打断、改写和重新开始。
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-7 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
                 <Button
-                  className="h-12 rounded-xl bg-stone-950 px-6 text-sm font-semibold text-white hover:bg-stone-800"
+                  className="h-12 rounded-xl bg-stone-950 px-4 text-sm font-semibold text-white hover:bg-stone-800 sm:px-6"
                   onClick={() => onStartCommunicate()}
                   type="button"
                 >
@@ -167,7 +182,7 @@ export default function HomeDashboard({
                 </Button>
                 <Button
                   asChild
-                  className="h-12 rounded-xl border-stone-300 bg-white px-6 text-sm font-semibold text-stone-800 hover:bg-stone-50"
+                  className="h-12 rounded-xl border-stone-300 bg-white px-4 text-sm font-semibold text-stone-800 hover:bg-stone-50 sm:px-6"
                   type="button"
                   variant="outline"
                 >
@@ -176,7 +191,7 @@ export default function HomeDashboard({
               </div>
             </div>
 
-            <div className="mt-12 grid gap-5 lg:grid-cols-3">
+            <div className="mt-9 grid gap-4 sm:mt-12 lg:grid-cols-3 lg:gap-5">
               {CAPABILITY_CARDS.map((card) => (
                 <CapabilityCardView
                   card={card}

@@ -69,7 +69,7 @@ export default function HomePage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.22),_transparent_28%),linear-gradient(180deg,_#fffaf2_0%,_#fffdf9_46%,_#fff7ed_100%)] flex items-center justify-center">
+      <div className="flex min-h-dvh items-center justify-center bg-stone-50">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600">正在准备燃言首页...</p>

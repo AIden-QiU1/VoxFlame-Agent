@@ -19,6 +19,25 @@
 
 ## 最新收口
 
+0. 2026-08-13 Web 与 Mobile 的信息架构和响应式交互继续收口
+   - Web 首页、沟通页、训练入口按“入口选择 -> 当前工作台 -> 训练回顾 / 沟通档案”分层；功能没有删除，只把低频说明、报告和匿名活动移出首屏主动作区。
+   - Web 沟通页在从首页带入场景时不再重复渲染场景选择大卡；手机顶栏改为紧凑动作区，返回、短句、连接和账号控件保持可触达，账号入口触控区提升到 44px。
+   - Web 训练首页明确拆成“20 词能力筛查”和“训练与收集”两个主任务；训练主题、自定义材料进入第二层；今日 / 7 天总结和匿名训练活动收进原生可访问的“训练回顾”折叠区。
+   - Web 训练与首页移动布局补齐 `h-dvh`、`text-balance/text-pretty`、焦点环、44px 关键动作、窄屏换行和实体表面约束；去掉训练入口和启动态的背景渐变。
+   - Mobile 档案编辑器去掉不必要的 non-null assertion；材料、画像、短句操作行在窄屏自动换行，避免组合按钮挤压。
+   - 已验证：Web 71 项测试、`npx tsc --noEmit`、Next production build、Playwright 390x844 / 1440x900 首页截图、未登录 `/contribute` 跳转与 console smoke；Mobile check/typecheck。
+   - 当前仍不能宣称 App 100% 替代 Web：必须补 Android/iOS 真机的登录、沟通 RTC、训练 RTC + 原生录音并行、最终转写、上传 / 撤回、TTS / 复制以及档案 CRUD smoke。
+
+0. 2026-08-13 已纠正 Mobile Workbench“只有登录和页面壳、沟通/训练功能近乎为零”的产品与工程偏差
+   - 根因确认：Web 长期承载完整产品逻辑，而 Mobile `0.1.x` 当时明确只是 V1 skeleton；App 虽能建 LiveKit room 和保存本机录音，但没有消费实时文本、confirmed output，也没有正式训练题库、筛查/训练分流和自动收集，因此不能视为 Web 一对一替代
+   - 一对一映射口径收口为“同一业务能力、同一后端事实源、按设备优化交互”，不使用 WebView，也不要求像素级复制桌面布局
+   - Mobile 沟通页已新增：沟通前场景选择、LiveKit user/assistant transcript、常用短句真正发送给 agent、可编辑确认输出、全屏给对方看、原生文本发声、复制；场景继续进入 RTC intent，不在实时工作台里堆主题卡
+   - Mobile 训练页已拆成独立 `20 词能力筛查` 与 `训练收集`；新增 `/api/training/catalog` 直接复用 Web 正式 9 类/9,000+ 句语料，支持每次 120 条分页，录音带 sentence id/category/flow，停止后自动进入现役上传回执链，失败保留本地重试
+   - Web 同步优化：沟通场景上移到首页进入前选择；已有场景进入沟通工作台后不再重复显示大块主题选择；训练首页把筛查从普通主题卡中移出，形成“能力筛查 / 训练与收集”两个清晰任务入口，并移除背景渐变
+   - 防回退：Mobile 静态守卫已要求 `RoomEvent.DataReceived / assistant transcript / expo-speech / expo-clipboard / training catalog / training flow metadata`
+   - 已验证：Web 71 项测试、TypeScript、production build；训练目录 `9` 类、筛查 `20/20`、现代文章分页 `4952 total / 120 page`；Playwright `390x844` 首页场景入口 smoke 与训练鉴权跳转；Mobile check、TypeScript、Android `913 modules / 5MB`、iOS `915 modules / 5MB` export
+   - 尚未完成的 App/Web parity：训练实时识别与评分、20 词整组结果、训练日报/周报、自定义材料切句、上传撤回，以及沟通档案完整编辑；这些完成并通过 Android 真机登录/LiveKit/录音/朗读/复制 smoke 前，App 仍不能宣称完全替代 Web
+
 0. 2026-08-13 Web 与 Mobile 前端用户提示已统一收口为简短产品文案
    - Web 与 Mobile 分别建立受控 `product-message` 转换层，后端、第三方 SDK、实时消息和异常对象的原始 `error / message / reason / code` 不再直接进入用户界面；Mobile 不跨目录导入 Next 模块
    - 登录 / 注册 / 短信 / 账号绑定 / 连接 / 麦克风 / 训练录音 / 上传 / 短语 / 记忆快照均迁移到白名单中文提示；默认一句话，只说明问题和下一步

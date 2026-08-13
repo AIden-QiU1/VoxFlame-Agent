@@ -73,7 +73,7 @@ export function CommunicationStarterKit({
   )
 
   return (
-    <section className="rounded-[28px] border border-amber-200 bg-white/90 p-6 shadow-sm">
+    <section className="rounded-[28px] border border-amber-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-sm font-semibold text-amber-700">第一句话</p>
@@ -119,7 +119,7 @@ export function CommunicationStarterKit({
         })}
       </div>
 
-      <div className="mt-5 rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-5">
+      <div className="mt-5 rounded-3xl border border-amber-100 bg-amber-50 p-5">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="text-base font-semibold text-gray-900">{selectedScene.title}</div>

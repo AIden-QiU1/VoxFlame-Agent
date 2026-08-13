@@ -2684,11 +2684,16 @@ export class SupabaseService {
   /**
    * 更新短语
    */
-  async updatePhrase(phraseId: string, updates: Partial<QuickPhrase>): Promise<QuickPhrase | null> {
+  async updatePhrase(
+    phraseId: string,
+    userId: string,
+    updates: Partial<QuickPhrase>,
+  ): Promise<QuickPhrase | null> {
     const { data, error } = await this.adminClient
       .from('quick_phrases')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', phraseId)
+      .eq('user_id', userId)
       .select()
       .single();
 
@@ -2702,11 +2707,12 @@ export class SupabaseService {
   /**
    * 删除短语
    */
-  async deletePhrase(phraseId: string): Promise<boolean> {
+  async deletePhrase(phraseId: string, userId: string): Promise<boolean> {
     const { error } = await this.adminClient
       .from('quick_phrases')
       .delete()
-      .eq('id', phraseId);
+      .eq('id', phraseId)
+      .eq('user_id', userId);
 
     if (error) {
       console.error('Error deleting phrase:', error);
@@ -2718,12 +2724,13 @@ export class SupabaseService {
   /**
    * 增加短语使用次数
    */
-  async incrementPhraseUsage(phraseId: string): Promise<QuickPhrase | null> {
+  async incrementPhraseUsage(phraseId: string, userId: string): Promise<QuickPhrase | null> {
     // 首先获取当前短语
     const { data: current } = await this.adminClient
       .from('quick_phrases')
       .select('*')
       .eq('id', phraseId)
+      .eq('user_id', userId)
       .single();
 
     if (!current) {
@@ -2738,6 +2745,7 @@ export class SupabaseService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', phraseId)
+      .eq('user_id', userId)
       .select()
       .single();
 
@@ -2751,7 +2759,10 @@ export class SupabaseService {
   /**
    * 批量更新短语顺序
    */
-  async reorderPhrases(phraseOrders: Array<{ id: string; order_index: number }>): Promise<boolean> {
+  async reorderPhrases(
+    userId: string,
+    phraseOrders: Array<{ id: string; order_index: number }>,
+  ): Promise<boolean> {
     // Supabase 不支持批量更新，需要逐个更新
     // 使用事务保证一致性
     const updates = phraseOrders.map(({ id, order_index }) =>
@@ -2759,6 +2770,7 @@ export class SupabaseService {
         .from('quick_phrases')
         .update({ order_index, updated_at: new Date().toISOString() })
         .eq('id', id)
+        .eq('user_id', userId)
     );
 
     // 并发执行所有更新

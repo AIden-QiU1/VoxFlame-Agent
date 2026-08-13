@@ -6,6 +6,7 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -16,6 +17,8 @@ import {
   View,
 } from 'react-native'
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar'
+import * as Clipboard from 'expo-clipboard'
+import * as Speech from 'expo-speech'
 
 import { getMobileRuntimeConfig } from './src/api/mobile-config'
 import { useMobileAuth } from './src/auth/use-mobile-auth'
@@ -29,7 +32,11 @@ import {
   type MobileWorkbenchSurfaceId,
 } from './src/constants/surfaces'
 import type { MobileWorkspaceReadModel } from './src/contracts/workspace-read-model'
-import type { MobileWorkbenchRecorderQueueItem } from './src/contracts/workbench-contracts'
+import type { MobileWorkspaceSnapshotContract } from './src/contracts/workspace-read-model'
+import type {
+  MobileWorkbenchRecorderQueueItem,
+  MobileWorkbenchScene,
+} from './src/contracts/workbench-contracts'
 import {
   type MobileDiagnosticSyncStatus,
   useMobileDiagnostics,
@@ -40,6 +47,19 @@ import { buildMobileWorkbenchRtcSessionIntent } from './src/realtime/rtc-session
 import { useMobileRtcSession } from './src/realtime/use-mobile-rtc-session'
 import { useMobileWorkspaceSnapshot } from './src/workspace/use-mobile-workspace'
 import { toMobileProductMessage } from './src/ui/product-message'
+import { useMobileTrainingCatalog } from './src/training/use-mobile-training-catalog'
+import {
+  analyzeMobileTrainingAttempt,
+  summarizeMobileAssessment,
+  type MobileAssessmentAttempt,
+  type MobileTrainingFeedback,
+} from './src/training/mobile-training-feedback'
+import { buildMobilePreparedMaterialExercises } from './src/training/prepared-material-practice'
+import { useMobileMemoryEditor } from './src/memory/use-mobile-memory-editor'
+import type {
+  MobileTrainingCategory,
+  MobileTrainingExercise,
+} from './src/training/training-catalog'
 
 const LOCAL_PREPARED_LINES = [
   '请等我说完，我会用手机把重点给你看。',
@@ -52,6 +72,19 @@ const LOCAL_QUICK_PHRASES = [
   '我需要一点时间',
   '请不要替我回答',
   '我想重新说一遍',
+]
+
+const MOBILE_COMMUNICATION_SCENES: Array<{
+  id: MobileWorkbenchScene
+  label: string
+  description: string
+}> = [
+  { id: 'interview', label: '求职 / 面试', description: '先守住表达权，再说结论和例子。' },
+  { id: 'work', label: '工作协作', description: '先说判断、风险和下一步。' },
+  { id: 'stranger', label: '陌生人开口', description: '先说明节奏，再说当前诉求。' },
+  { id: 'medical', label: '就医沟通', description: '先说症状、位置和需要的帮助。' },
+  { id: 'family', label: '家人 / 照护', description: '先说需求，保留自己回答的空间。' },
+  { id: 'emergency', label: '紧急求助', description: '先把危险、位置和求助动作说清。' },
 ]
 
 const COLORS = {
@@ -145,22 +178,48 @@ export default function App() {
     enabled: auth.status === 'signed_in',
   })
   const liveKitRoom = useLiveKitRoomConnection()
+  const trainingRtcSession = useMobileRtcSession({
+    apiBaseUrl: config.apiBaseUrl,
+    tokenProvider: auth.tokenProvider,
+    enabled: auth.status === 'signed_in',
+  })
+  const trainingLiveKitRoom = useLiveKitRoomConnection()
+  const trainingCatalog = useMobileTrainingCatalog({
+    apiBaseUrl: config.apiBaseUrl,
+    enabled: auth.status === 'signed_in',
+    tokenProvider: auth.tokenProvider,
+  })
+  const memoryEditor = useMobileMemoryEditor({
+    apiBaseUrl: config.apiBaseUrl,
+    userId: auth.user?.id ?? null,
+    tokenProvider: auth.tokenProvider,
+    enabled: auth.status === 'signed_in',
+  })
   const [activeSurfaceId, setActiveSurfaceId] =
     useState<MobileWorkbenchSurfaceId>('communication')
   const [practiceText, setPracticeText] = useState('')
   const [displayPhrase, setDisplayPhrase] = useState('')
+  const [confirmedOutput, setConfirmedOutput] = useState('')
+  const [communicationScene, setCommunicationScene] = useState<MobileWorkbenchScene | null>(null)
+
+  const selectCommunicationScene = (scene: MobileWorkbenchScene | null): void => {
+    if (scene && scene !== communicationScene) {
+      rtcSession.clear()
+    }
+    setCommunicationScene(scene)
+  }
 
   const rtcIntent = useMemo(
     () => buildMobileWorkbenchRtcSessionIntent({
       surfaceId: 'communication',
-      scene: 'work',
+      scene: communicationScene ?? 'stranger',
       deviceContext: {
         microphoneStatus: 'unknown',
         networkOnline: true,
         appState: 'active',
       },
     }),
-    [],
+    [communicationScene],
   )
   const preparedLines = workspace.readModel.priorityLines.length > 0
     ? workspace.readModel.priorityLines
@@ -168,6 +227,12 @@ export default function App() {
   const quickPhrases = workspace.readModel.quickPhrases.length > 0
     ? workspace.readModel.quickPhrases
     : LOCAL_QUICK_PHRASES
+
+  useEffect(() => {
+    if (liveKitRoom.latestAssistantTranscript) {
+      setConfirmedOutput(liveKitRoom.latestAssistantTranscript)
+    }
+  }, [liveKitRoom.latestAssistantTranscript])
 
   useEffect(() => {
     if (liveKitRoom.status !== 'connected') {
@@ -285,10 +350,27 @@ export default function App() {
     await rtcSession.stop()
   }
 
+  const ensureTrainingConnection = async (): Promise<boolean> => {
+    if (trainingLiveKitRoom.status === 'connected') return true
+    const intent = buildMobileWorkbenchRtcSessionIntent({
+      surfaceId: 'practice',
+      mode: 'training',
+      deviceContext: { microphoneStatus: 'available', networkOnline: true, appState: 'active' },
+    })
+    const session = trainingRtcSession.session ?? await trainingRtcSession.start(intent)
+    return session ? await trainingLiveKitRoom.connect(session) : false
+  }
+
+  const stopTrainingSession = async (): Promise<void> => {
+    await trainingLiveKitRoom.disconnect()
+    await trainingRtcSession.stop()
+  }
+
   const signOut = async (): Promise<void> => {
     if (rtcSession.session) {
       await stopCommunication()
     }
+    if (trainingRtcSession.session) await stopTrainingSession()
     await auth.signOut()
   }
 
@@ -319,6 +401,9 @@ export default function App() {
       )
     ) {
       void stopCommunication()
+    }
+    if (surfaceId !== 'practice' && trainingRtcSession.session) {
+      void stopTrainingSession()
     }
 
     setActiveSurfaceId(surfaceId)
@@ -354,14 +439,22 @@ export default function App() {
             <CommunicationScreen
               connectionStatus={liveKitRoom.status}
               displayPhrase={displayPhrase}
+              confirmedOutput={confirmedOutput}
               errorMessage={friendlyError(
                 liveKitRoom.errorMessage ?? rtcSession.errorMessage,
               )}
               onPhrasePress={setDisplayPhrase}
+              onConfirmedOutputChange={setConfirmedOutput}
+              onSendText={(text) => liveKitRoom.sendText(text)}
               onStart={() => void startCommunication()}
               onStop={() => void stopCommunication()}
               preparedLines={preparedLines}
               quickPhrases={quickPhrases}
+              currentUserTranscript={liveKitRoom.currentUserTranscript}
+              latestUserTranscript={liveKitRoom.latestUserTranscript}
+              scene={communicationScene}
+              scenes={MOBILE_COMMUNICATION_SCENES}
+              onSceneChange={selectCommunicationScene}
               starting={rtcSession.status === 'starting'}
             />
           ) : null}
@@ -371,8 +464,12 @@ export default function App() {
               dailyTarget={workspace.readModel.dailyTargetCount}
               onPracticeTextChange={setPracticeText}
               practiceText={practiceText}
+              preparedExpression={workspace.snapshot?.prepared_expression ?? null}
               preparedLines={preparedLines}
               queue={recorderQueue}
+              catalog={trainingCatalog}
+              ensureTrainingConnection={ensureTrainingConnection}
+              trainingConnection={trainingLiveKitRoom}
             />
           ) : null}
 
@@ -382,6 +479,8 @@ export default function App() {
               loading={workspace.status === 'loading'}
               onRefresh={workspace.refresh}
               readModel={workspace.readModel}
+              snapshot={workspace.snapshot}
+              editor={memoryEditor}
             />
           ) : null}
 
@@ -693,29 +792,82 @@ function AppHeader({ email, status }: { email: string; status: string }) {
 }
 
 function CommunicationScreen({
+  confirmedOutput,
   connectionStatus,
+  currentUserTranscript,
   displayPhrase,
   errorMessage,
+  latestUserTranscript,
+  onConfirmedOutputChange,
   onPhrasePress,
+  onSceneChange,
+  onSendText,
   onStart,
   onStop,
   preparedLines,
   quickPhrases,
+  scene,
+  scenes,
   starting,
 }: {
+  confirmedOutput: string
   connectionStatus: string
+  currentUserTranscript: string
   displayPhrase: string
   errorMessage: string | null
+  latestUserTranscript: string
+  onConfirmedOutputChange(value: string): void
   onPhrasePress(phrase: string): void
+  onSceneChange(scene: MobileWorkbenchScene | null): void
+  onSendText(text: string): Promise<boolean>
   onStart(): void
   onStop(): void
   preparedLines: string[]
   quickPhrases: string[]
+  scene: MobileWorkbenchScene | null
+  scenes: Array<{ id: MobileWorkbenchScene; label: string; description: string }>
   starting: boolean
 }) {
+  const [showPartnerView, setShowPartnerView] = useState(false)
+  const [outputStatus, setOutputStatus] = useState<string | null>(null)
   const connected = connectionStatus === 'connected' || connectionStatus === 'reconnecting'
   const busy = connectionStatus === 'connecting' || connectionStatus === 'disconnecting' || starting
   const leadPhrase = displayPhrase || preparedLines[0]
+  const liveTranscript = currentUserTranscript || latestUserTranscript
+
+  const usePhrase = async (phrase: string): Promise<void> => {
+    onPhrasePress(phrase)
+    onConfirmedOutputChange(phrase)
+    if (connected) {
+      await onSendText(phrase)
+    }
+  }
+
+  const speakConfirmedOutput = (): void => {
+    const text = confirmedOutput.trim()
+    if (!text) {
+      setOutputStatus('先写好要朗读的一句话。')
+      return
+    }
+    Speech.stop()
+    Speech.speak(text, {
+      language: 'zh-CN',
+      rate: 0.9,
+      onDone: () => setOutputStatus('朗读完成。'),
+      onError: () => setOutputStatus('朗读没有完成，请重试。'),
+    })
+    setOutputStatus('正在朗读。')
+  }
+
+  const copyConfirmedOutput = async (): Promise<void> => {
+    const text = confirmedOutput.trim()
+    if (!text) {
+      setOutputStatus('先写好要复制的一句话。')
+      return
+    }
+    await Clipboard.setStringAsync(text)
+    setOutputStatus('已复制，可以粘贴到其他应用。')
+  }
 
   return (
     <View style={styles.screen}>
@@ -725,6 +877,38 @@ function CommunicationScreen({
         <Text style={styles.pageCopy}>你随时可以停下、重说，或直接把文字给对方看。</Text>
       </View>
 
+      {!scene ? (
+        <View style={styles.taskCard}>
+          <Text style={styles.taskCardEyebrow}>先选当前场景</Text>
+          <Text style={styles.taskCardTitle}>让助手先知道这次最重要什么</Text>
+          <View style={styles.categoryList}>
+            {scenes.map((item) => (
+              <Pressable
+                accessibilityRole="button"
+                key={item.id}
+                onPress={() => onSceneChange(item.id)}
+                style={({ pressed }) => [styles.categoryRow, pressed ? styles.pressed : null]}
+              >
+                <View style={styles.categoryCopy}>
+                  <Text style={styles.categoryTitle}>{item.label}</Text>
+                  <Text style={styles.mutedText}>{item.description}</Text>
+                </View>
+                <Text style={styles.phraseArrow}>›</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {scene ? <><View style={styles.sceneBar}>
+        <View style={styles.sceneBarCopy}>
+          <Text style={styles.cardLabel}>当前场景</Text>
+          <Text style={styles.categoryTitle}>{scenes.find((item) => item.id === scene)?.label}</Text>
+        </View>
+        {!connected ? (
+          <SecondaryButton compact label="更换" onPress={() => onSceneChange(null)} />
+        ) : null}
+      </View>
       <View style={styles.communicationCard}>
         <View style={styles.connectionRow}>
           <View style={[styles.liveDot, connected ? styles.liveDotActive : null]} />
@@ -738,16 +922,41 @@ function CommunicationScreen({
           tone={connected ? 'neutral' : 'accent'}
         />
         {errorMessage ? <InlineMessage tone="danger" text={errorMessage} /> : null}
-      </View>
+      </View></> : null}
 
-      <SectionHeader title="常用短句" />
+      {scene && (connected || liveTranscript || confirmedOutput) ? (
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>实时理解</Text>
+          <Text style={styles.liveTranscript}>
+            {liveTranscript || '开始说话后，系统听到的内容会出现在这里。'}
+          </Text>
+          <Text style={styles.fieldLabel}>给对方看的这一句</Text>
+          <TextInput
+            accessibilityLabel="确认输出"
+            multiline
+            onChangeText={onConfirmedOutputChange}
+            placeholder="助手整理后的文本会出现在这里，也可以直接输入。"
+            placeholderTextColor={COLORS.subtle}
+            style={styles.practiceInput}
+            value={confirmedOutput}
+          />
+          <View style={styles.outputActions}>
+            <SecondaryButton label="给对方看" onPress={() => setShowPartnerView(true)} />
+            <SecondaryButton label="文本发声" onPress={speakConfirmedOutput} />
+            <SecondaryButton label="复制" onPress={() => void copyConfirmedOutput()} />
+          </View>
+          {outputStatus ? <Text style={styles.outputStatus}>{outputStatus}</Text> : null}
+        </View>
+      ) : null}
+
+      {scene ? <><SectionHeader title="常用短句" />
       <View style={styles.phraseList}>
         {quickPhrases.slice(0, 6).map((phrase) => (
           <Pressable
             accessibilityHint="将这句话放大显示"
             accessibilityRole="button"
             key={phrase}
-            onPress={() => onPhrasePress(phrase)}
+            onPress={() => void usePhrase(phrase)}
             style={({ pressed }) => [
               styles.phraseButton,
               displayPhrase === phrase ? styles.phraseButtonActive : null,
@@ -758,34 +967,108 @@ function CommunicationScreen({
             <Text style={styles.phraseArrow}>›</Text>
           </Pressable>
         ))}
-      </View>
+      </View></> : null}
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setShowPartnerView(false)}
+        transparent={false}
+        visible={showPartnerView}
+      >
+        <SafeAreaView style={styles.partnerView}>
+          <Text style={styles.partnerLabel}>请看这句话</Text>
+          <Text selectable style={styles.partnerText}>
+            {confirmedOutput.trim() || '请给我一点时间。'}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowPartnerView(false)}
+            style={styles.partnerCloseButton}
+          >
+            <Text style={styles.partnerCloseText}>返回沟通</Text>
+          </Pressable>
+        </SafeAreaView>
+      </Modal>
     </View>
   )
 }
 
 function PracticeScreen({
+  catalog,
   dailyTarget,
+  ensureTrainingConnection,
   onPracticeTextChange,
   practiceText,
+  preparedExpression,
   preparedLines,
   queue,
+  trainingConnection,
 }: {
+  catalog: ReturnType<typeof useMobileTrainingCatalog>
   dailyTarget: number
+  ensureTrainingConnection(): Promise<boolean>
   onPracticeTextChange(value: string): void
   practiceText: string
+  preparedExpression: MobileWorkspaceSnapshotContract['prepared_expression']
   preparedLines: string[]
   queue: ReturnType<typeof useNativeRecorderQueue>
+  trainingConnection: ReturnType<typeof useLiveKitRoomConnection>
 }) {
-  const targetText = practiceText.trim() || preparedLines[0] || '输入想练习的一句话'
+  const [flow, setFlow] = useState<'home' | 'assessment' | 'collection' | 'material'>('home')
+  const [selectedExercise, setSelectedExercise] = useState<MobileTrainingExercise | null>(null)
+  const [exerciseIndex, setExerciseIndex] = useState(0)
+  const [activeCaptureId, setActiveCaptureId] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<MobileTrainingFeedback | null>(null)
+  const [assessmentAttempts, setAssessmentAttempts] = useState<MobileAssessmentAttempt[]>([])
+  const [showRecordings, setShowRecordings] = useState(false)
+  const materialExercises = useMemo(
+    () => buildMobilePreparedMaterialExercises(preparedExpression),
+    [preparedExpression],
+  )
+  const visibleExercises = flow === 'material' ? materialExercises : catalog.exercises
+  const visibleTotal = flow === 'material' ? materialExercises.length : catalog.total
+  const selectedCategory = catalog.categories.find(
+    (category) => category.id === catalog.selectedCategory,
+  )
+  const targetText = practiceText.trim() || selectedExercise?.text || preparedLines[0] || '输入想练习的一句话'
+  const assessmentSummary = summarizeMobileAssessment(
+    assessmentAttempts,
+    flow === 'assessment' ? visibleTotal : 20,
+  )
+
+  useEffect(() => {
+    setSelectedExercise(visibleExercises[0] ?? null)
+    setExerciseIndex(0)
+  }, [flow, visibleExercises])
+
+  useEffect(() => {
+    if (!practiceText.trim()) setFeedback(null)
+  }, [practiceText])
+
+  const openAssessment = (): void => {
+    const assessment = catalog.categories.find((category) => category.kind === 'assessment')
+    if (assessment) {
+      setFlow('assessment')
+      void catalog.selectCategory(assessment.id)
+    }
+  }
+
+  const selectCollectionCategory = (category: MobileTrainingCategory): void => {
+    setFlow('collection')
+    setFeedback(null)
+    void catalog.selectCategory(category.id)
+  }
 
   const confirmDiscard = (item: MobileWorkbenchRecorderQueueItem): void => {
     Alert.alert(
       '删除这条录音？',
-      '删除后无法恢复；已经上传的训练资产不会一起删除。',
+      item.syncStatus === 'uploaded' || item.syncStatus === 'indexed'
+        ? '将同时撤回云端训练资产并删除本机录音。这个操作无法恢复。'
+        : '将删除本机录音。这个操作无法恢复。',
       [
         { text: '取消', style: 'cancel' },
         {
-          text: '删除本机录音',
+          text: item.syncStatus === 'uploaded' || item.syncStatus === 'indexed' ? '撤回并删除' : '删除录音',
           style: 'destructive',
           onPress: () => void queue.discard(item.recordingId),
         },
@@ -793,16 +1076,226 @@ function PracticeScreen({
     )
   }
 
+  const startTrainingAttempt = async (): Promise<void> => {
+    setFeedback(null)
+    const connected = await ensureTrainingConnection()
+    if (!connected) return
+    const captureId = `mobile-training-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const announced = await trainingConnection.startTrainingCapture(captureId, flow === 'assessment')
+    if (!announced) return
+    setActiveCaptureId(captureId)
+    await queue.startRecording(targetText, {
+      sentenceId: selectedExercise?.id,
+      source: flow === 'assessment' ? 'mobile_assessment' : flow === 'material' ? 'mobile_prepared_material' : 'mobile_training_catalog',
+      metadata: {
+        exercise_category: selectedExercise?.category,
+        training_flow: flow,
+        client_capture_id: captureId,
+      },
+    })
+  }
+
+  const stopAndAnalyze = async (): Promise<void> => {
+    const captureId = activeCaptureId
+    if (!captureId) return
+    setActiveCaptureId(null)
+    const [item] = await Promise.all([
+      queue.stopRecording(),
+      trainingConnection.stopTrainingCapture(captureId),
+    ])
+    if (!item) return
+    const heardText = await trainingConnection.waitForFinalTranscript(captureId)
+    const exercise = selectedExercise ?? { id: item.recordingId, text: targetText, category: '自定义练习' }
+    const nextFeedback = analyzeMobileTrainingAttempt(exercise, heardText)
+    setFeedback(nextFeedback)
+    const enrichedItem = await queue.attachRecognition(item.recordingId, heardText, {
+      kind: 'training_result',
+      exercise_id: exercise.id,
+      exercise_text: exercise.text,
+      target_text: exercise.text,
+      raw_transcript: heardText,
+      recognized_text: heardText,
+      feedback_status: nextFeedback.status,
+      clarity_score: nextFeedback.status === 'excellent'
+        ? 0.95
+        : nextFeedback.status === 'close' ? 0.78 : nextFeedback.status === 'retry' ? 0.48 : 0.2,
+      missing_chars: nextFeedback.missingChars,
+      extra_chars: nextFeedback.extraChars,
+      ...(flow === 'material' && preparedExpression
+        ? { prepared_expression_id: preparedExpression.id }
+        : {}),
+    })
+    if (enrichedItem) await queue.uploadRecording(enrichedItem.recordingId, enrichedItem)
+    if (flow === 'assessment' && selectedExercise) {
+      setAssessmentAttempts((current) => {
+        const attempt = {
+          exerciseId: selectedExercise.id,
+          targetText: selectedExercise.text,
+          heardText,
+          normalizedTarget: nextFeedback.normalizedTarget,
+          missingChars: nextFeedback.missingChars,
+        }
+        return [...current.filter((entry) => entry.exerciseId !== selectedExercise.id), attempt]
+      })
+    }
+  }
+
+  const selectExerciseAt = (index: number): void => {
+    const bounded = Math.max(0, Math.min(visibleExercises.length - 1, index))
+    setExerciseIndex(bounded)
+    setSelectedExercise(visibleExercises[bounded] ?? null)
+    onPracticeTextChange('')
+    setFeedback(null)
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.heroHeading}>
-        <Text style={styles.eyebrow}>今天练习</Text>
-        <Text style={styles.pageTitle}>一次只练一句</Text>
-        <Text style={styles.pageCopy}>目标 {dailyTarget} 句。录音会先留在本机，由你决定是否上传。</Text>
+        <Text style={styles.eyebrow}>练习</Text>
+        <Text style={styles.pageTitle}>
+          {flow === 'assessment' ? '20 词能力筛查' : flow === 'collection' ? '训练与收集' : '先选这次要做什么'}
+        </Text>
+        <Text style={styles.pageCopy}>
+          {flow === 'assessment'
+            ? '按顺序完成整组，只做训练分层，不替代医学评估。'
+            : flow === 'collection'
+              ? `今天建议 ${dailyTarget} 句。每次只专注当前这一句。`
+              : '筛查和训练是两件事，分开完成会更清楚。'}
+        </Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.fieldLabel}>这次想练</Text>
+      {flow === 'home' ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            onPress={openAssessment}
+            style={({ pressed }) => [styles.taskCard, pressed ? styles.pressed : null]}
+          >
+            <Text style={styles.taskCardEyebrow}>第一次或想重新了解自己</Text>
+            <Text style={styles.taskCardTitle}>开始 20 词能力筛查</Text>
+            <Text style={styles.taskCardCopy}>固定 20 词，完成整组后才显示训练分层。</Text>
+          </Pressable>
+          <View style={styles.taskCard}>
+            <Text style={styles.taskCardEyebrow}>今天继续练</Text>
+            <Text style={styles.taskCardTitle}>选择训练与收集主题</Text>
+            <Text style={styles.taskCardCopy}>使用与网页版同一份主题目录和训练题库。</Text>
+            <View style={styles.categoryList}>
+              {catalog.categories.filter((category) => category.kind === 'collection').map((category) => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={category.id}
+                  onPress={() => selectCollectionCategory(category)}
+                  style={({ pressed }) => [styles.categoryRow, pressed ? styles.pressed : null]}
+                >
+                  <View style={styles.categoryCopy}>
+                    <Text style={styles.categoryTitle}>{category.label}</Text>
+                    <Text numberOfLines={2} style={styles.mutedText}>{category.description}</Text>
+                  </View>
+                  <Text style={styles.categoryCount}>{category.count} 句</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          {preparedLines.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setFlow('material')
+                setFeedback(null)
+              }}
+              style={({ pressed }) => [styles.taskCard, pressed ? styles.pressed : null]}
+            >
+              <Text style={styles.taskCardEyebrow}>为下一次沟通准备</Text>
+              <Text style={styles.taskCardTitle}>练习我的材料</Text>
+              <Text style={styles.taskCardCopy}>使用沟通档案中的材料，不混入公共题库。</Text>
+            </Pressable>
+          ) : null}
+          {preparedExpression?.training_reports ? (
+            <View style={styles.trainingReportPreview}>
+              <View style={styles.sectionIntro}>
+                <Text style={styles.sectionTitle}>训练回顾</Text>
+                <Text style={styles.mutedText}>只看下一步，不做压力报表。</Text>
+              </View>
+              <View style={styles.reportItem}>
+                <Text style={styles.cardLabel}>今天</Text>
+                <Text style={styles.reportText}>{preparedExpression.training_reports.daily_summary?.summary ?? '今天继续练几句后会自动更新。'}</Text>
+              </View>
+              <View style={styles.reportItem}>
+                <Text style={styles.cardLabel}>最近 7 天</Text>
+                <Text style={styles.reportText}>{preparedExpression.training_reports.weekly_summary?.summary ?? '积累更多真实训练后再看稳定规律。'}</Text>
+              </View>
+              {preparedExpression.training_reports.training_plan?.items.length ? (
+                <Text style={styles.mutedText}>下一步：{preparedExpression.training_reports.training_plan.items[0]}</Text>
+              ) : null}
+            </View>
+          ) : null}
+          {catalog.status === 'loading' ? <ActivityIndicator color={COLORS.accent} /> : null}
+          {catalog.errorMessage ? <InlineMessage tone="danger" text={catalog.errorMessage} /> : null}
+        </>
+      ) : (
+        <>
+          <Pressable accessibilityRole="button" onPress={() => setFlow('home')} style={styles.textAction}>
+            <Text style={styles.textActionText}>← 返回练习选择</Text>
+          </Pressable>
+
+          <View style={styles.trainingStage}>
+            <View style={styles.trainingProgressRow}>
+              <Text style={styles.cardLabel}>{flow === 'material' ? '我的材料' : selectedCategory?.label ?? '训练题库'}</Text>
+              <Text style={styles.trainingProgressText}>{exerciseIndex + 1} / {visibleTotal || 1}</Text>
+            </View>
+            <Text style={styles.trainingTarget}>{targetText}</Text>
+            <View style={styles.recordingMeta}>
+              <Text style={styles.recordingMetaText}>
+                {queue.isRecording ? '正在听你说' : feedback ? '本次反馈' : `麦克风${permissionLabel(queue.permissionStatus)}`}
+              </Text>
+              <Text style={styles.timer}>{formatDuration(queue.durationMs)}</Text>
+            </View>
+            <PrimaryButton
+              label={queue.isRecording ? '说完了' : flow === 'assessment' ? '开始说这个词' : '开始说这句话'}
+              onPress={() => {
+                if (queue.isRecording) {
+                  void stopAndAnalyze()
+                } else {
+                  void startTrainingAttempt()
+                }
+              }}
+              tone={queue.isRecording ? 'neutral' : 'accent'}
+            />
+            {friendlyError(queue.errorMessage) ? (
+              <InlineMessage tone="danger" text={friendlyError(queue.errorMessage) ?? ''} />
+            ) : null}
+            {feedback ? (
+              <View style={styles.feedbackPanel}>
+                <Text style={styles.feedbackLabel}>系统听到</Text>
+                <Text style={styles.feedbackHeard}>{feedback.normalizedHeard || '暂时没有听清'}</Text>
+                <Text style={styles.feedbackSummary}>{feedback.summary}</Text>
+                <Text style={styles.mutedText}>{feedback.suggestion}</Text>
+              </View>
+            ) : null}
+            {flow === 'assessment' ? (
+              <View style={styles.assessmentProgress}>
+                <Text style={styles.categoryTitle}>{assessmentSummary.label}</Text>
+                <Text style={styles.mutedText}>{assessmentSummary.summary}</Text>
+              </View>
+            ) : null}
+            <View style={styles.stepActions}>
+              <SecondaryButton disabled={exerciseIndex === 0 || queue.isRecording} label="上一句" onPress={() => selectExerciseAt(exerciseIndex - 1)} />
+              <SecondaryButton disabled={exerciseIndex >= visibleExercises.length - 1 || queue.isRecording} label="下一句" onPress={() => selectExerciseAt(exerciseIndex + 1)} />
+            </View>
+          </View>
+
+          {flow !== 'material' && catalog.exercises.length < catalog.total ? (
+            <SecondaryButton
+              disabled={catalog.status === 'loading'}
+              label={catalog.status === 'loading' ? '正在加载…' : '加载更多句子'}
+              onPress={() => void catalog.loadMore()}
+            />
+          ) : null}
+        </>
+      )}
+
+      {flow === 'home' ? null : <View style={styles.customPracticePanel}>
+        <Text style={styles.fieldLabel}>改成自己的句子</Text>
         <TextInput
           accessibilityLabel="练习句"
           editable={!queue.isRecording}
@@ -813,32 +1306,19 @@ function PracticeScreen({
           style={styles.practiceInput}
           value={practiceText}
         />
-        <View style={styles.recordingMeta}>
-          <Text style={styles.recordingMetaText}>
-            {queue.isRecording ? '正在录音' : `麦克风${permissionLabel(queue.permissionStatus)}`}
-          </Text>
-          <Text style={styles.timer}>{formatDuration(queue.durationMs)}</Text>
-        </View>
-        <PrimaryButton
-          label={queue.isRecording ? '停止并保存' : '开始录音'}
-          onPress={() => {
-            if (queue.isRecording) {
-              void queue.stopRecording()
-            } else {
-              void queue.startRecording(targetText)
-            }
-          }}
-          tone={queue.isRecording ? 'neutral' : 'accent'}
-        />
-        {friendlyError(queue.errorMessage) ? (
-          <InlineMessage tone="danger" text={friendlyError(queue.errorMessage) ?? ''} />
-        ) : null}
-        {queue.lastUploadReceipt ? (
-          <InlineMessage tone="success" text="录音已安全上传。" />
-        ) : null}
-      </View>
+        <Text style={styles.mutedText}>输入后会替换上方目标句；录音仍会自动保存，失败时留在本机。</Text>
+      </View>}
 
-      <SectionHeader
+      {flow === 'home' ? null : <><Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showRecordings }}
+        onPress={() => setShowRecordings((value) => !value)}
+        style={styles.recordingDisclosure}
+      >
+        <Text style={styles.sectionTitle}>录音记录</Text>
+        <Text style={styles.sectionAside}>{queue.items.length} 条 · {showRecordings ? '收起' : '查看'}</Text>
+      </Pressable>
+      {showRecordings ? <><SectionHeader
         aside={`${queue.items.length} 条`}
         title="本机录音"
       />
@@ -888,22 +1368,70 @@ function PracticeScreen({
             </View>
           ))}
         </View>
-      )}
+      )}</> : null}</>}
     </View>
   )
 }
 
 function MemoryScreen({
+  editor,
   errorMessage,
   loading,
   onRefresh,
   readModel,
+  snapshot,
 }: {
+  editor: ReturnType<typeof useMobileMemoryEditor>
   errorMessage: string | null
   loading: boolean
   onRefresh(): void
   readModel: MobileWorkspaceReadModel
+  snapshot: MobileWorkspaceSnapshotContract | null
 }) {
+  const [section, setSection] = useState<'overview' | 'materials' | 'profile' | 'phrases'>('overview')
+  const [materialId, setMaterialId] = useState<string | undefined>()
+  const [materialTitle, setMaterialTitle] = useState('')
+  const [materialContent, setMaterialContent] = useState('')
+  const [profileDocument, setProfileDocument] = useState('')
+  const [profileScenarios, setProfileScenarios] = useState('')
+  const [profileStrategies, setProfileStrategies] = useState('')
+  const [phraseId, setPhraseId] = useState<string | undefined>()
+  const [phraseText, setPhraseText] = useState('')
+  const busy = loading || editor.status === 'loading' || editor.status === 'saving'
+
+  useEffect(() => {
+    const profile = snapshot?.user_profile_memory
+    setProfileDocument(profile?.document ?? '')
+    setProfileScenarios((profile?.common_scenarios ?? []).join('\n'))
+    setProfileStrategies((profile?.support_strategies ?? []).join('\n'))
+  }, [snapshot?.user_profile_memory])
+
+  const editMaterial = (id?: string): void => {
+    const asset = editor.library?.assets.find((item) => item.draft.id === id)
+    setMaterialId(asset?.draft.id)
+    setMaterialTitle(asset?.draft.title ?? '')
+    setMaterialContent(asset?.draft.content ?? '')
+  }
+
+  const saveMaterial = async (): Promise<void> => {
+    if (!materialTitle.trim() || !materialContent.trim()) return
+    const saved = await editor.saveMaterial({
+      id: materialId,
+      title: materialTitle.trim(),
+      content: materialContent.trim(),
+      make_active: !materialId,
+    })
+    if (saved) {
+      editMaterial(undefined)
+      onRefresh()
+    }
+  }
+
+  const splitLines = (value: string): string[] => value
+    .split(/\n|，|；/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
   return (
     <View style={styles.screen}>
       <View style={styles.heroHeading}>
@@ -912,7 +1440,26 @@ function MemoryScreen({
         <Text style={styles.pageCopy}>这里与网页版使用同一份沟通档案。</Text>
       </View>
 
-      <View style={styles.card}>
+      <View accessibilityRole="tablist" style={styles.segmentedTabs}>
+        {([
+          ['overview', '概览'],
+          ['materials', '材料'],
+          ['profile', '画像'],
+          ['phrases', '短句'],
+        ] as const).map(([id, label]) => (
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: section === id }}
+            key={id}
+            onPress={() => setSection(id)}
+            style={[styles.segmentedTab, section === id ? styles.segmentedTabActive : null]}
+          >
+            <Text style={[styles.segmentedTabText, section === id ? styles.segmentedTabTextActive : null]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {section === 'overview' ? <><View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderCopy}>
             <Text style={styles.cardLabel}>下一次重点</Text>
@@ -955,6 +1502,116 @@ function MemoryScreen({
           </View>
         ))}
       </View>
+
+      <SectionHeader title="训练回顾" />
+      <View style={styles.reportGrid}>
+        <View style={styles.reportItem}>
+          <Text style={styles.cardLabel}>今天</Text>
+          <Text style={styles.reportText}>
+            {snapshot?.prepared_expression?.training_reports?.daily_summary?.summary
+              ?? '完成练习后，今天最值得继续的重点会出现在这里。'}
+          </Text>
+        </View>
+        <View style={styles.reportItem}>
+          <Text style={styles.cardLabel}>最近 7 天</Text>
+          <Text style={styles.reportText}>
+            {snapshot?.prepared_expression?.training_reports?.weekly_summary?.summary
+              ?? '积累几次练习后，再看稳定规律，不急着给自己下结论。'}
+          </Text>
+        </View>
+      </View>
+      </> : null}
+
+      {section === 'materials' ? <>
+        <View style={styles.sectionIntro}>
+          <Text style={styles.sectionTitle}>自定义材料</Text>
+          <Text style={styles.mutedText}>保存后会同步到 Web，并可直接进入训练切句。</Text>
+        </View>
+        {(editor.library?.assets ?? []).map((asset) => {
+          const active = editor.library?.active_asset_id === asset.draft.id
+          return (
+            <View key={asset.draft.id} style={[styles.libraryItem, active ? styles.libraryItemActive : null]}>
+              <View style={styles.cardHeader}>
+                <View style={styles.cardHeaderCopy}>
+                  <Text style={styles.cardTitle}>{asset.draft.title}</Text>
+                  <Text numberOfLines={2} style={styles.mutedText}>{asset.structured.summary}</Text>
+                </View>
+                {active ? <Text style={styles.activeBadge}>正在使用</Text> : null}
+              </View>
+              <View style={styles.actionRow}>
+                {!active ? <SecondaryButton label="设为当前" onPress={() => void editor.activateMaterial(asset.draft.id).then(onRefresh)} /> : null}
+                <SecondaryButton label="编辑" onPress={() => editMaterial(asset.draft.id)} />
+                <SecondaryButton destructive label="删除" onPress={() => Alert.alert(
+                  '删除这份材料？',
+                  'Web 和 App 中都会删除，无法恢复。',
+                  [
+                    { text: '取消', style: 'cancel' },
+                    { text: '删除', style: 'destructive', onPress: () => void editor.deleteMaterial(asset.draft.id).then(onRefresh) },
+                  ],
+                )} />
+              </View>
+            </View>
+          )
+        })}
+        <View style={styles.editorPanel}>
+          <Text style={styles.cardTitle}>{materialId ? '编辑材料' : '新增材料'}</Text>
+          <TextInput accessibilityLabel="材料标题" editable={!busy} onChangeText={setMaterialTitle} placeholder="例如：下次复诊要说的话" placeholderTextColor={COLORS.subtle} style={styles.input} value={materialTitle} />
+          <TextInput accessibilityLabel="材料正文" editable={!busy} multiline onChangeText={setMaterialContent} placeholder="粘贴或输入完整材料" placeholderTextColor={COLORS.subtle} style={[styles.practiceInput, styles.materialInput]} value={materialContent} />
+          <View style={styles.actionRow}>
+            {materialId ? <SecondaryButton label="取消编辑" onPress={() => editMaterial(undefined)} /> : null}
+            <PrimaryButton disabled={busy || !materialTitle.trim() || !materialContent.trim()} label={busy ? '正在保存…' : '保存材料'} onPress={() => void saveMaterial()} />
+          </View>
+        </View>
+      </> : null}
+
+      {section === 'profile' ? <View style={styles.editorPanel}>
+        <Text style={styles.cardTitle}>我的沟通画像</Text>
+        <Text style={styles.mutedText}>只写对沟通有帮助的事实，不需要医学化描述自己。</Text>
+        <Text style={styles.fieldLabel}>希望别人怎样理解我</Text>
+        <TextInput accessibilityLabel="沟通画像" editable={!busy} multiline onChangeText={setProfileDocument} placeholder="例如：我理解没有问题，但需要更多时间把话说完整。" placeholderTextColor={COLORS.subtle} style={styles.practiceInput} value={profileDocument} />
+        <Text style={styles.fieldLabel}>常见场景（每行一项）</Text>
+        <TextInput accessibilityLabel="常见沟通场景" editable={!busy} multiline onChangeText={setProfileScenarios} placeholder="工作会议\n就医沟通" placeholderTextColor={COLORS.subtle} style={styles.practiceInput} value={profileScenarios} />
+        <Text style={styles.fieldLabel}>有效支持方式（每行一项）</Text>
+        <TextInput accessibilityLabel="有效支持方式" editable={!busy} multiline onChangeText={setProfileStrategies} placeholder="让我先说完\n必要时看手机文字" placeholderTextColor={COLORS.subtle} style={styles.practiceInput} value={profileStrategies} />
+        <PrimaryButton disabled={busy} label={busy ? '正在保存…' : '保存画像'} onPress={() => void editor.saveProfile({
+          ...snapshot?.user_profile_memory,
+          document: profileDocument.trim(),
+          common_scenarios: splitLines(profileScenarios),
+          support_strategies: splitLines(profileStrategies),
+        }).then((saved) => { if (saved) onRefresh() })} />
+      </View> : null}
+
+      {section === 'phrases' ? <>
+        <View style={styles.sectionIntro}>
+          <Text style={styles.sectionTitle}>常用短句</Text>
+          <Text style={styles.mutedText}>沟通页和 Web 会使用同一份短句。</Text>
+        </View>
+        {editor.phrases.map((phrase) => (
+          <View key={phrase.id} style={styles.phraseEditorRow}>
+            <Text style={styles.preparedText}>{phrase.text}</Text>
+            <View style={styles.compactActions}>
+              <SecondaryButton compact label="编辑" onPress={() => { setPhraseId(phrase.id); setPhraseText(phrase.text) }} />
+              <SecondaryButton compact destructive label="删除" onPress={() => Alert.alert(
+                '删除这条短句？',
+                'Web 和 App 中都会删除。',
+                [{ text: '取消', style: 'cancel' }, { text: '删除', style: 'destructive', onPress: () => void editor.deletePhrase(phrase.id).then(onRefresh) }],
+              )} />
+            </View>
+          </View>
+        ))}
+        <View style={styles.editorPanel}>
+          <Text style={styles.cardTitle}>{phraseId ? '编辑短句' : '新增短句'}</Text>
+          <TextInput accessibilityLabel="常用短句内容" editable={!busy} onChangeText={setPhraseText} placeholder="例如：请让我把这句话说完" placeholderTextColor={COLORS.subtle} style={styles.input} value={phraseText} />
+          <View style={styles.actionRow}>
+            {phraseId ? <SecondaryButton label="取消" onPress={() => { setPhraseId(undefined); setPhraseText('') }} /> : null}
+            <PrimaryButton disabled={busy || !phraseText.trim()} label={busy ? '正在保存…' : '保存短句'} onPress={() => void editor.savePhrase({ id: phraseId, text: phraseText.trim() }).then((saved) => {
+              if (saved) { setPhraseId(undefined); setPhraseText(''); onRefresh() }
+            })} />
+          </View>
+        </View>
+      </> : null}
+
+      {editor.errorMessage ? <InlineMessage tone="danger" text={editor.errorMessage} /> : null}
     </View>
   )
 }
@@ -1377,11 +2034,38 @@ const styles = StyleSheet.create({
     gap: 18,
     padding: 20,
   },
+  sceneBar: {
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    padding: 14,
+  },
+  sceneBarCopy: { flex: 1 },
   connectionRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   liveDot: { backgroundColor: COLORS.subtle, borderRadius: 999, height: 8, width: 8 },
   liveDotActive: { backgroundColor: COLORS.success },
   connectionText: { color: COLORS.muted, fontSize: 13, fontWeight: '700' },
   displayPhrase: { color: COLORS.ink, fontSize: 25, fontWeight: '700', lineHeight: 37 },
+  liveTranscript: { color: COLORS.ink, fontSize: 21, fontWeight: '700', lineHeight: 31 },
+  outputActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  outputStatus: { color: COLORS.muted, fontSize: 13, lineHeight: 20 },
+  partnerView: {
+    alignItems: 'center',
+    backgroundColor: COLORS.ink,
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 28,
+    paddingVertical: 36,
+  },
+  partnerLabel: { color: '#D6CEC6', fontSize: 16, fontWeight: '700' },
+  partnerText: { color: '#FFFFFF', fontSize: 42, fontWeight: '800', lineHeight: 58, textAlign: 'center' },
+  partnerCloseButton: { backgroundColor: '#FFFFFF', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 14 },
+  partnerCloseText: { color: COLORS.ink, fontSize: 15, fontWeight: '800' },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: COLORS.accent,
@@ -1456,6 +2140,56 @@ const styles = StyleSheet.create({
     padding: 14,
     textAlignVertical: 'top',
   },
+  taskCard: {
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 9,
+    padding: 18,
+  },
+  taskCardEyebrow: { color: COLORS.accent, fontSize: 12, fontWeight: '800' },
+  taskCardTitle: { color: COLORS.ink, fontSize: 21, fontWeight: '800', lineHeight: 29 },
+  taskCardCopy: { color: COLORS.muted, fontSize: 14, lineHeight: 22 },
+  trainingStage: { backgroundColor: COLORS.ink, borderRadius: 24, gap: 18, padding: 22 },
+  trainingProgressRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  trainingProgressText: { color: '#CFC7BF', fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800' },
+  trainingTarget: { color: '#FFFFFF', fontSize: 30, fontWeight: '800', lineHeight: 43 },
+  feedbackPanel: { backgroundColor: '#312A25', borderRadius: 16, gap: 6, padding: 15 },
+  feedbackLabel: { color: '#D4A68E', fontSize: 12, fontWeight: '800' },
+  feedbackHeard: { color: '#FFFFFF', fontSize: 21, fontWeight: '800', lineHeight: 30 },
+  feedbackSummary: { color: '#E9E2DB', fontSize: 14, lineHeight: 21 },
+  assessmentProgress: { backgroundColor: COLORS.surfaceMuted, borderRadius: 14, gap: 4, padding: 14 },
+  stepActions: { flexDirection: 'row', gap: 8 },
+  customPracticePanel: { borderTopColor: COLORS.border, borderTopWidth: 1, gap: 10, paddingTop: 18 },
+  recordingDisclosure: { alignItems: 'center', borderTopColor: COLORS.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 56 },
+  categoryList: { gap: 8, marginTop: 6 },
+  categoryRow: {
+    alignItems: 'center',
+    borderTopColor: COLORS.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+  },
+  categoryCopy: { flex: 1, gap: 3 },
+  categoryTitle: { color: COLORS.ink, fontSize: 15, fontWeight: '800' },
+  categoryCount: { color: COLORS.accent, fontSize: 12, fontWeight: '800' },
+  exerciseList: { gap: 8 },
+  exerciseRow: {
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+  },
+  exerciseRowActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
+  exerciseIndex: { color: COLORS.accent, fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800' },
+  exerciseText: { color: COLORS.ink, flex: 1, fontSize: 15, fontWeight: '700', lineHeight: 22 },
   recordingMeta: { flexDirection: 'row', justifyContent: 'space-between' },
   recordingMetaText: { color: COLORS.muted, fontSize: 13 },
   timer: { color: COLORS.ink, fontSize: 14, fontVariant: ['tabular-nums'], fontWeight: '800' },
@@ -1471,7 +2205,7 @@ const styles = StyleSheet.create({
   recordingText: { color: COLORS.ink, fontSize: 16, fontWeight: '700', lineHeight: 24 },
   recordingItemMeta: { flexDirection: 'row', justifyContent: 'space-between' },
   mutedText: { color: COLORS.muted, fontSize: 13, lineHeight: 20 },
-  actionRow: { flexDirection: 'row', gap: 8 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   inlineMessage: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
   inlineMessageDanger: { backgroundColor: COLORS.dangerSoft },
   inlineMessageSuccess: { backgroundColor: COLORS.successSoft },
@@ -1504,6 +2238,23 @@ const styles = StyleSheet.create({
   },
   preparedIndex: { color: COLORS.accent, fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800', paddingTop: 3 },
   preparedText: { color: COLORS.ink, flex: 1, fontSize: 15, lineHeight: 23 },
+  segmentedTabs: { backgroundColor: '#EAE4DC', borderRadius: 14, flexDirection: 'row', gap: 3, padding: 4 },
+  segmentedTab: { alignItems: 'center', borderRadius: 10, flex: 1, justifyContent: 'center', minHeight: 42 },
+  segmentedTabActive: { backgroundColor: COLORS.surface },
+  segmentedTabText: { color: COLORS.muted, fontSize: 13, fontWeight: '700' },
+  segmentedTabTextActive: { color: COLORS.ink, fontWeight: '800' },
+  sectionIntro: { gap: 5, paddingTop: 2 },
+  libraryItem: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 16, borderWidth: 1, gap: 13, padding: 16 },
+  libraryItemActive: { borderColor: COLORS.accent },
+  activeBadge: { backgroundColor: COLORS.accentSoft, borderRadius: 999, color: COLORS.accent, fontSize: 11, fontWeight: '800', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 6 },
+  editorPanel: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 20, borderWidth: 1, gap: 13, padding: 17 },
+  materialInput: { minHeight: 180 },
+  phraseEditorRow: { alignItems: 'flex-start', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 10, padding: 14 },
+  compactActions: { flexDirection: 'row', gap: 6 },
+  reportGrid: { gap: 10 },
+  reportItem: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 16, borderWidth: 1, padding: 16 },
+  reportText: { color: COLORS.ink, fontSize: 14, lineHeight: 23 },
+  trainingReportPreview: { gap: 10, paddingTop: 4 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: COLORS.accentSoft, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
   chipText: { color: '#6E3A24', fontSize: 13, fontWeight: '700' },

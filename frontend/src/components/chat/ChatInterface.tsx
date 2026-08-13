@@ -669,7 +669,7 @@ export default function ChatInterface({
   }), [runtimeScene])
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-[linear-gradient(180deg,_#fcf7ee_0%,_#fffdf9_42%,_#f4efe6_100%)]">
+    <div className="flex h-dvh overflow-hidden bg-stone-50">
       {showPhrasesPanel ? (
         <button
           type="button"
@@ -709,15 +709,15 @@ export default function ChatInterface({
       {/* Main Chat Area */}
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
-      <header className="shrink-0 border-b border-stone-200 bg-white px-4 py-4 sm:px-6">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+      <header className="shrink-0 border-b border-stone-200 bg-white px-3 py-2.5 sm:px-6 sm:py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <div className="flex size-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
               燃
             </div>
-            <div>
-              <div className="text-lg font-semibold text-stone-950">燃言助手</div>
-              <div className="text-sm text-stone-500">沟通工作台</div>
+            <div className="min-w-0">
+              <div className="text-base font-semibold text-stone-950 sm:text-lg">沟通工作台</div>
+              <div className="truncate text-xs text-stone-500 sm:text-sm">{activeStarterScene?.title ?? '燃言助手'}</div>
             </div>
             {sessionId && (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
@@ -731,34 +731,37 @@ export default function ChatInterface({
             )}
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
             {homeHref && (
               onReturnHome ? (
                 <button
                   type="button"
                   onClick={onReturnHome}
-                  className="hidden text-sm text-stone-600 hover:text-stone-950 sm:inline"
+                  className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-950 sm:px-3"
                 >
-                  返回首页
+                  <span className="sm:hidden" aria-hidden="true">←</span>
+                  <span className="hidden sm:inline">返回首页</span>
                 </button>
               ) : (
-                <Link href={homeHref} className="hidden text-sm text-stone-600 hover:text-stone-950 sm:inline">
-                  返回首页
+                <Link href={homeHref} className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-950 sm:px-3">
+                  <span className="sm:hidden" aria-hidden="true">←</span>
+                  <span className="hidden sm:inline">返回首页</span>
                 </Link>
               )
             )}
-            <Link href="/memory" className="hidden text-sm text-stone-600 hover:text-stone-950 lg:inline">
+            <Link href="/memory" className="hidden min-h-11 items-center rounded-xl px-3 text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-950 lg:inline-flex">
               沟通档案
             </Link>
-            <Link href="/contribute" className="hidden text-sm text-stone-600 hover:text-stone-950 lg:inline">
+            <Link href="/contribute" className="hidden min-h-11 items-center rounded-xl px-3 text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-950 lg:inline-flex">
               练习表达
             </Link>
             <button
               type="button"
               onClick={() => setShowPhrasesPanel(true)}
-              className="rounded-full border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950"
+              className="min-h-11 rounded-xl border border-stone-200 px-3 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950 sm:rounded-full sm:px-4"
             >
-              表达工具箱
+              <span className="sm:hidden">短句</span>
+              <span className="hidden sm:inline">表达工具箱</span>
             </button>
             {!isConnected ? (
               <button
@@ -766,21 +769,21 @@ export default function ChatInterface({
                   void connect()
                 }}
                 disabled={isConnecting}
-                className="rounded-full bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600"
+                className="min-h-11 rounded-xl bg-amber-500 px-3 text-sm font-medium text-white transition-colors hover:bg-amber-600 sm:rounded-full sm:px-4"
               >
                 {isConnecting ? '正在连接...' : '连接助手'}
               </button>
             ) : (
               <button
                 onClick={disconnect}
-                className="rounded-full bg-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-300"
+                className="min-h-11 rounded-xl bg-stone-200 px-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-300 sm:rounded-full sm:px-4"
               >
                 断开连接
               </button>
             )}
             <button
               onClick={() => setIsCaptionMode(!isCaptionMode)}
-              className="hidden rounded-full bg-stone-950 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 md:inline-flex"
+              className="hidden min-h-11 rounded-full bg-stone-950 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 md:inline-flex"
             >
               {isCaptionMode ? '退出字幕辅助' : '字幕辅助'}
             </button>
@@ -790,16 +793,15 @@ export default function ChatInterface({
       </header>
 
       {/* Messages Area */}
-      <main ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-        <div className="mx-auto max-w-6xl space-y-6">
-          <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <div className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+      <main ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6">
+        <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
+          {!hasConversationStarted && !initialStarterSceneId ? <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="rounded-3xl border border-stone-200 bg-white p-5 sm:p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-amber-700">先说关键一句</div>
-                  <h1 className="max-w-3xl text-3xl font-semibold text-stone-950 text-balance">
-                    先让对方听懂重点，
-                    <span className="block text-amber-600">后面再慢慢补充</span>
+                  <h1 className="max-w-3xl text-balance text-2xl font-semibold text-stone-950 sm:text-3xl">
+                    先说最重要的一句
                   </h1>
                   <p className="max-w-3xl text-sm leading-6 text-stone-600 text-pretty">
                     如果现在不想从零开始，先点一句场景句。对方停下来后，再继续补第二句、第三句。
@@ -834,11 +836,11 @@ export default function ChatInterface({
               ) : null}
             </div>
 
-            <div className="rounded-[28px] border border-stone-200 bg-stone-100 p-5 shadow-sm">
+            <div className="rounded-3xl border border-stone-200 bg-stone-100 p-5">
               <div className="text-sm font-medium text-stone-700">当前状态</div>
               <div className="mt-3 text-2xl font-semibold text-stone-950">{statusText}</div>
               <div className="mt-2 space-y-2 text-sm text-stone-600">
-                <p>先选场景，再点一句开口句。</p>
+                <p>{activeStarterScene ? `当前场景：${activeStarterScene.title}` : '可以直接开口，也可以用常用短句。'}</p>
                 <p>对方停下来后，再继续补充。</p>
                 <p>如果被打断，就先用短语补一句。</p>
               </div>
@@ -848,29 +850,26 @@ export default function ChatInterface({
                 className="mt-4"
               />
             </div>
-          </section>
+          </section> : null}
 
-          <SessionReadinessPanel
-            intent={sessionIntent}
-            readiness={sessionReadiness}
-            grantedCapabilities={grantedCapabilities}
-            plannedIntent={plannedIntent}
-            title="沟通前准备"
-          />
-
-          <section className="rounded-[24px] border border-stone-200 bg-stone-50 px-5 py-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">
-                隐私边界
-              </span>
-              <p className="text-sm text-stone-700 text-pretty">
-                沟通页默认只做实时理解和纠错，不默认上传原始沟通音频。训练样本上传只发生在训练页。
+          {!hasConversationStarted ? <details className="rounded-2xl border border-stone-200 bg-white">
+            <summary className="min-h-12 cursor-pointer px-4 py-3 text-sm font-medium text-stone-700">
+              本次资料与隐私设置
+            </summary>
+            <div className="space-y-4 border-t border-stone-200 p-4 sm:p-5">
+              <SessionReadinessPanel
+                intent={sessionIntent}
+                readiness={sessionReadiness}
+                grantedCapabilities={grantedCapabilities}
+                plannedIntent={plannedIntent}
+                title="连接准备"
+              />
+              <p className="text-pretty text-sm leading-6 text-stone-700">
+                沟通页默认只做实时理解和纠错，不上传原始沟通音频。训练样本上传只发生在训练页。
               </p>
-            </div>
-          </section>
 
           {communicationLoadout ? (
-            <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm">
+            <section className="rounded-3xl border border-stone-200 bg-stone-50 p-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="text-sm font-medium text-amber-700">本次沟通会用到的资料</div>
@@ -967,9 +966,11 @@ export default function ChatInterface({
               </div>
             </section>
           ) : null}
+            </div>
+          </details> : null}
 
           {/* Welcome message */}
-          {!hasMessageThreadActivity && (
+          {!hasMessageThreadActivity && !initialStarterSceneId && (
             <div className="space-y-4">
               <CommunicationStarterKit
                 disabled={isLaunchingStarter}
@@ -1008,7 +1009,7 @@ export default function ChatInterface({
           ) : null}
 
           {latestAssistantMessage || hasConfirmedOutput ? (
-            <section className="rounded-[32px] border border-stone-200 bg-white p-5 shadow-sm">
+            <section className="rounded-3xl border border-stone-200 bg-white p-4 sm:p-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="text-sm font-medium text-amber-700">确认输出</div>
@@ -1093,7 +1094,7 @@ export default function ChatInterface({
 
           {/* Message list */}
           {hasMessageThreadActivity ? (
-            <section className="rounded-[32px] border border-stone-200 bg-white px-4 py-5 shadow-sm sm:px-6">
+            <section className="rounded-3xl border border-stone-200 bg-white px-4 py-5 sm:px-6">
               <div className="space-y-4">
                 {messages.map((message) => (
                   <MessageBubble key={message.id} message={message} />
@@ -1156,7 +1157,7 @@ export default function ChatInterface({
       )}
 
       {/* Input Area */}
-      <footer className="shrink-0 border-t border-stone-200 bg-white px-4 py-4 sm:px-6">
+      <footer className="shrink-0 border-t border-stone-200 bg-white px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:py-4">
         <div className="mx-auto max-w-6xl">
           {isRecording ? (
             <div className="mb-3 flex items-center gap-3 rounded-[22px] border border-red-100 bg-red-50 px-4 py-2 shadow-sm">

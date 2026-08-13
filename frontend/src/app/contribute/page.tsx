@@ -597,7 +597,7 @@ export default function ContributePage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-stone-50">
+      <div className="flex min-h-dvh items-center justify-center bg-stone-50">
         <div className="text-center text-sm text-gray-600">正在准备训练页...</div>
       </div>
     )
@@ -607,99 +607,79 @@ export default function ContributePage() {
     return null
   }
 
+  const collectionCategories = MANDARIN_TRAINING_CATEGORIES.filter(
+    (category) => category !== '评估筛查',
+  )
+
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_54%,_#f6f4ee_100%)]">
+    <div className="min-h-dvh bg-stone-50">
       <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
-            <Link href="/" className="text-sm font-medium text-amber-700 hover:text-amber-800">
-              返回首页
+            <Link href="/" className="inline-flex min-h-11 items-center text-sm font-medium text-amber-700 hover:text-amber-800">
+              ← 返回首页
             </Link>
-            <h1 className="mt-1 text-2xl font-semibold text-gray-900">训练页</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              先选训练主题，再跳到录音页一条条往下练。
+            <h1 className="text-balance text-2xl font-semibold text-gray-900">练习表达</h1>
+            <p className="mt-1 text-sm text-gray-600 text-pretty">
+              能力筛查和训练收集分开进行，每次只完成一件事。
             </p>
           </div>
-          <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700">
+          <div className="hidden rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700 sm:block">
             当前账号：{user?.email || '已登录用户'}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
-        <section className="grid gap-4 xl:grid-cols-3">
-          <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-medium text-amber-800">当前目标</p>
-            <h2 className="mt-2 text-2xl font-semibold text-gray-900">{dailyPracticeSlogan}</h2>
-            <p className="mt-3 text-sm leading-6 text-gray-600">
-              训练主页面现在只做主题选择，不再把录音区和句子序列直接摊在这里。
+      <main className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-8">
+        <section aria-labelledby="training-task-heading">
+          <div className="mb-4">
+            <p className="text-sm font-medium text-orange-700">先选今天要做的事</p>
+            <h2 id="training-task-heading" className="mt-2 text-balance text-2xl font-semibold text-stone-950">
+              筛查与训练，分开完成
+            </h2>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+          <Link
+            href={getTrainingTopicHref('assessment-screening')}
+            className="flex min-h-56 flex-col rounded-3xl border border-stone-800 bg-stone-950 p-6 text-white shadow-sm transition-colors hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+          >
+            <p className="text-sm font-medium text-orange-200">20 词能力筛查</p>
+            <h2 className="mt-3 text-balance text-2xl font-semibold">完成 20 词筛查</h2>
+            <p className="mt-3 text-pretty text-sm leading-7 text-stone-300">
+              固定词表、独立进度和整组结果，用于选择后续训练强度，不替代医学评估。
             </p>
-          </section>
-
-          <section className="rounded-[28px] border border-stone-200 bg-amber-50 p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-amber-900">今日总结</p>
-                <p className="mt-3 text-sm leading-7 text-gray-700">
-                  {trainingReports?.dailySummary?.summary ?? '今天还没有总结，先选一个主题录第一句。'}
-                </p>
-              </div>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-800">
-                {trainingReports?.dailySummary
-                  ? `${trainingReports.dailySummary.sampleCount} 条`
-                  : '待生成'}
-              </span>
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-stone-200 bg-sky-50 p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-sky-900">最近 7 天总结</p>
-                <p className="mt-3 text-sm leading-7 text-gray-700">
-                  {trainingReports?.weeklySummary?.summary ?? '最近 7 天的稳定规律会在训练积累后自动更新。'}
-                </p>
-              </div>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-sky-800">
-                {trainingReports?.weeklySummary
-                  ? `${trainingReports.weeklySummary.sampleCount} 条`
-                  : '待生成'}
-              </span>
-            </div>
-          </section>
-        </section>
-
-        <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-gray-900">昨日训练榜</p>
-              <p className="mt-2 text-sm leading-6 text-gray-600">
-                只展示匿名名次和录音条数，不展示账号信息。
-              </p>
-            </div>
-            <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-              昨天共 {trainingActivity?.yesterday.total_recordings ?? 0} 句
+            <span className="mt-auto inline-flex min-h-11 w-fit items-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-stone-950">
+              开始筛查
             </span>
-          </div>
-          <div className="mt-4">
-            {renderYesterdayTopContributors(trainingActivity)}
+          </Link>
+
+            <Link
+              href="#training-topics"
+              className="flex min-h-56 flex-col rounded-3xl border border-stone-200 bg-white p-6 shadow-sm transition-colors hover:border-orange-300 hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+            >
+              <p className="text-sm font-medium text-orange-700">训练与收集</p>
+              <h2 className="mt-3 text-balance text-2xl font-semibold text-stone-950">按真实场景练一句</h2>
+              <p className="mt-3 text-pretty text-sm leading-7 text-stone-600">
+                选择主题后进入专注工作台，完成目标句、实时识别、反馈、自动保存和撤回。
+              </p>
+              <span className="mt-auto inline-flex min-h-11 w-fit items-center rounded-xl bg-orange-700 px-4 py-2 text-sm font-semibold text-white">
+                选择训练主题
+              </span>
+            </Link>
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+        <section id="training-topics" className="scroll-mt-4 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-sm font-medium text-amber-800">
-                <Sparkles className="h-4 w-4" />
-                选择训练主题
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold text-gray-900">点一个主题，直接跳到录音页</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
-                主题选择和录音已经分成两层页面。这里负责决定练哪一组，进去后就只做录音、看结果、自动切下一句。
+              <p className="text-sm font-medium text-orange-700">训练与收集主题</p>
+              <h2 className="mt-2 text-balance text-2xl font-semibold text-gray-900">选一个现在会用到的场景</h2>
+              <p className="mt-2 max-w-3xl text-pretty text-sm leading-6 text-gray-600">
+                进入后页面只保留当前句、录音和本次结果；录稳一条会自动切到下一句。
               </p>
             </div>
             <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-              录稳一条后会默认自动切到下一句
+              今天目标：{dailyPracticeSlogan}
             </div>
           </div>
 
@@ -707,7 +687,7 @@ export default function ContributePage() {
             {preparedExpression ? (
               <Link
                 href={getTrainingTopicHref('custom-material')}
-                className="rounded-[22px] border border-amber-300 bg-amber-50 px-5 py-5 text-left shadow-sm transition hover:border-amber-400 hover:bg-amber-100"
+                className="min-h-44 rounded-[22px] border border-amber-300 bg-amber-50 px-5 py-5 text-left shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -727,7 +707,7 @@ export default function ContributePage() {
             ) : (
               <Link
                 href="/memory#memory-custom-material-editor"
-                className="rounded-[22px] border border-dashed border-stone-300 bg-stone-50 px-5 py-5 text-left transition hover:border-amber-300 hover:bg-white"
+                className="min-h-44 rounded-[22px] border border-dashed border-stone-300 bg-stone-50 px-5 py-5 text-left transition-colors hover:border-amber-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
               >
                 <p className="text-sm font-semibold text-gray-900">自定义训练</p>
                 <p className="mt-3 text-sm leading-6 text-gray-600">
@@ -736,13 +716,13 @@ export default function ContributePage() {
               </Link>
             )}
 
-            {MANDARIN_TRAINING_CATEGORIES.map((category) => {
+            {collectionCategories.map((category) => {
               const meta = MANDARIN_TRAINING_CATEGORY_META[category]
               return (
                 <Link
                   key={category}
                   href={getTrainingTopicHref(getTrainingTopicIdForCategory(category))}
-                  className="rounded-[22px] border border-stone-200 bg-white px-5 py-5 text-left transition hover:border-amber-300 hover:bg-amber-50"
+                  className="min-h-44 rounded-[22px] border border-stone-200 bg-white px-5 py-5 text-left transition-colors hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
                 >
                   <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
                   <p className="mt-2 text-sm leading-6 text-gray-600">{meta.description}</p>
@@ -759,6 +739,51 @@ export default function ContributePage() {
             })}
           </div>
         </section>
+
+        <details className="rounded-2xl border border-stone-200 bg-white">
+          <summary className="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-500">
+            <span>训练回顾</span>
+            <span className="text-xs font-normal text-stone-500">今日、7 天与匿名活动</span>
+          </summary>
+          <div className="space-y-4 border-t border-stone-200 p-5 sm:p-6">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <section className="rounded-2xl bg-amber-50 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-amber-950">今日总结</h3>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-800">
+                    {trainingReports?.dailySummary ? `${trainingReports.dailySummary.sampleCount} 条` : '待生成'}
+                  </span>
+                </div>
+                <p className="mt-3 text-pretty text-sm leading-7 text-stone-700">
+                  {trainingReports?.dailySummary?.summary ?? '今天还没有总结，先选一个主题录第一句。'}
+                </p>
+              </section>
+              <section className="rounded-2xl bg-stone-100 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-stone-950">最近 7 天</h3>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">
+                    {trainingReports?.weeklySummary ? `${trainingReports.weeklySummary.sampleCount} 条` : '待生成'}
+                  </span>
+                </div>
+                <p className="mt-3 text-pretty text-sm leading-7 text-stone-700">
+                  {trainingReports?.weeklySummary?.summary ?? '最近 7 天的稳定规律会在训练积累后自动更新。'}
+                </p>
+              </section>
+            </div>
+            <section className="rounded-2xl border border-stone-200 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-stone-950">昨日匿名活动</h3>
+                  <p className="mt-1 text-pretty text-sm text-stone-600">只展示匿名名次和录音条数，不展示账号信息。</p>
+                </div>
+                <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
+                  昨天共 {trainingActivity?.yesterday.total_recordings ?? 0} 句
+                </span>
+              </div>
+              <div className="mt-4">{renderYesterdayTopContributors(trainingActivity)}</div>
+            </section>
+          </div>
+        </details>
       </main>
     </div>
   )
@@ -1668,7 +1693,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-stone-50">
+      <div className="flex min-h-dvh items-center justify-center bg-stone-50">
         <div className="text-center text-sm text-gray-600">正在准备训练页...</div>
       </div>
     )
@@ -1680,7 +1705,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
   if (!currentExercise) {
     return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_54%,_#f6f4ee_100%)]">
+      <div className="min-h-dvh bg-stone-50">
         <header className="border-b border-stone-200 bg-white">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
             <div>
@@ -1725,9 +1750,9 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_54%,_#f6f4ee_100%)]">
+    <div className="min-h-dvh bg-stone-50">
       <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
             <Link href="/contribute" className="inline-flex items-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800">
               <ArrowLeft className="h-4 w-4" />
@@ -1738,7 +1763,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
               {topicSelection.description}
             </p>
           </div>
-          <div className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700">
+          <div className="hidden rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700 sm:block">
             当前账号：{user?.email || '已登录用户'}
           </div>
         </div>
@@ -1750,7 +1775,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         </div>
       ) : null}
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+      <main className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-8">
         <section className="order-2 grid gap-4 sm:grid-cols-3 xl:order-none">
           {currentProgressStats.map((stat) => (
             <div
@@ -2103,7 +2128,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
           <section className="order-1 space-y-6 xl:order-2">
             {!isAssessmentTopic ? (
-              <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+              <section className="hidden rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm lg:block">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium text-amber-800">每日目标</p>
@@ -2137,7 +2162,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
               </section>
             ) : null}
 
-            <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
+            <section className="rounded-3xl border border-stone-200 bg-white p-4 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">

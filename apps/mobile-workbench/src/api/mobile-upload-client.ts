@@ -22,6 +22,10 @@ interface UploadCompleteResponse {
   manifestAlreadySynced?: boolean
 }
 
+interface UploadDiscardResponse {
+  success: boolean
+}
+
 function buildApiUrl(apiBaseUrl: string, path: string): string {
   return `${apiBaseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`
 }
@@ -173,7 +177,7 @@ export async function uploadMobileRecorderQueueItem(
       body: JSON.stringify({
         audioPath: storagePath,
         text: item.text,
-        recognizedText: null,
+        recognizedText: item.recognizedText ?? null,
         sentenceId: item.sentenceId ?? null,
         duration: item.recording.audio.durationSeconds,
         source: 'mobile_workbench_native_recorder',
@@ -201,5 +205,36 @@ export async function uploadMobileRecorderQueueItem(
     message: completePayload.manifestAlreadySynced
       ? '这条移动端录音已经写入训练资产，本次重试已安全复用。'
       : '移动端录音已上传并写入训练资产。',
+  }
+}
+
+export async function discardMobileRecorderQueueItem(
+  item: MobileWorkbenchRecorderQueueItem,
+  options: MobileWorkbenchClientOptions,
+): Promise<void> {
+  const authHeaders = await getAuthorizationHeader(options.tokenProvider)
+  const response = await fetch(
+    buildApiUrl(options.apiBaseUrl, '/upload/contribution'),
+    {
+      method: 'DELETE',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contributionId: item.uploadReceipt?.contributionId ?? null,
+        audioPath: item.uploadReceipt?.storagePath ?? null,
+        recordingId: item.recordingId,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(`mobile_upload_discard_${response.status}`)
+  }
+
+  const payload = await parseJsonResponse<UploadDiscardResponse>(response)
+  if (!payload.success) {
+    throw new Error('mobile_upload_discard_failed')
   }
 }

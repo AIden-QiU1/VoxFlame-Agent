@@ -122,6 +122,29 @@ export async function updateNativeRecorderQueueItemStatus(
   return nextItems
 }
 
+export async function updateNativeRecorderQueueItemRecognition(
+  recordingId: string,
+  recognizedText: string,
+  metadata: Record<string, unknown>,
+): Promise<MobileWorkbenchRecorderQueueItem[]> {
+  const items = await loadNativeRecorderQueue()
+  const nextItems = items.map((item) => (
+    item.recordingId === recordingId
+      ? {
+        ...item,
+        recognizedText: recognizedText.trim() || null,
+        metadata: {
+          ...item.metadata,
+          ...metadata,
+        },
+      }
+      : item
+  ))
+
+  await saveNativeRecorderQueue(nextItems)
+  return nextItems
+}
+
 export async function removeNativeRecorderQueueItem(
   recordingId: string,
 ): Promise<MobileWorkbenchRecorderQueueItem[]> {

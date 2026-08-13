@@ -97,8 +97,14 @@ export class PhrasesController {
    */
   async updatePhrase(req: Request, res: Response): Promise<void> {
     try {
+      const authenticatedUserId = req.user?.id
       const { phraseId } = req.params
       const { text, category, order_index } = req.body
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: '未授权 - 无用户上下文' })
+        return
+      }
 
       if (!phraseId) {
         res.status(400).json({ error: '缺少 phraseId 参数' })
@@ -110,7 +116,11 @@ export class PhrasesController {
       if (category !== undefined) updates.category = category
       if (order_index !== undefined) updates.order_index = order_index
 
-      const updated = await SupabaseService.getInstance().updatePhrase(phraseId, updates)
+      const updated = await SupabaseService.getInstance().updatePhrase(
+        phraseId,
+        authenticatedUserId,
+        updates,
+      )
 
       if (!updated) {
         res.status(404).json({ error: '短语不存在或更新失败' })
@@ -129,14 +139,23 @@ export class PhrasesController {
    */
   async deletePhrase(req: Request, res: Response): Promise<void> {
     try {
+      const authenticatedUserId = req.user?.id
       const { phraseId } = req.params
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: '未授权 - 无用户上下文' })
+        return
+      }
 
       if (!phraseId) {
         res.status(400).json({ error: '缺少 phraseId 参数' })
         return
       }
 
-      const success = await SupabaseService.getInstance().deletePhrase(phraseId)
+      const success = await SupabaseService.getInstance().deletePhrase(
+        phraseId,
+        authenticatedUserId,
+      )
 
       if (!success) {
         res.status(404).json({ error: '短语不存在或删除失败' })
@@ -155,14 +174,23 @@ export class PhrasesController {
    */
   async incrementUsage(req: Request, res: Response): Promise<void> {
     try {
+      const authenticatedUserId = req.user?.id
       const { phraseId } = req.params
+
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: '未授权 - 无用户上下文' })
+        return
+      }
 
       if (!phraseId) {
         res.status(400).json({ error: '缺少 phraseId 参数' })
         return
       }
 
-      const updated = await SupabaseService.getInstance().incrementPhraseUsage(phraseId)
+      const updated = await SupabaseService.getInstance().incrementPhraseUsage(
+        phraseId,
+        authenticatedUserId,
+      )
 
       if (!updated) {
         res.status(404).json({ error: '短语不存在或更新失败' })
@@ -202,7 +230,10 @@ export class PhrasesController {
       }
 
       // phrase_orders 格式: [{ id: string, order_index: number }, ...]
-      const success = await SupabaseService.getInstance().reorderPhrases(phrase_orders)
+      const success = await SupabaseService.getInstance().reorderPhrases(
+        authenticatedUserId,
+        phrase_orders,
+      )
 
       if (!success) {
         res.status(500).json({ error: '批量更新失败' })

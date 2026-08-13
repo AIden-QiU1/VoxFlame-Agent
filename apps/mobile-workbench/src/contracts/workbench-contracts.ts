@@ -166,6 +166,7 @@ export interface MobileWorkbenchRecorderQueueItem {
   contributorId: string
   text: string
   sentenceId?: string
+  recognizedText?: string | null
   source?: string
   surface: MobileWorkbenchSurfaceId
   metadata: Record<string, unknown>
