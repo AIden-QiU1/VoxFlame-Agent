@@ -226,6 +226,8 @@ bash scripts/ops/configure-android-release-github.sh
 
 After the workflow commit reaches `main`, run `Android Preview Release` once with `workflow_dispatch`. Later Mobile changes under `apps/mobile-workbench/**` publish automatically after they are pushed to `main`.
 
+If GitHub-hosted Actions cannot start because the account is billing-locked, production uses the equivalent `voxflame-android-main-sync.timer` fallback. It checks public `origin/main` every five minutes from an isolated, disposable checkout, builds only when Mobile or Android release files changed, caches the artifact by commit, and publishes through the same restricted SSH receiver. The timer never reads or modifies the developer working tree.
+
 The permanent URL is sent with `Cache-Control: no-store`, and each successful release keeps `VoxFlame-Android.previous.apk` plus its metadata for rollback. Trigger the complete release after Mobile changes pass review and land on `main`; do not rebuild on every editor save.
 
 The app environment is public-client only. Before building for a real phone, set `EXPO_PUBLIC_API_BASE_URL` to the computer or server address the phone can reach, such as `http://192.168.1.23:3001/api`. Do not use `127.0.0.1` for a physical phone.

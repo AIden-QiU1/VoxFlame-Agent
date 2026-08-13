@@ -1,0 +1,12 @@
+[Unit]
+Description=Check origin/main for VoxFlame Android releases
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30s
+Persistent=true
+Unit=voxflame-android-main-sync.service
+
+[Install]
+WantedBy=timers.target
