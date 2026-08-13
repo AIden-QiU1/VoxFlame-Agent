@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - 'apps/mobile-workbench/**'
+      - '!apps/mobile-workbench/**/*.md'
       - 'scripts/release-android-preview.sh'
       - 'scripts/publish-android-artifact.sh'
       - '.github/workflows/android-preview-release.yml'

@@ -29,11 +29,16 @@
 
 0. 2026-08-13 Android 官网下载与 App 包发布已收口为本站稳定直链和单一自动发布事务
    - 根因确认：生产下载页仍注入 Expo build 详情页 URL，Caddy 虽已有 `/download/android` 规则，但旧容器没有挂载 `releases/android`；页面文案“本站直下”与真实发布链漂移
-   - 已生成并发布 Android `0.1.3`（build `4`），EAS build `b1874d89-afe4-4238-acf4-cc13c3b0080f`，本站 APK 为 `114244393` bytes，SHA-256 `b24368571a2592fd57a539d2b894e191cf140df7b67200dca646ceebee1c7c05`
+   - 已生成并发布 Android `0.1.4`（build `5`），EAS build `9de8d084-f201-4817-8665-a11565eafbfc`，本站 APK 为 `114244777` bytes，SHA-256 `f29db506b74190f8b3c72cc05d991d74c31b390277527f01c60ab827a2faf4a4`
    - `https://voxember.com/download` 的 Android 按钮固定使用同域 `/download/android`，不再暴露或跳转 Expo；线上 APK 响应为 `200/206 + application/vnd.android.package-archive + attachment`，并禁用缓存
    - 新增 `npm run release:android:preview`：校验 Mobile、按最新 EAS build 递增版本、云构建、下载校验、原子替换、保留上一版、仅重建 Caddy、验证公网直链；`npm run sync:android:latest` 可在发布后半程中断时只同步最新成品，不重复云构建
    - App 包不会随源码保存自动变化；当前正确触发点是 Mobile 改动通过检查并进入 `main` 后执行上述发布事务。已安装 App 的 JS/资源 OTA 仍未启用，原生依赖、权限和 Expo SDK 变化始终必须重建 APK
    - 已验证：Mobile check/typecheck、EAS build、APK ZIP、版本 metadata、Caddy release mount、frontend 单服务生产构建/health、官网 HTML 无 Expo URL、APK Range 下载
+   - GitHub Actions 自动发布代码已就绪：`main` 的 `apps/mobile-workbench/**` 变更会执行检查、EAS APK 构建、SHA/ZIP 校验和生产原子替换；生产 APK 已迁到 `/srv/voxflame/android`，Caddy 只读挂载该目录
+   - 生产发布使用无 sudo 的 `voxflame-release` 专用账号，部署 key 被 SSH forced-command 限制为只接收 APK 与 metadata，不能执行任意服务器命令；受限 SSH 同版本重发与公网 Range 已实测通过
+   - GitHub CLI 与 `production` environment secrets 已配置；手动 workflow、AI Guard 和 CodeQL 都在 runner 分配前被账户 billing lock 拦截，因此 `ANDROID_AUTO_RELEASE_ENABLED` 暂保持 `false`
+   - 生产 fallback 已启用：`voxflame-android-main-sync.timer` 每 5 分钟从隔离 checkout 检查 `origin/main`，仅 Mobile/Android 发布代码变化时构建，按 commit 缓存 APK，并通过同一 forced-command SSH receiver 原子发布
+   - fallback 首轮已完成 `0.1.4 (5)` 构建、ZIP/SHA 校验、发布和公网 Range 验证；紧随其后的同 SHA 检查正确 no-op。EAS CLI 配置目录权限问题也已修复进 systemd unit
 
 0. 2026-08-12 腾讯云短信签名已完成报备，短信登录进入真实发送与端到端验收阶段
    - 签名管理已确认：ID `713027`，签名内容为“上海生声不息科技有限公司”，用途为验证码/通知，状态可用（正常），报备成功；营销用途仍未报备，不用于登录短信
