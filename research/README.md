@@ -1,0 +1,88 @@
+# VoxFlame Research
+
+`research/` 是当前应用的研究唯一入口。这里不复制模型仓库的实验原始事实，而是回答一个更严格的问题：**哪些证据足以改变 VoxFlame 的产品、模型接入、临床边界或工程实现？**
+
+## 两层事实源
+
+- 上游实验事实源：[CLEAR-VOX-MODEL](../references/clear-vox-model/) submodule。模型代码、数据处理、实验配置、逐实验记录和原始结果都留在那里。
+- 应用研究事实源：本目录。这里只保存经审阅的综合研究、VoxFlame 映射、决策状态和验证要求。
+- 产品与运行时事实源仍是 [产品 PRD](../docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)、[当前任务](../.tasks/current.md) 和实际代码；研究结论不能自行变成运行时能力。
+
+## 五大主题
+
+| 主题 | 目录 | 研究问题 |
+| --- | --- | --- |
+| Voice agent | [`voice-agent/`](voice-agent/) | 实时 agent、ASR/TTS、纠错、上下文、memory、打断和工具边界 |
+| 通用 Agent 系统 | [`agent-systems/`](agent-systems/) | 通用 Agent 底层机制、工程架构、产品化和场景落地；为语音 Agent 提供跨模态对照 |
+| 语音底层与医疗/健康 | [`speech-health/`](speech-health/) | 构音障碍 ASR、声学/音系、训练评估、康复、健康检测及临床边界 |
+| 产品与用户心理 | [`product-psychology/`](product-psychology/) | 创始人即用户、沟通失败、信任、羞耻/疲劳、坚持使用、照护者和无障碍体验 |
+| 应用/全栈与商业化质量 | [`product-engineering/`](product-engineering/) | Web/App/硬件架构、vibe coding 治理、安全、质量、部署与商业化可维护性 |
+
+## 从研究到应用
+
+研究不能只停在“值得关注”。每条准备影响应用的结论都进入 [应用回流登记](APPLICATION_FEEDBACK_REGISTRY.md)，并沿同一条链路推进：
+
+```text
+上游实验 / 论文 / 用户研究
+  -> 证据与限制
+  -> adopt / validate / hold / reject
+  -> 产品或工程 owner
+  -> 最小实现
+  -> 用户 / 指标 / 安全验证
+  -> PRD、任务与代码
+```
+
+状态含义：
+
+- `adopt`：证据和应用边界足够明确，可以进入实施计划。
+- `validate`：有希望但证据未达到部署门槛，只允许做隔离实验或小流量验证。
+- `hold`：缺关键证据、资源、授权或临床复核，暂不进入实现。
+- `reject`：已被实验否定或与产品边界冲突，禁止换名后重复引入。
+
+新增研究使用 [研究模板](templates/RESEARCH_NOTE_TEMPLATE.md)；从模型实验提炼应用结论使用 [实验回流模板](templates/EXPERIMENT_TO_APPLICATION_TEMPLATE.md)。涉及语音的通用 Agent 研究还应按 [`agent-systems/README.md`](agent-systems/README.md) 补齐跨模态对照。
+
+## 来源与实时更新
+
+- [来源注册表](SOURCE_REGISTRY.yaml)：五个主题的官方、专业、行业和探索性来源，包含抓取方式、更新周期、备用来源与许可边界。
+- [来源路由与更新规范](SOURCE_ROUTING.md)：决定先搜什么、如何抓取、如何处理失败和如何回流证据。
+- [专家/学者/博主雷达](EXPERT_WATCHLIST.yaml)：中外学者、工程师、临床专家及机构社媒的待核验清单。社媒只负责发现和实时动态，重要结论必须回到论文、标准、官方文档、代码或机构页面。
+
+## 端到端 Harness
+
+- [研究 Harness](RESEARCH_HARNESS.md)：统一 `研究 → 发现 → 证据 → 实验 → 学术/专利 → 产品场景 → 反馈优化` 的生命周期、状态和硬门禁。
+- [Pipeline registry](PIPELINE.yaml)：每个研究机会的唯一 `research_id` 和阶段索引。
+- [Feedback registry](FEEDBACK_REGISTRY.yaml)：用户、沟通伙伴、专家、遥测和失败样本的优化输入。
+- [Evidence package](evidence/RO-000.yaml)：强证据、独立复核、可复现性和成果/产品门禁的事实包模板。
+- [Outcome review](outcome-reviews/RO-000.md)：每个研究机会必须挂载的初步成果审查/改进建议报告。
+
+所有论文、专利和产品试点都必须关联同一 `research_id`，并通过独立证据包；没有强证据只能保持候选、内部研究或隔离试点状态。
+
+发布论文、专利、公开数据/代码、产品默认能力，或把 idea 扩大到新用户/病因/语言/设备/场景之前，必须通过证据包中的 `authority_gate`。闸门未通过时只能 `internal_only` 或 `hold`，不能对外宣称或扩大承诺。
+
+国内成果初审规则见 [国内成果初步审查与改进建议](OUTCOME_REVIEW.md)。论文、专利、软件著作权和产品分别使用不同检查项；初步审查报告只能帮助发现材料缺口和改进方向，不能替代版权登记、专利代理/法律意见或期刊同行评审。
+
+## CLEAR-VOX-MODEL 使用方式
+
+首次克隆当前仓库：
+
+```bash
+git clone --recurse-submodules <VoxFlame-Agent URL>
+```
+
+已有工作树：
+
+```bash
+git submodule sync --recursive
+git submodule update --init --recursive
+```
+
+上游仓库当前是私有仓库，协作者必须同时拥有访问权限。模型权重、数据集或外部对象存储资产仍按上游自己的说明下载；submodule 负责 Git 跟踪的完整代码、文档、实验记录和嵌套仓库。
+
+更新上游版本时，不直接修改 gitlink 后宣称应用已升级。先阅读上游 `modules/dsr/R&D/Qwen3-ASR/EXP/EXP-INDEX.md` 与相关 EXP，再更新本目录 registry，完成应用侧验证后才能更改部署配置。
+
+## 医疗与健康边界
+
+- 研究检测信号不等于诊断、治疗建议或医疗器械能力。
+- 未经临床专家复核、目标人群验证和合规评估的结果，只能标为研究或训练反馈。
+- 健康数据坚持最小必要收集、明确授权、可撤回和用途隔离。
+- 任何面向用户的健康提示都必须声明能力边界，并为高风险情况提供人工专业支持路径。

@@ -22,6 +22,7 @@ import type {
 import { getValidToken } from '@/lib/supabase/client'
 import { useAuth } from './useAuth'
 import { config } from '@/lib/config'
+import { sanitizeTrainingUploadMetadata } from '@/lib/recording/upload-metadata'
 
 interface UploadOptions {
   /** 录音对应的文本内容 */
@@ -328,7 +329,6 @@ export function useVoiceUpload() {
             collection_mode: normalizedOptions.recording.collectionMode,
             consent_scope: normalizedOptions.consentScope ?? 'training_only',
             source: normalizedOptions.source || 'unknown',
-            user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
             timestamp: normalizedOptions.recording.createdAt,
             storage_type: 'oss',
             audio_format: normalizedOptions.recording.audio.format,
@@ -337,11 +337,6 @@ export function useVoiceUpload() {
             duration_ms: normalizedOptions.recording.audio.durationMs,
             file_size_bytes: normalizedOptions.recording.audio.fileSizeBytes,
             capture_transport: normalizedOptions.recording.audio.captureTransport,
-            microphone_device_id: normalizedOptions.recording.audio.inputDevice?.deviceId,
-            microphone_label: normalizedOptions.recording.audio.inputDevice?.label,
-            selected_microphone_device_id: normalizedOptions.recording.audio.inputDevice?.selectedDeviceId,
-            selected_microphone_label: normalizedOptions.recording.audio.inputDevice?.selectedLabel,
-            microphone_is_system_default: normalizedOptions.recording.audio.inputDevice?.isSystemDefault,
             speech_duration_ms: normalizedOptions.recording.audio.quality?.speechDurationMs,
             leading_silence_ms: normalizedOptions.recording.audio.quality?.leadingSilenceMs,
             trailing_silence_ms: normalizedOptions.recording.audio.quality?.trailingSilenceMs,
@@ -350,7 +345,7 @@ export function useVoiceUpload() {
             input_level_peak: normalizedOptions.recording.audio.quality?.inputLevelPeak,
             audio_quality_disposition: normalizedOptions.recording.audio.quality?.disposition,
             audio_quality_reasons: normalizedOptions.recording.audio.quality?.reasons,
-            ...normalizedOptions.metadata,
+            ...sanitizeTrainingUploadMetadata(normalizedOptions.metadata),
           }
         })
       })

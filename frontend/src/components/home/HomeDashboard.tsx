@@ -12,13 +12,11 @@ import {
 import { Button } from '@/components/ui/button'
 import { IcpBeianFooter } from '@/components/legal/IcpBeianFooter'
 import { buildLoginPath } from '@/lib/auth/navigation'
-import type { StarterKitScene } from '@/lib/communication/starter-kit'
-import { STARTER_KIT_SCENES } from '@/lib/communication/starter-kit'
 import { UserNav } from '@/components/ui/user-nav'
 
 interface HomeDashboardProps {
   isAuthenticated: boolean
-  onStartCommunicate: (sceneId?: StarterKitScene['id']) => void
+  onStartCommunicate: () => void
 }
 
 interface CapabilityCard {
@@ -43,7 +41,7 @@ const CAPABILITY_CARDS: CapabilityCard[] = [
     title: '练一句',
     summary: '用真实会说出口的句子练习，录完马上回听。',
     actionLabel: '开始练习',
-    href: '/contribute',
+    href: '/practice',
     icon: AudioLines,
   },
   {
@@ -63,7 +61,7 @@ function CapabilityCardView({
 }: {
   card: CapabilityCard
   isAuthenticated: boolean
-  onStartCommunicate: (sceneId?: StarterKitScene['id']) => void
+  onStartCommunicate: () => void
 }) {
   const Icon = card.icon
   const href = card.href
@@ -77,20 +75,6 @@ function CapabilityCardView({
       </div>
       <h2 className="mt-5 text-balance text-2xl font-semibold text-stone-950">{card.title}</h2>
       <p className="mt-3 text-pretty text-sm leading-7 text-stone-600">{card.summary}</p>
-      {card.id === 'communicate' ? (
-        <div className="mt-5 grid grid-cols-2 gap-2" aria-label="沟通场景">
-          {STARTER_KIT_SCENES.slice(0, 6).map((scene) => (
-            <button
-              key={scene.id}
-              className="min-h-11 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-left text-sm font-medium text-stone-800 transition-colors hover:border-orange-300 hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-              onClick={() => onStartCommunicate(scene.id)}
-              type="button"
-            >
-              {scene.title}
-            </button>
-          ))}
-        </div>
-      ) : null}
       <div className="mt-auto pt-7">
         {card.id === 'communicate' ? (
           <Button
@@ -122,7 +106,7 @@ export default function HomeDashboard({
   isAuthenticated,
   onStartCommunicate,
 }: HomeDashboardProps) {
-  const practiceHref = isAuthenticated ? '/contribute' : buildLoginPath('/contribute')
+  const practiceHref = isAuthenticated ? '/practice' : buildLoginPath('/practice')
 
   return (
     <div className="flex min-h-dvh flex-col overflow-x-hidden bg-[#f5f1ea] text-stone-950">

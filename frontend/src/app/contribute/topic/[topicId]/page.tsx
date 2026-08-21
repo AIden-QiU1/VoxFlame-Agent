@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import {
   isTrainingTopicId,
   type TrainingTopicId,
@@ -12,6 +12,10 @@ interface TrainingTopicPageProps {
 }
 
 export default function TrainingTopicPage({ params }: TrainingTopicPageProps) {
+  if (params.topicId === 'assessment-screening') {
+    redirect('/assessment')
+  }
+
   if (!isTrainingTopicId(params.topicId)) {
     notFound()
   }

@@ -1,0 +1,15 @@
+feedback_id: FB-xxx
+research_id: RO-xxx
+source: user|communication_partner|clinician|maintainer|telemetry|support|field_observation
+observed_at: 
+scenario: 
+observation: 只记录可观察事实，避免把解释写成事实
+severity: critical|high|medium|low
+failure_type: model|context|tool|ux|device|network|privacy|scenario|data|unknown
+evidence_ref: 
+hypothesis: 可证伪的原因假设
+owner: 
+action: 
+validation: 指标、对照、样本和停止条件
+state: new|triaged|experiment_ready|validating|resolved|rejected|accepted_risk
+resolved_at: 

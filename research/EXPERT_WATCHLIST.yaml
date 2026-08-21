@@ -1,0 +1,39 @@
+version: 2
+updated_at: 2026-08-14
+purpose: >-
+  最小专家雷达。只收少量身份清楚、长期有一手产出的作者；新账号先按单次问题临时核验，
+  不为了“覆盖中外社媒”批量收录。
+rules:
+  - 社媒/博客是 radar，不是 evidence；重要观点必须绑定论文、标准、官方文档、代码或机构页面
+  - 记录作者主页、机构关系、专业范围、发布日期和利益关系
+  - 找不到一手回溯或账号身份不清，降级为临时线索，不进入默认抓取
+experts:
+  - id: lilian-weng
+    name: Lilian Weng
+    language: en
+    topics: [agent-systems]
+    profile_url: https://lilianweng.github.io/
+    channels: [blog]
+    verify_with: [original_papers, official_implementations]
+  - id: simon-willison
+    name: Simon Willison
+    language: en
+    topics: [agent-systems, product-engineering]
+    profile_url: https://simonwillison.net/
+    channels: [blog, newsletter]
+    verify_with: [official_docs, source_repositories]
+  - id: alan-black
+    name: Alan W. Black
+    language: en
+    topics: [voice-agent, speech-health]
+    profile_url: https://www.cs.cmu.edu/~awb/
+    channels: [institution, publications]
+    verify_with: [institution_profile, original_papers, official_projects]
+  - id: chinese-expert-search
+    name: 中文专家按需检索入口
+    language: zh
+    topics: [voice-agent, speech-health, agent-systems, product-psychology, product-engineering]
+    profile_url: null
+    channels: [CNKI, PubMed, university_sites, professional_societies, WeChat, Zhihu, Bilibili]
+    verify_with: [institution_profile, paper_or_standard, official_project]
+    note: 不预设姓名名单；每次按问题从大学/医院/学会主页找到专家，再核验其公开社媒账号

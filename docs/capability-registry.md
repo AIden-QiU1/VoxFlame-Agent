@@ -55,7 +55,7 @@
 - `external_effect`
   会对设备、第三方服务或用户外部环境产生明显副作用
 
-产品运行时 capability 现以 [产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 的产品边界、[control-plane.md](/home/ubuntu/VoxFlame-Agent/docs/control-plane.md) 的 backend 实现边界，以及具体 surface 专题文档为准；App / Mobile Workbench 方向见 [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)。
+产品运行时 capability 现以 [产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 的产品边界、[control-plane.md](/home/ubuntu/VoxFlame-Agent/docs/control-plane.md) 的 backend 实现边界，以及具体 surface 专题文档为准；App / Mobile Workbench 方向见 [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](/home/ubuntu/VoxFlame-Agent/research/product-engineering/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)。
 
 ## 当前保留：工程协作 capability registry
 

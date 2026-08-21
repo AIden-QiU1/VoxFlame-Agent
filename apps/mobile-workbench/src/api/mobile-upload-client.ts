@@ -80,41 +80,72 @@ function buildMobileStoragePath(item: MobileWorkbenchRecorderQueueItem): string 
   ].join('/')
 }
 
+const TRAINING_METADATA_KEYS = new Set([
+  'kind',
+  'sentence_id',
+  'target_text',
+  'spoken_text',
+  'recognized_text',
+  'consent_version',
+  'collection_plan_id',
+  'etiology',
+  'severity',
+  'age_band',
+  'sex',
+  'exercise_id',
+  'exercise_category',
+  'feedback_status',
+  'clarity_score',
+  'alignment_score',
+  'missing_chars',
+  'extra_chars',
+  'prepared_expression_id',
+  'prepared_expression_section_id',
+  'speech_patterns',
+  'articulation_tips',
+  'pronunciation_summary',
+])
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isSafeMetadataValue(value: unknown): boolean {
+  if (isNonEmptyString(value) || (typeof value === 'number' && Number.isFinite(value)) || typeof value === 'boolean') {
+    return true
+  }
+
+  return Array.isArray(value)
+    && value.length <= 32
+    && value.every((item) => isNonEmptyString(item))
+}
+
+function sanitizeMobileTrainingMetadata(
+  metadata: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(metadata)
+      .filter(([key, value]) => TRAINING_METADATA_KEYS.has(key) && isSafeMetadataValue(value))
+      .map(([key, value]) => [
+        key,
+        typeof value === 'string' ? value.trim() : value,
+      ]),
+  )
+}
+
 function buildUploadMetadata(
   item: MobileWorkbenchRecorderQueueItem,
   contentType: string,
 ): Record<string, unknown> {
   return {
+    ...sanitizeMobileTrainingMetadata(item.metadata),
     recording_id: item.recording.recordingId,
     session_id: item.recording.sessionId,
-    mode: item.recording.mode,
-    source_surface: item.recording.sourceSurface,
-    collection_mode: item.recording.collectionMode,
     consent_scope: item.consentScope,
-    source: 'mobile_workbench_native_recorder',
-    app_surface: 'mobile_workbench',
-    queue_owner: 'mobile_cache',
+    sentence_id: item.sentenceId,
     target_text: item.text,
-    exercise_text: item.text,
-    timestamp: item.recording.createdAt,
-    storage_type: 'oss',
     audio_format: contentType,
-    local_audio_format: item.recording.audio.format,
-    sample_rate: item.recording.audio.sampleRate,
-    channel_count: item.recording.audio.channelCount,
-    duration_ms: item.recording.audio.durationMs,
-    file_size_bytes: item.recording.audio.fileSizeBytes,
-    capture_transport: item.recording.audio.captureTransport,
-    speech_duration_ms: item.recording.audio.quality?.speechDurationMs,
-    leading_silence_ms: item.recording.audio.quality?.leadingSilenceMs,
-    trailing_silence_ms: item.recording.audio.quality?.trailingSilenceMs,
-    silence_ratio: item.recording.audio.quality?.silenceRatio,
-    input_level_rms: item.recording.audio.quality?.inputLevelRms,
-    input_level_peak: item.recording.audio.quality?.inputLevelPeak,
-    audio_quality_disposition: item.recording.audio.quality?.disposition,
-    audio_quality_reasons: item.recording.audio.quality?.reasons,
-    mobile_recording_id: item.recordingId,
-    ...item.metadata,
+    spoken_text: item.recognizedText ?? '',
   }
 }
 

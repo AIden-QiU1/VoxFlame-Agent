@@ -132,7 +132,7 @@
 
 这轮已经把“面对一个需求，如何自己判断前端、后端、agent、数据和验证怎么建”沉淀成一份长期学习入口：
 
-- [VoxFlame Full-stack Architecture Learning Guide（2026-04-29）](VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
+- [VoxFlame Full-stack Architecture Learning Guide（2026-04-29）](../research/product-engineering/VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
 
 它重点回答：
 
@@ -145,7 +145,7 @@
 
 当前 Web/PWA 已经基本具备稳定演示和录音补传基础，可以开始完整移动端工作台研发。这里的“一步到位”指产品信息架构、owner、contract 和技术路线一步到位；工程交付仍按可验证切片推进，不能用一次性重写破坏现役 Web / PWA 主链。
 
-- [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+- [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](../research/product-engineering/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
 
 它重点回答：
 

@@ -1,0 +1,39 @@
+version: 1
+updated_at: 2026-08-14
+purpose: >-
+  把用户反馈、沟通伙伴观察、运行监控和失败样本转成可验证的优化输入。
+  每条反馈必须关联 research_id；反馈本身不是结论。
+severity: [critical, high, medium, low]
+sources: [user, communication_partner, clinician, maintainer, telemetry, support, field_observation]
+failure_types: [model, context, tool, ux, device, network, privacy, scenario, data, unknown]
+required_fields:
+  - feedback_id
+  - research_id
+  - source
+  - observed_at
+  - scenario
+  - observation
+  - severity
+  - failure_type
+  - evidence_ref
+  - hypothesis
+  - owner
+  - action
+  - validation
+  - state
+states: [new, triaged, experiment_ready, validating, resolved, rejected, accepted_risk]
+entries:
+  - feedback_id: FB-000
+    research_id: RO-000
+    source: maintainer
+    observed_at: 2026-08-14
+    scenario: TEMPLATE
+    observation: TEMPLATE - replace before use
+    severity: low
+    failure_type: unknown
+    evidence_ref: TBD
+    hypothesis: TBD
+    owner: TBD
+    action: replace this template entry
+    validation: TBD
+    state: new

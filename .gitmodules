@@ -1,0 +1,4 @@
+[submodule "references/clear-vox-model"]
+	path = references/clear-vox-model
+	url = git@github.com:voxflame/CLEAR-VOX-MODEL.git
+	branch = main

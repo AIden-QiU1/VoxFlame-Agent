@@ -8,7 +8,16 @@ import {
   useRef,
   useState,
 } from 'react'
-import { ArrowLeft, Mic, PlayCircle, RotateCcw, Sparkles } from 'lucide-react'
+import {
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Mic,
+  PlayCircle,
+  RotateCcw,
+  Sparkles,
+} from 'lucide-react'
 import { MicrophoneInputFeedback } from '@/components/runtime/MicrophoneInputFeedback'
 import { useAuth } from '@/hooks/useAuth'
 import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
@@ -30,6 +39,11 @@ import type {
   VoxFlameConsentScope,
   VoxFlameRecordingEnvelope,
 } from '@/lib/recording/recording-contract'
+import {
+  COLLECTION_PLANS,
+  isCollectionPreflightReady,
+  type CollectionPlanId,
+} from '@/lib/recording/collection-protocol'
 import {
   type MandarinTrainingFeedback,
   analyzeMandarinAttempt,
@@ -53,7 +67,11 @@ import {
   assessTrainingSampleQuality,
   type TrainingSampleQuality,
 } from '@/lib/training/training-sample-quality'
-import { summarizeAssessmentAttempts } from '@/lib/training/training-assessment'
+import {
+  calculateCharacterEditDistance,
+  summarizeAssessmentAttempts,
+} from '@/lib/training/training-assessment'
+import { buildSpeechPerformanceReport } from '@/lib/training/speech-performance-report'
 import {
   DEFAULT_TRAINING_GUIDANCE_PROFILE,
   TRAINING_ETIOLOGY_OPTIONS,
@@ -83,6 +101,7 @@ type AttemptUploadStatus =
   | 'discarded'
 
 type AttemptSaveTrigger = 'auto' | 'manual'
+type CollectionFlowStep = 'prepare' | 'record' | 'review'
 
 type PracticeSourceMode = 'prepared_content' | 'sentence_corpus'
 type PracticeExercise = MandarinTrainingExercise | PreparedExpressionPracticeExercise
@@ -90,7 +109,17 @@ type PracticeExercise = MandarinTrainingExercise | PreparedExpressionPracticeExe
 interface TrainingUploadLabels {
   etiology?: TrainingEtiology
   severity?: TrainingSeverity
+  ageBand?: string
+  sex?: 'male' | 'female' | 'other' | 'unspecified'
 }
+
+const COLLECTION_AGE_BANDS = ['unspecified', '18–39', '40–59', '60–69', '70–79', '80+'] as const
+const COLLECTION_SEX_OPTIONS = [
+  { value: 'unspecified', label: '不愿说明' },
+  { value: 'female', label: '女' },
+  { value: 'male', label: '男' },
+  { value: 'other', label: '其他' },
+] as const
 
 interface PracticeAttempt {
   createdAt: number
@@ -203,94 +232,42 @@ function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`
 }
 
-function mapAssessmentSeverityToProfileSeverity(
-  severityBand: ReturnType<typeof summarizeAssessmentAttempts>['severityBand'],
-): TrainingSeverity {
-  if (severityBand === 'severe') {
-    return 'severe'
-  }
-
-  if (severityBand === 'moderate') {
-    return 'moderate'
-  }
-
-  if (severityBand === 'mild') {
-    return 'mild'
-  }
-
-  return 'unsure'
+function usesGuidedCollectionFlow(isAssessmentTopic: boolean): boolean {
+  return !isAssessmentTopic
 }
 
 function buildUploadMetadata(
   exercise: PracticeExercise,
   recording: VoxFlameRecordingEnvelope,
   transcript: string,
-  transcriptLatencyMs: number,
   feedback: MandarinTrainingFeedback,
   sampleQuality: TrainingSampleQuality,
-  saveTrigger: AttemptSaveTrigger,
-  clientCaptureId: string,
   uploadLabels?: TrainingUploadLabels | null,
+  collectionPlanId?: CollectionPlanId,
 ): Record<string, unknown> {
   const lineage = buildTrainingSampleLineage(exercise, recording)
-  const isAssessmentExercise = exercise.category === '评估筛查'
   const metadata: Record<string, unknown> = {
     kind: 'training_result',
-    client_capture_id: clientCaptureId,
+    // The model-facing labels stay deliberately small. These lineage fields
+    // only support exact retry de-duplication and are not training features.
+    sentence_id: exercise.id,
     exercise_id: exercise.id,
-    exercise_text: exercise.text,
     exercise_category: exercise.category,
     target_text: exercise.text,
-    prompt_aligned_transcript: exercise.text,
-    raw_transcript: transcript,
-    recognized_text: transcript,
-    confidence: sampleQuality.confidence,
-    confidence_source: 'heuristic_training_workspace_v1',
-    latency_ms: transcriptLatencyMs,
-    prompt_group_key: lineage.promptGroupKey,
-    prompt_fingerprint: lineage.promptFingerprint,
-    recording_dedupe_key: lineage.recordingDedupeKey,
-    duplicate_policy: lineage.duplicatePolicy,
-    repeated_prompt_strategy: lineage.repeatedPromptStrategy,
+    spoken_text: transcript,
     feedback_status: feedback.status,
     clarity_score: getClarityScore(feedback.status),
     alignment_score: sampleQuality.score,
-    alignment_status: sampleQuality.action === 'retry' ? 'retry_recommended' : 'matched',
-    alignment_tier: sampleQuality.tier,
-    alignment_summary: sampleQuality.summary,
-    alignment_reasons: sampleQuality.reasons,
-    transcript_coverage_ratio: sampleQuality.coverageRatio,
     missing_chars: feedback.missingChars,
     extra_chars: feedback.extraChars,
     speech_patterns: feedback.speechPatterns,
     articulation_tips: feedback.articulationTips,
-    pronunciation_targets: feedback.pronunciationTargets,
     pronunciation_summary: feedback.pronunciationSummary,
+    prompt_group_key: lineage.promptGroupKey,
+    prompt_fingerprint: lineage.promptFingerprint,
+    recording_dedupe_key: lineage.recordingDedupeKey,
     consent_version: LEGAL_CONSENT_VERSION,
-    source_label: 'training_workspace_v3',
-    save_trigger: saveTrigger,
-    auto_saved: saveTrigger === 'auto',
-  }
-  const inputDevice = recording.audio.inputDevice
-  const audioQuality = recording.audio.quality
-
-  if (inputDevice) {
-    metadata.microphone_device_id = inputDevice.deviceId
-    metadata.microphone_label = inputDevice.label
-    metadata.selected_microphone_device_id = inputDevice.selectedDeviceId
-    metadata.selected_microphone_label = inputDevice.selectedLabel
-    metadata.microphone_is_system_default = inputDevice.isSystemDefault
-  }
-
-  if (audioQuality) {
-    metadata.speech_duration_ms = audioQuality.speechDurationMs
-    metadata.leading_silence_ms = audioQuality.leadingSilenceMs
-    metadata.trailing_silence_ms = audioQuality.trailingSilenceMs
-    metadata.silence_ratio = audioQuality.silenceRatio
-    metadata.input_level_rms = audioQuality.inputLevelRms
-    metadata.input_level_peak = audioQuality.inputLevelPeak
-    metadata.audio_quality_disposition = audioQuality.disposition
-    metadata.audio_quality_reasons = audioQuality.reasons
+    collection_plan_id: collectionPlanId,
   }
 
   if (uploadLabels?.etiology && uploadLabels.etiology !== DEFAULT_TRAINING_GUIDANCE_PROFILE.etiology) {
@@ -300,23 +277,11 @@ function buildUploadMetadata(
   if (uploadLabels?.severity && uploadLabels.severity !== DEFAULT_TRAINING_GUIDANCE_PROFILE.severity) {
     metadata.severity = uploadLabels.severity
   }
-
-  if (isAssessmentExercise) {
-    metadata.assessment_mode = 'screening'
-    metadata.assessment_scheme = 'character_accuracy_v1'
-    metadata.assessment_prompt_count = 20
+  if (uploadLabels?.ageBand && uploadLabels.ageBand !== 'unspecified') {
+    metadata.age_band = uploadLabels.ageBand
   }
-
-  if (isPreparedExpressionExercise(exercise)) {
-    metadata.prepared_expression_id = exercise.preparedExpressionId
-    metadata.prepared_expression_title = exercise.preparedExpressionTitle
-    metadata.prepared_expression_section_id = exercise.preparedExpressionSectionId
-    metadata.prepared_expression_section_title = exercise.preparedExpressionSectionTitle
-    metadata.high_risk_phrases = exercise.preparedExpressionHighRiskPhrases
-    metadata.fallback_phrases = exercise.preparedExpressionFallbackPhrases
-    metadata.keywords = exercise.preparedExpressionKeywords
-    metadata.hotwords = exercise.preparedExpressionKeywords
-    metadata.practice_source = exercise.practiceSource
+  if (uploadLabels?.sex && uploadLabels.sex !== 'unspecified') {
+    metadata.sex = uploadLabels.sex
   }
 
   for (const key of Object.keys(metadata)) {
@@ -610,18 +575,21 @@ export default function ContributePage() {
   const collectionCategories = MANDARIN_TRAINING_CATEGORIES.filter(
     (category) => category !== '评估筛查',
   )
+  const recommendedCategory = collectionCategories.find((category) => category === '日常与出行')
+    ?? collectionCategories[0]
+  const additionalCategories = collectionCategories.filter((category) => category !== recommendedCategory)
 
   return (
     <div className="min-h-dvh bg-stone-50">
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
-            <Link href="/" className="inline-flex min-h-11 items-center text-sm font-medium text-amber-700 hover:text-amber-800">
-              ← 返回首页
+            <Link href="/practice" className="inline-flex min-h-11 items-center text-sm font-medium text-amber-700 hover:text-amber-800">
+              ← 返回练习选择
             </Link>
-            <h1 className="text-balance text-2xl font-semibold text-gray-900">练习表达</h1>
+            <h1 className="text-balance text-2xl font-semibold text-gray-900">训练与数据录入</h1>
             <p className="mt-1 text-sm text-gray-600 text-pretty">
-              能力筛查和训练收集分开进行，每次只完成一件事。
+              选择一个主题，再进入只保留目标句、录音和反馈的专注工作台。
             </p>
           </div>
           <div className="hidden rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700 sm:block">
@@ -631,48 +599,10 @@ export default function ContributePage() {
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-8">
-        <section aria-labelledby="training-task-heading">
-          <div className="mb-4">
-            <p className="text-sm font-medium text-orange-700">先选今天要做的事</p>
-            <h2 id="training-task-heading" className="mt-2 text-balance text-2xl font-semibold text-stone-950">
-              筛查与训练，分开完成
-            </h2>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-          <Link
-            href={getTrainingTopicHref('assessment-screening')}
-            className="flex min-h-56 flex-col rounded-3xl border border-stone-800 bg-stone-950 p-6 text-white shadow-sm transition-colors hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-          >
-            <p className="text-sm font-medium text-orange-200">20 词能力筛查</p>
-            <h2 className="mt-3 text-balance text-2xl font-semibold">完成 20 词筛查</h2>
-            <p className="mt-3 text-pretty text-sm leading-7 text-stone-300">
-              固定词表、独立进度和整组结果，用于选择后续训练强度，不替代医学评估。
-            </p>
-            <span className="mt-auto inline-flex min-h-11 w-fit items-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-stone-950">
-              开始筛查
-            </span>
-          </Link>
-
-            <Link
-              href="#training-topics"
-              className="flex min-h-56 flex-col rounded-3xl border border-stone-200 bg-white p-6 shadow-sm transition-colors hover:border-orange-300 hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-            >
-              <p className="text-sm font-medium text-orange-700">训练与收集</p>
-              <h2 className="mt-3 text-balance text-2xl font-semibold text-stone-950">按真实场景练一句</h2>
-              <p className="mt-3 text-pretty text-sm leading-7 text-stone-600">
-                选择主题后进入专注工作台，完成目标句、实时识别、反馈、自动保存和撤回。
-              </p>
-              <span className="mt-auto inline-flex min-h-11 w-fit items-center rounded-xl bg-orange-700 px-4 py-2 text-sm font-semibold text-white">
-                选择训练主题
-              </span>
-            </Link>
-          </div>
-        </section>
-
         <section id="training-topics" className="scroll-mt-4 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-orange-700">训练与收集主题</p>
+              <p className="text-sm font-medium text-orange-700">数据录入主题</p>
               <h2 className="mt-2 text-balance text-2xl font-semibold text-gray-900">选一个现在会用到的场景</h2>
               <p className="mt-2 max-w-3xl text-pretty text-sm leading-6 text-gray-600">
                 进入后页面只保留当前句、录音和本次结果；录稳一条会自动切到下一句。
@@ -683,11 +613,30 @@ export default function ContributePage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-5 space-y-3">
+            {recommendedCategory ? (() => {
+              const meta = MANDARIN_TRAINING_CATEGORY_META[recommendedCategory]
+              return (
+                <Link
+                  href={getTrainingTopicHref(getTrainingTopicIdForCategory(recommendedCategory))}
+                  className="block rounded-[22px] border border-amber-300 bg-amber-50 px-5 py-5 text-left shadow-sm transition-colors duration-150 hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
+                      <p className="mt-2 text-pretty text-sm leading-6 text-gray-600">{meta.description}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-800">推荐</span>
+                  </div>
+                  <p className="mt-4 text-sm font-semibold text-amber-900">从常用表达开始 →</p>
+                </Link>
+              )
+            })() : null}
+
             {preparedExpression ? (
               <Link
                 href={getTrainingTopicHref('custom-material')}
-                className="min-h-44 rounded-[22px] border border-amber-300 bg-amber-50 px-5 py-5 text-left shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                className="block rounded-[22px] border border-stone-200 bg-white px-5 py-5 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -696,7 +645,7 @@ export default function ContributePage() {
                       {preparedExpression.title}
                     </p>
                   </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-800">
+                  <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">
                     {preparedExpressionExercises.length} 句
                   </span>
                 </div>
@@ -707,7 +656,7 @@ export default function ContributePage() {
             ) : (
               <Link
                 href="/memory#memory-custom-material-editor"
-                className="min-h-44 rounded-[22px] border border-dashed border-stone-300 bg-stone-50 px-5 py-5 text-left transition-colors hover:border-amber-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                className="block rounded-[22px] border border-dashed border-stone-300 bg-stone-50 px-5 py-5 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
               >
                 <p className="text-sm font-semibold text-gray-900">自定义训练</p>
                 <p className="mt-3 text-sm leading-6 text-gray-600">
@@ -716,28 +665,30 @@ export default function ContributePage() {
               </Link>
             )}
 
-            {collectionCategories.map((category) => {
-              const meta = MANDARIN_TRAINING_CATEGORY_META[category]
-              return (
-                <Link
-                  key={category}
-                  href={getTrainingTopicHref(getTrainingTopicIdForCategory(category))}
-                  className="min-h-44 rounded-[22px] border border-stone-200 bg-white px-5 py-5 text-left transition-colors hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
-                >
-                  <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-gray-600">{meta.description}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
-                      {meta.corpusCount} 条
-                    </span>
-                    <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
-                      {meta.shortLabel}
-                    </span>
-                  </div>
-                </Link>
-              )
-            })}
           </div>
+
+          <details className="mt-4 rounded-2xl border border-stone-200 bg-stone-50">
+            <summary className="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
+              <span>查看更多录入主题</span>
+              <span className="text-xs font-normal text-stone-500">{additionalCategories.length} 类</span>
+            </summary>
+            <div className="space-y-2 border-t border-stone-200 p-4">
+              {additionalCategories.map((category) => {
+                const meta = MANDARIN_TRAINING_CATEGORY_META[category]
+                return (
+                  <Link
+                    key={category}
+                    href={getTrainingTopicHref(getTrainingTopicIdForCategory(category))}
+                    className="block rounded-2xl border border-stone-200 bg-white px-4 py-4 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                  >
+                    <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
+                    <p className="mt-2 line-clamp-2 text-pretty text-sm leading-6 text-gray-600">{meta.description}</p>
+                    <p className="mt-3 text-xs text-stone-500">{meta.corpusCount} 条 · {meta.shortLabel}</p>
+                  </Link>
+                )
+              })}
+            </div>
+          </details>
         </section>
 
         <details className="rounded-2xl border border-stone-200 bg-white">
@@ -794,6 +745,8 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     () => resolveTrainingTopicSelection(topicId),
     [topicId],
   )
+  const returnHref = topicId === 'assessment-screening' ? '/practice' : '/contribute'
+  const returnLabel = topicId === 'assessment-screening' ? '返回练习选择' : '返回主题选择'
   const { user, userId, session, isLoading, isAuthenticated } = useAuth({
     redirectToLogin: true,
     nextPath: getTrainingTopicHref(topicId),
@@ -844,6 +797,12 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const [notice, setNotice] = useState<NoticeState | null>(null)
   const [isPreparedPreviewOpen, setIsPreparedPreviewOpen] = useState(false)
   const [attemptPlaybackUrl, setAttemptPlaybackUrl] = useState<string | null>(null)
+  const [collectionPlanId, setCollectionPlanId] = useState<CollectionPlanId>('baseline')
+  const [environmentReady, setEnvironmentReady] = useState(false)
+  const [distanceReady, setDistanceReady] = useState(false)
+  const [ageBand, setAgeBand] = useState<string>('unspecified')
+  const [sex, setSex] = useState<TrainingUploadLabels['sex']>('unspecified')
+  const [collectionFlowStep, setCollectionFlowStep] = useState<CollectionFlowStep>('prepare')
 
   const disconnectRef = useRef(disconnect)
   disconnectRef.current = disconnect
@@ -851,6 +810,11 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const recordingExerciseRef = useRef<PracticeExercise | null>(null)
 
   const canSaveTrainingSample = hasRequiredLegalConsent(user)
+  const collectionPreflightReady = isCollectionPreflightReady({
+    environmentReady,
+    distanceReady,
+    understandsConsent: canSaveTrainingSample,
+  })
   const preparedExpression = workspaceSnapshot?.prepared_expression ?? null
   const preparedExpressionExercises = useMemo(
     () => buildPreparedExpressionPracticeExercises(preparedExpression),
@@ -1018,7 +982,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
               targetText: savedAttempt.exercise.text,
               heardText: savedAttempt.transcript,
               normalizedTarget: savedAttempt.feedback.normalizedTarget,
-              missingChars: savedAttempt.feedback.missingChars,
+              normalizedHeard: savedAttempt.feedback.normalizedHeard,
             })),
             categoryExercises.length,
           )
@@ -1026,29 +990,40 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     ),
     [assessmentAttemptsByExercise, categoryExercises.length, isAssessmentTopic],
   )
-  const assessedSeverity = useMemo(
+  const speechPerformanceReport = useMemo(
     () => (
-      assessmentSummary
-        ? mapAssessmentSeverityToProfileSeverity(assessmentSummary.severityBand)
-        : 'unsure'
+      isAssessmentTopic
+        ? buildSpeechPerformanceReport(
+            Object.values(assessmentAttemptsByExercise).map((savedAttempt) => ({
+              exerciseId: savedAttempt.exercise.id,
+              targetText: savedAttempt.exercise.text,
+              heardText: savedAttempt.transcript,
+              normalizedTarget: savedAttempt.feedback.normalizedTarget,
+              normalizedHeard: savedAttempt.feedback.normalizedHeard,
+              missingChars: savedAttempt.feedback.missingChars,
+              extraChars: savedAttempt.feedback.extraChars,
+              durationMs: savedAttempt.recording?.audio.durationMs,
+              speechDurationMs: savedAttempt.recording?.audio.quality?.speechDurationMs,
+              silenceRatio: savedAttempt.recording?.audio.quality?.silenceRatio,
+              inputLevelRms: savedAttempt.recording?.audio.quality?.inputLevelRms,
+              inputLevelPeak: savedAttempt.recording?.audio.quality?.inputLevelPeak,
+              qualityDisposition: savedAttempt.recording?.audio.quality?.disposition,
+            })),
+          )
+        : null
     ),
-    [assessmentSummary],
+    [assessmentAttemptsByExercise, isAssessmentTopic],
   )
   const trainingUploadLabels = useMemo<TrainingUploadLabels>(() => {
-    const completedAssessmentSeverity =
-      isAssessmentTopic && assessmentSummary?.isComplete
-        ? assessedSeverity
-        : null
-
     return {
       etiology: trainingEtiology,
       severity: isAssessmentTopic
-        ? completedAssessmentSeverity && completedAssessmentSeverity !== 'unsure'
-          ? completedAssessmentSeverity
-          : undefined
+        ? undefined
         : workspaceSnapshot?.user_profile_memory?.severity as TrainingSeverity | undefined,
+      ageBand,
+      sex,
     }
-  }, [assessedSeverity, assessmentSummary?.isComplete, isAssessmentTopic, trainingEtiology, workspaceSnapshot?.user_profile_memory?.severity])
+  }, [ageBand, isAssessmentTopic, sex, trainingEtiology, workspaceSnapshot?.user_profile_memory?.severity])
   const recorderStatus = getRecorderStatusCopy(status, sessionError, isAssessmentTopic)
   const currentAttemptCharacterAccuracy = useMemo(() => {
     if (!attempt || !isAssessmentTopic || attempt.feedback.normalizedTarget.length === 0) {
@@ -1057,7 +1032,10 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
     return Math.max(
       0,
-      (attempt.feedback.normalizedTarget.length - attempt.feedback.missingChars.length)
+      (attempt.feedback.normalizedTarget.length - calculateCharacterEditDistance(
+        attempt.feedback.normalizedTarget,
+        attempt.feedback.normalizedHeard,
+      ))
       / attempt.feedback.normalizedTarget.length,
     )
   }, [attempt, isAssessmentTopic])
@@ -1089,7 +1067,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const currentGoalHeadline = useMemo(() => {
     if (isAssessmentTopic && assessmentSummary) {
       return assessmentSummary.completedCount > 0
-        ? `当前初步等级：${assessmentSummary.severityLabel}`
+        ? `当前训练支持：${assessmentSummary.severityLabel}`
         : '先把 20 条筛查词录完一遍'
     }
 
@@ -1132,7 +1110,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
           detail: '按正确字数算。',
         },
         {
-          label: '初步等级',
+          label: '训练支持',
           value: assessmentSummary?.severityLabel ?? '待开始',
           detail: '训练分层用。',
         },
@@ -1177,6 +1155,8 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     setSessionPracticedExerciseIds([])
     setAssessmentAttemptsByExercise({})
     setSelectedPhonologyGroupId('all')
+    setAttempt(null)
+    setCollectionFlowStep('prepare')
     void refreshLocalQueueCount()
   }, [refreshLocalQueueCount, topicId, userId])
 
@@ -1289,8 +1269,17 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       return
     }
 
+    if (!collectionPreflightReady) {
+      setNotice({
+        tone: 'info',
+        message: '先完成采集前确认：环境、距离和数据授权。',
+      })
+      return
+    }
+
     setAttempt(null)
     setNotice(null)
+    setCollectionFlowStep('record')
     recordingExerciseRef.current = currentExercise
 
     try {
@@ -1303,17 +1292,58 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         message: '录音失败，请重试。',
       })
     }
-  }, [currentExercise, isProcessing, isUploading, startRecording])
+  }, [collectionPreflightReady, currentExercise, isProcessing, isUploading, startRecording])
 
-  const handleRetryCurrentExercise = useCallback(() => {
+  const handleRetryCurrentExercise = useCallback(async () => {
     if (isRecording || isProcessing || isUploading) {
       return
     }
 
+    const exerciseToRetry = attempt?.exercise ?? currentExercise
+    if (!exerciseToRetry) {
+      return
+    }
+
+    if (!collectionPreflightReady) {
+      setCollectionFlowStep('prepare')
+      setNotice({
+        tone: 'info',
+        message: '先完成采集前确认：环境、距离和数据授权。',
+      })
+      return
+    }
+
+    setSelectedExerciseId(exerciseToRetry.id)
     setAttempt(null)
     setNotice(null)
-    void handleStartRecording()
-  }, [handleStartRecording, isProcessing, isRecording, isUploading])
+    setCollectionFlowStep('record')
+    recordingExerciseRef.current = exerciseToRetry
+
+    try {
+      await startRecording()
+    } catch (error) {
+      recordingExerciseRef.current = null
+      console.error('[contribute] retry recording failed:', error)
+      setNotice({
+        tone: 'error',
+        message: '录音失败，请重试。',
+      })
+    }
+  }, [
+    attempt?.exercise,
+    collectionPreflightReady,
+    currentExercise,
+    isProcessing,
+    isRecording,
+    isUploading,
+    startRecording,
+  ])
+
+  const handleContinueAfterAttempt = useCallback(() => {
+    setAttempt(null)
+    setNotice(null)
+    setCollectionFlowStep('record')
+  }, [])
 
   const handleSaveTrainingLabels = useCallback(async () => {
     if (!userId || !isAuthenticated) {
@@ -1338,16 +1368,11 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       await saveWorkspaceUserProfileMemory(userId, {
         document: workspaceSnapshot?.user_profile_memory.document ?? undefined,
         etiology: trainingEtiology,
-        ...(assessmentSummary?.isComplete && assessedSeverity !== 'unsure'
-          ? { severity: assessedSeverity }
-          : {}),
       })
       await refreshWorkspaceSnapshot()
       setNotice({
         tone: 'success',
-        message: assessmentSummary?.isComplete
-          ? '训练资料标签已保存，后续上传样本会带上疾病种类和整组评测严重程度。'
-          : '疾病种类已保存；严重程度要等 20 条筛查全部完成后才会生成和保存。',
+        message: '病因信息已保存。系统听清率和训练支持建议不会写成医学严重程度。',
       })
     } catch (error) {
       console.error('[contribute] save training labels failed:', error)
@@ -1359,8 +1384,6 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       setIsSavingTrainingLabels(false)
     }
   }, [
-    assessedSeverity,
-    assessmentSummary?.isComplete,
     isAuthenticated,
     refreshWorkspaceSnapshot,
     trainingEtiology,
@@ -1370,7 +1393,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
   const persistTrainingAttempt = useCallback(async (
     attemptToPersist: PracticeAttempt,
-    saveTrigger: AttemptSaveTrigger,
+    _saveTrigger: AttemptSaveTrigger,
   ) => {
     if (!attemptToPersist.recording) {
       setNotice({
@@ -1421,12 +1444,10 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         attemptToPersist.exercise,
         attemptToPersist.recording,
         attemptToPersist.transcript,
-        attemptToPersist.transcriptLatencyMs,
         attemptToPersist.feedback,
         attemptToPersist.sampleQuality,
-        saveTrigger,
-        attemptToPersist.clientCaptureId,
         trainingUploadLabels,
+        collectionPlanId,
       ),
     })
     const wasDiscarded = discardedAttemptIdsRef.current.has(attemptToPersist.createdAt)
@@ -1502,6 +1523,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     })
   }, [
     canSaveTrainingSample,
+    collectionPlanId,
     discardUploadedRecording,
     trainingUploadLabels,
     uploadRecording,
@@ -1632,6 +1654,9 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         ))
       }
       setAttempt(nextAttempt)
+      if (!isAssessmentTopic) {
+        setCollectionFlowStep(result.recording ? 'review' : 'record')
+      }
       if (isAssessmentTopic && hasUsableAssessmentTranscript) {
         setAssessmentAttemptsByExercise((current) => ({
           ...current,
@@ -1655,12 +1680,14 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       }
 
       setNotice({
-        tone: isAssessmentTopic && !hasUsableAssessmentTranscript
+        tone: !result.recording || (isAssessmentTopic && !hasUsableAssessmentTranscript)
           ? 'error'
           : canSaveTrainingSample && result.recording
             ? 'info'
             : 'success',
-        message: isAssessmentTopic && !hasUsableAssessmentTranscript
+        message: !result.recording
+          ? '这次没有生成完整录音文件，请重新录一次。'
+          : isAssessmentTopic && !hasUsableAssessmentTranscript
           ? '识别结果不完整，请放慢一点再录一次。'
           : canSaveTrainingSample && result.recording
           ? nextExercise
@@ -1709,9 +1736,9 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         <header className="border-b border-stone-200 bg-white">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
             <div>
-              <Link href="/contribute" className="inline-flex items-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800">
+              <Link href={returnHref} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800">
                 <ArrowLeft className="h-4 w-4" />
-                返回主题选择
+                {returnLabel}
               </Link>
               <h1 className="mt-2 text-2xl font-semibold text-gray-900">{topicSelection.label}</h1>
               <p className="mt-1 text-sm text-gray-600">{topicSelection.description}</p>
@@ -1737,7 +1764,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 </Link>
               ) : null}
               <Link
-                href="/contribute"
+                href={returnHref}
                 className="inline-flex items-center rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-700"
               >
                 回到主题选择
@@ -1749,14 +1776,391 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     )
   }
 
+  if (usesGuidedCollectionFlow(isAssessmentTopic)) {
+    const flowSteps: Array<{ id: CollectionFlowStep; label: string }> = [
+      { id: 'prepare', label: '准备' },
+      { id: 'record', label: '录一句' },
+      { id: 'review', label: '确认结果' },
+    ]
+    const activeStepIndex = flowSteps.findIndex((step) => step.id === collectionFlowStep)
+
+    return (
+      <div className="min-h-dvh bg-stone-50">
+        <header className="border-b border-stone-200 bg-white">
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+            <div>
+              <Link
+                href={returnHref}
+                className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+              >
+                <ArrowLeft className="size-4" aria-hidden="true" />
+                {returnLabel}
+              </Link>
+              <h1 className="mt-1 text-balance text-2xl font-semibold text-gray-900">{topicSelection.label}</h1>
+              <p className="mt-1 text-pretty text-sm text-gray-600">一次只做一步，录完再确认结果。</p>
+            </div>
+            <span className="hidden rounded-full bg-white px-4 py-2 text-sm text-stone-600 ring-1 ring-stone-200 sm:block">
+              本轮已完成 {sessionPracticedExerciseIds.length} 句
+            </span>
+          </div>
+        </header>
+
+        <main className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-5 sm:px-6 sm:py-8">
+          <nav aria-label="数据录入进度" className="rounded-2xl border border-stone-200 bg-white px-4 py-4 sm:px-6">
+            <ol className="grid grid-cols-3 gap-2">
+              {flowSteps.map((step, index) => {
+                const isActive = step.id === collectionFlowStep
+                const isComplete = index < activeStepIndex
+                return (
+                  <li key={step.id} className="flex items-center gap-2 sm:gap-3">
+                    <span
+                      aria-current={isActive ? 'step' : undefined}
+                      className={cn(
+                        'flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold',
+                        isActive
+                          ? 'bg-amber-600 text-white'
+                          : isComplete
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-stone-100 text-stone-500',
+                      )}
+                    >
+                      {isComplete ? <Check className="size-4" aria-hidden="true" /> : index + 1}
+                    </span>
+                    <span className={cn('text-sm font-medium', isActive ? 'text-stone-950' : 'text-stone-500')}>
+                      {step.label}
+                    </span>
+                  </li>
+                )
+              })}
+            </ol>
+          </nav>
+
+          {notice ? (
+            <div
+              role={notice.tone === 'error' ? 'alert' : 'status'}
+              aria-live="polite"
+              className={cn(
+                'rounded-2xl border px-4 py-3 text-sm font-medium',
+                notice.tone === 'error'
+                  ? 'border-rose-200 bg-rose-50 text-rose-800'
+                  : notice.tone === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-200 bg-amber-50 text-amber-900',
+              )}
+            >
+              {notice.message}
+            </div>
+          ) : null}
+
+          {collectionFlowStep === 'prepare' ? (
+            <section aria-labelledby="collection-prepare-heading" className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
+              <p className="text-sm font-medium text-amber-800">第 1 步</p>
+              <h2 id="collection-prepare-heading" className="mt-2 text-balance text-2xl font-semibold text-stone-950">
+                准备好后再开始
+              </h2>
+              <p className="mt-2 text-pretty text-sm leading-6 text-stone-600">
+                只确认两件事。构音方式不是重录理由，按你平时说话的方式录就好。
+              </p>
+
+              <div className="mt-6 space-y-3">
+                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 focus-within:ring-2 focus-within:ring-amber-500 focus-within:ring-offset-2">
+                  <input
+                    type="checkbox"
+                    checked={environmentReady}
+                    onChange={(event) => setEnvironmentReady(event.target.checked)}
+                    className="mt-0.5 size-5 accent-amber-600"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-stone-950">周围比较安静</span>
+                    <span className="mt-1 block text-pretty text-sm leading-6 text-stone-600">没有持续的电视声、谈话声或明显风声。</span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 focus-within:ring-2 focus-within:ring-amber-500 focus-within:ring-offset-2">
+                  <input
+                    type="checkbox"
+                    checked={distanceReady}
+                    onChange={(event) => setDistanceReady(event.target.checked)}
+                    className="mt-0.5 size-5 accent-amber-600"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-stone-950">麦克风位置稳定</span>
+                    <span className="mt-1 block text-pretty text-sm leading-6 text-stone-600">手机或麦克风离嘴约 20–30 厘米，录音时尽量别移动。</span>
+                  </span>
+                </label>
+              </div>
+
+              <div className={cn(
+                'mt-4 flex items-start gap-3 rounded-2xl px-4 py-3 text-sm',
+                canSaveTrainingSample ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-800',
+              )}>
+                {canSaveTrainingSample ? (
+                  <CheckCircle2 className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+                ) : (
+                  <span className="mt-0.5 size-5 shrink-0 rounded-full border-2 border-current" aria-hidden="true" />
+                )}
+                <span>
+                  {canSaveTrainingSample
+                    ? '数据授权已确认。录音会按训练用途保存，你仍可以在结果页选择不收录。'
+                    : '当前账号缺少新的数据授权记录，请重新登录确认后再开始。'}
+                </span>
+              </div>
+
+              <details className="mt-5 rounded-2xl border border-stone-200">
+                <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
+                  <span>可选：补充采集资料</span>
+                  <span className="text-xs font-normal text-stone-500">计划、年龄段、性别</span>
+                </summary>
+                <div className="grid gap-4 border-t border-stone-200 p-4 sm:grid-cols-3">
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-stone-700">采集计划</span>
+                    <select value={collectionPlanId} onChange={(event) => setCollectionPlanId(event.target.value as CollectionPlanId)} className="h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                      {COLLECTION_PLANS.map((plan) => <option key={plan.id} value={plan.id}>{plan.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-stone-700">年龄段</span>
+                    <select value={ageBand} onChange={(event) => setAgeBand(event.target.value)} className="h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                      {COLLECTION_AGE_BANDS.map((band) => <option key={band} value={band}>{band === 'unspecified' ? '不愿说明' : band}</option>)}
+                    </select>
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-stone-700">性别</span>
+                    <select value={sex} onChange={(event) => setSex(event.target.value as TrainingUploadLabels['sex'])} className="h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                      {COLLECTION_SEX_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+              </details>
+
+              <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-pretty text-sm text-stone-500">
+                  {!environmentReady || !distanceReady ? '完成上面两项确认后即可继续。' : canSaveTrainingSample ? '准备完成，可以录第一句了。' : '需要先补充数据授权。'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCollectionFlowStep('record')}
+                  disabled={!collectionPreflightReady}
+                  aria-describedby="collection-prepare-help"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-700 px-6 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300"
+                >
+                  下一步，录一句
+                  <ChevronRight className="size-4" aria-hidden="true" />
+                </button>
+                <span id="collection-prepare-help" className="sr-only">需要确认安静环境、稳定距离和数据授权后才能继续</span>
+              </div>
+            </section>
+          ) : null}
+
+          {collectionFlowStep === 'record' ? (
+            <section aria-labelledby="collection-record-heading" className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-amber-800">第 2 步</p>
+                  <h2 id="collection-record-heading" className="mt-2 text-balance text-2xl font-semibold text-stone-950">读出这一句</h2>
+                  <p className="mt-2 text-pretty text-sm text-stone-600">按平时说话的方式读，读完点停止。</p>
+                </div>
+                <span className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700">
+                  {isRecording ? formatRecordingTime(recordingSeconds) : recorderStatus.label}
+                </span>
+              </div>
+
+              <div className="mt-6 rounded-3xl bg-amber-50 px-5 py-7 text-center ring-1 ring-amber-200 sm:px-8 sm:py-9">
+                <p className="text-sm font-medium text-amber-800">目标句</p>
+                <p className="mt-3 text-balance text-2xl font-semibold leading-relaxed text-stone-950 sm:text-3xl">{currentExercise.text}</p>
+                {currentPhonologyTarget?.focus ? (
+                  <p className="mt-3 text-pretty text-sm text-amber-900">本句重点：{currentPhonologyTarget.focus}</p>
+                ) : null}
+              </div>
+
+              <div className="mt-7 flex flex-col items-center text-center">
+                <button
+                  type="button"
+                  aria-label={isRecording ? '停止录音' : '开始录音'}
+                  onClick={isRecording ? () => void handleStopRecording() : () => void handleStartRecording()}
+                  disabled={isUploading || isProcessing || status === 'connecting'}
+                  className={cn(
+                    'flex size-28 items-center justify-center rounded-full text-white shadow-lg transition-transform duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-4 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100',
+                    isRecording ? 'bg-rose-600 focus-visible:ring-rose-500' : 'bg-amber-600 focus-visible:ring-amber-500',
+                  )}
+                >
+                  <span className="flex flex-col items-center gap-1">
+                    <Mic className="size-6" aria-hidden="true" />
+                    <span className="text-sm font-semibold">{isRecording ? '停止' : '开始录音'}</span>
+                  </span>
+                </button>
+                <p className="mt-4 text-pretty text-sm leading-6 text-stone-600">{recorderStatus.description}</p>
+              </div>
+
+              {isRecording ? (
+                <>
+                  <MicrophoneInputFeedback analyser={analyser} active title="收音状态" className="mt-6" />
+                  <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4" aria-live="polite">
+                    <p className="text-sm font-medium text-stone-900">系统正在听</p>
+                    <p className="mt-2 min-h-7 text-pretty text-sm leading-6 text-stone-600">{interimText || '开始说话后，识别内容会显示在这里。'}</p>
+                  </div>
+                </>
+              ) : null}
+
+              {sessionError ? (
+                <div role="alert" className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{sessionError}</div>
+              ) : null}
+
+              <details className="mt-6 rounded-2xl border border-stone-200">
+                <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
+                  <span>换一句</span>
+                  <span className="text-xs font-normal text-stone-500">当前主题还有 {matchingExercises.length} 句</span>
+                </summary>
+                <div className="border-t border-stone-200 p-4">
+                  <label className="block">
+                    <span className="sr-only">搜索训练句子</span>
+                    <input
+                      value={exerciseQuery}
+                      onChange={(event) => setExerciseQuery(event.target.value)}
+                      placeholder="搜索句子"
+                      className="h-11 w-full rounded-xl border border-stone-300 bg-white px-4 text-sm text-stone-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </label>
+                  <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+                    {visibleExercises.map((exercise) => {
+                      const isActive = currentExercise.id === exercise.id
+                      return (
+                        <button
+                          key={exercise.id}
+                          type="button"
+                          aria-pressed={isActive}
+                          onClick={() => handleSelectExercise(exercise.id)}
+                          disabled={isRecording || isProcessing}
+                          className={cn(
+                            'w-full rounded-xl border px-4 py-3 text-left text-sm leading-6 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
+                            isActive ? 'border-amber-400 bg-amber-50 text-stone-950' : 'border-stone-200 bg-white text-stone-700 hover:border-amber-300',
+                          )}
+                        >
+                          {exercise.text}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </details>
+
+              <button
+                type="button"
+                onClick={() => setCollectionFlowStep('prepare')}
+                disabled={isRecording || isProcessing}
+                className="mt-5 min-h-11 text-sm font-medium text-stone-600 underline-offset-4 hover:text-stone-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                返回修改采集准备
+              </button>
+            </section>
+          ) : null}
+
+          {collectionFlowStep === 'review' && attempt ? (
+            <section aria-labelledby="collection-review-heading" className="rounded-3xl border border-emerald-200 bg-white p-5 shadow-sm sm:p-7">
+              <div role="status" aria-live="polite" className="flex items-start gap-4 rounded-2xl bg-emerald-50 px-4 py-4 sm:px-5">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+                  <Check className="size-6" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-emerald-800">录音成功</p>
+                  <h2 id="collection-review-heading" className="mt-1 text-balance text-xl font-semibold text-emerald-950">很好，这一句已经完整收下了</h2>
+                  <p className="mt-1 text-pretty text-sm leading-6 text-emerald-800">
+                    {attempt.uploadStatus === 'saving'
+                      ? '正在自动保存，你可以先确认系统听到的内容。'
+                      : attempt.uploadStatus === 'uploaded'
+                        ? '已经安全保存到你的训练数据中。'
+                        : attempt.uploadStatus === 'retrying'
+                          ? '录音已留在本机，网络恢复后会自动补登。'
+                          : '你可以回听、重录或继续下一句。'}
+                  </p>
+                </div>
+              </div>
+
+              <dl className="mt-5 divide-y divide-stone-200 rounded-2xl border border-stone-200 px-4 sm:px-5">
+                <div className="grid gap-1 py-4 sm:grid-cols-[5rem_1fr] sm:gap-4">
+                  <dt className="text-sm font-medium text-stone-500">目标句</dt>
+                  <dd className="text-pretty text-base leading-7 text-stone-950">{attempt.exercise.text}</dd>
+                </div>
+                <div className="grid gap-1 py-4 sm:grid-cols-[5rem_1fr] sm:gap-4">
+                  <dt className="text-sm font-medium text-stone-500">系统听到</dt>
+                  <dd className="text-pretty text-base leading-7 text-stone-950">{attempt.transcript || '这次没有拿到稳定的识别文本，但录音仍可回听。'}</dd>
+                </div>
+              </dl>
+
+              {attempt.recording && attemptPlaybackUrl ? (
+                <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4">
+                  <p className="inline-flex items-center gap-2 text-sm font-medium text-stone-900">
+                    <PlayCircle className="size-4 text-amber-700" aria-hidden="true" />
+                    回听录音 · {formatRecordingTime(attempt.recording.audio.durationSeconds)}
+                  </p>
+                  <audio controls preload="metadata" src={attemptPlaybackUrl} className="mt-3 w-full">
+                    当前浏览器暂不支持直接播放这条录音。
+                  </audio>
+                </div>
+              ) : null}
+
+              <p className="mt-4 text-pretty text-sm leading-6 text-stone-600">{attempt.sampleQuality.summary}</p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={handleContinueAfterAttempt}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-700 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                >
+                  继续下一句
+                  <ChevronRight className="size-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRetryCurrentExercise()}
+                  disabled={isUploading || isProcessing || isRecording}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-800 transition-colors duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RotateCcw className="size-4" aria-hidden="true" />
+                  重录这一句
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleDiscardAttempt()}
+                disabled={attempt.uploadStatus === 'discarding' || attempt.uploadStatus === 'discarded'}
+                className="mt-3 min-h-11 w-full text-sm font-medium text-stone-600 underline-offset-4 hover:text-stone-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                这条不收录
+              </button>
+            </section>
+          ) : null}
+
+          {collectionFlowStep === 'review' && !attempt ? (
+            <section className="rounded-3xl border border-stone-200 bg-white p-6 text-center">
+              <p className="text-pretty text-sm text-stone-600">这次结果已处理，可以继续录下一句。</p>
+              <button type="button" onClick={handleContinueAfterAttempt} className="mt-4 rounded-xl bg-amber-700 px-5 py-3 text-sm font-semibold text-white">继续录音</button>
+            </section>
+          ) : null}
+
+          <details className="rounded-2xl border border-stone-200 bg-white">
+            <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
+              <span>本轮与主题信息</span>
+              <span className="text-xs font-normal text-stone-500">进度、待补登与材料</span>
+            </summary>
+            <div className="grid gap-3 border-t border-stone-200 p-4 sm:grid-cols-3">
+              <div className="rounded-xl bg-stone-50 px-4 py-3"><p className="text-xs text-stone-500">本轮已录</p><p className="mt-1 font-semibold text-stone-900 tabular-nums">{sessionPracticedExerciseIds.length} 句</p></div>
+              <div className="rounded-xl bg-stone-50 px-4 py-3"><p className="text-xs text-stone-500">待补登</p><p className="mt-1 font-semibold text-stone-900 tabular-nums">{localQueueItems.length} 条</p></div>
+              <div className="rounded-xl bg-stone-50 px-4 py-3"><p className="text-xs text-stone-500">当前主题</p><p className="mt-1 font-semibold text-stone-900">{topicSelection.label}</p></div>
+            </div>
+          </details>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-dvh bg-stone-50">
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
-            <Link href="/contribute" className="inline-flex items-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800">
+            <Link href={returnHref} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800">
               <ArrowLeft className="h-4 w-4" />
-              返回主题选择
+              {returnLabel}
             </Link>
             <h1 className="mt-1 text-2xl font-semibold text-gray-900">{topicSelection.label}</h1>
             <p className="mt-1 text-sm text-gray-600">
@@ -1800,9 +2204,9 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
               <div className="rounded-[22px] border border-amber-200 bg-white px-5 py-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-2xl font-semibold text-gray-900 text-balance">先选病种，再录筛查词</h2>
+                    <h2 className="text-2xl font-semibold text-gray-900 text-balance">完成固定词表，建立你的沟通表现基线</h2>
                     <p className="mt-2 text-sm text-gray-600 text-pretty">
-                      疾病种类只选一次。严重程度会按这一组筛查词自动更新。
+                      疾病种类可选填；报告重点看系统听清、音系差异、节奏和收音，不从一次录音诊断疾病。
                     </p>
                   </div>
                   <button
@@ -1832,14 +2236,14 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                   </label>
 
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
-                    <p className="text-sm font-medium text-gray-900">评测严重程度</p>
+                    <p className="text-sm font-medium text-gray-900">训练支持级别</p>
                     <p className="mt-2 text-lg font-semibold text-gray-900">
                       {assessmentSummary.completedCount > 0
                         ? assessmentSummary.severityLabel
                         : '先录评估词'}
                     </p>
                     <p className="mt-1 text-sm text-gray-600">
-                      训练分层用，可重测覆盖。
+                      只反映系统本轮听清程度，可重测覆盖。
                     </p>
                   </div>
                 </div>
@@ -1879,6 +2283,71 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                   </p>
                 )}
               </div>
+              {speechPerformanceReport ? (
+                <div className="rounded-[22px] border border-stone-200 bg-white px-5 py-5 lg:col-span-2">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">声音与沟通表现报告 · 体验版</p>
+                      <h3 className="mt-1 text-xl font-semibold text-gray-900">不只看一个分数，找到下一次真正能改的动作</h3>
+                    </div>
+                    <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-600">
+                      已分析 {speechPerformanceReport.sampleCount} 条
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-2xl bg-stone-50 px-4 py-4">
+                      <p className="text-xs text-stone-500">系统听清程度</p>
+                      <p className="mt-2 text-2xl font-semibold text-gray-900">{speechPerformanceReport.systemUnderstandingPercent}%</p>
+                      <p className="mt-1 text-xs leading-5 text-stone-600">错字、多字、漏字均计入</p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 px-4 py-4">
+                      <p className="text-xs text-stone-500">不同词稳定性</p>
+                      <p className="mt-2 text-base font-semibold text-gray-900">{speechPerformanceReport.consistencyLabel}</p>
+                      <p className="mt-1 text-xs leading-5 text-stone-600">{speechPerformanceReport.consistencyDetail}</p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 px-4 py-4">
+                      <p className="text-xs text-stone-500">表达节奏</p>
+                      <p className="mt-2 text-base font-semibold text-gray-900">
+                        {speechPerformanceReport.speechRateCharsPerSecond === null ? '继续积累' : `${speechPerformanceReport.speechRateCharsPerSecond} 字/秒`}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-stone-600">与自己的历史基线比较更有意义</p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 px-4 py-4">
+                      <p className="text-xs text-stone-500">收音状态</p>
+                      <p className="mt-2 text-base font-semibold text-gray-900">{speechPerformanceReport.captureLabel}</p>
+                      <p className="mt-1 text-xs leading-5 text-stone-600">{speechPerformanceReport.captureDetail}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-stone-200 px-4 py-4">
+                      <p className="text-sm font-medium text-gray-900">本轮易混淆线索</p>
+                      {speechPerformanceReport.patterns.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {speechPerformanceReport.patterns.map((pattern) => (
+                            <span key={pattern.id} className="rounded-full bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                              {pattern.label} · {pattern.count} 次
+                            </span>
+                          ))}
+                        </div>
+                      ) : <p className="mt-2 text-sm text-stone-600">完成更多词条后，会归纳易漏听的字和音系组。</p>}
+                    </div>
+                    <div className="rounded-2xl border border-stone-200 px-4 py-4">
+                      <p className="text-sm font-medium text-gray-900">个性化识别数据准备度</p>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100">
+                        <div className="h-full rounded-full bg-amber-600" style={{ width: `${speechPerformanceReport.personalizationProgressPercent}%` }} />
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-stone-600">{speechPerformanceReport.personalizationDetail}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-4">
+                    <p className="text-sm font-medium text-amber-950">下一轮建议</p>
+                    <ul className="mt-2 space-y-2 text-sm leading-6 text-amber-950">
+                      {speechPerformanceReport.nextActions.map((action) => <li key={action}>· {action}</li>)}
+                    </ul>
+                  </div>
+                  <p className="mt-4 text-xs leading-5 text-stone-500">{speechPerformanceReport.boundary}</p>
+                </div>
+              ) : null}
             </div>
           </section>
         ) : null}
@@ -1896,13 +2365,48 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                   <p className="mt-2 text-sm text-gray-600 text-pretty">{topicSelection.description}</p>
                 </div>
                 <Link
-                  href="/contribute"
+                  href={returnHref}
                   className="inline-flex items-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-400 hover:bg-stone-50"
                 >
-                  切换主题
+                  {isAssessmentTopic ? '退出筛查' : '切换主题'}
                 </Link>
               </div>
 
+              <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50 p-5">
+                <p className="text-sm font-medium text-amber-800">采集前确认</p>
+                <p className="mt-1 text-sm leading-6 text-stone-600">只为保证样本可用，不会因为构音错误要求重录。</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <label className="flex items-start gap-2 rounded-2xl bg-white px-3 py-3 text-sm text-stone-700">
+                    <input type="checkbox" checked={environmentReady} onChange={(event) => setEnvironmentReady(event.target.checked)} />
+                    <span>环境安静，已录过短暂环境音</span>
+                  </label>
+                  <label className="flex items-start gap-2 rounded-2xl bg-white px-3 py-3 text-sm text-stone-700">
+                    <input type="checkbox" checked={distanceReady} onChange={(event) => setDistanceReady(event.target.checked)} />
+                    <span>麦克风位置稳定，约 20–30 cm</span>
+                  </label>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-stone-600">采集计划</span>
+                    <select value={collectionPlanId} onChange={(event) => setCollectionPlanId(event.target.value as CollectionPlanId)} className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm">
+                      {COLLECTION_PLANS.map((plan) => <option key={plan.id} value={plan.id}>{plan.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-stone-600">年龄段（可选）</span>
+                    <select value={ageBand} onChange={(event) => setAgeBand(event.target.value)} className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm">
+                      {COLLECTION_AGE_BANDS.map((band) => <option key={band} value={band}>{band === 'unspecified' ? '不愿说明' : band}</option>)}
+                    </select>
+                  </label>
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-stone-600">性别（可选）</span>
+                    <select value={sex} onChange={(event) => setSex(event.target.value as TrainingUploadLabels['sex'])} className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm">
+                      {COLLECTION_SEX_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-stone-500">默认只保存音频、目标文本、实际转写、严重程度、病种、年龄段和性别；其他信息只在质检需要时使用。</p>
+              </div>
               <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50 p-5">
                 {practiceMode === 'prepared_content' ? (
                   <>

@@ -17,7 +17,11 @@ export interface MobileAssessmentAttempt {
   targetText: string
   heardText: string
   normalizedTarget: string
+  normalizedHeard: string
   missingChars: string[]
+  extraChars: string[]
+  durationMs?: number
+  qualityDisposition?: 'high_confidence' | 'review' | 'low_confidence'
 }
 
 export interface MobileAssessmentSummary {
@@ -28,12 +32,38 @@ export interface MobileAssessmentSummary {
   label: string
   summary: string
   isComplete: boolean
+  patterns: Array<{ label: string; count: number }>
+  personalizationSeconds: number
+  personalizationProgressPercent: number
+  nextAction: string
+  boundary: string
 }
 
 const PUNCTUATION_PATTERN = /[，。！？、；：“”‘’（）()\s]/g
 
 function normalizeChineseText(text: string): string {
   return text.replace(PUNCTUATION_PATTERN, '').trim()
+}
+
+function characterEditDistance(target: string, heard: string): number {
+  const targetChars = Array.from(target)
+  const heardChars = Array.from(heard)
+  let previous = Array.from({ length: heardChars.length + 1 }, (_, index) => index)
+
+  for (let targetIndex = 1; targetIndex <= targetChars.length; targetIndex += 1) {
+    const current = [targetIndex]
+    for (let heardIndex = 1; heardIndex <= heardChars.length; heardIndex += 1) {
+      const substitutionCost = targetChars[targetIndex - 1] === heardChars[heardIndex - 1] ? 0 : 1
+      current[heardIndex] = Math.min(
+        current[heardIndex - 1] + 1,
+        previous[heardIndex] + 1,
+        previous[heardIndex - 1] + substitutionCost,
+      )
+    }
+    previous = current
+  }
+
+  return previous[heardChars.length]
 }
 
 function buildLcsTable(target: string[], heard: string[]): number[][] {
@@ -134,13 +164,53 @@ export function summarizeMobileAssessment(
 ): MobileAssessmentSummary {
   const completedCount = attempts.length
   const remainingCount = Math.max(0, totalCount - completedCount)
-  const totalChars = attempts.reduce((sum, attempt) => sum + attempt.normalizedTarget.length, 0)
+  const totalChars = attempts.reduce(
+    (sum, attempt) => sum + Array.from(attempt.normalizedTarget).length,
+    0,
+  )
   const matchedChars = attempts.reduce(
-    (sum, attempt) => sum + Math.max(0, attempt.normalizedTarget.length - attempt.missingChars.length),
+    (sum, attempt) => {
+      const targetLength = Array.from(attempt.normalizedTarget).length
+      return sum + Math.max(
+        0,
+        targetLength - characterEditDistance(attempt.normalizedTarget, attempt.normalizedHeard),
+      )
+    },
     0,
   )
   const accuracyPercent = totalChars > 0 ? Math.round((matchedChars / totalChars) * 100) : 0
   const isComplete = totalCount > 0 && completedCount >= totalCount
+  const patternCounts = new Map<string, number>()
+  attempts.forEach((attempt) => {
+    for (const character of [...attempt.missingChars, ...attempt.extraChars]) {
+      patternCounts.set(character, (patternCounts.get(character) ?? 0) + 1)
+    }
+  })
+  const patterns = Array.from(patternCounts.entries())
+    .map(([label, count]) => ({ label: `“${label}”`, count }))
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 5)
+  const personalizationSeconds = Math.round(
+    attempts.reduce((sum, attempt) => sum + (attempt.durationMs ?? 0), 0) / 1000,
+  )
+  const personalizationProgressPercent = Math.min(
+    100,
+    Math.round((personalizationSeconds / 300) * 100),
+  )
+  const hasLowConfidenceRecording = attempts.some(
+    (attempt) => attempt.qualityDisposition === 'low_confidence',
+  )
+  const reportFields = {
+    patterns,
+    personalizationSeconds,
+    personalizationProgressPercent,
+    nextAction: hasLowConfidenceRecording
+      ? '有录音过短或收音不稳，先在相同设备上重录，再比较系统听清率。'
+      : patterns[0]
+        ? `下一轮优先复练${patterns[0].label}，再比较前后两轮系统听清率。`
+        : '保持当前设备和距离，完成更多词后再看稳定规律。',
+    boundary: '报告描述系统本轮如何听到你的声音，不诊断疾病、嗓音健康或医学严重程度。',
+  }
 
   if (!isComplete) {
     return {
@@ -150,24 +220,26 @@ export function summarizeMobileAssessment(
       accuracyPercent,
       label: completedCount > 0 ? '筛查进行中' : '还未开始',
       summary: completedCount > 0
-        ? `已经完成 ${completedCount}/${totalCount} 个词。整组完成前不生成等级。`
-        : '完成整组后再看字符准确率和训练分层。',
+        ? `已经完成 ${completedCount}/${totalCount} 个词。整组完成前不生成训练支持级别。`
+        : '完成整组后再看字符准确率和训练支持级别。',
       isComplete: false,
+      ...reportFields,
     }
   }
 
   const label = accuracyPercent < 30
-    ? '重度'
+    ? '高支持需求'
     : accuracyPercent < 50
-      ? '中度'
-      : accuracyPercent < 80 ? '轻度' : '待观察'
+      ? '中支持需求'
+      : accuracyPercent < 80 ? '低支持需求' : '继续观察'
   return {
     completedCount,
     totalCount,
     remainingCount,
     accuracyPercent,
     label,
-    summary: `字符准确率约 ${accuracyPercent}%，当前训练分层为“${label}”。这不替代医学评估。`,
+    summary: `系统转写字符准确率约 ${accuracyPercent}%，建议按“${label}”安排训练辅助。这反映当前系统听清程度，不是医学严重程度。`,
     isComplete: true,
+    ...reportFields,
   }
 }

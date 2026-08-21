@@ -63,7 +63,7 @@ export interface NativeRecorderQueueState {
       source?: string
       metadata?: Record<string, unknown>
     },
-  ): Promise<void>
+  ): Promise<boolean>
   stopRecording(): Promise<MobileWorkbenchRecorderQueueItem | null>
   playRecording(recordingId: string): void
   playLatest(): void
@@ -160,18 +160,18 @@ export function useNativeRecorderQueue(params: {
       source?: string
       metadata?: Record<string, unknown>
     },
-  ): Promise<void> => {
+  ): Promise<boolean> => {
     setErrorMessage(null)
 
     if (!params.contributorId) {
       setErrorMessage('请先登录。')
-      return
+      return false
     }
 
     const hasPermission = await requestPermission()
     if (!hasPermission) {
       setErrorMessage('请允许麦克风权限后重试。')
-      return
+      return false
     }
 
     try {
@@ -184,8 +184,10 @@ export function useNativeRecorderQueue(params: {
       setRecordingStartedAt(new Date().toISOString())
       setRecordingText(text.trim() || '移动端练习样本')
       setRecordingContext(context ?? null)
+      return true
     } catch (error) {
       setErrorMessage(toMobileProductMessage(error, 'recording'))
+      return false
     }
   }, [params.contributorId, recorder, requestPermission])
 

@@ -6,8 +6,8 @@ VoxFlame 的 Expo / React Native 移动端，Android 与 iOS 共用一套产品�
 
 `0.1.0` 第一版包含四个可测试页面：
 
-1. `沟通`：通过 backend 创建、保活和结束 RTC session，再连接 LiveKit 麦克风。
-2. `练习`：原生录音、本机队列、逐条回放、确认删除、上传和 receipt。
+1. `沟通`：先进入固定场景选择 screen，再进入实时沟通 screen；通过 backend 创建、保活和结束 RTC session，再连接 LiveKit 麦克风。
+2. `练习`：只区分独立筛查与数据录入；自定义材料是数据录入页的一种内容来源。执行面支持原生录音、本机队列、逐条回放、确认删除、上传和 receipt。
 3. `准备`：读取与 Web 相同的 workspace snapshot、准备材料和常用短句。
 4. `我的`：账户、麦克风权限、资料同步和待上传状态。
 

@@ -7,7 +7,8 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { usePhrases } from '@/hooks/usePhrases'
 import { QuickPhraseGrid } from './QuickPhraseGrid'
@@ -19,11 +20,13 @@ import { PlusIcon, RefreshCw } from 'lucide-react'
 export interface QuickPhrasesPanelProps {
   onPhrasePlay?: (text: string) => void
   className?: string
+  mode?: 'use' | 'manage'
 }
 
 export function QuickPhrasesPanel({
   onPhrasePlay,
-  className
+  className,
+  mode = 'use',
 }: QuickPhrasesPanelProps) {
   const {
     phrases,
@@ -42,6 +45,22 @@ export function QuickPhrasesPanel({
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingPhrase, setEditingPhrase] = useState<QuickPhrase | undefined>()
+  const [pendingDeletePhrase, setPendingDeletePhrase] = useState<QuickPhrase | null>(null)
+  const deleteDialogRef = useRef<HTMLDialogElement | null>(null)
+  const isManageMode = mode === 'manage'
+
+  useEffect(() => {
+    const dialog = deleteDialogRef.current
+    if (!dialog) {
+      return
+    }
+
+    if (pendingDeletePhrase && !dialog.open) {
+      dialog.showModal()
+    } else if (!pendingDeletePhrase && dialog.open) {
+      dialog.close()
+    }
+  }, [pendingDeletePhrase])
 
   // 初始化预设短语
   const handleInitializePresets = useCallback(async () => {
@@ -49,12 +68,15 @@ export function QuickPhrasesPanel({
   }, [initializePresets])
 
   // 处理短语点击 - 播放并记录使用
-  const handlePhraseClick = useCallback(async (phrase: QuickPhrase) => {
-    // 记录使用
-    await incrementUsage(phrase.id!)
-    // 播放
+  const handlePhraseClick = useCallback((phrase: QuickPhrase) => {
+    if (isManageMode) {
+      return
+    }
+
+    // 先立即表达，再在后台记录使用次数，避免网络延迟阻塞代播。
     onPhrasePlay?.(phrase.text)
-  }, [incrementUsage, onPhrasePlay])
+    void incrementUsage(phrase.id!)
+  }, [incrementUsage, isManageMode, onPhrasePlay])
 
   // 打开添加对话框
   const handleAdd = useCallback(() => {
@@ -83,10 +105,18 @@ export function QuickPhrasesPanel({
 
   // 删除短语
   const handleDelete = useCallback(async (phraseId: string) => {
-    if (confirm('确定要删除这个短语吗？')) {
-      await deletePhrase(phraseId)
+    const phrase = phrases.find((item) => item.id === phraseId) ?? null
+    setPendingDeletePhrase(phrase)
+  }, [phrases])
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDeletePhrase) {
+      return
     }
-  }, [deletePhrase])
+
+    await deletePhrase(pendingDeletePhrase.id)
+    setPendingDeletePhrase(null)
+  }, [deletePhrase, pendingDeletePhrase])
 
   // 分类筛选
   const handleFilterChange = useCallback((category: PhraseCategory | 'all') => {
@@ -103,9 +133,14 @@ export function QuickPhrasesPanel({
   return (
     <div className={className}>
       {/* 头部 */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">常用短语</h2>
-        <div className="flex gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-balance text-xl font-semibold">{isManageMode ? '我的快速短语' : '我的常用短语'}</h2>
+          <p className="mt-1 text-pretty text-sm text-stone-600">
+            {isManageMode ? '在这里统一增删改，沟通页只负责直接使用。' : '点一句，直接用本机语音说出来。'}
+          </p>
+        </div>
+        {isManageMode ? <div className="flex gap-2">
           {showInitPrompt && (
             <Button
               variant="outline"
@@ -125,16 +160,18 @@ export function QuickPhrasesPanel({
             <PlusIcon className="h-4 w-4" />
             添加
           </Button>
-        </div>
+        </div> : null}
       </div>
 
-      {/* 分类筛选 */}
-      <CategoryFilter
-        selected={selectedCategory}
-        onChange={handleFilterChange}
-        counts={categoryStats}
-        className="mb-4"
-      />
+      {/* 只有存在可筛选内容或处于维护态时才显示分类，避免匿名使用面出现一排空控件。 */}
+      {(isManageMode || phrases.length > 0) ? (
+        <CategoryFilter
+          selected={selectedCategory}
+          onChange={handleFilterChange}
+          counts={categoryStats}
+          className="mb-4"
+        />
+      ) : null}
 
       {/* 错误提示 */}
       {error && (
@@ -162,7 +199,7 @@ export function QuickPhrasesPanel({
         </div>
       )}
 
-      {showInitPrompt && (
+      {showInitPrompt && isManageMode && (
         <div className="text-center py-8 px-4 border border-dashed rounded-lg">
           <p className="text-muted-foreground mb-4">
             还没有短语，您可以：
@@ -181,24 +218,70 @@ export function QuickPhrasesPanel({
         </div>
       )}
 
+      {showInitPrompt && !isManageMode ? (
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-5 py-7 text-center">
+          <p className="text-pretty text-sm text-stone-600">还没有个人短语，可以先使用上方通用短语。</p>
+          <Link
+            href="/memory#memory-scene-template-selector"
+            className="mt-3 inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-orange-700 hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+          >
+            去记忆页添加
+          </Link>
+        </div>
+      ) : null}
+
       {/* 短语网格 */}
       {!isLoading && phrases.length > 0 && (
         <QuickPhraseGrid
           phrases={phrases}
           onPhraseClick={handlePhraseClick}
-          onPhraseEdit={handleEdit}
-          onPhraseDelete={handleDelete}
-          editable={true}
+          onPhraseEdit={isManageMode ? handleEdit : undefined}
+          onPhraseDelete={isManageMode ? handleDelete : undefined}
+          editable={isManageMode}
         />
       )}
 
       {/* 编辑对话框 */}
-      <PhraseEditorModal
-        phrase={editingPhrase}
-        open={editorOpen}
-        onClose={() => setEditorOpen(false)}
-        onSave={handleSave}
-      />
+      {isManageMode ? (
+        <PhraseEditorModal
+          phrase={editingPhrase}
+          open={editorOpen}
+          onClose={() => setEditorOpen(false)}
+          onSave={handleSave}
+        />
+      ) : null}
+
+      <dialog
+        ref={deleteDialogRef}
+        role="alertdialog"
+        aria-labelledby="delete-phrase-title"
+        aria-describedby="delete-phrase-description"
+        onCancel={() => setPendingDeletePhrase(null)}
+        className="w-[min(28rem,calc(100%-2rem))] rounded-3xl border border-stone-200 bg-white p-0 text-stone-950 shadow-xl backdrop:bg-stone-950/40"
+      >
+        <div className="p-6">
+          <h3 id="delete-phrase-title" className="text-balance text-xl font-semibold">删除这条短语？</h3>
+          <p id="delete-phrase-description" className="mt-3 text-pretty text-sm leading-6 text-stone-600">
+            “{pendingDeletePhrase?.text}”会从个人短语库中移除，这个操作无法撤销。
+          </p>
+          <div className="mt-6 flex flex-wrap justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setPendingDeletePhrase(null)}
+            className="inline-flex min-h-11 items-center rounded-xl border border-stone-200 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => void confirmDelete()}
+              className="inline-flex min-h-11 items-center rounded-xl bg-rose-700 px-4 text-sm font-semibold text-white hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2"
+            >
+              确认删除
+            </button>
+          </div>
+        </div>
+      </dialog>
     </div>
   )
 }

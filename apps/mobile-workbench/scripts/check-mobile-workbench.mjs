@@ -76,6 +76,7 @@ assert(packageJson.name === '@voxflame/mobile-workbench', 'package name must sta
 assert(packageJson.version === appJson.expo?.version, 'package and Expo versions must match')
 assert(packageJson.dependencies?.['@react-native-async-storage/async-storage'] === '2.2.0', 'AsyncStorage must stay on the Expo SDK 55 compatible version')
 assert(packageJson.scripts?.check === 'node scripts/check-mobile-workbench.mjs', 'mobile check script is missing')
+assert(packageJson.scripts?.['test:training'] === 'node scripts/test-mobile-training-feedback.mjs', 'mobile training regression script is missing')
 assert(packageJson.scripts?.web === undefined, 'web script must stay disabled until web dependencies are explicit')
 assert(packageJson.scripts?.['export:android'] === 'expo export --platform android', 'android export smoke script is missing')
 assert(packageJson.scripts?.['export:ios'] === 'expo export --platform ios', 'ios export smoke script is missing')
@@ -188,6 +189,7 @@ for (const requiredFile of [
   'scripts/configure-eas-project.mjs',
   'scripts/save-expo-token.sh',
   'scripts/with-expo-token.sh',
+  'scripts/test-mobile-training-feedback.mjs',
 ]) {
   assert(existsSync(path.join(appRoot, requiredFile)), `missing required mobile file: ${requiredFile}`)
 }
@@ -218,7 +220,14 @@ for (const requiredToken of [
   'expo-clipboard',
   '/training/catalog',
   "training_flow: flow",
+  'characterEditDistance',
+  "flow === 'collection' ? <View style={styles.customPracticePanel}",
+  'sentenceId: effectiveExercise.id',
   'recognizedText: item.recognizedText',
+  'understandsConsent: consentReady',
+  '我同意本次录音用于训练',
+  'MOBILE_COLLECTION_PLANS',
+  'collection_plan_id: flow === \'collection\' ? collectionPlanId : undefined',
   '/prepared-expressions/active',
   '/profile-memory',
   '/phrases/user/',
@@ -232,6 +241,27 @@ for (const requiredToken of [
 
 for (const surface of ['communication', 'practice', 'memory', 'device']) {
   assert(sourceText.includes(`'${surface}'`), `missing mobile surface: ${surface}`)
+}
+
+const appSource = readFileSync(path.join(appRoot, 'App.tsx'), 'utf8')
+for (const taskRoute of [
+  'communication_setup',
+  'communication_live',
+  'practice_home',
+  'assessment',
+  'collection',
+]) {
+  assert(appSource.includes(`'${taskRoute}'`), `missing mobile task route: ${taskRoute}`)
+}
+assert(!appSource.includes("| 'material'\n"), 'custom material must not return as a top-level mobile task route')
+assert(appSource.includes("type MobileCollectionSource = 'catalog' | 'prepared_material'"), 'data entry must own catalog and custom-material sources')
+for (const taskScreen of [
+  'function CommunicationSetupScreen',
+  'function CommunicationScreen',
+  'function PracticeHomeScreen',
+  'function PracticeScreen',
+]) {
+  assert(appSource.includes(taskScreen), `missing separated mobile task screen: ${taskScreen}`)
 }
 
 assert(!sourceText.includes(`from '@/`), 'Metro runtime must not depend on tsconfig-only @ alias imports')

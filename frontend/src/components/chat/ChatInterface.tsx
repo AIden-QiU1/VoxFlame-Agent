@@ -12,20 +12,9 @@ import Link from 'next/link'
 import { useRtcAgentSession, ConversationMessage } from '@/hooks/useRtcAgentSession'
 import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
 import WaveformVisualizer from '@/components/WaveformVisualizer'
-import { CommunicationStarterKit } from '@/components/chat/CommunicationStarterKit'
-import { QuickPhrasesPanel } from '@/components/phrases'
 import { UserNav } from '@/components/ui/user-nav'
-import { SessionReadinessPanel } from '@/components/runtime/SessionReadinessPanel'
 import { MicrophoneInputFeedback } from '@/components/runtime/MicrophoneInputFeedback'
-import {
-  STARTER_KIT_SCENES,
-  type StarterKitScene,
-} from '@/lib/communication/starter-kit'
-import {
-  defaultCapabilitiesForMode,
-  defaultStrategyForMode,
-  type RtcScene,
-} from '@/lib/realtime-audio/session-contract'
+import type { RtcScene } from '@/lib/realtime-audio/session-contract'
 import { memoryService } from '@/lib/memory/memory-service'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
 import { cn } from '@/lib/utils'
@@ -35,23 +24,18 @@ import {
   RotateCcw,
   ScreenShare,
   Volume2,
-  XIcon,
 } from 'lucide-react'
 
 interface ChatInterfaceProps {
   userId?: string
   accessToken?: string
   isAuthenticated?: boolean
-  initialStarterSceneId?: StarterKitScene['id']
-  homeHref?: string
   onReturnHome?: () => void
 }
 
 type ConfirmedOutputMode = 'display' | 'copy' | 'speech'
 
-function mapStarterSceneToRuntimeScene(
-  sceneId: StarterKitScene['id'] | undefined,
-): RtcScene | undefined {
+function toRtcScene(sceneId: WorkspaceMemorySnapshot['expression_kit']['active_scene_id']): RtcScene | undefined {
   if (sceneId === 'workplace') {
     return 'work'
   }
@@ -60,7 +44,7 @@ function mapStarterSceneToRuntimeScene(
     return 'family'
   }
 
-  return sceneId
+  return sceneId ?? undefined
 }
 
 function buildPreparationContextUpdate(
@@ -223,25 +207,18 @@ export default function ChatInterface({
   userId,
   accessToken,
   isAuthenticated = false,
-  initialStarterSceneId,
-  homeHref,
   onReturnHome,
 }: ChatInterfaceProps) {
-  const requestedRuntimeScene = mapStarterSceneToRuntimeScene(initialStarterSceneId)
   const {
     isConnecting,
     isConnected,
     isRecording,
     isThinking,
-    isSpeaking,
     sessionId,
     currentASRText,
     currentResponseText,
     messages,
     error,
-    sessionIntent,
-    sessionReadiness,
-    grantedCapabilities,
     analyser,
     connect,
     disconnect,
@@ -253,7 +230,6 @@ export default function ChatInterface({
     userId,
     accessToken,
     surface: 'communication_workspace',
-    scene: requestedRuntimeScene,
     executionBackend: 'livekit',
     timeoutSeconds: 1800,
   })
@@ -262,12 +238,8 @@ export default function ChatInterface({
   const messagesScrollRef = useRef<HTMLElement | null>(null)
   const lastPreparationSyncKeyRef = useRef<string | null>(null)
   const pendingPreparationSyncKeyRef = useRef<string | null>(null)
-  const [showPhrasesPanel, setShowPhrasesPanel] = useState(false)
   const [isCaptionMode, setIsCaptionMode] = useState(false)
-  const [isLaunchingStarter, setIsLaunchingStarter] = useState(false)
   const [microphoneEnvironmentWarning, setMicrophoneEnvironmentWarning] = useState<string | null>(null)
-  const [activeStarterSceneId, setActiveStarterSceneId] = useState<StarterKitScene['id'] | undefined>(initialStarterSceneId)
-  const [selectedLoadoutItemIds, setSelectedLoadoutItemIds] = useState<string[]>([])
   const [confirmedOutputText, setConfirmedOutputText] = useState('')
   const [confirmedOutputSourceId, setConfirmedOutputSourceId] = useState<string | null>(null)
   const [confirmedOutputStatus, setConfirmedOutputStatus] = useState<string | null>(null)
@@ -279,7 +251,6 @@ export default function ChatInterface({
   } = useWorkspaceMemorySnapshot({
     userId,
     isAuthenticated,
-    sceneId: activeStarterSceneId,
   })
 
   useEffect(() => {
@@ -325,10 +296,6 @@ export default function ChatInterface({
 
     setMicrophoneEnvironmentWarning(null)
   }, [])
-
-  useEffect(() => {
-    setActiveStarterSceneId(initialStarterSceneId)
-  }, [initialStarterSceneId])
 
   useEffect(() => {
     if (!isConnected) {
@@ -379,21 +346,6 @@ export default function ChatInterface({
     () => [...messages].reverse().find((message) => message.role === 'assistant'),
     [messages],
   )
-
-  const handlePhrasePlay = async (text: string) => {
-    setIsLaunchingStarter(true)
-
-    try {
-      if (!isConnected) {
-        await connect({ suppressGreeting: true })
-      }
-
-      await sendText(text)
-      setShowPhrasesPanel(false)
-    } finally {
-      setIsLaunchingStarter(false)
-    }
-  }
 
   useEffect(() => {
     if (!latestAssistantMessage || latestAssistantMessage.id === confirmedOutputSourceId) {
@@ -509,47 +461,15 @@ export default function ChatInterface({
     || (isThinking ? '正在整理本句...' : '正在等待语音输入...')
   const hasConversationStarted = messages.length > 0 || Boolean(currentResponseText) || Boolean(currentASRText)
   const hasMessageThreadActivity = hasConversationStarted || isRecording
-  const statusText = isRecording
-    ? '正在听你说话'
-    : isConnecting
-      ? '助手正在进入房间'
-    : isSpeaking
-      ? '正在为你代播'
-      : isThinking
-        ? '正在整理回应'
-        : isConnected
-          ? '已经准备好沟通'
-          : '还没连接助手'
   const trimmedConfirmedOutput = confirmedOutputText.trim()
   const hasConfirmedOutput = trimmedConfirmedOutput.length > 0
   const communicationLoadout = workspaceSnapshot?.communication_loadout ?? null
-  const effectiveSceneId = workspaceSnapshot?.expression_kit.active_scene_id ?? activeStarterSceneId
-  const activeStarterScene = useMemo(
-    () => STARTER_KIT_SCENES.find((scene) => scene.id === effectiveSceneId),
-    [effectiveSceneId],
+  const runtimeScene = toRtcScene(workspaceSnapshot?.expression_kit.active_scene_id ?? null)
+
+  const selectedLoadoutItemIds = useMemo(
+    () => buildDefaultSelectedLoadoutItemIds(communicationLoadout),
+    [communicationLoadout],
   )
-  const runtimeScene = useMemo<RtcScene | undefined>(
-    () => mapStarterSceneToRuntimeScene(effectiveSceneId),
-    [effectiveSceneId],
-  )
-
-  useEffect(() => {
-    if (!communicationLoadout) {
-      setSelectedLoadoutItemIds([])
-      return
-    }
-
-    setSelectedLoadoutItemIds((currentIds) => {
-      const requiredIds = communicationLoadout.sections.flatMap((section) => (
-        section.items.filter((item) => item.required).map((item) => item.id)
-      ))
-      const nextIds = currentIds.length > 0
-        ? Array.from(new Set([...requiredIds, ...currentIds]))
-        : buildDefaultSelectedLoadoutItemIds(communicationLoadout)
-
-      return nextIds
-    })
-  }, [communicationLoadout])
 
   const preparationContextUpdate = useMemo(
     () => buildPreparationContextUpdate(
@@ -573,47 +493,6 @@ export default function ChatInterface({
     )) ?? [],
     [communicationLoadout, selectedLoadoutItemIds],
   )
-  const selectableLoadoutSections = useMemo(
-    () => communicationLoadout?.sections
-      .filter((section) => section.id === 'scene_pack' || section.id === 'custom_materials')
-      .filter((section) => section.items.length > 0) ?? [],
-    [communicationLoadout],
-  )
-  const contextResultSummary = useMemo(() => {
-    const autoItems = ['用户画像']
-
-    const selectedCustomMaterials = selectedLoadoutEntries
-      .filter((entry) => entry.sourceType === 'custom_material')
-      .map((entry) => entry.title)
-    const selectedSceneTemplates = selectedLoadoutEntries
-      .filter((entry) => entry.sourceType === 'scene_template')
-      .map((entry) => entry.title)
-
-    const resultLines = [
-      `默认加入：${autoItems.join('、')}`,
-      selectedCustomMaterials.length > 0
-        ? `已加入自定义材料：${selectedCustomMaterials.join('、')}`
-        : '当前没有把自定义材料带进本次沟通。',
-      selectedSceneTemplates.length > 0
-        ? `已加入场景模板：${selectedSceneTemplates.join('、')}，系统会一起带上对应热词、风险词和沟通策略。`
-        : '当前没有额外加载场景模板。',
-    ]
-
-    return resultLines
-  }, [selectedLoadoutEntries])
-
-  const handleLoadoutItemToggle = (itemId: string, required: boolean) => {
-    if (required) {
-      return
-    }
-
-    setSelectedLoadoutItemIds((currentIds) => (
-      currentIds.includes(itemId)
-        ? currentIds.filter((id) => id !== itemId)
-        : [...currentIds, itemId]
-    ))
-  }
-
   useEffect(() => {
     if (!userId || !communicationLoadout) {
       return
@@ -660,52 +539,8 @@ export default function ChatInterface({
       })
   }, [isConnected, preparationContextUpdate, sendControlEvent])
 
-  const plannedIntent = useMemo(() => ({
-    surface: 'communication_workspace' as const,
-    mode: 'communication' as const,
-    sessionStrategy: defaultStrategyForMode('communication'),
-    requestedCapabilities: defaultCapabilitiesForMode('communication'),
-    scene: runtimeScene,
-  }), [runtimeScene])
-
   return (
     <div className="flex h-dvh overflow-hidden bg-stone-50">
-      {showPhrasesPanel ? (
-        <button
-          type="button"
-          aria-label="关闭表达工具箱"
-          onClick={() => setShowPhrasesPanel(false)}
-          className="fixed inset-0 z-20 bg-stone-950/20"
-        />
-      ) : null}
-      <aside
-        className={cn(
-          'fixed inset-y-0 right-0 z-30 flex w-full max-w-md flex-col border-l border-stone-200 bg-white shadow-xl transition-transform duration-200',
-          showPhrasesPanel ? 'translate-x-0' : 'translate-x-full',
-        )}
-      >
-        <div className="flex items-start justify-between border-b border-stone-200 px-5 py-4">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-amber-700">表达工具箱</p>
-            <h2 className="text-lg font-semibold text-stone-950">常用短语与个人表达</h2>
-            <p className="text-sm text-stone-600 text-pretty">
-              这里放你的高频短语和补救句。需要时少打字、少切换，直接补一句就行。
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-label="关闭表达工具箱"
-            onClick={() => setShowPhrasesPanel(false)}
-            className="flex size-10 items-center justify-center rounded-full border border-stone-200 text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-950"
-          >
-            <XIcon className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5">
-          <QuickPhrasesPanel onPhrasePlay={handlePhrasePlay} />
-        </div>
-      </aside>
-
       {/* Main Chat Area */}
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
@@ -716,8 +551,8 @@ export default function ChatInterface({
               燃
             </div>
             <div className="min-w-0">
-              <div className="text-base font-semibold text-stone-950 sm:text-lg">沟通工作台</div>
-              <div className="truncate text-xs text-stone-500 sm:text-sm">{activeStarterScene?.title ?? '燃言助手'}</div>
+              <div className="text-base font-semibold text-stone-950 sm:text-lg">日常沟通</div>
+              <div className="truncate text-xs text-stone-500 sm:text-sm">理解、纠错和连续对话</div>
             </div>
             {sessionId && (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
@@ -732,55 +567,23 @@ export default function ChatInterface({
           </div>
           
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-            {homeHref && (
-              onReturnHome ? (
-                <button
-                  type="button"
-                  onClick={onReturnHome}
-                  className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-950 sm:px-3"
-                >
-                  <span className="sm:hidden" aria-hidden="true">←</span>
-                  <span className="hidden sm:inline">返回首页</span>
-                </button>
-              ) : (
-                <Link href={homeHref} className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-950 sm:px-3">
-                  <span className="sm:hidden" aria-hidden="true">←</span>
-                  <span className="hidden sm:inline">返回首页</span>
-                </Link>
-              )
-            )}
-            <Link href="/memory" className="hidden min-h-11 items-center rounded-xl px-3 text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-950 lg:inline-flex">
-              沟通档案
-            </Link>
-            <Link href="/contribute" className="hidden min-h-11 items-center rounded-xl px-3 text-sm text-stone-600 hover:bg-stone-50 hover:text-stone-950 lg:inline-flex">
-              练习表达
-            </Link>
-            <button
-              type="button"
-              onClick={() => setShowPhrasesPanel(true)}
-              className="min-h-11 rounded-xl border border-stone-200 px-3 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950 sm:rounded-full sm:px-4"
-            >
-              <span className="sm:hidden">短句</span>
-              <span className="hidden sm:inline">表达工具箱</span>
-            </button>
-            {!isConnected ? (
+            {onReturnHome ? (
               <button
-                onClick={() => {
-                  void connect()
-                }}
-                disabled={isConnecting}
-                className="min-h-11 rounded-xl bg-amber-500 px-3 text-sm font-medium text-white transition-colors hover:bg-amber-600 sm:rounded-full sm:px-4"
+                type="button"
+                onClick={onReturnHome}
+                className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-medium text-stone-600 hover:bg-stone-50 hover:text-stone-950 sm:px-3"
               >
-                {isConnecting ? '正在连接...' : '连接助手'}
+                返回快速表达
               </button>
-            ) : (
+            ) : null}
+            {isConnected ? (
               <button
                 onClick={disconnect}
                 className="min-h-11 rounded-xl bg-stone-200 px-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-300 sm:rounded-full sm:px-4"
               >
                 断开连接
               </button>
-            )}
+            ) : null}
             <button
               onClick={() => setIsCaptionMode(!isCaptionMode)}
               className="hidden min-h-11 rounded-full bg-stone-950 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 md:inline-flex"
@@ -795,216 +598,47 @@ export default function ChatInterface({
       {/* Messages Area */}
       <main ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6">
         <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
-          {!hasConversationStarted && !initialStarterSceneId ? <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <div className="rounded-3xl border border-stone-200 bg-white p-5 sm:p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-amber-700">先说关键一句</div>
-                  <h1 className="max-w-3xl text-balance text-2xl font-semibold text-stone-950 sm:text-3xl">
-                    先说最重要的一句
-                  </h1>
-                  <p className="max-w-3xl text-sm leading-6 text-stone-600 text-pretty">
-                    如果现在不想从零开始，先点一句场景句。对方停下来后，再继续补第二句、第三句。
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
+          {!hasConversationStarted ? (
+            <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
+              <p className="text-sm font-semibold text-amber-700">日常沟通助手</p>
+              <h1 className="mt-2 text-balance text-2xl font-semibold text-stone-950 sm:text-4xl">
+                直接说，系统负责听懂和纠错
+              </h1>
+              <p className="mt-3 max-w-3xl text-pretty text-sm leading-7 text-stone-600 sm:text-base">
+                你的画像、已启用场景和当前材料会自动带入，不需要在这里再配置一遍。沟通音频默认不上传为训练样本。
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                {!isConnected ? (
                   <button
                     type="button"
-                    onClick={() => setShowPhrasesPanel(true)}
-                    className="rounded-full border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950"
+                    onClick={() => void connect()}
+                    disabled={isConnecting}
+                    className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-amber-500 px-6 text-sm font-semibold text-white hover:bg-amber-600 disabled:cursor-wait disabled:bg-amber-300"
                   >
-                    打开表达工具箱
+                    {isConnecting ? '正在连接…' : '开始沟通'}
                   </button>
-                  {!isConnected ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void connect()
-                      }}
-                      disabled={isConnecting}
-                      className="rounded-full bg-amber-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-600"
-                    >
-                      {isConnecting ? '正在连接...' : '先连接助手'}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-              {microphoneEnvironmentWarning ? (
-                <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                  {microphoneEnvironmentWarning}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="rounded-3xl border border-stone-200 bg-stone-100 p-5">
-              <div className="text-sm font-medium text-stone-700">当前状态</div>
-              <div className="mt-3 text-2xl font-semibold text-stone-950">{statusText}</div>
-              <div className="mt-2 space-y-2 text-sm text-stone-600">
-                <p>{activeStarterScene ? `当前场景：${activeStarterScene.title}` : '可以直接开口，也可以用常用短句。'}</p>
-                <p>对方停下来后，再继续补充。</p>
-                <p>如果被打断，就先用短语补一句。</p>
+                ) : (
+                  <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800">
+                    已准备好，点击下方麦克风开始说话
+                  </span>
+                )}
+                <Link
+                  href="/memory#memory-scene-template-selector"
+                  className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-stone-600 hover:bg-stone-50 hover:text-stone-950"
+                >
+                  查看沟通准备
+                </Link>
               </div>
               <MicrophoneInputFeedback
                 analyser={analyser}
                 active={isConnected || isRecording}
-                className="mt-4"
+                className="mt-5 max-w-md"
               />
-            </div>
-          </section> : null}
-
-          {!hasConversationStarted ? <details className="rounded-2xl border border-stone-200 bg-white">
-            <summary className="min-h-12 cursor-pointer px-4 py-3 text-sm font-medium text-stone-700">
-              本次资料与隐私设置
-            </summary>
-            <div className="space-y-4 border-t border-stone-200 p-4 sm:p-5">
-              <SessionReadinessPanel
-                intent={sessionIntent}
-                readiness={sessionReadiness}
-                grantedCapabilities={grantedCapabilities}
-                plannedIntent={plannedIntent}
-                title="连接准备"
-              />
-              <p className="text-pretty text-sm leading-6 text-stone-700">
-                沟通页默认只做实时理解和纠错，不上传原始沟通音频。训练样本上传只发生在训练页。
-              </p>
-
-          {communicationLoadout ? (
-            <section className="rounded-3xl border border-stone-200 bg-stone-50 p-5">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="text-sm font-medium text-amber-700">本次沟通会用到的资料</div>
-                  <h2 className="mt-1 text-xl font-semibold text-stone-950">
-                    {activeStarterScene
-                      ? `当前按“${activeStarterScene.title}”场景优先准备沟通`
-                      : '当前会按本次场景和资料自动准备沟通'}
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600 text-pretty">
-                    用户画像会默认进入这次上下文。你这里只需要决定要不要再带上自定义材料和场景模板。
-                  </p>
-                </div>
-                <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-stone-700">
-                  手动已选 {selectedLoadoutEntries.filter((entry) => entry.sourceType !== 'user_profile').length} 份资料
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                {selectableLoadoutSections.map((section) => {
-                  return (
-                  <article
-                    key={section.id}
-                    className="rounded-[24px] border border-stone-200 bg-stone-50 p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-semibold text-stone-950">
-                          {section.id === 'custom_materials' ? '自定义材料' : '场景模板'}
-                        </h3>
-                        <p className="mt-1 text-sm leading-6 text-stone-600">
-                          {section.id === 'custom_materials'
-                            ? '把你自己准备的稿件、提纲或说明带进这次沟通。'
-                            : '把模板里的热词、风险词和沟通策略带进这次沟通。'}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">
-                          {section.items.length} 项
-                        </span>
-                        <Link
-                          href="/memory"
-                          className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:text-stone-950"
-                        >
-                          去记忆页编辑
-                        </Link>
-                      </div>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {section.items.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleLoadoutItemToggle(item.id, item.required)}
-                          className={cn(
-                            'w-full rounded-2xl border px-3 py-3 text-left transition-colors',
-                            selectedLoadoutItemIds.includes(item.id)
-                              ? 'border-amber-300 bg-amber-50'
-                              : 'border-stone-200 bg-white hover:border-stone-300',
-                          )}
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-medium text-stone-900">{item.title}</span>
-                            {selectedLoadoutItemIds.includes(item.id) ? (
-                              <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-medium text-white">
-                                已加入本次上下文
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-700">
-                                点击加入
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-stone-700">{item.summary}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </article>
-                )})}
-              </div>
-
-              {selectableLoadoutSections.length === 0 ? (
-                <div className="mt-5 rounded-[24px] border border-dashed border-stone-300 bg-stone-50 px-4 py-5 text-sm text-stone-600">
-                  当前没有可手动加载的自定义材料或场景模板。去记忆页准备后，这里会直接出现可选标题。
+              {microphoneEnvironmentWarning ? (
+                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                  {microphoneEnvironmentWarning}
                 </div>
               ) : null}
-
-              <div className="mt-5 rounded-[24px] border border-amber-200 bg-amber-50 p-4">
-                <div className="text-sm font-semibold text-stone-950">当前会送进助手的上下文</div>
-                <div className="mt-3 space-y-2 text-sm leading-6 text-stone-700">
-                  {contextResultSummary.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
-              </div>
-            </section>
-          ) : null}
-            </div>
-          </details> : null}
-
-          {/* Welcome message */}
-          {!hasMessageThreadActivity && !initialStarterSceneId && (
-            <div className="space-y-4">
-              <CommunicationStarterKit
-                disabled={isLaunchingStarter}
-                initialSceneId={initialStarterSceneId}
-                isConnected={isConnected}
-                isLaunching={isLaunchingStarter}
-                onSceneChange={setActiveStarterSceneId}
-                onSelectPhrase={(text) => {
-                  void handlePhrasePlay(text)
-                }}
-              />
-              <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-900">
-                如果这会儿不方便自己先说，也可以先点一句场景句代播，再慢慢补充。
-              </div>
-            </div>
-          )}
-
-          {hasConversationStarted ? (
-            <section className="rounded-[28px] border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-sm font-medium text-stone-900">沟通已经开始</div>
-                  <p className="mt-1 text-sm text-stone-600 text-pretty">
-                    需要补一句高频表达、常用需求或个人短语时，随时打开表达工具箱。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowPhrasesPanel(true)}
-                  className="rounded-full border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-950"
-                >
-                  打开表达工具箱
-                </button>
-              </div>
             </section>
           ) : null}
 

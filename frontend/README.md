@@ -31,10 +31,16 @@ Frontend
 
 - `/`
   首页已经从说明页收口成“高压场景优先”的任务入口，重点是 `现在沟通 / 练习表达 / 沟通档案`。
-- `/?mode=communicate`
-  沟通工作台，围绕 `starter kit -> live session -> expression kit` 组织。
+- `/communicate`
+  唯一沟通 surface。匿名默认可直接用通用短语和手动输入做本机朗读；用户明确选择日常沟通后，才要求登录并在同页启动 LiveKit agent。记忆资料自动带入，不在沟通页重复编辑。
+- `/practice`
+  练习任务入口，只负责区分 `20 词能力筛查 / 训练与数据录入`。
+- `/assessment`
+  独立的 20 词能力筛查执行页。
 - `/contribute`
-  练习工作台，围绕真实场景录音、训练反馈、训练资产上传和本地待同步队列组织。
+  数据录入主题选择页。
+- `/contribute/topic/[topicId]`
+  单主题录音、训练反馈、训练资产上传和本地待同步队列工作台。
 - `/memory`
   沟通档案页，不再只做统计，而是为“下一次沟通前准备什么”服务。
 
@@ -87,7 +93,7 @@ app (路由/页面入口)
 
 用这个标准再看现在的目录：
 
-- `src/app/chat`、`src/app/contribute`、`src/app/memory`
+- `src/app/communicate`、`src/app/contribute`、`src/app/memory`
   是产品 surface
 - `src/components/chat`、`src/components/home`
   是 surface-specific UI

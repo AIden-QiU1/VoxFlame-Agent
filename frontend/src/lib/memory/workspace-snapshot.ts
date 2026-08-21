@@ -1,5 +1,5 @@
 import type { CommunicationPreferences } from '@/lib/communication/communication-preferences'
-import type { StarterKitScene } from '@/lib/communication/starter-kit'
+import type { CommunicationSceneId } from '@/lib/communication/communication-scene'
 
 export interface ExpressionKitSuggestion {
   id: string
@@ -185,7 +185,7 @@ export interface WorkspaceMemorySnapshot {
     updated_at: string
   }
   preparation: {
-    active_scene_id: StarterKitScene['id'] | null
+    active_scene_id: CommunicationSceneId | null
     profile_summary: string
     overview: string
     immediate_goal: string | null
@@ -233,7 +233,7 @@ export interface WorkspaceMemorySnapshot {
     }
   }
   expression_kit: {
-    active_scene_id: StarterKitScene['id'] | null
+    active_scene_id: CommunicationSceneId | null
     recommended_phrases: ExpressionKitSuggestion[]
     hotword_profiles: Array<{
       id: string

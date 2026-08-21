@@ -12,6 +12,7 @@ import {
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Loader2, Sparkles, Trash2, UploadCloud } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
+import { QuickPhrasesPanel } from '@/components/phrases'
 import {
   activatePreparedExpressionAsset,
   deletePreparedExpressionAsset,
@@ -201,6 +202,22 @@ export default function MemoryPage() {
     userId,
     isAuthenticated,
   })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const openLinkedSection = () => {
+      if (window.location.hash === '#memory-scene-template-selector') {
+        setExpandedSectionId('scene_templates')
+      }
+    }
+
+    openLinkedSection()
+    window.addEventListener('hashchange', openLinkedSection)
+    return () => window.removeEventListener('hashchange', openLinkedSection)
+  }, [])
 
   useEffect(() => {
     if (!sceneTemplateStatus) {
@@ -1028,10 +1045,10 @@ export default function MemoryPage() {
             id="scene_templates"
             expandedSectionId={expandedSectionId}
             onToggle={handleSectionToggle}
-            eyebrow="场景 / 热词模板"
+            eyebrow="场景与快速表达"
             eyebrowTone="stone"
-            title="场景 / 热词模板"
-            description="先看模板标题，再决定要不要加载，不把整库细节一次性摊开。"
+            title="场景与快速表达"
+            description="在这里统一维护场景模板、热词、沟通策略和快速短语；沟通页只负责使用。"
             preview={selectedSceneTemplateSummary}
             badge={`已选 ${selectedSceneTemplateIds.length} 套`}
           >
@@ -1177,6 +1194,9 @@ export default function MemoryPage() {
                     模板库还没加载出来，稍后刷新再试。
                   </div>
                 )}
+              </div>
+              <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50 p-5">
+                <QuickPhrasesPanel mode="manage" />
               </div>
           </MemorySectionShell>
         </div>

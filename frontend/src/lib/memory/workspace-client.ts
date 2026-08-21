@@ -2,7 +2,7 @@
 
 import { config } from '@/lib/config'
 import { getValidToken } from '@/lib/supabase/client'
-import type { StarterKitScene } from '@/lib/communication/starter-kit'
+import type { CommunicationSceneId } from '@/lib/communication/communication-scene'
 import type { CommunicationPreferences } from '@/lib/communication/communication-preferences'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
 
@@ -120,7 +120,7 @@ export interface UserProfileMemoryAsset {
 
 function buildWorkspaceSnapshotUrl(
   userId: string,
-  sceneId?: StarterKitScene['id'],
+  sceneId?: CommunicationSceneId,
 ): string {
   const params = new URLSearchParams()
   if (sceneId) {
@@ -132,7 +132,7 @@ function buildWorkspaceSnapshotUrl(
 
 export async function fetchWorkspaceSnapshot(
   userId: string,
-  sceneId?: StarterKitScene['id'],
+  sceneId?: CommunicationSceneId,
 ): Promise<WorkspaceMemorySnapshot | null> {
   const token = await getValidToken()
   if (!token) {

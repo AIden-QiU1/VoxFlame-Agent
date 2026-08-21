@@ -1,0 +1,56 @@
+research_id: RO-xxx
+status: draft
+evidence_class: discovery_only|mechanism|engineering|product|scenario|outcome
+claim: 可证伪的主张，而不是愿望
+sources:
+  - source_id: 
+    url: 
+    evidence_level: primary|professional|radar
+    accessed_at: 
+    published_or_version: 
+    supports: 
+    limitations: 
+independent_review:
+  required: true
+  reviewer: 
+  relationship_to_author: 
+  completed_at: 
+  result: pending|pass|revise|fail
+authority_gate:
+  status: pending|pass|fail
+  release_or_expansion: internal_only|paper|patent|public_dataset|open_source|product_default|scope_expansion
+  claim_scope: 
+  authority_sources:
+    - source_id: 
+      url: 
+      tier: primary|professional
+      independence_basis: 
+      supports: 
+      limitations: 
+  independent_review:
+    reviewer: 
+    institution_or_scope: 
+    conflict_of_interest: 
+    result: pending|pass|fail
+    reviewed_at: 
+  counterevidence_recorded: false
+  population_device_scenario_bounds_recorded: false
+  failure_conditions: 
+  rollback_or_withdrawal: 
+  recheck_date: 
+reproducibility:
+  code_or_protocol: 
+  data_version_and_license: 
+  commit_or_release: 
+  run_command: 
+  seed_or_determinism: 
+  raw_artifacts: 
+uncertainty_and_counterevidence:
+  uncertainty: 
+  counterevidence: 
+  out_of_scope: 
+outcome_gates:
+  scholarly: pending|pass|fail|not_applicable
+  patent: pending|pass|fail|not_applicable
+  software_copyright: pending|pass|fail|not_applicable
+  product: pending|pass|fail|not_applicable

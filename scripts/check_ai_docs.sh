@@ -13,6 +13,8 @@ required_files=(
   "docs/AI_EXECUTION_PLAN_TEMPLATE.md"
   ".claude-summary.md"
   ".tasks/current.md"
+  "research/README.md"
+  "research/APPLICATION_FEEDBACK_REGISTRY.md"
 )
 
 assert_file() {
@@ -44,5 +46,9 @@ done
 
 assert_contains "docs/README.md" "AI_ENGINEERING_SYSTEM.md"
 assert_contains "docs/README.md" "AI_EXECUTION_PLAN_TEMPLATE.md"
+assert_contains "docs/README.md" "../research/README.md"
+assert_contains "AGENTS.md" "research/APPLICATION_FEEDBACK_REGISTRY.md"
+
+bash "${ROOT_DIR}/scripts/check_research_system.sh"
 
 echo "AI docs harness check passed."

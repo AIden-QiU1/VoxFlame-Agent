@@ -31,21 +31,24 @@ Frontend LiveKit RTC/Data
 ```
 
 2. Web 首页已经按 `沟通 / 训练 / 记忆` 三个 surface 组织。
-3. 沟通页已经是主链入口：
-   - `frontend/src/components/chat/ChatInterface.tsx`
-   - 支持 LiveKit 连接、语音输入、文本输入、字幕辅助、表达工具箱、场景 starter kit、workspace loadout 和麦克风输入反馈。
-4. 训练页已经拆成两层：
-   - `/contribute`：主题选择、今日 / 7 天训练总结、匿名榜单。
-   - `/contribute/topic/[topicId]`：单主题录音训练、评估筛查、自定义材料切句训练、自动上传与撤回。
+3. 沟通任务已收口为唯一 `/communicate` surface，不再使用 `/chat` 或 `/communicate/live` 子路由：
+   - 默认是“快速表达”：匿名用户无需登录即可使用通用短语和手动输入；个人短语在登录后异步加载。三者均使用浏览器本机朗读，不连接 LiveKit、不调用 agent、不上传声音。
+   - 用户明确选择“日常沟通”后，才要求登录并在同页挂载 `frontend/src/components/chat/ChatInterface.tsx`，使用 LiveKit agent 做语音理解、意图纠错、连续上下文和 confirmed output。
+   - 记忆页是场景模板、热词、沟通策略、自定义材料和个人短语的唯一维护面；日常沟通自动读取已启用模板与当前材料，不再提供第二套手动装配 UI。
+4. 练习入口下只有两个产品任务：筛查与数据录入：
+   - `/practice`：只区分 `20 词能力筛查 / 训练与数据录入`。
+   - `/assessment`：独立 20 词能力筛查执行页。
+   - `/contribute`：数据录入主题选择、今日 / 7 天训练总结、匿名榜单；自定义材料是数据录入的一种来源。
+   - `/contribute/topic/[topicId]`：公共题库或自定义材料的录音、自动上传与撤回执行面。
 5. 记忆页已经不是单文档壳子：
-   - 支持用户画像、场景 / 热词模板、多份自定义材料库、当前 active material、材料摘要和编辑删除。
+   - 支持用户画像、场景 / 热词模板、多份自定义材料库、当前 active material、材料摘要、个人短语及编辑删除。
 6. Web 音频设置已经落地：
    - `/settings/audio` 支持麦克风授权、设备列表、首选麦克风保存和现场电平测试。
 7. Mobile Workbench 已进入 Web/App 能力对齐阶段：
    - `communication / practice / memory / device` 四个 surface 继续复用同一 backend owner，不通过 WebView 复制页面。
    - 沟通页已消费 LiveKit user/assistant transcript，并提供可编辑 confirmed output、给对方看、原生朗读、复制和文本发送。
-   - 沟通场景在进入实时工作台前选择，场景仍进入 RTC intent，不在工作台里占据主视觉。
-   - 练习页已把 `20 词能力筛查` 与 `训练收集` 拆成两条路径，并从 Web 正在使用的正式题库目录读取 sentence id、分类和题目；录音自动上传，失败保留本地重试。
+   - 沟通 surface 内部使用 `communication_setup / communication_live` 两个 screen route；场景仍进入 RTC intent，不在实时工作台里占据主视觉。
+   - 练习 surface 内部只使用 `practice_home / assessment / collection` screen route；自定义材料是 `collection` 内部的 `prepared_material` 来源，不是第三个产品任务。
    - 当前仍未达到 App 完全替代 Web：移动端尚缺训练实时识别/评分/总结、完整自定义材料训练，以及沟通档案的完整增删改；在这些 parity 项和真机 smoke 完成前，App 不能再标为“完整替代版”。
 8. `dataset != memory` 仍是硬边界：
    - 训练样本上传进入 dataset / review / export 路线。
@@ -314,15 +317,15 @@ P1 本机 v0 已支持这些出口：
 
 App / Mobile Workbench 技术路线：
 
-- [VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+- [App / Mobile Workbench 最佳实践与机会](../research/product-engineering/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
 
 分病因疗法锚点：
 
-- [VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md](VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
+- [分病因疗法锚点与产品化边界](../research/speech-health/VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
 
 Voiceitt 对标与设置启发：
 
-- [VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md](VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
+- [Voiceitt 功能设置与 VoxFlame 启发](../research/product-psychology/VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
 
 录音、上传与训练资产 contract：
 

@@ -1,8 +1,8 @@
-import type { StarterKitScene } from '@/lib/communication/starter-kit'
+import type { CommunicationSceneId } from '@/lib/communication/communication-scene'
 import type { MandarinTrainingCategory } from '@/lib/corpus/mandarin-training'
 
 export interface TrainingSceneProfile {
-  id: StarterKitScene['id']
+  id: CommunicationSceneId
   title: string
   summary: string
   rationale: string
@@ -11,7 +11,7 @@ export interface TrainingSceneProfile {
   coachingFocus: string
 }
 
-export const DEFAULT_TRAINING_SCENE_ID: StarterKitScene['id'] = 'interview'
+export const DEFAULT_TRAINING_SCENE_ID: CommunicationSceneId = 'interview'
 
 export const TRAINING_SCENE_PROFILES: TrainingSceneProfile[] = [
   {
@@ -71,7 +71,7 @@ export const TRAINING_SCENE_PROFILES: TrainingSceneProfile[] = [
 ]
 
 export function getTrainingSceneProfile(
-  sceneId: StarterKitScene['id'] | undefined,
+  sceneId: CommunicationSceneId | undefined,
 ): TrainingSceneProfile {
   return (
     TRAINING_SCENE_PROFILES.find((profile) => profile.id === sceneId) ??
@@ -80,7 +80,7 @@ export function getTrainingSceneProfile(
 }
 
 export function getTrainingSceneSuggestedCategories(
-  sceneId: StarterKitScene['id'] | undefined,
+  sceneId: CommunicationSceneId | undefined,
 ): MandarinTrainingCategory[] {
   return getTrainingSceneProfile(sceneId).recommendedCategories
 }
