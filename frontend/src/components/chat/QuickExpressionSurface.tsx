@@ -2,16 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, BrainCircuit, Volume2 } from 'lucide-react'
+import { ArrowLeft, Volume2 } from 'lucide-react'
 import { QuickPhrasesPanel } from '@/components/phrases'
 import { UserNav } from '@/components/ui/user-nav'
 import { QUICK_EXPRESSION_PHRASES } from '@/lib/communication/quick-expression-phrases'
 
-interface QuickExpressionSurfaceProps {
-  onOpenAssistant: () => void
-}
-
-export function QuickExpressionSurface({ onOpenAssistant }: QuickExpressionSurfaceProps) {
+export function QuickExpressionSurface() {
   const [draft, setDraft] = useState('')
   const [status, setStatus] = useState<string | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -61,11 +57,11 @@ export function QuickExpressionSurface({ onOpenAssistant }: QuickExpressionSurfa
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3 sm:px-8">
           <Link
-            href="/"
+            href="/communicate"
             className="inline-flex min-h-11 items-center gap-2 rounded-xl text-sm font-semibold text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
-            返回首页
+            返回沟通方式
           </Link>
           <div className="flex items-center gap-2">
             <Link
@@ -139,25 +135,6 @@ export function QuickExpressionSurface({ onOpenAssistant }: QuickExpressionSurfa
           <QuickPhrasesPanel mode="use" onPhrasePlay={speak} />
         </section>
 
-        <section className="mt-5 flex flex-col gap-4 rounded-3xl border border-stone-200 bg-stone-900 p-5 text-white sm:flex-row sm:items-center sm:justify-between sm:p-6">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-orange-200">
-              <BrainCircuit className="size-4" aria-hidden="true" />
-              需要系统持续听懂你
-            </div>
-            <h2 className="mt-2 text-balance text-xl font-semibold">进入日常沟通助手</h2>
-            <p className="mt-2 max-w-2xl text-pretty text-sm leading-6 text-stone-300">
-              需要语音识别、意图纠错、上下文记忆或连续对话时，再启动助手。
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenAssistant}
-            className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-2xl bg-white px-6 text-sm font-semibold text-stone-950 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900"
-          >
-            打开日常沟通
-          </button>
-        </section>
       </main>
     </div>
   )

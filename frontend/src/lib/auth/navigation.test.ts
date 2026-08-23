@@ -44,6 +44,14 @@ test('isProtectedPath does not revive removed communication child routes', () =>
 test('isProtectedPath keeps active nested route trees behind authentication', () => {
   assert.equal(isProtectedPath('/contribute'), true)
   assert.equal(isProtectedPath('/contribute/topic/assessment-screening'), true)
+  assert.equal(isProtectedPath('/communicate/assistant'), true)
+  assert.equal(isProtectedPath('/corpus-review'), true)
+  assert.equal(isProtectedPath('/corpus-review/core-gap'), true)
   assert.equal(isProtectedPath('/settings/account'), true)
   assert.equal(isProtectedPath('/settings-legacy'), false)
+})
+
+test('corpus spoken-text review remains a protected nested route', () => {
+  assert.equal(isProtectedPath('/corpus-review/spoken-text'), true)
+  assert.equal(isProtectedPath('/corpus-review/dual-spoken-text'), true)
 })

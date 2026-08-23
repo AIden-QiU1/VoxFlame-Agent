@@ -1,0 +1,509 @@
+{
+  "kind": "voxflame_mandarin_dual_review_audio_integrity_report",
+  "generated_at": "2026-08-23T06:52:49.917Z",
+  "input_queue_items": 60,
+  "manifest_files": [
+    "manifest.jsonl",
+    "manifest.jsonl",
+    "manifest.jsonl",
+    "manifest.jsonl",
+    "manifest.jsonl",
+    "manifest.jsonl",
+    "manifest.jsonl",
+    "manifest.jsonl",
+    "manifest.jsonl",
+    "manifest.jsonl"
+  ],
+  "status_counts": {
+    "audio_missing": 11,
+    "ok": 49
+  },
+  "audio_integrity_gate_passed": false,
+  "results": [
+    {
+      "recording_id": "12fdc742-b137-483b-9bd4-5d1c15a9ae70",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "77e7e364-0def-4b53-9229-cd784fec5fb4",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "088d8032-801b-44b1-ab7e-38efd60fdd21",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "69c481e1-d5ed-4ef9-8c6d-87f14c6f4f70",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "566db4b8-4deb-4ac3-afe6-a73098ec2815",
+      "status": "ok",
+      "size_bytes": 276524,
+      "expected_size_bytes_match": true,
+      "duration_ms": 8640,
+      "expected_duration_ms": 8659,
+      "duration_delta_ms": -19
+    },
+    {
+      "recording_id": "b7ae9c51-dfd3-4450-b985-35d5187653e3",
+      "status": "ok",
+      "size_bytes": 113324,
+      "expected_size_bytes_match": true,
+      "duration_ms": 3540,
+      "expected_duration_ms": 3605,
+      "duration_delta_ms": -65
+    },
+    {
+      "recording_id": "ae0936ee-eca9-4e3b-881e-9f2a072a9ac0",
+      "status": "ok",
+      "size_bytes": 319532,
+      "expected_size_bytes_match": true,
+      "duration_ms": 9984,
+      "expected_duration_ms": 10070,
+      "duration_delta_ms": -86
+    },
+    {
+      "recording_id": "a87d27c3-522e-4654-9770-c55fd4d219bb",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "5111306d-7c02-45f8-99b8-132fa1327cb4",
+      "status": "ok",
+      "size_bytes": 203564,
+      "expected_size_bytes_match": true,
+      "duration_ms": 6360,
+      "expected_duration_ms": 6382,
+      "duration_delta_ms": -22
+    },
+    {
+      "recording_id": "80aa3569-c123-4370-89e3-04b7a2576c52",
+      "status": "ok",
+      "size_bytes": 184364,
+      "expected_size_bytes_match": true,
+      "duration_ms": 5760,
+      "expected_duration_ms": 5799,
+      "duration_delta_ms": -39
+    },
+    {
+      "recording_id": "135cb806-e2b6-4162-ad41-c6a5b3029ee2",
+      "status": "ok",
+      "size_bytes": 88364,
+      "expected_size_bytes_match": true,
+      "duration_ms": 2760,
+      "expected_duration_ms": 2820,
+      "duration_delta_ms": -60
+    },
+    {
+      "recording_id": "5df6a996-df2d-4515-8dd4-0fb8a2ba3046",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "e64df897-9c36-464b-8b8f-6d5c527abbc0",
+      "status": "ok",
+      "size_bytes": 165164,
+      "expected_size_bytes_match": true,
+      "duration_ms": 5160,
+      "expected_duration_ms": 5199,
+      "duration_delta_ms": -39
+    },
+    {
+      "recording_id": "9d679dd1-3ba0-48a7-9aaa-d91b944cbd36",
+      "status": "ok",
+      "size_bytes": 149804,
+      "expected_size_bytes_match": true,
+      "duration_ms": 4680,
+      "expected_duration_ms": 4729,
+      "duration_delta_ms": -49
+    },
+    {
+      "recording_id": "bcb1b545-ad30-4442-ad9c-7f5c9b69792a",
+      "status": "ok",
+      "size_bytes": 249644,
+      "expected_size_bytes_match": true,
+      "duration_ms": 7800,
+      "expected_duration_ms": 7860,
+      "duration_delta_ms": -60
+    },
+    {
+      "recording_id": "3051e592-f5fb-4d20-8977-c2872840a88a",
+      "status": "ok",
+      "size_bytes": 155564,
+      "expected_size_bytes_match": true,
+      "duration_ms": 4860,
+      "expected_duration_ms": 4900,
+      "duration_delta_ms": -40
+    },
+    {
+      "recording_id": "5edd836d-ce25-4265-a201-8c653826a94b",
+      "status": "ok",
+      "size_bytes": 128684,
+      "expected_size_bytes_match": true,
+      "duration_ms": 4020,
+      "expected_duration_ms": 4037,
+      "duration_delta_ms": -17
+    },
+    {
+      "recording_id": "d478cdbf-858e-4343-b238-873fe5b3a823",
+      "status": "ok",
+      "size_bytes": 169004,
+      "expected_size_bytes_match": true,
+      "duration_ms": 5280,
+      "expected_duration_ms": 5300,
+      "duration_delta_ms": -20
+    },
+    {
+      "recording_id": "c1079f24-7a92-46b4-8399-74f769bba858",
+      "status": "ok",
+      "size_bytes": 286764,
+      "expected_size_bytes_match": true,
+      "duration_ms": 8960,
+      "expected_duration_ms": 9265,
+      "duration_delta_ms": -305
+    },
+    {
+      "recording_id": "fc1046a1-18c8-49ce-b87f-151ec846598c",
+      "status": "ok",
+      "size_bytes": 65324,
+      "expected_size_bytes_match": true,
+      "duration_ms": 2040,
+      "expected_duration_ms": 2099,
+      "duration_delta_ms": -59
+    },
+    {
+      "recording_id": "b1f34053-64eb-4a97-a956-eab5f495dcc4",
+      "status": "ok",
+      "size_bytes": 136364,
+      "expected_size_bytes_match": true,
+      "duration_ms": 4260,
+      "expected_duration_ms": 4287,
+      "duration_delta_ms": -27
+    },
+    {
+      "recording_id": "c41cdfc5-9c6f-4d9c-a5b1-303c092c12df",
+      "status": "ok",
+      "size_bytes": 360492,
+      "expected_size_bytes_match": true,
+      "duration_ms": 11264,
+      "expected_duration_ms": 11386,
+      "duration_delta_ms": -122
+    },
+    {
+      "recording_id": "544503c1-23ea-4e21-b5fc-b09afe6fdc6b",
+      "status": "ok",
+      "size_bytes": 319532,
+      "expected_size_bytes_match": true,
+      "duration_ms": 9984,
+      "expected_duration_ms": 10268,
+      "duration_delta_ms": -284
+    },
+    {
+      "recording_id": "s_0146_1769407945010",
+      "status": "ok",
+      "size_bytes": 81964,
+      "expected_size_bytes_match": null,
+      "duration_ms": 2560,
+      "expected_duration_ms": 3632,
+      "duration_delta_ms": -1072
+    },
+    {
+      "recording_id": "s_0154_1769407962018",
+      "status": "ok",
+      "size_bytes": 90156,
+      "expected_size_bytes_match": null,
+      "duration_ms": 2816,
+      "expected_duration_ms": 3256,
+      "duration_delta_ms": -440
+    },
+    {
+      "recording_id": "1339f00a-2572-4d6f-b903-15201ca0b873",
+      "status": "ok",
+      "size_bytes": 163884,
+      "expected_size_bytes_match": true,
+      "duration_ms": 5120,
+      "expected_duration_ms": 5381,
+      "duration_delta_ms": -261
+    },
+    {
+      "recording_id": "628167c1-1532-40da-a488-36bc049efffb",
+      "status": "ok",
+      "size_bytes": 221228,
+      "expected_size_bytes_match": true,
+      "duration_ms": 6912,
+      "expected_duration_ms": 7094,
+      "duration_delta_ms": -182
+    },
+    {
+      "recording_id": "cecbf7a0-90b3-462c-881f-cea42f80a974",
+      "status": "ok",
+      "size_bytes": 41004,
+      "expected_size_bytes_match": true,
+      "duration_ms": 1280,
+      "expected_duration_ms": 1398,
+      "duration_delta_ms": -118
+    },
+    {
+      "recording_id": "8d633346-2476-492e-ba2d-8105ff0cc292",
+      "status": "ok",
+      "size_bytes": 32812,
+      "expected_size_bytes_match": true,
+      "duration_ms": 1024,
+      "expected_duration_ms": 1329,
+      "duration_delta_ms": -305
+    },
+    {
+      "recording_id": "b3d70b6b-1044-4d3b-916c-2b5644e2d22c",
+      "status": "ok",
+      "size_bytes": 180268,
+      "expected_size_bytes_match": true,
+      "duration_ms": 5632,
+      "expected_duration_ms": 5870,
+      "duration_delta_ms": -238
+    },
+    {
+      "recording_id": "b812c655-8089-43d8-aaba-9c4106f8f8a6",
+      "status": "ok",
+      "size_bytes": 401452,
+      "expected_size_bytes_match": true,
+      "duration_ms": 12544,
+      "expected_duration_ms": 12759,
+      "duration_delta_ms": -215
+    },
+    {
+      "recording_id": "f65eaa18-f8a8-44c7-b297-f106f347df71",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "6ff04547-d52d-4361-b848-6354075a025a",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "3da8b072-ad5a-4742-9b53-b0f971777a5c",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "2d4bb8ea-4f85-410d-8388-b28b51ecc164",
+      "status": "ok",
+      "size_bytes": 458796,
+      "expected_size_bytes_match": true,
+      "duration_ms": 14336,
+      "expected_duration_ms": 14491,
+      "duration_delta_ms": -155
+    },
+    {
+      "recording_id": "4e441a75-423a-4d83-8503-15c59c192448",
+      "status": "ok",
+      "size_bytes": 63404,
+      "expected_size_bytes_match": true,
+      "duration_ms": 1980,
+      "expected_duration_ms": 2011,
+      "duration_delta_ms": -31
+    },
+    {
+      "recording_id": "a2d19a05-8b71-452b-bd69-93bb673bdb9f",
+      "status": "ok",
+      "size_bytes": 165164,
+      "expected_size_bytes_match": true,
+      "duration_ms": 5160,
+      "expected_duration_ms": 5202,
+      "duration_delta_ms": -42
+    },
+    {
+      "recording_id": "eec5612c-74fe-4dc4-8ca3-a3f21c8cdfd5",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "20b54a51-7877-4bb0-b89e-c61d5b9aae22",
+      "status": "ok",
+      "size_bytes": 262188,
+      "expected_size_bytes_match": true,
+      "duration_ms": 8192,
+      "expected_duration_ms": 8444,
+      "duration_delta_ms": -252
+    },
+    {
+      "recording_id": "64e02681-6b2d-43cb-84ee-3f18dbcb3469",
+      "status": "ok",
+      "size_bytes": 335916,
+      "expected_size_bytes_match": true,
+      "duration_ms": 10496,
+      "expected_duration_ms": 10612,
+      "duration_delta_ms": -116
+    },
+    {
+      "recording_id": "750d0136-6d19-41c0-890c-0d9e2824a750",
+      "status": "ok",
+      "size_bytes": 335916,
+      "expected_size_bytes_match": true,
+      "duration_ms": 10496,
+      "expected_duration_ms": 10549,
+      "duration_delta_ms": -53
+    },
+    {
+      "recording_id": "53e6827c-1622-4322-be2c-8fadc8f52aeb",
+      "status": "ok",
+      "size_bytes": 335916,
+      "expected_size_bytes_match": true,
+      "duration_ms": 10496,
+      "expected_duration_ms": 10681,
+      "duration_delta_ms": -185
+    },
+    {
+      "recording_id": "c1e45614-7f90-4c5d-9584-4c5f32ba7f07",
+      "status": "ok",
+      "size_bytes": 385068,
+      "expected_size_bytes_match": true,
+      "duration_ms": 12032,
+      "expected_duration_ms": 12193,
+      "duration_delta_ms": -161
+    },
+    {
+      "recording_id": "5a8c8da0-7636-452f-bdc4-939fec676c38",
+      "status": "ok",
+      "size_bytes": 90156,
+      "expected_size_bytes_match": true,
+      "duration_ms": 2816,
+      "expected_duration_ms": 2867,
+      "duration_delta_ms": -51
+    },
+    {
+      "recording_id": "e03868ae-9122-4f42-ac8f-e1aaa275a11b",
+      "status": "ok",
+      "size_bytes": 319532,
+      "expected_size_bytes_match": true,
+      "duration_ms": 9984,
+      "expected_duration_ms": 10164,
+      "duration_delta_ms": -180
+    },
+    {
+      "recording_id": "63eaf687-3807-4d00-aae1-12cd429cda87",
+      "status": "ok",
+      "size_bytes": 57644,
+      "expected_size_bytes_match": true,
+      "duration_ms": 1800,
+      "expected_duration_ms": 1824,
+      "duration_delta_ms": -24
+    },
+    {
+      "recording_id": "b8241ebc-038f-4800-a150-a4808821a158",
+      "status": "ok",
+      "size_bytes": 94124,
+      "expected_size_bytes_match": true,
+      "duration_ms": 2940,
+      "expected_duration_ms": 2977,
+      "duration_delta_ms": -37
+    },
+    {
+      "recording_id": "779632fb-e093-420e-bda3-f9fa3692e0a2",
+      "status": "ok",
+      "size_bytes": 136364,
+      "expected_size_bytes_match": true,
+      "duration_ms": 4260,
+      "expected_duration_ms": 4324,
+      "duration_delta_ms": -64
+    },
+    {
+      "recording_id": "6cb5cfab-8d84-4bee-85c3-ffe034e71324",
+      "status": "ok",
+      "size_bytes": 151724,
+      "expected_size_bytes_match": true,
+      "duration_ms": 4740,
+      "expected_duration_ms": 4772,
+      "duration_delta_ms": -32
+    },
+    {
+      "recording_id": "390d4629-569a-40c1-b8a6-7fa6c03a3225",
+      "status": "ok",
+      "size_bytes": 186284,
+      "expected_size_bytes_match": true,
+      "duration_ms": 5820,
+      "expected_duration_ms": 5881,
+      "duration_delta_ms": -61
+    },
+    {
+      "recording_id": "18123376-82b4-4413-a0bb-d0730d21ae86",
+      "status": "ok",
+      "size_bytes": 245804,
+      "expected_size_bytes_match": true,
+      "duration_ms": 7680,
+      "expected_duration_ms": 7775,
+      "duration_delta_ms": -95
+    },
+    {
+      "recording_id": "52a18a80-0731-4ab6-b067-9f1de16cc8aa",
+      "status": "ok",
+      "size_bytes": 303148,
+      "expected_size_bytes_match": true,
+      "duration_ms": 9472,
+      "expected_duration_ms": 9779,
+      "duration_delta_ms": -307
+    },
+    {
+      "recording_id": "0370c845-ddbf-458b-beb7-d5c0613d4693",
+      "status": "ok",
+      "size_bytes": 475180,
+      "expected_size_bytes_match": true,
+      "duration_ms": 14848,
+      "expected_duration_ms": 15023,
+      "duration_delta_ms": -175
+    },
+    {
+      "recording_id": "06f3944b-7f0d-4d34-a8e4-975b0c497dd1",
+      "status": "ok",
+      "size_bytes": 335916,
+      "expected_size_bytes_match": true,
+      "duration_ms": 10496,
+      "expected_duration_ms": 10733,
+      "duration_delta_ms": -237
+    },
+    {
+      "recording_id": "7abd4300-8bf5-474c-943e-1604db11755f",
+      "status": "ok",
+      "size_bytes": 401452,
+      "expected_size_bytes_match": true,
+      "duration_ms": 12544,
+      "expected_duration_ms": 12795,
+      "duration_delta_ms": -251
+    },
+    {
+      "recording_id": "1a3dada4-3d8f-4746-b905-1fdc0c623b16",
+      "status": "ok",
+      "size_bytes": 352300,
+      "expected_size_bytes_match": true,
+      "duration_ms": 11008,
+      "expected_duration_ms": 11228,
+      "duration_delta_ms": -220
+    },
+    {
+      "recording_id": "c13626a7-cfcd-43f2-92b3-d1b6bf31128c",
+      "status": "audio_missing"
+    },
+    {
+      "recording_id": "bb6b6a7e-e8a9-4b12-a824-fd9d8a2ce650",
+      "status": "ok",
+      "size_bytes": 63404,
+      "expected_size_bytes_match": true,
+      "duration_ms": 1980,
+      "expected_duration_ms": 2085,
+      "duration_delta_ms": -105
+    },
+    {
+      "recording_id": "a099c206-1790-444b-ab2a-684bae26f20f",
+      "status": "ok",
+      "size_bytes": 614444,
+      "expected_size_bytes_match": true,
+      "duration_ms": 19200,
+      "expected_duration_ms": 19333,
+      "duration_delta_ms": -133
+    },
+    {
+      "recording_id": "954f6a10-81fb-4cd5-b464-9975e07e2644",
+      "status": "ok",
+      "size_bytes": 385068,
+      "expected_size_bytes_match": true,
+      "duration_ms": 12032,
+      "expected_duration_ms": 12232,
+      "duration_delta_ms": -200
+    }
+  ]
+}

@@ -1,6 +1,48 @@
 # 当前任务状态
 
-> 最后更新: 2026-08-21
+> 最后更新: 2026-08-23
+
+## 2026-08-22 普通话语言学覆盖与录音区持续优化
+
+- 核心目标：录音区以语言学和目标用户证据为根本依据，持续完成 `现有微调/采集诊断 -> 缺口驱动补料 -> 准确分区 -> 用户友好采集 -> 固定评测复盘`；SOP 只作现场操作参考，不定义覆盖完整性。
+- 已建立四层覆盖模型：音系库存、常用合法音节/音节—声调、连续语流、任务与真实沟通场景；主任务分区与可叠加语言学标签分开，禁止用“句库总量”或“各音出现一次”宣称全面覆盖。
+- 新增可重复工具：`frontend/scripts/mandarin-coverage-core.mjs`、参考集合生成、现役题库导出、应用/模型 manifest 审计 CLI 和回归测试。版本化参考集合来自 `pinyin-data` commit `923b108d...`，包含 402 个常用无调音节和 1242 个常用音节—声调形式，并保留上游 410 行待复核/争议限制。
+- 题库基线：9107 条唯一题目；相对 9112 仅退出 5 条明确“学习包”商业污染，历史录音、manifest 和原始来源未删除。声母 `22/22`，规范化韵母 `38/39`；常用无调音节 `386/402`，音节—声调 `1025/1242`。达到每项至少 20 次的比例分别为 `79.1%` 与 `45.8%`，主要缺口是长尾音节—声调，不是总量。
+- 数量口径已用回归测试固定：`mandarin-training-real.json` 为 8771 条外部生成子池，前端合并 336 条人工策划/固定评估项后才是现役 9107 条；8771 不是再次删除 336 条。全台账有 9 个 disputed tier，其中 8 个属于 217 个完全缺失项，另 1 个已出现但低于 20 次。
+- 应用采集基线：10 个 manifest 原始 1421 行，按 `recording_id` 去重为 1185 条、约 2.568 小时、9 名说话人/48 sessions；常用无调音节覆盖 `339/402`，音节—声调 `708/1242`；独立人工 `spoken_text` 为 0，只有 166 条标为高置信，必须先建复核/候选/排除队列。
+- 微调诊断边界：CLEAR-VOX-MODEL 固定记录确认主 CDSD 为 `112424/14032/14100`，明确错配清理有效，但按高 CER 删除重度说话人、标准拼音 CTC 和机械最小对立增强均未形成稳定突破。当前机器未挂载 `/qiu/data/.../cdsd`，本轮不能声称逐条审过主微调集；审计 CLI 已支持 `--model-manifest`，数据挂载后补跑。
+- 研究与应用决策已登记为 `RF-011 validate`。当前主线是语言学与目标用户逐条审核 263 条核心候选，再做小规模采集和固定 speaker-disjoint 微调消融；人工实际转写工具保留为旁路，不再抢占全音系列语料建设主线。
+- 2026-08-23 已完成任务/标签旁路索引：`frontend/src/lib/corpus/generated/mandarin-linguistic-index.json` 覆盖现役 `9107/9107` 条，保留正常题面、原文和原类别；仅 5 条确认商业污染退出。每条只有一个互斥 `task_id`，可叠加声母、韵母、声调、音节—声调、位置和连续语流标签。现役统计为 `connected_reading 4947 / targeted_gap 2972 / functional_speech 1168 / baseline_words 20`。
+- 2026-08-23 已建立候选人工复核门禁：`frontend/scripts/validate-mandarin-review-queue.mjs` 要求语言学、自然度、安全、许可、任务五项审核；Tatoeba 300 条候选当前 `pending 1500/1500`，生产导入数为 0。该门禁只新增校验，不修改或删除题库、录音和候选原文。
+- 2026-08-23 已增加评测结构门禁：`frontend/scripts/validate-mandarin-evaluation-report.mjs` 强制固定 speaker-disjoint 测试集、总体/最差说话人/短句 CER、严重度/长度分层、P95 延迟、用户成功/跳过/疲劳指标和回退动作；没有真实结果时只能保持 `validate`，不能宣称模型提升。
+- 2026-08-23 已按反馈清理前端生成题库中的 5 条“学习包”类课程/考试营销噪声；清理审计总数为 209 条，新增项均为 `commercial_or_advertising`。该操作不删除历史录音、manifest 或原始来源，仅阻止污染题面进入用户录音区。
+- 2026-08-23 已同步重建 1242 项全量覆盖目标台账：现役题库为 `569 robust / 456 below_minimum / 217 missing`；217 个硬缺口按现代词、实际使用证据和默认用户负担收紧为 `88 core / 121 edge / 8 disputed`。`chun3 / heng4 / long4 / ming3 / nüe4 / zei2` 等主要依赖贬损、地域、醉酒、虐待或犯罪承载词的形式转入边缘专项；它们仍在全音台账，不从语言学库存删除。
+- 核心第一阶段已为 88 个默认核心硬缺口各准备 3 条候选，共 `263` 条唯一文本（`88` 词、`175` 短句；1 条短句同时覆盖两个目标）。选择策略固定为每目标 `1 个整词锚点 + 2 个句境`；开放句必须命中可接受的多字整词并记录整词拼音，不能靠单字/专名字形凑覆盖。六项审核均为 pending，生产导出严格为 `0` 条。
+- 2026-08-23 继续按用户负担优化核心候选：将 `歹徒/懒惰/醉醺醺/挣扎/产卵/烫伤` 等默认词锚点替换为同音目标下的 `好歹/掌舵/烟熏/炸鱼/鹅卵石/烫发` 等中性现代词；挑衅、指人评价、灾难语义和明显翻译腔句进入永久拦截。人工短句现强制提供句内整词与整词拼音证据，175/175 均已满足；当前候选快照为 `2026-08-23T03:34:40.850Z`，仍为 263 条且全部 pending。
+- 2026-08-23 已为 456 个 `below_minimum` 音节—声调建立独立补强计划：455 个默认核心目标进入调度，1 个争议目标下线；从现役 9107 条安全题库选出 835 条题面，分配 2998 个未来采集槽位，309 项完整分配、146 项因题面稀少部分分配。计划明确把题面命中、未来槽位和人工确认真实录音分开；455 项题面多样性仍低于 20 次门槛，不能宣称覆盖完成。
+- 录音区新增“低频补强”组，可跨原主题调用上述 835 条现役题面，并按计划槽位优先；原有八个音系练习组不变，“核心补音”继续只读六项审核通过的正式导出（当前 0）。完整审计计划保留为 1.7MB 旁路产物，浏览器只加载约 120KB 的轻量产品索引。
+- 本切片验证：普通话语料脚本 75/75、Web 85/85、Python 语料测试 6/6、TypeScript、Next production build 24/24 页面、AI docs harness 和 `git diff --check` 通过；Playwright 未登录 smoke 正确回跳并保留审核路径，受保护 API 返回 401、console 0 错误/警告；授权审核者真实交互仍需白名单账号验证。
+- 边缘专项单列 121 项，争议 8 项保持下线。地域/轻声口径冲突、只有词典证据和高负担承载形式不进入默认录音。CC-CEDICT 另发现 311 个核心基线外词音（225 轻声、68 额外声调、18 额外词汇音节），只进入发现审核表，不扩张当前覆盖分母。
+- 已生成 `mandarin-core-gap-phase1-review.tsv`：263 行按每批 30 条分成 9 批，包含目标音、文本、来源、整词读音证据和六项审核栏，供语言学与目标用户复核；TSV 不直接进入生产。
+- 2026-08-23 已把同一 263 条候选产品化为站内 `/corpus-review` 审稿台：9 批导航、搜索/状态筛选、六项审核、本机自动保存和 decision JSON 导出均已完成。页面/API 需登录，服务端 `VOXFLAME_CORPUS_REVIEWER_EMAILS` 精确白名单控制候选读取；浏览器不能直接写仓库或生产语料。
+- 2026-08-23 已为 146 个安全题面不足的低频目标重扫完整 Tatoeba 普通话快照并建立独立低频语境审稿任务：严格用户负担门后保留 346 条唯一待审句、354 个目标—句分配，118 个目标达到每音 3 条候选，28 个目标仍需补写；全部六项 `pending`，生产 0。候选层收紧不修改 9107 条现役题库、历史录音、manifest 或来源。
+- 2026-08-23 低频补写 brief 已产品化进入同一 `/corpus-review`：当前 28 个目标均进入结构化专家路线，记录风险类别、允许证据、默认录音政策和下一动作；支持目标音/承载词/拼音搜索与独立 authoring worksheet 导出，不提供浏览器直写生产。学习包及 `挨骂 / 殡仪 / 娼妓 / 排尿 / 奴役` 等高负担承载词被拦截，音系目标本身仍完整保留在 1242 项台账。
+- decision JSON 已有独立校验/合并 CLI：拒绝过期来源快照、未知或重复 ID、非法状态和无说明的改写/拒绝。真实候选快照的临时往返验证确认只提交 1 条决定时仅 1 条进入批准导出，其余候选保持未动；临时产物已删除。正式审核仍全为 pending，生产导出仍为 0。
+- Web 录音区已接入产品状态与安全导出：原有按音组练习保留；“核心补音”只读取语言学、自然度、用户负担、安全、许可、产品六项全批准内容，0 条时禁用并明确说明；边缘与争议不混入默认推荐。
+- 2026-08-23 已完成真实应用录音人工 `spoken_text` 复核旁路的第一版：从全部 10 个历史 manifest 去重生成 1185 条待复核项，ASR 仅保留为 `asr_hint`，实际文本和 audio-text 对应均为 `pending`；校验器拒绝用户/设备/存储路径字段，并把只有 `approved + confirmed` 的条目接入覆盖审计。当前没有任何条目进入训练或覆盖统计。
+- 2026-08-23 已把真实录音复核闭环生成正式证据包：1185 条全量队列全部 pending，另按类别/音频质量确定性分层抽取 60 条双人复核样本；本机音频核验为 49 条可访问、11 条缺失，完整性门未通过，双人一致性覆盖资格为 0。`mandarin-collection-evidence.json` 与前端产品状态严格区分 2998 个计划槽位、0 条人工确认录音和 0 条双人一致性覆盖，不删除原 manifest 或历史录音记录。
+- 2026-08-23 已将 1185 条历史录音接入受保护的 `/corpus-review/spoken-text` 人工复核工作区：审核邮箱白名单、受控音频 API、不透明 `recording_id`、ASR 非权威提示、人工 `spoken_text` 与 audio-text 对应确认、本机草稿和决定 JSON 导出均已产品化；工作区 `training_import_allowed=false`，浏览器不能直写生产，所有条目仍 pending。
+- 2026-08-23 已补齐真实录音决定离线收口：`validate-mandarin-spoken-text-review` + `merge-mandarin-spoken-text-review-decisions` 强制精确队列快照、审核者/时间、人工文本与音频对应门，并以稀疏补丁合并；未提交录音保持 pending，合并产物仍禁止训练导入。
+- 2026-08-23 已将 60 条双人样本产品化为 `/corpus-review/dual-spoken-text`：A/B 角色由两组互斥服务端白名单分配，单账号不能同时伪造两位审核者；页面只提交当前角色标注，`merge-mandarin-dual-review-annotations` 只稀疏更新对应角色，agreement/consensus 仍由离线工具决定。当前 60 条均 pending，音频完整性为 49 可访问、11 缺失。
+- 本轮验证通过：普通话语料脚本 75 项、前端测试 85 项、Python 语料测试 6 项、TypeScript、Next production build（24/24 页面）、AI docs 和 `git diff --check`。Playwright 已确认未登录访问 `/corpus-review` 与 `/corpus-review/spoken-text` 正确回跳并保留 `next`，受保护 API 返回 401，console 为 0 errors/0 warnings；授权审核者页面仍需配置白名单并用真实账号补 smoke。
+
+## 2026-08-21 沟通入口信息架构收口
+
+- 沟通入口已拆成独立信息流：`/communicate` 只负责选择“快速表达 / 日常沟通”，不再把一个模式嵌入另一个页面。
+- 快速表达独立为 `/communicate/quick`，保持本机朗读、通用短语和个人短语；日常沟通独立为 `/communicate/assistant`，由鉴权保护并保留正确登录回跳。
+- 两个工作界面都能回到 `/communicate` 重新选择；首页所有“现在沟通”入口统一进入选择页。
+- `useAuth` 的公共快速表达超时竞态不再决定工作界面；日常沟通使用受保护路由，避免已登录用户因 session 恢复时序被误送到登录页。
+- 验证通过：frontend TypeScript、78 项测试、production build、lint（仅保留既有其他文件 warnings）、AI docs harness、`git diff --check`；Playwright 在开发端口 `3200` 验证选择页、快速表达页和未登录日常沟通回跳 `/login?next=%2Fcommunicate%2Fassistant`。
 
 ## 2026-08-21 Web 数据录入分步引导
 
@@ -165,23 +207,6 @@
    - `test1@poc.com` 仍长期停用；当前 Auth 仍为公开注册、邮箱自动确认、未观察到 CAPTCHA 开启
    - 报告对外口径为“通报所述越权读取路径已完成技术整改并复测通过”，不声称日志尚不能证明的“绝无数据访问”
    - 后续计划依据现行《网络安全法》第二十三、第二十四、第二十七条，覆盖等保、六个月日志、漏洞闭环、密钥治理、注册安全、WAF/源站、数据分类、供应链和应急演练
-
-0. 2026-08-01 独立手机号注册 / 登录已完成 Web 与 Mobile 部署，真实短信只剩腾讯云签名配置阻塞
-   - Supabase Auth 继续是身份事实源；邮箱和手机号是并列选择，手机号可直接创建独立 phone-only 用户，不要求绑定邮箱账号或共用 UUID
-   - Web 与 Mobile 在注册模式使用 `shouldCreateUser: true`、登录模式使用 `false`；邮箱密码注册 / 登录完整保留
-   - backend 新增 Supabase Send SMS Hook 与腾讯云 SMS adapter：校验 Standard Webhooks 签名、仅接受中国大陆 E.164 号码和 6 位 OTP、同 webhook id 幂等、单号码 60 秒 / 小时 / 日限流
-   - 腾讯云调用固定使用已审核签名、模板与单个 `{1}` OTP 参数；日志不记录 OTP 或完整手机号，只保留掩码号码、provider code 与 RequestId
-   - Web 登录 / 注册页与 Mobile Workbench 登录 / 注册页均提供邮箱、手机两种入口；`/settings/account` 的绑定入口仅作为可选能力保留
-   - Supabase Phone provider 与 HTTPS Send SMS Hook 已开启；backend 为 `PHONE_AUTH_ENABLED=1`、`TENCENT_SMS_DRY_RUN=0`，Web 与 EAS development/preview/production 手机入口均已开启
-   - CAM 最小权限编程访问子用户凭据已保存到 `backend/.env`（文件 `600`）；误建的 CVM 角色不进入轻量应用服务器运行链路
-   - 已提供两个隐藏输入脚本：`scripts/ops/save_tencent_sms_credentials.sh` 与 `scripts/ops/save_supabase_sms_hook_secret.sh`，密钥不进入聊天、命令历史或源码
-   - Supabase 生产 Hook 实际会传入无加号的 `861...` 号码；backend 已兼容 `+861... / 861... / 1...` 并统一规范化为 E.164，相关回归通过
-   - 真实短信请求已到达腾讯云，但返回 `FailedOperation.SignatureIncorrectOrUnapproved`；当前 `TENCENT_SMS_SIGN_NAME` 与原计划的公司全称一致，需从腾讯云“国内短信 -> 签名管理”核对实际签名内容、审核 / 运营商报备状态和应用关联后完成 smoke
-   - 部署后验证：backend/frontend 容器均 healthy；`/`、`/login`、`/api/rtc/health` 均为 `200`；Playwright 已验证登录与注册状态下邮箱 / 手机标签及手机号注册表单
-   - 回滚镜像标签：`voxflame-agent-backend:pre-phone-auth-20260801`、`voxflame-agent-frontend:pre-phone-auth-20260801`
-   - Android `0.1.2`（build 3）EAS preview 已完成：`b47cd371-ef9f-409f-a45d-1e1d180a26dd`；`https://voxember.com/download` 已部署该构建入口
-   - 下一步人工边界：提供腾讯云审核通过的准确“签名内容”；更新后用负责人手机号完成一次真实注册和再次登录，并做 Android 真机 smoke
-   - CAPTCHA 继续等 Web 与 Mobile 都接好 token 后再全局开启，避免提前中断任一现有邮箱登录入口
 
 0. 2026-08-01 Docker 部署与磁盘维护经验已写入工程 harness
    - `scripts/docker-rebuild-core-fast.sh` 新增 `env-backend / backend / frontend / core` 最小影响模式；环境变量更新不再先 `docker compose down`，只 recreate backend

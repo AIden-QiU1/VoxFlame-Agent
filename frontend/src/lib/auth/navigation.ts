@@ -8,6 +8,8 @@ const EXACT_PROTECTED_PATHS = new Set([
 
 const PROTECTED_PATH_TREES = [
   '/contribute',
+  '/communicate/assistant',
+  '/corpus-review',
   '/settings',
 ]
 

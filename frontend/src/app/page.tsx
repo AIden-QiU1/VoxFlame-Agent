@@ -1,19 +1,26 @@
 'use client'
 
 import { startTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { HomeDashboard } from '@/components/home'
 import { useAuth } from '@/hooks/useAuth'
-import { buildLoginPath } from '@/lib/auth/navigation'
 
 export default function HomePage() {
   const router = useRouter()
+  const [isOpeningCommunicate, setIsOpeningCommunicate] = useState(false)
   const { isLoading: authLoading, isAuthenticated } = useAuth({
     timeoutBehavior: 'guest',
   })
-  const openCommunicateView = () => {
+  const openCommunicateView = async () => {
+    if (isOpeningCommunicate) {
+      return
+    }
+
+    setIsOpeningCommunicate(true)
     startTransition(() => {
-      router.push(isAuthenticated ? '/communicate' : buildLoginPath('/communicate'))
+      router.push('/communicate')
+      setIsOpeningCommunicate(false)
     })
   }
 
@@ -31,6 +38,7 @@ export default function HomePage() {
   return (
     <HomeDashboard
       isAuthenticated={isAuthenticated}
+      isOpeningCommunicate={isOpeningCommunicate}
       onStartCommunicate={openCommunicateView}
     />
   )

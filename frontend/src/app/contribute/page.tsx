@@ -40,7 +40,8 @@ import type {
   VoxFlameRecordingEnvelope,
 } from '@/lib/recording/recording-contract'
 import {
-  COLLECTION_PLANS,
+  getCollectionPlan,
+  getCollectionPlanIdForTopic,
   isCollectionPreflightReady,
   type CollectionPlanId,
 } from '@/lib/recording/collection-protocol'
@@ -82,6 +83,7 @@ import { buildTrainingSampleLineage } from '@/lib/training/training-sample-linea
 import { selectTrainingExercises } from '@/lib/training/training-exercise-selection'
 import {
   PHONOLOGY_GROUPS,
+  MANDARIN_COVERAGE_PRODUCT_STATUS,
   filterExercisesByPhonologyGroup,
   getPhonologyExerciseTargets,
   getPhonologyFocusForGroup,
@@ -577,7 +579,16 @@ export default function ContributePage() {
   )
   const recommendedCategory = collectionCategories.find((category) => category === '日常与出行')
     ?? collectionCategories[0]
-  const additionalCategories = collectionCategories.filter((category) => category !== recommendedCategory)
+  const readingCategory = collectionCategories.find((category) => category === '现代文章朗读')
+  const phonologyCategory = collectionCategories.find((category) => category === '音系强化')
+  const additionalCategories = collectionCategories.filter((category) => (
+    category !== recommendedCategory
+    && category !== readingCategory
+    && category !== phonologyCategory
+  ))
+  const functionalPlan = getCollectionPlan('functional_speech')
+  const targetedGapPlan = getCollectionPlan('targeted_gap')
+  const connectedReadingPlan = getCollectionPlan('connected_reading')
 
   return (
     <div className="min-h-dvh bg-stone-50">
@@ -602,10 +613,10 @@ export default function ContributePage() {
         <section id="training-topics" className="scroll-mt-4 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-orange-700">数据录入主题</p>
-              <h2 className="mt-2 text-balance text-2xl font-semibold text-gray-900">选一个现在会用到的场景</h2>
+              <p className="text-sm font-medium text-orange-700">今天录什么</p>
+              <h2 className="mt-2 text-balance text-2xl font-semibold text-gray-900">先选一个任务，录几句就可以</h2>
               <p className="mt-2 max-w-3xl text-pretty text-sm leading-6 text-gray-600">
-                进入后页面只保留当前句、录音和本次结果；录稳一条会自动切到下一句。
+                系统会在后台检查声音覆盖；你只需要按平时的方式说，累了可以随时结束。
               </p>
             </div>
             <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
@@ -613,25 +624,56 @@ export default function ContributePage() {
             </div>
           </div>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
             {recommendedCategory ? (() => {
               const meta = MANDARIN_TRAINING_CATEGORY_META[recommendedCategory]
               return (
                 <Link
                   href={getTrainingTopicHref(getTrainingTopicIdForCategory(recommendedCategory))}
-                  className="block rounded-[22px] border border-amber-300 bg-amber-50 px-5 py-5 text-left shadow-sm transition-colors duration-150 hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                  className="block rounded-[22px] border border-amber-300 bg-amber-50 px-5 py-5 text-left shadow-sm transition-colors duration-150 hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 lg:col-span-1"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
-                      <p className="mt-2 text-pretty text-sm leading-6 text-gray-600">{meta.description}</p>
+                      <p className="text-sm font-semibold text-gray-900">{functionalPlan.label}</p>
+                      <p className="mt-2 text-pretty text-sm leading-6 text-gray-600">{functionalPlan.userLabel}，先从日常与出行开始。</p>
                     </div>
                     <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-800">推荐</span>
                   </div>
-                  <p className="mt-4 text-sm font-semibold text-amber-900">从常用表达开始 →</p>
+                  <p className="mt-4 text-xs leading-5 text-stone-600">{meta.examples.slice(0, 2).join(' · ')}</p>
+                  <p className="mt-4 text-sm font-semibold text-amber-900">录 8–15 句，可随时结束 →</p>
                 </Link>
               )
             })() : null}
+
+            {phonologyCategory ? (
+              <Link
+                href={getTrainingTopicHref(getTrainingTopicIdForCategory(phonologyCategory))}
+                className="block rounded-[22px] border border-stone-200 bg-white px-5 py-5 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+              >
+                <p className="text-sm font-semibold text-gray-900">{targetedGapPlan.label}</p>
+                <p className="mt-2 text-pretty text-sm leading-6 text-gray-600">
+                  核心缺口候选已备齐 {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.targets_with_three_candidates}/{MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.targets} 项；只有人工审核通过的词句才会开放录音。
+                </p>
+                <p className="mt-3 text-xs leading-5 text-stone-600 tabular-nums">
+                  当前已批准 {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.approved_prompts} 条 · 边缘专项 {MANDARIN_COVERAGE_PRODUCT_STATUS.held_targets.edge_missing} 项不进入默认推荐
+                </p>
+                <p className="mt-4 text-sm font-semibold text-stone-900">录 5–10 句 →</p>
+              </Link>
+            ) : null}
+
+            {readingCategory ? (
+              <Link
+                href={getTrainingTopicHref(getTrainingTopicIdForCategory(readingCategory))}
+                className="block rounded-[22px] border border-stone-200 bg-white px-5 py-5 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+              >
+                <p className="text-sm font-semibold text-gray-900">{connectedReadingPlan.label}</p>
+                <p className="mt-2 text-pretty text-sm leading-6 text-gray-600">{connectedReadingPlan.userLabel}，保留真实停顿和回读。</p>
+                <p className="mt-4 text-sm font-semibold text-stone-900">每段 20–60 秒 →</p>
+              </Link>
+            ) : null}
+          </div>
+
+          <div className="mt-3 space-y-3">
 
             {preparedExpression ? (
               <Link
@@ -658,9 +700,9 @@ export default function ContributePage() {
                 href="/memory#memory-custom-material-editor"
                 className="block rounded-[22px] border border-dashed border-stone-300 bg-stone-50 px-5 py-5 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
               >
-                <p className="text-sm font-semibold text-gray-900">自定义训练</p>
+                <p className="text-sm font-semibold text-gray-900">用自己的材料朗读</p>
                 <p className="mt-3 text-sm leading-6 text-gray-600">
-                  还没有当前加载材料。先去记忆页选一份材料，再回来练。
+                  还没有当前加载材料。先去记忆页选一份材料，再回来分段朗读。
                 </p>
               </Link>
             )}
@@ -669,8 +711,8 @@ export default function ContributePage() {
 
           <details className="mt-4 rounded-2xl border border-stone-200 bg-stone-50">
             <summary className="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
-              <span>查看更多录入主题</span>
-              <span className="text-xs font-normal text-stone-500">{additionalCategories.length} 类</span>
+              <span>按场景选择常用表达</span>
+              <span className="text-xs font-normal text-stone-500">{additionalCategories.length} 个场景</span>
             </summary>
             <div className="space-y-2 border-t border-stone-200 p-4">
               {additionalCategories.map((category) => {
@@ -689,6 +731,10 @@ export default function ContributePage() {
               })}
             </div>
           </details>
+
+          <p className="mt-4 rounded-2xl bg-stone-50 px-4 py-3 text-pretty text-xs leading-5 text-stone-600">
+            基础字词在“20 词筛查”中完成；自然说话和稳定复测需要专用提示与固定材料，验证完成前不会用普通朗读题代替。
+          </p>
         </section>
 
         <details className="rounded-2xl border border-stone-200 bg-white">
@@ -797,7 +843,6 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const [notice, setNotice] = useState<NoticeState | null>(null)
   const [isPreparedPreviewOpen, setIsPreparedPreviewOpen] = useState(false)
   const [attemptPlaybackUrl, setAttemptPlaybackUrl] = useState<string | null>(null)
-  const [collectionPlanId, setCollectionPlanId] = useState<CollectionPlanId>('baseline')
   const [environmentReady, setEnvironmentReady] = useState(false)
   const [distanceReady, setDistanceReady] = useState(false)
   const [ageBand, setAgeBand] = useState<string>('unspecified')
@@ -838,6 +883,8 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   }, [preparedExpression?.summary, preparedExpressionDocument])
   const selectedCategory = topicSelection.category ?? MANDARIN_TRAINING_CATEGORIES[0]
   const practiceMode: PracticeSourceMode = topicSelection.practiceMode
+  const collectionPlanId: CollectionPlanId = getCollectionPlanIdForTopic(topicId)
+  const collectionPlan = getCollectionPlan(collectionPlanId)
   const isAssessmentTopic =
     practiceMode === 'sentence_corpus' && selectedCategory === '评估筛查'
   const isPhonologyTopic =
@@ -851,16 +898,22 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     ),
     [practiceMode, preparedExpressionExercises, selectedCategory],
   )
+  const fullTrainingExercises = useMemo(
+    () => getExercisesByCategory('all'),
+    [],
+  )
   const categoryExercises = useMemo(
     () => (
       isPhonologyTopic
         ? filterExercisesByPhonologyGroup(
-            baseCategoryExercises as MandarinTrainingExercise[],
+            (selectedPhonologyGroupId === 'coverage-reinforcement'
+              ? fullTrainingExercises
+              : baseCategoryExercises) as MandarinTrainingExercise[],
             selectedPhonologyGroupId,
           )
         : baseCategoryExercises
     ),
-    [baseCategoryExercises, isPhonologyTopic, selectedPhonologyGroupId],
+    [baseCategoryExercises, fullTrainingExercises, isPhonologyTopic, selectedPhonologyGroupId],
   )
   const phonologyGroupOptions = useMemo(
     () => (
@@ -868,13 +921,15 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
         ? PHONOLOGY_GROUPS.map((group) => ({
             ...group,
             count: filterExercisesByPhonologyGroup(
-              baseCategoryExercises as MandarinTrainingExercise[],
+              (group.id === 'coverage-reinforcement'
+                ? fullTrainingExercises
+                : baseCategoryExercises) as MandarinTrainingExercise[],
               group.id,
             ).length,
           }))
         : []
     ),
-    [baseCategoryExercises, isPhonologyTopic],
+    [baseCategoryExercises, fullTrainingExercises, isPhonologyTopic],
   )
   const activePhonologyGroup = getPhonologyGroupMeta(selectedPhonologyGroupId)
 
@@ -1908,15 +1963,14 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
               <details className="mt-5 rounded-2xl border border-stone-200">
                 <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
                   <span>可选：补充采集资料</span>
-                  <span className="text-xs font-normal text-stone-500">计划、年龄段、性别</span>
+                  <span className="text-xs font-normal text-stone-500">任务、年龄段、性别</span>
                 </summary>
                 <div className="grid gap-4 border-t border-stone-200 p-4 sm:grid-cols-3">
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium text-stone-700">采集计划</span>
-                    <select value={collectionPlanId} onChange={(event) => setCollectionPlanId(event.target.value as CollectionPlanId)} className="h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500">
-                      {COLLECTION_PLANS.map((plan) => <option key={plan.id} value={plan.id}>{plan.label}</option>)}
-                    </select>
-                  </label>
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
+                    <span className="text-sm font-medium text-stone-700">本次任务</span>
+                    <p className="mt-1 text-sm font-semibold text-stone-950">{collectionPlan.label}</p>
+                    <p className="mt-1 text-pretty text-xs leading-5 text-stone-600">由当前主题自动确定，避免录音被分到错误任务。</p>
+                  </div>
                   <label className="block space-y-2">
                     <span className="text-sm font-medium text-stone-700">年龄段</span>
                     <select value={ageBand} onChange={(event) => setAgeBand(event.target.value)} className="h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500">
@@ -2386,12 +2440,10 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                   </label>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <label className="block space-y-1">
-                    <span className="text-xs font-medium text-stone-600">采集计划</span>
-                    <select value={collectionPlanId} onChange={(event) => setCollectionPlanId(event.target.value as CollectionPlanId)} className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm">
-                      {COLLECTION_PLANS.map((plan) => <option key={plan.id} value={plan.id}>{plan.label}</option>)}
-                    </select>
-                  </label>
+                  <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
+                    <span className="text-xs font-medium text-stone-600">本次任务</span>
+                    <p className="mt-1 text-sm font-semibold text-stone-900">{collectionPlan.label}</p>
+                  </div>
                   <label className="block space-y-1">
                     <span className="text-xs font-medium text-stone-600">年龄段（可选）</span>
                     <select value={ageBand} onChange={(event) => setAgeBand(event.target.value)} className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm">
@@ -2506,8 +2558,75 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 <>
                   {isPhonologyTopic ? (
                     <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50 p-4">
+                      <div className="rounded-2xl border border-stone-200 bg-white px-4 py-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-balance text-sm font-semibold text-stone-950">全音系补料进度</p>
+                            <p className="mt-1 max-w-2xl text-pretty text-sm leading-6 text-stone-600">
+                              核心缺口先准备自然、低负担的词语和短句；边缘音单独审核，争议读音不会出现在录音任务里。
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 tabular-nums">
+                            已批准 {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.approved_prompts} 条
+                          </span>
+                        </div>
+                        <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+                          <div className="rounded-xl bg-stone-50 px-3 py-3">
+                            <dt className="text-xs text-stone-500">核心候选</dt>
+                            <dd className="mt-1 text-sm font-semibold text-stone-950 tabular-nums">
+                              {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.targets_with_three_candidates}/{MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.targets} 项备齐
+                            </dd>
+                          </div>
+                          <div className="rounded-xl bg-stone-50 px-3 py-3">
+                            <dt className="text-xs text-stone-500">边缘专项</dt>
+                            <dd className="mt-1 text-sm font-semibold text-stone-950 tabular-nums">
+                              {MANDARIN_COVERAGE_PRODUCT_STATUS.held_targets.edge_missing} 项暂不推荐
+                            </dd>
+                          </div>
+                          <div className="rounded-xl bg-stone-50 px-3 py-3">
+                            <dt className="text-xs text-stone-500">争议读音</dt>
+                            <dd className="mt-1 text-sm font-semibold text-stone-950 tabular-nums">
+                              {MANDARIN_COVERAGE_PRODUCT_STATUS.held_targets.disputed_missing} 项保持下线
+                            </dd>
+                          </div>
+                        </dl>
+                        <div className="mt-3 rounded-xl bg-stone-50 px-3 py-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs text-stone-500">低频补强计划</p>
+                            <p className="text-xs font-medium text-stone-700 tabular-nums">
+                              {MANDARIN_COVERAGE_PRODUCT_STATUS.below_minimum_reinforcement.selected_prompts} 条现役题面
+                            </p>
+                          </div>
+                          <p className="mt-1 text-pretty text-sm leading-6 text-stone-700">
+                            {MANDARIN_COVERAGE_PRODUCT_STATUS.below_minimum_reinforcement.fully_allocated_targets} 项已分配建议采集槽位；
+                            {MANDARIN_COVERAGE_PRODUCT_STATUS.below_minimum_reinforcement.partially_allocated_targets} 项因安全题面较少只做部分调度。
+                          </p>
+                          <p className="mt-1 text-pretty text-xs leading-5 text-stone-500">
+                            这 {MANDARIN_COVERAGE_PRODUCT_STATUS.below_minimum_reinforcement.prompt_diversity_below_minimum_targets} 项的题面多样性仍低于门槛；待采集计划不是已确认录音覆盖。
+                          </p>
+                        </div>
+                        <div className="mt-3 rounded-xl bg-stone-50 px-3 py-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs text-stone-500">真实录音核验</p>
+                            <p className="text-xs font-medium text-stone-700 tabular-nums">
+                              {MANDARIN_COVERAGE_PRODUCT_STATUS.actual_collection_evidence.coverage_eligible_recordings ?? 0} 条具备覆盖资格
+                            </p>
+                          </div>
+                          <p className="mt-1 text-pretty text-sm leading-6 text-stone-700">
+                            已建立 {MANDARIN_COVERAGE_PRODUCT_STATUS.actual_collection_evidence.full_review_queue_items ?? 0} 条人工转写复核队列，只有“人工转写通过 + 音频对应确认”才计入音系覆盖。
+                          </p>
+                          <p className="mt-1 text-pretty text-xs leading-5 text-stone-500">
+                            双人抽样 {MANDARIN_COVERAGE_PRODUCT_STATUS.actual_collection_evidence.dual_sample_items ?? 0} 条；音频完整性门：{MANDARIN_COVERAGE_PRODUCT_STATUS.actual_collection_evidence.audio_integrity_gate_passed ? '通过' : '未通过'}。这不是模型效果或完整覆盖声明。
+                          </p>
+                        </div>
+                        {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.approved_prompts === 0 ? (
+                          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-3 text-pretty text-xs leading-5 text-amber-950">
+                            语言学、自然度、用户负担、安全、许可和产品审核尚未完成。审核前不会让你朗读这些候选。
+                          </p>
+                        ) : null}
+                      </div>
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
+                        <div className="mt-4">
                           <p className="text-sm font-semibold text-stone-950 text-balance">选择音系小组</p>
                           <p className="mt-1 text-sm leading-6 text-stone-600 text-pretty">
                             每句按真实拼音标注，可以同时属于多个专项；这里选择本轮主要练什么。
@@ -2524,13 +2643,14 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                       >
                         {phonologyGroupOptions.map((group) => {
                           const isActive = group.id === selectedPhonologyGroupId
+                          const isUnavailable = group.id === 'coverage-core' && group.count === 0
                           return (
                             <button
                               key={group.id}
                               type="button"
                               aria-pressed={isActive}
                               onClick={() => handleSelectPhonologyGroup(group.id)}
-                              disabled={isRecording || isProcessing}
+                              disabled={isRecording || isProcessing || isUnavailable}
                               className={cn(
                                 'rounded-2xl border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
                                 isActive
@@ -2543,7 +2663,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                                 <span className="text-xs tabular-nums text-stone-500">{group.count}</span>
                               </span>
                               <span className="mt-1 block text-xs leading-5 text-stone-600 text-pretty">
-                                {group.shortLabel}
+                                {isUnavailable ? '待人工审核后开放' : group.shortLabel}
                               </span>
                             </button>
                           )

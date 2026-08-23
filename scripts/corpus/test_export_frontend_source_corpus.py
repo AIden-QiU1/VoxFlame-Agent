@@ -24,6 +24,10 @@ class SevereCorpusQualityTest(unittest.TestCase):
             "我们为为什么要用药呢": "asr_disfluency_or_duplication",
             "我们希望达成的是": "severe_broken_fragment",
             "基金从业考试历年真题": "commercial_or_advertising",
+            "软考各科目自学必备学习包": "commercial_or_advertising",
+            "初级护师学习包": "commercial_or_advertising",
+            "中医护师学习包": "commercial_or_advertising",
+            "护理培训资料包": "commercial_or_advertising",
             "所以你看这是出出门就是在学习": "asr_disfluency_or_duplication",
         }
 

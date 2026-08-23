@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-19T04:36:16.464533+00:00",
+  "generated_at": "2026-08-23T01:24:06.025012+00:00",
   "kind": "source_extracted_mandarin_training_corpus",
   "generated_from": {
     "builder": "scripts/corpus/export_frontend_source_corpus.py",
@@ -25,7 +25,7 @@
     },
     "source_item_counts_stage": "before_targeted_severe_cleanup",
     "targeted_severe_cleanup": {
-      "removed_count": 204,
+      "removed_count": 209,
       "sentence_level_only": true,
       "source_level_exclusion": false,
       "audit": "frontend/src/lib/corpus/generated/mandarin-training-real.cleanup-audit.json"
@@ -81,7 +81,7 @@
       "items": []
     },
     "现代文章朗读": {
-      "count": 4952,
+      "count": 4947,
       "items": [
         {
           "id": "现代文章朗读_source_0001",
@@ -341,31 +341,6 @@
         {
           "id": "现代文章朗读_source_0052",
           "text": "小鸟给远航生活蒙上了一层浪漫色调",
-          "category": "现代文章朗读"
-        },
-        {
-          "id": "现代文章朗读_source_0053",
-          "text": "软考各科目自学必备学习包",
-          "category": "现代文章朗读"
-        },
-        {
-          "id": "现代文章朗读_source_0054",
-          "text": "主管护师学习包",
-          "category": "现代文章朗读"
-        },
-        {
-          "id": "现代文章朗读_source_0055",
-          "text": "初级护师学习包",
-          "category": "现代文章朗读"
-        },
-        {
-          "id": "现代文章朗读_source_0056",
-          "text": "中医护师学习包",
-          "category": "现代文章朗读"
-        },
-        {
-          "id": "现代文章朗读_source_0057",
-          "text": "主管中医护师学习包",
           "category": "现代文章朗读"
         },
         {

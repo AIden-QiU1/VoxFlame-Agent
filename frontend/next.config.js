@@ -44,16 +44,18 @@ const nextConfig = {
       process.env.BACKEND_INTERNAL_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       'http://backend:3001';
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${backendUrl}/api/:path*`,
-      },
-      {
-        source: '/rtc/:path*',
-        destination: 'http://livekit-server:7880/rtc/:path*',
-      }
-    ]
+    return {
+      afterFiles: [
+        {
+          source: '/api/:path((?!corpus-review(?:/|$)).*)',
+          destination: `${backendUrl}/api/:path*`,
+        },
+        {
+          source: '/rtc/:path*',
+          destination: 'http://livekit-server:7880/rtc/:path*',
+        },
+      ],
+    }
   },
   async headers() {
     const securityHeaders = [

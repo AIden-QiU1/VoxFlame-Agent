@@ -1,17 +1,41 @@
-export const MOBILE_COLLECTION_PROTOCOL_VERSION = '2026-08-18.v1'
+export const MOBILE_COLLECTION_PROTOCOL_VERSION = '2026-08-22.v2'
 
-export type MobileCollectionPlanId = 'baseline' | 'anchor' | 'reading' | 'natural_speech'
+export type MobileCollectionPlanId =
+  | 'baseline_words'
+  | 'targeted_gap'
+  | 'functional_speech'
+  | 'connected_reading'
+  | 'natural_speech'
+  | 'anchor_retest'
 
 export const MOBILE_COLLECTION_PLANS: readonly {
   id: MobileCollectionPlanId
   label: string
   description: string
 }[] = [
-  { id: 'baseline', label: '首轮基线', description: '固定字词和核心朗读，建立可比较的起点。' },
-  { id: 'anchor', label: '跨天 Anchor', description: '重复同一小段，观察同人、同设备的变化。' },
-  { id: 'reading', label: '连续朗读', description: '按自己的节奏朗读，保留真实停顿和回读。' },
-  { id: 'natural_speech', label: '自然表达', description: '从熟悉话题开始，状态不好时随时结束。' },
+  { id: 'baseline_words', label: '基础字词', description: '固定高频字词，建立声、韵、调和短词起点。' },
+  { id: 'targeted_gap', label: '补齐声音', description: '按已确认的覆盖缺口录自然字词和短句。' },
+  { id: 'functional_speech', label: '常用表达', description: '录日常、出行、求助、工作等真实会用到的话。' },
+  { id: 'connected_reading', label: '连续朗读', description: '按自己的节奏朗读，保留真实停顿和回读。' },
+  { id: 'natural_speech', label: '自然说话', description: '围绕熟悉任务自由表达，不要求逐字一致。' },
+  { id: 'anchor_retest', label: '稳定复测', description: '隔天再录同一组，观察同条件下的稳定变化。' },
 ] as const
+
+export function getMobileCollectionPlanId(options: {
+  category?: string | null
+  usesPreparedMaterial: boolean
+}): MobileCollectionPlanId {
+  if (options.usesPreparedMaterial || options.category === '现代文章朗读') {
+    return 'connected_reading'
+  }
+  if (options.category === '音系强化') {
+    return 'targeted_gap'
+  }
+  if (options.category === '评估筛查') {
+    return 'baseline_words'
+  }
+  return 'functional_speech'
+}
 
 export interface MobileCollectionPreflight {
   environmentReady: boolean

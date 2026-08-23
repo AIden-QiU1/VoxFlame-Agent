@@ -1,6 +1,6 @@
 # 研究到应用回流登记
 
-> 更新日期：2026-08-17
+> 更新日期：2026-08-22
 >
 > 这是研究结论影响 VoxFlame 应用的唯一登记表。原始实验结果以 `references/clear-vox-model` 为准，本表不改写实验事实。
 
@@ -28,6 +28,7 @@
 | RF-008 | 声音与沟通表现 | [报告研究](speech-health/VOICE_AND_COMMUNICATION_PERFORMANCE_REPORT_RESEARCH_2026-08-16.md) · Shor 2019 · ASHA · ELS/UEP 共识 · 2024–2026 会话 ASR、核心结局、表达教练与伙伴训练研究 · Orai/ELSA/Yoodli/Voiceitt/Poised/Project Relate/Apple/Microsoft 官方能力 | 可采用字符编辑距离、音系错误、节奏、静音、收音、用户预设要点、伙伴听懂结果和个人趋势做低风险沟通反馈；固定词与自由表达必须分开；5 分钟仅作 Shor 英语 ALS 实验的研究参考；禁止自动医学分级 | `validate` | Web/App 20词筛查增加体验版沟通表现报告；不新增入口。自由表达、A/B 复测和伙伴确认只作为现有验证/报告流程内的候选增强，完成用户研究后再落地。owner：训练工作台 | Web 回归与真实登录录音；目标用户和普通用户理解率；同设备复测稳定性；伙伴确认可用性；无诊断性文案或持久化医学标签 |
 | RF-009 | 沟通入口收口 | 仓库内 `/communicate`、quick phrases、workspace loadout 与 LiveKit agent 数据流复核 | “把话表达出去”是唯一用户目标；通用短语和手动输入只需本机朗读，不应被登录或 agent 阻塞；持续理解、个人短语与 workspace 才需要身份。场景/材料/短语的长期维护只属于记忆页，不能在沟通页再造一套配置面 | `adopt` | 唯一 `/communicate` 同页承接快速表达与日常沟通；删除 `/chat`、`/communicate/live` 和固定场景选择组件。匿名快速表达零 RTC/agent；日常沟通按需登录、挂载 agent，并自动读取 workspace 默认准备。owner：沟通工作台 / 记忆页 | 匿名 `/communicate` 为 200，旧入口均直接 404；点击快速短语不产生 RTC session 请求；进入日常沟通前不挂载 agent；记忆页选择能进入 preparation context；真实账号麦克风 smoke |
 | RF-010 | 硬件产品路线 | [首家供应商产品功能需求](product-engineering/RANYAN_HARDWARE_PRODUCT_REQUIREMENTS_FIRST_SUPPLIER_2026-08-17.md) · [通用供应商产品方案](product-engineering/RANYAN_HARDWARE_PRODUCT_PLAN_GENERAL_SUPPLIER_2026-08-17.md) · [参数台账](product-engineering/evidence/ranyan-hardware-product-2026-08-17/PARAMETER_LEDGER.md) · [来源清单](product-engineering/evidence/ranyan-hardware-product-2026-08-17/SOURCE_MANIFEST.md) | P0 是证据项目，G1 是唯一近期产品候选，G2 是条件期权，G3—G7 是独立产品线期权；原厂事实、采购门槛、候选配置和整机研究目标已分开。芯片、BOM、重量、续航和性能尚未由用户验证、书面报价与样机共同冻结；监管材料不构成分类、认证或医疗有效性 | `validate` | 先完成目标用户 P0 交叉 A/B、支付方访谈与 intended use 预分类；样本量由统计计划与人群分层确定，不以草案数字冒充冻结方案。Gate 0 通过后向至少两家供应商发同口径 G1 RFI/RFQ。owner：产品 + 硬件/移动端 + 质量/法规 + 经营负责人 | 相对裸手机的真实任务增益、携带接受、音频路由可靠、支付信号、完全落地成本、两家报价、法规边界与可停止决策门同时成立 |
+| RF-011 | 普通话语言学覆盖与采集闭环 | [普通话语言学覆盖与构音障碍采集基线](speech-health/MANDARIN_LINGUISTIC_COVERAGE_AND_COLLECTION_BASELINE_2026-08-22.md) · Lee & Zee 2003 · 版本化规范字常用读音集合 · CC-CEDICT/Tatoeba 核验快照 · 本地题库/manifest · CLEAR-VOX-MODEL EXP-1/2/13/17 | SOP 只作现场流程参考；覆盖必须分开审计音系库存、核心音节—声调、词汇扩展读音、连续语流和真实任务。现有 9107 条题库仍缺 217 个音节—声调；按现代词、整词读音证据与默认用户负担分为 88 个默认核心、121 个边缘专项和 8 个争议下线目标。主要依赖贬损、地域、醉酒、虐待或犯罪承载词的形式仍保留在全音台账，但不进入默认任务。88 个核心目标各有 3 条待审候选，共 263 条唯一文本（88 词、175 短句；每目标 1 词 + 2 句）；175/175 句都有句内整词拼音证据，高负担词锚点已替换为同音中性词。候选均未批准，生产导入仍为 0。1185 条去重应用录音仍没有独立人工 `spoken_text`；覆盖增长不等于模型收益 | `validate` | 保持版本化全量台账、同源状态门和六项发布门；原音组练习保留，“核心补音”只读取全审批准导出，边缘/争议不混入默认任务。下一步由语言学与目标用户审核 263 条候选，再做小规模采集和固定 baseline 消融。owner：训练工作台 + 数据管线 + CLEAR-VOX-MODEL | 核心候选批准率与目标覆盖；目标用户完成/跳过/疲劳；人工转写一致性与 audio-text 完整性；speaker-disjoint overall/worst/短句不回退；真实沟通成功率改善 |
 
 ## 新条目要求
 

@@ -17,6 +17,7 @@ import { UserNav } from '@/components/ui/user-nav'
 interface HomeDashboardProps {
   isAuthenticated: boolean
   onStartCommunicate: () => void
+  isOpeningCommunicate?: boolean
 }
 
 interface CapabilityCard {
@@ -104,6 +105,7 @@ function CapabilityCardView({
 
 export default function HomeDashboard({
   isAuthenticated,
+  isOpeningCommunicate = false,
   onStartCommunicate,
 }: HomeDashboardProps) {
   const practiceHref = isAuthenticated ? '/practice' : buildLoginPath('/practice')
@@ -123,7 +125,7 @@ export default function HomeDashboard({
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <Button
+              <Button
               asChild
               className="hidden rounded-xl border-stone-300 bg-white px-4 text-sm text-stone-800 hover:bg-stone-50 sm:inline-flex"
               type="button"
@@ -133,10 +135,11 @@ export default function HomeDashboard({
             </Button>
             <Button
               className="hidden rounded-xl bg-stone-950 px-4 text-sm text-white hover:bg-stone-800 md:inline-flex"
-              onClick={() => onStartCommunicate()}
+                onClick={() => onStartCommunicate()}
+                disabled={isOpeningCommunicate}
               type="button"
             >
-              现在沟通
+              {isOpeningCommunicate ? '正在确认登录状态…' : '现在沟通'}
             </Button>
             <UserNav />
           </div>
@@ -159,9 +162,10 @@ export default function HomeDashboard({
                 <Button
                   className="h-12 rounded-xl bg-stone-950 px-4 text-sm font-semibold text-white hover:bg-stone-800 sm:px-6"
                   onClick={() => onStartCommunicate()}
+                  disabled={isOpeningCommunicate}
                   type="button"
                 >
-                  现在开始沟通
+                  {isOpeningCommunicate ? '正在确认登录状态…' : '现在开始沟通'}
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </Button>
                 <Button
@@ -177,7 +181,7 @@ export default function HomeDashboard({
 
             <div className="mt-9 grid gap-4 sm:mt-12 lg:grid-cols-3 lg:gap-5">
               {CAPABILITY_CARDS.map((card) => (
-                <CapabilityCardView
+                  <CapabilityCardView
                   card={card}
                   isAuthenticated={isAuthenticated}
                   key={card.id}

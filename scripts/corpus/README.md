@@ -11,6 +11,7 @@
 - 网页来源会先做文章打散、子句拆分和页面噪声过滤，尽量剔除导航、按钮、面包屑等无效文本。
 - 前端训练目标句必须统一简体中文。推荐在导出环境安装 `opencc-python-reimplemented`，`export_frontend_source_corpus.py` 会优先使用 OpenCC `t2s` 做繁转简；未安装时才使用脚本内置兜底表。
 - 严重污染按句子清理，不按来源或固定数量清理。明确色情、直接暴力、广告导流、确定的 ASR 重复 / 填充 / 拼接残片退出；普通新闻、财经、影视对话和有效医疗表达不因题材退出。
+- “学习包 / 课程包 / 培训包 / 资料包”以及考试课程推广标题视为商业/课程营销噪声，逐句移除；不要把它们当成现代文章朗读或音系强化材料。原始来源只留作可追溯审计，不进入前端题库。
 
 ## 推荐来源分层
 
@@ -203,3 +204,172 @@ python3 scripts/corpus/build_phonology_article_corpus.py \
 - 这里不会把拼音写进最终句库产物。
 - `coverage_score` 只是离线筛选用的内部指标，不应该直接给用户看。
 - 如果某个来源抓取失败，脚本会打印 `[warn]` 并跳过，不会让整批构建中断。
+
+## 语言学覆盖审计
+
+题库数量、主题数量或“声母/韵母各出现一次”都不能证明覆盖充分。当前统一审计入口会分别报告核心音系库存、常用规范字读音涉及的无调音节、音节—声调、声调组合、连续语流现象和任务分区；`present` 与达到最小重复次数的 `robust` 分开统计。
+
+先固定参考集合。参考源必须是本地已核验文件，命令显式记录来源 URL 和 commit：
+
+```bash
+node frontend/scripts/generate-mandarin-reference.mjs \
+  --input /path/to/kMandarin_8105.txt \
+  --output frontend/src/lib/corpus/generated/mandarin-common-syllable-reference.json \
+  --source-url https://raw.githubusercontent.com/mozillazg/pinyin-data/<commit>/kMandarin_8105.txt \
+  --source-commit <commit>
+```
+
+导出现役前端题库并审计：
+
+```bash
+cd frontend
+npm run export:training-corpus -- --output .tmp/mandarin-training-prompts.json
+cd ..
+
+node frontend/scripts/audit-mandarin-coverage.mjs \
+  --reference frontend/src/lib/corpus/generated/mandarin-common-syllable-reference.json \
+  --corpus frontend/.tmp/mandarin-training-prompts.json \
+  --minimum-hits 20 \
+  --output /tmp/voxflame-prompt-coverage.json
+```
+
+审计应用采集 manifest 时可重复传入 `--manifest`；审计 CLEAR-VOX-MODEL 训练/验证/评测 JSONL 时重复传入 `--model-manifest`。输出只应保存聚合统计，不应提交用户 ID、逐条转写、设备标识或原始音频。
+
+```bash
+node frontend/scripts/audit-mandarin-coverage.mjs \
+  --reference frontend/src/lib/corpus/generated/mandarin-common-syllable-reference.json \
+  --manifest /path/to/app-manifest.jsonl \
+  --model-manifest /path/to/train.jsonl \
+  --minimum-hits 20 \
+  --output /tmp/voxflame-collected-and-model-coverage.json
+```
+
+覆盖报告只能决定“下一批优先补什么”，不能单独证明微调有效。新增语料仍需人工实际转写、audio-text 完整性检查、speaker-disjoint 固定评测和目标用户完成率/疲劳验证。
+
+应用录音的实际 `spoken_text` 必须走独立人工复核旁路。先从 manifest 生成队列（不会改写原 manifest 或音频）：
+
+```bash
+node frontend/scripts/build-mandarin-spoken-text-review-queue.mjs \
+  --manifest /path/to/app-manifest.jsonl \
+  --output /tmp/mandarin-spoken-text-review.json
+node frontend/scripts/validate-mandarin-spoken-text-review.mjs \
+  --input /tmp/mandarin-spoken-text-review.json
+```
+
+复核员只填写 `spoken_text`、`spoken_text_status`、`audio_text_alignment`、`reviewed_by` 和 `reviewed_at`。ASR 只作为 `asr_hint`，不能直接升级为实际转写；只有 `approved + confirmed` 条目进入覆盖审计：
+
+```bash
+node frontend/scripts/audit-mandarin-coverage.mjs \
+  --reference frontend/src/lib/corpus/generated/mandarin-common-syllable-reference.json \
+  --spoken-review /tmp/mandarin-spoken-text-review.json \
+  --minimum-hits 20 \
+  --output /tmp/voxflame-human-spoken-coverage.json
+```
+
+外部开放文本只能生成待审核候选。例如 Tatoeba detailed export 必须先校验压缩包、SHA-256、许可与逐句署名，再用缺口筛选器生成 review queue：
+
+```bash
+node frontend/scripts/select-mandarin-gap-candidates.mjs \
+  --input /path/to/cmn_sentences_detailed.simplified.tsv \
+  --audit research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/baseline-audit.json \
+  --corpus frontend/.tmp/mandarin-training-prompts.json \
+  --output /tmp/mandarin-gap-candidates.json \
+  --source-url https://downloads.tatoeba.org/exports/per_language/cmn/cmn_sentences_detailed.tsv.bz2 \
+  --source-sha256 <verified-sha256> \
+  --license "CC BY 2.0 FR"
+```
+
+输出中的任务类型只是候选召回标签，五类 review 必须全部由审核人完成。不得把 `human_review_required_not_for_production` 文件导入现役题库。
+
+## 全音系列目标台账与核心补音发布
+
+1242 项核心音节—声调要逐项建立 `当前命中 -> 规范汉字 -> 现代词语 -> 自然短句` 承载链。CC-CEDICT 和 Tatoeba 只能生成待审候选；词典条目存在不等于适合默认用户，字形出现也不等于多音字实际读到目标音。
+
+当前数量口径必须分清：`mandarin-training-real.json` 是 8771 条外部生成子池，前端再合并 336 条人工策划/固定评估项，形成 9107 条现役唯一题目。相对历史 9112 条，只退出 5 条明确“学习包”商业污染；不能把 8771 误读为又删除了 336 条。217 个完全缺失目标仍全部保留在 1242 项台账中，产品路由为 `88 core / 121 edge / 8 disputed`；另有 1 个已出现但不足 20 次的 disputed 目标，所以全台账 tier 总数会显示 9 disputed。
+
+```bash
+cd frontend
+npm run build:mandarin-coverage-ledger -- \
+  --reference src/lib/corpus/generated/mandarin-common-syllable-reference.json \
+  --audit ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/baseline-audit.json \
+  --corpus .tmp/mandarin-training-prompts.json \
+  --characters /path/to/kMandarin_8105.txt \
+  --cedict /path/to/cedict_1_0_ts_utf-8_mdbg.txt.gz \
+  --tatoeba /path/to/cmn_sentences_detailed.simplified.tsv \
+  --output src/lib/corpus/generated/mandarin-coverage-target-ledger.json \
+  --candidate-output ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/mandarin-gap-prompt-candidates.json
+
+npm run select:mandarin-core-gap-phase1 -- \
+  --input src/lib/corpus/generated/mandarin-coverage-target-ledger.json \
+  --authored ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/mandarin-authored-gap-candidates.json \
+  --output ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/mandarin-core-gap-phase1-review.json \
+  --examples-per-target 3
+
+npm run validate:mandarin-core-gap-review -- \
+  --input ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/mandarin-core-gap-phase1-review.json \
+  --approved-output src/lib/corpus/generated/mandarin-approved-core-gap-corpus.json
+
+npm run export:mandarin-core-gap-review-sheet -- \
+  --input ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/mandarin-core-gap-phase1-review.json \
+  --output ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/mandarin-core-gap-phase1-review.tsv \
+  --batch-size 30
+
+npm run build:mandarin-core-gap-review-workspace -- \
+  --input ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/mandarin-core-gap-phase1-review.json \
+  --output src/lib/corpus/generated/mandarin-core-gap-review-workspace.json \
+  --batch-size 30
+```
+
+核心候选必须完成 `linguistic / naturalness / user_burden / safety / license / product` 六项审核并填写审核人、时间，才会进入批准导出。当前 88 个默认核心目标各保持 `1 个整词锚点 + 2 个短句句境`，共 263 条唯一候选（88 词、175 短句，其中 1 句同时覆盖两个目标），分成 9 批。词锚点优先中性现代承载词；高频但高负担的“歹徒、懒惰、醉醺醺、挣扎”等不得仅因词频较高成为默认锚点。TSV 便于语言学和目标用户逐行复核；它是审核工作表，不是生产导入文件。边缘音单独生成 specialist review pack，争议读音不生成用户任务。`学习包 / 课程包 / 培训包 / 资料包` 在候选入口和发布门双重拦截。正常题库、历史录音和 manifest 不因补音建设被删除。
+
+站内 `/corpus-review` 是同一审核包的产品化入口。页面和 `/api/corpus-review/core-gap` 均需登录，且服务端环境变量 `VOXFLAME_CORPUS_REVIEWER_EMAILS` 必须显式列出审核者邮箱；空白名单默认拒绝。浏览器只把草稿保存在本机并导出 decision JSON，不能直接写仓库、现役题库或生产语料。
+
+导出的 decision JSON 必须经 CLI 校验来源快照、候选 ID、六项状态与改写/拒绝说明，再合并回审核包：
+
+```bash
+cd frontend
+npm run merge:mandarin-core-gap-review-decisions -- \
+  --review ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/mandarin-core-gap-phase1-review.json \
+  --decisions /path/to/mandarin-core-gap-decisions.json \
+  --output /tmp/mandarin-core-gap-phase1-reviewed.json \
+  --summary /tmp/mandarin-core-gap-decision-validation.json
+
+npm run validate:mandarin-core-gap-review -- \
+  --input /tmp/mandarin-core-gap-phase1-reviewed.json \
+  --summary /tmp/mandarin-core-gap-review-validation.json \
+  --approved-output /tmp/mandarin-approved-core-gap-corpus.json
+```
+
+只有第二步输出中的六项全批准条目才具备进入正式 `mandarin-approved-core-gap-corpus.json` 的资格。审核者仍需核对目标用户可读性和疲劳，不能用网页的一键通过替代语言学判断。
+
+题库的任务分区与语言学标签通过旁路索引生成，原题目文本和原类别保持不变：
+
+```bash
+cd frontend
+npm run build:mandarin-linguistic-index
+npm run test:mandarin-linguistic-index
+```
+
+索引中的 `task_id` 只有一个，供用户任务导航使用；`initials`、`finals`、`tones`、`syllable_tones`、`tone_pairs`、音节位置和连续语流标记可以同时存在，供缺口推荐、审计和人工复核使用。索引不是医疗判断，也不代表方言或构音障碍人群的完整覆盖。
+
+人工复核门禁：
+
+```bash
+cd frontend
+npm run test:mandarin-review-queue
+node scripts/validate-mandarin-review-queue.mjs \
+  --input ../research/speech-health/evidence/mandarin-collection-coverage-2026-08-22/tatoeba-gap-candidates.json \
+  --output /tmp/mandarin-review-queue-validation.json
+```
+
+五项审核（语言学、自然度、安全、许可、任务）必须逐条填写。`pending`、`rewrite`、`rejected` 都不能进入题库；即使五项都是 `approved`，还必须补 `reviewed_by` 和 `reviewed_at`，并经过目标用户可读性/疲劳测试与固定评测后才允许另行导入。校验器不会修改候选队列，也不会删除原题库。
+
+实验评测门禁：
+
+```bash
+cd frontend
+npm run test:mandarin-evaluation-gate
+node scripts/validate-mandarin-evaluation-report.mjs --input /path/to/evaluation-report.json
+```
+
+评测报告必须提供固定 speaker-disjoint split、冻结测试集、总体 CER、最差说话人 CER、短句 CER、严重度和长度分层、P95 延迟、用户任务成功/跳过/疲劳指标，以及可验证回退动作。只有 `validate`/`hold`/`reject` 可以在证据不足时保留；`adopt` 还必须有实测用户收益和已验证回退路径。

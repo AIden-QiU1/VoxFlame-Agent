@@ -1,0 +1,1069 @@
+{
+  "kind": "voxflame_authored_mandarin_gap_candidates",
+  "status": "human_review_required_not_for_production",
+  "policy": {
+    "purpose": "Fill natural-context candidate shortages after licensed corpus discovery, without fabricating rare-word coverage.",
+    "authoring_language": "Modern Mainland Mandarin",
+    "target_length_han_characters": [4, 12],
+    "linguistic_and_user_review_required": true,
+    "no_existing_prompt_or_recording_removed": true
+  },
+  "items": [
+    {
+      "id": "authored-ang1-001",
+      "text": "这块抹布有点肮脏",
+      "coverage_targets": ["ang1"],
+      "target_carriers": [{ "text": "肮脏", "source_pinyin": "ang1 zang1", "source": "CC-CEDICT" }],
+      "rationale": "Short object-focused sentence using the unambiguous modern word 肮脏 without describing a person.",
+      "reviews": {
+        "linguistic": "pending",
+        "naturalness": "pending",
+        "user_burden": "pending",
+        "safety": "pending",
+        "product": "pending"
+      }
+    },
+    {
+      "id": "authored-ang1-002",
+      "text": "请换掉这条肮脏毛巾",
+      "coverage_targets": ["ang1"],
+      "target_carriers": [{ "text": "肮脏", "source_pinyin": "ang1 zang1", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden daily request with a clear 肮脏 carrier and no person-directed judgment.",
+      "reviews": {
+        "linguistic": "pending",
+        "naturalness": "pending",
+        "user_burden": "pending",
+        "safety": "pending",
+        "product": "pending"
+      }
+    },
+    {
+      "id": "authored-lin1-001",
+      "text": "请把袋子拎起来",
+      "coverage_targets": ["lin1"],
+      "target_carriers": [{ "text": "拎起", "source_pinyin": "lin1 qi3", "source": "CC-CEDICT" }],
+      "rationale": "Natural daily request with a clear, non-polyphonic 拎 carrier.",
+      "reviews": {
+        "linguistic": "pending",
+        "naturalness": "pending",
+        "user_burden": "pending",
+        "safety": "pending",
+        "product": "pending"
+      }
+    },
+    {
+      "id": "authored-lin1-002",
+      "text": "把书包轻轻拎起",
+      "coverage_targets": ["lin1"],
+      "target_carriers": [{ "text": "拎起", "source_pinyin": "lin1 qi3", "source": "CC-CEDICT" }],
+      "rationale": "Short action phrase with low semantic and reading burden.",
+      "reviews": {
+        "linguistic": "pending",
+        "naturalness": "pending",
+        "user_burden": "pending",
+        "safety": "pending",
+        "product": "pending"
+      }
+    },
+    {
+      "id": "authored-bei0-001",
+      "text": "我的胳臂有点酸",
+      "coverage_targets": ["bei0"],
+      "target_carriers": [{ "text": "胳臂", "source_pinyin": "ge1 bei5", "source": "CC-CEDICT" }],
+      "rationale": "Short body-state sentence using the lexical neutral-tone reading of 胳臂.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-bo3-001",
+      "text": "这段路有些颠簸",
+      "coverage_targets": ["bo3"],
+      "target_carriers": [{ "text": "颠簸", "source_pinyin": "dian1 bo3", "source": "CC-CEDICT" }],
+      "rationale": "Natural travel sentence with the unambiguous word 颠簸.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-bo4-001",
+      "text": "我想要一杯薄荷茶",
+      "coverage_targets": ["bo4"],
+      "target_carriers": [{ "text": "薄荷", "source_pinyin": "bo4 he5", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden daily request with the lexical reading 薄荷.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-chong4-001",
+      "text": "年轻人很有冲劲",
+      "coverage_targets": ["chong4"],
+      "target_carriers": [{ "text": "冲劲", "source_pinyin": "chong4 jin4", "source": "CC-CEDICT" }],
+      "rationale": "Short positive sentence with the lexical reading 冲劲.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ga2-001",
+      "text": "我买了一盒牛轧糖",
+      "coverage_targets": ["ga2"],
+      "target_carriers": [{ "text": "牛轧糖", "source_pinyin": "niu2 ga2 tang2", "source": "CC-CEDICT" }],
+      "rationale": "Daily shopping sentence; whole-word dictionary attribution prevents character-level polyphone error.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ga2-002",
+      "text": "这块牛轧糖有点硬",
+      "coverage_targets": ["ga2"],
+      "target_carriers": [{ "text": "牛轧糖", "source_pinyin": "niu2 ga2 tang2", "source": "CC-CEDICT" }],
+      "rationale": "Short food description using the attributed whole-word reading 牛轧糖.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-hao1-001",
+      "text": "你在家好好儿休息",
+      "coverage_targets": ["hao1"],
+      "target_carriers": [{ "text": "好好儿", "source_pinyin": "hao3 hao1 r5", "source": "CC-CEDICT" }],
+      "rationale": "Natural supportive sentence with 好好儿 as a lexicalized colloquial form.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-hong3-001",
+      "text": "家人正在耐心哄劝他",
+      "coverage_targets": ["hong3"],
+      "target_carriers": [{ "text": "哄劝", "source_pinyin": "hong3 quan4", "source": "CC-CEDICT" }],
+      "rationale": "Supportive family scene using the whole-word reading 哄劝.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-hong4-001",
+      "text": "他们别再起哄了",
+      "coverage_targets": ["hong4"],
+      "target_carriers": [{ "text": "起哄", "source_pinyin": "qi3 hong4", "source": "CC-CEDICT" }],
+      "rationale": "Short natural sentence using the lexical reading 起哄.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-kui3-001",
+      "text": "孩子在看傀儡戏",
+      "coverage_targets": ["kui3"],
+      "target_carriers": [{ "text": "傀儡", "source_pinyin": "kui3 lei3", "source": "CC-CEDICT" }],
+      "rationale": "Concrete scene with the attested word 傀儡.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-kui3-002",
+      "text": "台上摆着一个傀儡",
+      "coverage_targets": ["kui3"],
+      "target_carriers": [{ "text": "傀儡", "source_pinyin": "kui3 lei3", "source": "CC-CEDICT" }],
+      "rationale": "Concrete low-burden sentence with 傀儡 used literally.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-la3-001",
+      "text": "请把喇叭声音调低",
+      "coverage_targets": ["la3"],
+      "target_carriers": [{ "text": "喇叭", "source_pinyin": "la3 ba5", "source": "CC-CEDICT" }],
+      "rationale": "Functional device request with the common word 喇叭.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-la3-002",
+      "text": "门口传来喇叭声",
+      "coverage_targets": ["la3"],
+      "target_carriers": [{ "text": "喇叭", "source_pinyin": "la3 ba5", "source": "CC-CEDICT" }],
+      "rationale": "Short auditory scene with the common word 喇叭.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-lei1-001",
+      "text": "请把绳子勒紧一点",
+      "coverage_targets": ["lei1"],
+      "target_carriers": [{ "text": "勒紧", "source_pinyin": "lei1 jin3", "source": "CC-CEDICT" }],
+      "rationale": "Functional request; whole-word dictionary attribution prevents character-level polyphone error.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-qiu3-001",
+      "text": "这件事让我出糗了",
+      "coverage_targets": ["qiu3"],
+      "target_carriers": [{ "text": "出糗", "source_pinyin": "chu1 qiu3", "source": "CC-CEDICT" }],
+      "rationale": "Short modern colloquial sentence with 出糗.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-rong3-001",
+      "text": "这份说明过于冗长",
+      "coverage_targets": ["rong3"],
+      "target_carriers": [{ "text": "冗长", "source_pinyin": "rong3 chang2", "source": "CC-CEDICT" }],
+      "rationale": "Neutral document description with the clear word 冗长.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-rui3-001",
+      "text": "请用石蕊试纸检测",
+      "coverage_targets": ["rui3"],
+      "target_carriers": [{ "text": "石蕊试纸", "source_pinyin": "shi2 rui3 shi4 zhi3", "source": "CC-CEDICT" }],
+      "rationale": "Concrete science-task sentence using the attested term 石蕊试纸.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-sui3-001",
+      "text": "这篇文章抓住了精髓",
+      "coverage_targets": ["sui3"],
+      "target_carriers": [{ "text": "精髓", "source_pinyin": "jing1 sui3", "source": "CC-CEDICT" }],
+      "rationale": "Natural reading-context sentence with 精髓.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-tuan1-001",
+      "text": "这里的水流很湍急",
+      "coverage_targets": ["tuan1"],
+      "target_carriers": [{ "text": "湍急", "source_pinyin": "tuan1 ji2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete natural-scene sentence with 湍急.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-xiao2-001",
+      "text": "请不要混淆这两个词",
+      "coverage_targets": ["xiao2"],
+      "target_carriers": [{ "text": "混淆", "source_pinyin": "hun4 xiao2", "source": "CC-CEDICT" }],
+      "rationale": "Functional clarification request using 混淆.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-yu1-001",
+      "text": "鞋底沾满了淤泥",
+      "coverage_targets": ["yu1"],
+      "target_carriers": [{ "text": "淤泥", "source_pinyin": "yu1 ni2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete daily scene with the unambiguous word 淤泥.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-bo3-002",
+      "text": "山路上有些颠簸",
+      "coverage_targets": ["bo3"],
+      "target_carriers": [{ "text": "颠簸", "source_pinyin": "dian1 bo3", "source": "CC-CEDICT" }],
+      "rationale": "Neutral travel scene with the whole-word reading 颠簸.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-chuo1-001",
+      "text": "请别戳破气球",
+      "coverage_targets": ["chuo1"],
+      "target_carriers": [{ "text": "戳破", "source_pinyin": "chuo1 po4", "source": "CC-CEDICT" }],
+      "rationale": "Short everyday request using the attested whole word 戳破.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-chuo1-002",
+      "text": "铅笔戳破了纸张",
+      "coverage_targets": ["chuo1"],
+      "target_carriers": [{ "text": "戳破", "source_pinyin": "chuo1 po4", "source": "CC-CEDICT" }],
+      "rationale": "Concrete object-focused sentence with no person-directed action.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-cuan4-001",
+      "text": "请勿篡改原始记录",
+      "coverage_targets": ["cuan4"],
+      "target_carriers": [{ "text": "篡改", "source_pinyin": "cuan4 gai3", "source": "CC-CEDICT" }],
+      "rationale": "Neutral data-handling instruction with the unambiguous word 篡改.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-cuo1-001",
+      "text": "大家一起切磋技艺",
+      "coverage_targets": ["cuo1"],
+      "target_carriers": [{ "text": "切磋", "source_pinyin": "qie1 cuo1", "source": "CC-CEDICT" }],
+      "rationale": "Positive collaborative sentence using the whole-word reading 切磋.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-e1-001",
+      "text": "这盒阿胶已经开封",
+      "coverage_targets": ["e1"],
+      "target_carriers": [{ "text": "阿胶", "source_pinyin": "e1 jiao1", "source": "CC-CEDICT" }],
+      "rationale": "Concrete product sentence using the Mainland whole-word reading 阿胶.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ga1-001",
+      "text": "今晚我们吃咖喱饭",
+      "coverage_targets": ["ga1"],
+      "target_carriers": [{ "text": "咖喱", "source_pinyin": "ga1 li2", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden food sentence with the attested word 咖喱.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-hong3-002",
+      "text": "老师轻声哄劝孩子",
+      "coverage_targets": ["hong3"],
+      "target_carriers": [{ "text": "哄劝", "source_pinyin": "hong3 quan4", "source": "CC-CEDICT" }],
+      "rationale": "Gentle caregiving scene replacing deception wording.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-luo1-001",
+      "text": "请别反复啰嗦",
+      "coverage_targets": ["luo1"],
+      "target_carriers": [{ "text": "啰嗦", "source_pinyin": "luo1 suo5", "source": "CC-CEDICT" }],
+      "rationale": "Short request with the common Mainland spelling 啰嗦.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-luo1-002",
+      "text": "这段说明太啰嗦",
+      "coverage_targets": ["luo1"],
+      "target_carriers": [{ "text": "啰嗦", "source_pinyin": "luo1 suo5", "source": "CC-CEDICT" }],
+      "rationale": "Neutral document description with the whole-word reading 啰嗦.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-nei3-001",
+      "text": "遇到困难不要气馁",
+      "coverage_targets": ["nei3"],
+      "target_carriers": [{ "text": "气馁", "source_pinyin": "qi4 nei3", "source": "CC-CEDICT" }],
+      "rationale": "Supportive sentence using the unambiguous word 气馁.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-pie1-001",
+      "text": "我刚才瞥见了他",
+      "coverage_targets": ["pie1"],
+      "target_carriers": [{ "text": "瞥见", "source_pinyin": "pie1 jian4", "source": "CC-CEDICT" }],
+      "rationale": "Short neutral observation with the whole-word reading 瞥见.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-qin3-001",
+      "text": "寝室晚上准时熄灯",
+      "coverage_targets": ["qin3"],
+      "target_carriers": [{ "text": "寝室", "source_pinyin": "qin3 shi4", "source": "CC-CEDICT" }],
+      "rationale": "Familiar dormitory scene using the whole-word reading 寝室.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-qin3-002",
+      "text": "请保持寝室安静",
+      "coverage_targets": ["qin3"],
+      "target_carriers": [{ "text": "寝室", "source_pinyin": "qin3 shi4", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden functional request using the common word 寝室.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-qiu3-002",
+      "text": "偶尔出糗也没关系",
+      "coverage_targets": ["qiu3"],
+      "target_carriers": [{ "text": "出糗", "source_pinyin": "chu1 qiu3", "source": "CC-CEDICT" }],
+      "rationale": "Reassuring sentence that avoids shaming the reader while realizing 出糗.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-reng1-001",
+      "text": "请把空瓶扔掉",
+      "coverage_targets": ["reng1"],
+      "target_carriers": [{ "text": "扔掉", "source_pinyin": "reng1 diao4", "source": "CC-CEDICT" }],
+      "rationale": "Simple daily request with the whole-word reading 扔掉.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ao1-001",
+      "text": "这块地面凹凸不平",
+      "coverage_targets": ["ao1"],
+      "target_carriers": [{ "text": "凹凸不平", "source_pinyin": "ao1 tu1 bu4 ping2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete surface description with an attributed whole-word reading.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-chai2-001",
+      "text": "抽屉里还有一盒火柴",
+      "coverage_targets": ["chai2"],
+      "target_carriers": [{ "text": "火柴", "source_pinyin": "huo3 chai2", "source": "CC-CEDICT" }],
+      "rationale": "Familiar household object with the unambiguous word 火柴.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-cuan4-002",
+      "text": "这份文件禁止篡改",
+      "coverage_targets": ["cuan4"],
+      "target_carriers": [{ "text": "篡改", "source_pinyin": "cuan4 gai3", "source": "CC-CEDICT" }],
+      "rationale": "Short neutral instruction using the whole-word reading 篡改.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-dai3-001",
+      "text": "好歹先吃点东西",
+      "coverage_targets": ["dai3"],
+      "target_carriers": [{ "text": "好歹", "source_pinyin": "hao3 dai3", "source": "CC-CEDICT" }],
+      "rationale": "Everyday supportive phrase that avoids crime-related carriers.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-dai3-002",
+      "text": "我们好歹赶上了车",
+      "coverage_targets": ["dai3"],
+      "target_carriers": [{ "text": "好歹", "source_pinyin": "hao3 dai3", "source": "CC-CEDICT" }],
+      "rationale": "Neutral travel sentence using the whole-word reading 好歹.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-e1-002",
+      "text": "阿胶需要密封保存",
+      "coverage_targets": ["e1"],
+      "target_carriers": [{ "text": "阿胶", "source_pinyin": "e1 jiao1", "source": "CC-CEDICT" }],
+      "rationale": "Short storage instruction using the Mainland whole-word reading 阿胶.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-fei3-001",
+      "text": "这台设备价格不菲",
+      "coverage_targets": ["fei3"],
+      "target_carriers": [{ "text": "不菲", "source_pinyin": "bu4 fei3", "source": "CC-CEDICT" }],
+      "rationale": "Neutral price description avoiding criminal or defamatory carriers.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-fei3-002",
+      "text": "那枚戒指镶着翡翠",
+      "coverage_targets": ["fei3"],
+      "target_carriers": [{ "text": "翡翠", "source_pinyin": "fei3 cui4", "source": "CC-CEDICT" }],
+      "rationale": "Concrete object sentence with the whole-word reading 翡翠.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ga1-002",
+      "text": "咖喱汤还在加热",
+      "coverage_targets": ["ga1"],
+      "target_carriers": [{ "text": "咖喱", "source_pinyin": "ga1 li2", "source": "CC-CEDICT" }],
+      "rationale": "Simple food sentence using the attested word 咖喱.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-gong3-001",
+      "text": "院子里有一座拱门",
+      "coverage_targets": ["gong3"],
+      "target_carriers": [{ "text": "拱门", "source_pinyin": "gong3 men2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete architectural scene replacing a brand-like external sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-gong3-002",
+      "text": "我们从石拱门下经过",
+      "coverage_targets": ["gong3"],
+      "target_carriers": [{ "text": "拱门", "source_pinyin": "gong3 men2", "source": "CC-CEDICT" }],
+      "rationale": "Natural movement scene with the whole-word reading 拱门.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ha2-001",
+      "text": "池塘边蹲着一只蛤蟆",
+      "coverage_targets": ["ha2"],
+      "target_carriers": [{ "text": "蛤蟆", "source_pinyin": "ha2 ma5", "source": "CC-CEDICT" }],
+      "rationale": "Literal animal scene avoiding an insulting proverb.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ha2-002",
+      "text": "雨后蛤蟆叫得很响",
+      "coverage_targets": ["ha2"],
+      "target_carriers": [{ "text": "蛤蟆", "source_pinyin": "ha2 ma5", "source": "CC-CEDICT" }],
+      "rationale": "Neutral nature sentence with the whole-word reading 蛤蟆.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-han1-001",
+      "text": "他的鼾声有点响",
+      "coverage_targets": ["han1"],
+      "target_carriers": [{ "text": "鼾声", "source_pinyin": "han1 sheng1", "source": "CC-CEDICT" }],
+      "rationale": "Short auditory description with the unambiguous word 鼾声.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-hou3-001",
+      "text": "远处传来一阵吼声",
+      "coverage_targets": ["hou3"],
+      "target_carriers": [{ "text": "吼声", "source_pinyin": "hou3 sheng1", "source": "CC-CEDICT" }],
+      "rationale": "Non-directed sound description using the neutral whole-word carrier 吼声.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-kun3-001",
+      "text": "请把纸箱捆绑牢固",
+      "coverage_targets": ["kun3"],
+      "target_carriers": [{ "text": "捆绑", "source_pinyin": "kun3 bang3", "source": "CC-CEDICT" }],
+      "rationale": "Object-focused packing instruction replacing a restraint sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-kun3-002",
+      "text": "这些电线需要捆绑整理",
+      "coverage_targets": ["kun3"],
+      "target_carriers": [{ "text": "捆绑", "source_pinyin": "kun3 bang3", "source": "CC-CEDICT" }],
+      "rationale": "Neutral organization task using the whole-word reading 捆绑.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-lei1-002",
+      "text": "把袋口勒紧一点",
+      "coverage_targets": ["lei1"],
+      "target_carriers": [{ "text": "勒紧", "source_pinyin": "lei1 jin3", "source": "CC-CEDICT" }],
+      "rationale": "Simple packing instruction with whole-word polyphone attribution.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-luo3-001",
+      "text": "这幅画用裸眼就能看清",
+      "coverage_targets": ["luo3"],
+      "target_carriers": [{ "text": "裸眼", "source_pinyin": "luo3 yan3", "source": "CC-CEDICT" }],
+      "rationale": "Benign visual observation using 裸眼 rather than body exposure.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-men4-001",
+      "text": "房间里的空气有些沉闷",
+      "coverage_targets": ["men4"],
+      "target_carriers": [{ "text": "沉闷", "source_pinyin": "chen2 men4", "source": "CC-CEDICT" }],
+      "rationale": "Neutral room description with the whole-word reading 沉闷.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-men4-002",
+      "text": "今天的天气有点沉闷",
+      "coverage_targets": ["men4"],
+      "target_carriers": [{ "text": "沉闷", "source_pinyin": "chen2 men4", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden weather description using 沉闷.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-nie1-001",
+      "text": "两块黏土可以捏合",
+      "coverage_targets": ["nie1"],
+      "target_carriers": [{ "text": "捏合", "source_pinyin": "nie1 he2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete craft sentence replacing fabrication-related wording.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-piao3-001",
+      "text": "这块白布需要漂白",
+      "coverage_targets": ["piao3"],
+      "target_carriers": [{ "text": "漂白", "source_pinyin": "piao3 bai2", "source": "CC-CEDICT" }],
+      "rationale": "Simple laundry context using the whole-word reading 漂白.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-piao3-002",
+      "text": "漂白剂放在柜子里",
+      "coverage_targets": ["piao3"],
+      "target_carriers": [{ "text": "漂白剂", "source_pinyin": "piao3 bai2 ji4", "source": "CC-CEDICT" }],
+      "rationale": "Neutral storage sentence replacing a chemical-mixing warning.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-pie1-002",
+      "text": "我在人群中瞥见朋友",
+      "coverage_targets": ["pie1"],
+      "target_carriers": [{ "text": "瞥见", "source_pinyin": "pie1 jian4", "source": "CC-CEDICT" }],
+      "rationale": "Everyday observation with the whole-word reading 瞥见.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-rao2-001",
+      "text": "这里的土地十分富饶",
+      "coverage_targets": ["rao2"],
+      "target_carriers": [{ "text": "富饶", "source_pinyin": "fu4 rao2", "source": "CC-CEDICT" }],
+      "rationale": "Positive geography description replacing a pleading sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-rao2-002",
+      "text": "这片平原物产富饶",
+      "coverage_targets": ["rao2"],
+      "target_carriers": [{ "text": "富饶", "source_pinyin": "fu4 rao2", "source": "CC-CEDICT" }],
+      "rationale": "Neutral landscape sentence with the whole-word reading 富饶.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-reng1-002",
+      "text": "坏掉的纸盒可以扔掉",
+      "coverage_targets": ["reng1"],
+      "target_carriers": [{ "text": "扔掉", "source_pinyin": "reng1 diao4", "source": "CC-CEDICT" }],
+      "rationale": "Routine cleanup sentence using the whole-word reading 扔掉.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-rui3-002",
+      "text": "石蕊试纸变成红色",
+      "coverage_targets": ["rui3"],
+      "target_carriers": [{ "text": "石蕊试纸", "source_pinyin": "shi2 rui3 shi4 zhi3", "source": "CC-CEDICT" }],
+      "rationale": "Concrete science observation with explicit whole-word pronunciation evidence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-san3-001",
+      "text": "出门记得带上雨伞",
+      "coverage_targets": ["san3"],
+      "target_carriers": [{ "text": "雨伞", "source_pinyin": "yu3 san3", "source": "CC-CEDICT" }],
+      "rationale": "Familiar travel reminder with the whole-word reading 雨伞.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-shai1-001",
+      "text": "请用筛子过滤细沙",
+      "coverage_targets": ["shai1"],
+      "target_carriers": [{ "text": "筛子", "source_pinyin": "shai1 zi5", "source": "CC-CEDICT" }],
+      "rationale": "Concrete tool instruction using the whole-word reading 筛子.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-shuai3-001",
+      "text": "请把伞上的水甩掉",
+      "coverage_targets": ["shuai3"],
+      "target_carriers": [{ "text": "甩掉", "source_pinyin": "shuai3 diao4", "source": "CC-CEDICT" }],
+      "rationale": "Object-focused action replacing a weight-related external sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-shuai3-002",
+      "text": "先把鞋上的泥甩掉",
+      "coverage_targets": ["shuai3"],
+      "target_carriers": [{ "text": "甩掉", "source_pinyin": "shuai3 diao4", "source": "CC-CEDICT" }],
+      "rationale": "Neutral cleanup action with the whole-word reading 甩掉.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-tang1-001",
+      "text": "请给我一把汤匙",
+      "coverage_targets": ["tang1"],
+      "target_carriers": [{ "text": "汤匙", "source_pinyin": "tang1 chi2", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden dining request using the whole-word reading 汤匙.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-tang1-002",
+      "text": "汤匙放在餐桌上",
+      "coverage_targets": ["tang1"],
+      "target_carriers": [{ "text": "汤匙", "source_pinyin": "tang1 chi2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete object-location sentence using 汤匙.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-tang4-001",
+      "text": "她打算周末去烫发",
+      "coverage_targets": ["tang4"],
+      "target_carriers": [{ "text": "烫发", "source_pinyin": "tang4 fa4", "source": "CC-CEDICT" }],
+      "rationale": "Ordinary personal-care plan replacing an injury-focused carrier.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-tang4-002",
+      "text": "这家店可以预约烫发",
+      "coverage_targets": ["tang4"],
+      "target_carriers": [{ "text": "烫发", "source_pinyin": "tang4 fa4", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden service sentence using the attested word 烫发.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-tian3-001",
+      "text": "他笑起来有些腼腆",
+      "coverage_targets": ["tian3"],
+      "target_carriers": [{ "text": "腼腆", "source_pinyin": "mian3 tian3", "source": "CC-CEDICT" }],
+      "rationale": "Neutral personality description with the whole-word reading 腼腆.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-wai1-001",
+      "text": "墙上的画有些歪斜",
+      "coverage_targets": ["wai1"],
+      "target_carriers": [{ "text": "歪斜", "source_pinyin": "wai1 xie2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete object description with the whole-word reading 歪斜.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-wai1-002",
+      "text": "这根木杆已经歪斜",
+      "coverage_targets": ["wai1"],
+      "target_carriers": [{ "text": "歪斜", "source_pinyin": "wai1 xie2", "source": "CC-CEDICT" }],
+      "rationale": "Neutral physical-state sentence using 歪斜.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-xia1-001",
+      "text": "这盘龙虾已经上桌",
+      "coverage_targets": ["xia1"],
+      "target_carriers": [{ "text": "龙虾", "source_pinyin": "long2 xia1", "source": "CC-CEDICT" }],
+      "rationale": "Simple dining sentence avoiding disability-stigmatizing carriers.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-yu1-002",
+      "text": "雨后路面都是淤泥",
+      "coverage_targets": ["yu1"],
+      "target_carriers": [{ "text": "淤泥", "source_pinyin": "yu1 ni2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete weather scene with the whole-word reading 淤泥.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-yuan1-001",
+      "text": "老师的知识十分渊博",
+      "coverage_targets": ["yuan1"],
+      "target_carriers": [{ "text": "渊博", "source_pinyin": "yuan1 bo2", "source": "CC-CEDICT" }],
+      "rationale": "Positive knowledge description replacing an abyss sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-yuan1-002",
+      "text": "他学识渊博又谦和",
+      "coverage_targets": ["yuan1"],
+      "target_carriers": [{ "text": "渊博", "source_pinyin": "yuan1 bo2", "source": "CC-CEDICT" }],
+      "rationale": "Positive person description using the whole-word reading 渊博.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-zang4-001",
+      "text": "心脏正在规律跳动",
+      "coverage_targets": ["zang4"],
+      "target_carriers": [{ "text": "心脏", "source_pinyin": "xin1 zang4", "source": "CC-CEDICT" }],
+      "rationale": "Neutral body-function sentence with whole-word polyphone attribution.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-zang4-002",
+      "text": "适量运动保护心脏",
+      "coverage_targets": ["zang4"],
+      "target_carriers": [{ "text": "心脏", "source_pinyin": "xin1 zang4", "source": "CC-CEDICT" }],
+      "rationale": "General wellness sentence with explicit whole-word pronunciation evidence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-zha2-001",
+      "text": "我点了一份炸鱼",
+      "coverage_targets": ["zha2"],
+      "target_carriers": [{ "text": "炸鱼", "source_pinyin": "zha2 yu2", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden dining sentence replacing a struggle context.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-zha2-002",
+      "text": "炸鱼已经端上桌",
+      "coverage_targets": ["zha2"],
+      "target_carriers": [{ "text": "炸鱼", "source_pinyin": "zha2 yu2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete meal sentence with the whole-word reading 炸鱼.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-zhou3-001",
+      "text": "我的手肘有点酸",
+      "coverage_targets": ["zhou3"],
+      "target_carriers": [{ "text": "手肘", "source_pinyin": "shou3 zhou3", "source": "CC-CEDICT" }],
+      "rationale": "Simple body-state sentence with the whole-word reading 手肘.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-duo4-001",
+      "text": "船长正在掌舵",
+      "coverage_targets": ["duo4"],
+      "target_carriers": [{ "text": "掌舵", "source_pinyin": "zhang3 duo4", "source": "CC-CEDICT" }],
+      "rationale": "Neutral work scene replacing person-directed laziness judgments.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-duo4-002",
+      "text": "今天由他负责掌舵",
+      "coverage_targets": ["duo4"],
+      "target_carriers": [{ "text": "掌舵", "source_pinyin": "zhang3 duo4", "source": "CC-CEDICT" }],
+      "rationale": "Short responsibility sentence using the whole-word reading 掌舵.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-nie4-001",
+      "text": "桌上放着一把镊子",
+      "coverage_targets": ["nie4"],
+      "target_carriers": [{ "text": "镊子", "source_pinyin": "nie4 zi5", "source": "CC-CEDICT" }],
+      "rationale": "Concrete tool sentence replacing rude dialogue.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-nie4-002",
+      "text": "请用镊子夹住棉球",
+      "coverage_targets": ["nie4"],
+      "target_carriers": [{ "text": "镊子", "source_pinyin": "nie4 zi5", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden tool instruction using the whole-word reading 镊子.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-po0-001",
+      "text": "婆婆正在阳台浇花",
+      "coverage_targets": ["po0"],
+      "target_carriers": [{ "text": "婆婆", "source_pinyin": "po2 po5", "source": "CC-CEDICT" }],
+      "rationale": "Positive daily scene replacing a scam sentence involving an older adult.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-po0-002",
+      "text": "她陪婆婆去散步",
+      "coverage_targets": ["po0"],
+      "target_carriers": [{ "text": "婆婆", "source_pinyin": "po2 po5", "source": "CC-CEDICT" }],
+      "rationale": "Supportive family scene using the lexical neutral tone in 婆婆.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-qiao4-001",
+      "text": "这段山坡十分陡峭",
+      "coverage_targets": ["qiao4"],
+      "target_carriers": [{ "text": "陡峭", "source_pinyin": "dou3 qiao4", "source": "CC-CEDICT" }],
+      "rationale": "Neutral landscape description replacing school misconduct and competence judgments.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-qiao4-002",
+      "text": "前方山路有些陡峭",
+      "coverage_targets": ["qiao4"],
+      "target_carriers": [{ "text": "陡峭", "source_pinyin": "dou3 qiao4", "source": "CC-CEDICT" }],
+      "rationale": "Travel-oriented sentence with the whole-word reading 陡峭.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-sao4-001",
+      "text": "请把扫帚放回原处",
+      "coverage_targets": ["sao4"],
+      "target_carriers": [{ "text": "扫帚", "source_pinyin": "sao4 zhou5", "source": "CC-CEDICT" }],
+      "rationale": "Neutral household request replacing a shame-directed sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-sao4-002",
+      "text": "这把扫帚很耐用",
+      "coverage_targets": ["sao4"],
+      "target_carriers": [{ "text": "扫帚", "source_pinyin": "sao4 zhou5", "source": "CC-CEDICT" }],
+      "rationale": "Simple object description using the whole-word reading 扫帚.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ang4-001",
+      "text": "春天的公园绿意盎然",
+      "coverage_targets": ["ang4"],
+      "target_carriers": [{ "text": "盎然", "source_pinyin": "ang4 ran2", "source": "CC-CEDICT" }],
+      "rationale": "Natural local scene replacing a place-name-heavy external sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ang4-002",
+      "text": "院子里一片生机盎然",
+      "coverage_targets": ["ang4"],
+      "target_carriers": [{ "text": "盎然", "source_pinyin": "ang4 ran2", "source": "CC-CEDICT" }],
+      "rationale": "Positive nature sentence using the whole-word reading 盎然.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-zuan1-001",
+      "text": "小猫钻进了纸箱",
+      "coverage_targets": ["zuan1"],
+      "target_carriers": [{ "text": "钻进", "source_pinyin": "zuan1 jin4", "source": "CC-CEDICT" }],
+      "rationale": "Concrete animal scene replacing embarrassment-related contexts.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-zuan1-002",
+      "text": "阳光钻进了窗缝",
+      "coverage_targets": ["zuan1"],
+      "target_carriers": [{ "text": "钻进", "source_pinyin": "zuan1 jin4", "source": "CC-CEDICT" }],
+      "rationale": "Low-burden descriptive sentence with the whole-word reading 钻进.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-niang4-001",
+      "text": "这个计划仍在酝酿",
+      "coverage_targets": ["niang4"],
+      "target_carriers": [{ "text": "酝酿", "source_pinyin": "yun4 niang4", "source": "CC-CEDICT" }],
+      "rationale": "Neutral planning sentence replacing a malformed disaster sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-kua3-001",
+      "text": "大雨冲垮了旧木桥",
+      "coverage_targets": ["kua3"],
+      "target_carriers": [{ "text": "冲垮", "source_pinyin": "chong1 kua3", "source": "CC-CEDICT" }],
+      "rationale": "Natural weather sentence replacing awkward source wording.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-mang3-001",
+      "text": "请别做出鲁莽决定",
+      "coverage_targets": ["mang3"],
+      "target_carriers": [{ "text": "鲁莽", "source_pinyin": "lu3 mang3", "source": "CC-CEDICT" }],
+      "rationale": "Natural request replacing grammatically awkward external wording.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-xiu3-001",
+      "text": "这座木桥已经腐朽",
+      "coverage_targets": ["xiu3"],
+      "target_carriers": [{ "text": "腐朽", "source_pinyin": "fu3 xiu3", "source": "CC-CEDICT" }],
+      "rationale": "Concrete object-state sentence replacing a literary metaphor.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-xun1-001",
+      "text": "这块腊肉经过烟熏",
+      "coverage_targets": ["xun1"],
+      "target_carriers": [{ "text": "烟熏", "source_pinyin": "yan1 xun1", "source": "CC-CEDICT" }],
+      "rationale": "Neutral food-preparation sentence replacing an alcohol-related context.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-ci1-001",
+      "text": "这件产品还有瑕疵",
+      "coverage_targets": ["ci1"],
+      "target_carriers": [{ "text": "瑕疵", "source_pinyin": "xia2 ci1", "source": "CC-CEDICT" }],
+      "rationale": "Neutral product description replacing person-directed criticism.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-chong4-002",
+      "text": "这个团队很有冲劲",
+      "coverage_targets": ["chong4"],
+      "target_carriers": [{ "text": "冲劲", "source_pinyin": "chong4 jin4", "source": "CC-CEDICT" }],
+      "rationale": "Positive team description replacing a deficit-framed statement.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-can3-001",
+      "text": "这场比赛最终惨败",
+      "coverage_targets": ["can3"],
+      "target_carriers": [{ "text": "惨败", "source_pinyin": "can3 bai4", "source": "CC-CEDICT" }],
+      "rationale": "Event-focused sentence using 惨败 without judging or threatening a person.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-can3-002",
+      "text": "今天的生意有些惨淡",
+      "coverage_targets": ["can3"],
+      "target_carriers": [{ "text": "惨淡", "source_pinyin": "can3 dan4", "source": "CC-CEDICT" }],
+      "rationale": "Neutral business-state description replacing person-directed failure language.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-cheng3-001",
+      "text": "这个企图最终没有得逞",
+      "coverage_targets": ["cheng3"],
+      "target_carriers": [{ "text": "得逞", "source_pinyin": "de2 cheng3", "source": "CC-CEDICT" }],
+      "rationale": "Neutral outcome statement without gendered or reader-directed hostility.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-cheng3-002",
+      "text": "他们的计划未能得逞",
+      "coverage_targets": ["cheng3"],
+      "target_carriers": [{ "text": "得逞", "source_pinyin": "de2 cheng3", "source": "CC-CEDICT" }],
+      "rationale": "Short impersonal sentence preserving the lexical carrier with lower emotional burden.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-cuo1-002",
+      "text": "同学们课后切磋球技",
+      "coverage_targets": ["cuo1"],
+      "target_carriers": [{ "text": "切磋", "source_pinyin": "qie1 cuo1", "source": "CC-CEDICT" }],
+      "rationale": "Collaborative practice scene replacing a challenging dialogue prompt.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-rong3-002",
+      "text": "请删去冗长的段落",
+      "coverage_targets": ["rong3"],
+      "target_carriers": [{ "text": "冗长", "source_pinyin": "rong3 chang2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete editing request replacing a judgmental meeting sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-wa4-001",
+      "text": "这双袜子已经洗净",
+      "coverage_targets": ["wa4"],
+      "target_carriers": [{ "text": "袜子", "source_pinyin": "wa4 zi5", "source": "CC-CEDICT" }],
+      "rationale": "Simple household sentence replacing an awkward translated instruction.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-xiao2-002",
+      "text": "请分清容易混淆的词",
+      "coverage_targets": ["xiao2"],
+      "target_carriers": [{ "text": "混淆", "source_pinyin": "hun4 xiao2", "source": "CC-CEDICT" }],
+      "rationale": "Natural clarification request replacing an ungrammatical translated sentence.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-che3-001",
+      "text": "这件事牵扯多个环节",
+      "coverage_targets": ["che3"],
+      "target_carriers": [{ "text": "牵扯", "source_pinyin": "qian1 che3", "source": "CC-CEDICT" }],
+      "rationale": "Neutral process description replacing dismissive dialogue.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-che3-002",
+      "text": "这个问题牵扯很多部门",
+      "coverage_targets": ["che3"],
+      "target_carriers": [{ "text": "牵扯", "source_pinyin": "qian1 che3", "source": "CC-CEDICT" }],
+      "rationale": "Workplace-oriented sentence using the neutral carrier 牵扯.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-hong4-002",
+      "text": "观众席上有人起哄",
+      "coverage_targets": ["hong4"],
+      "target_carriers": [{ "text": "起哄", "source_pinyin": "qi3 hong4", "source": "CC-CEDICT" }],
+      "rationale": "Concrete scene replacing conflict-heavy 内讧 wording.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-luan3-001",
+      "text": "院子里铺着鹅卵石",
+      "coverage_targets": ["luan3"],
+      "target_carriers": [{ "text": "鹅卵石", "source_pinyin": "e2 luan3 shi2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete landscape scene replacing reproductive terminology.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-luan3-002",
+      "text": "我捡起一块鹅卵石",
+      "coverage_targets": ["luan3"],
+      "target_carriers": [{ "text": "鹅卵石", "source_pinyin": "e2 luan3 shi2", "source": "CC-CEDICT" }],
+      "rationale": "Simple object-action sentence with an unambiguous whole-word reading.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-mang3-002",
+      "text": "动物园里有一条蟒蛇",
+      "coverage_targets": ["mang3"],
+      "target_carriers": [{ "text": "蟒蛇", "source_pinyin": "mang3 she2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete animal sentence replacing a person-judgment carrier.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-niang4-002",
+      "text": "团队正在酝酿新方案",
+      "coverage_targets": ["niang4"],
+      "target_carriers": [{ "text": "酝酿", "source_pinyin": "yun4 niang4", "source": "CC-CEDICT" }],
+      "rationale": "Neutral planning context replacing disaster-oriented source material.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-nie1-002",
+      "text": "请把两块黏土捏合",
+      "coverage_targets": ["nie1"],
+      "target_carriers": [{ "text": "捏合", "source_pinyin": "nie1 he2", "source": "CC-CEDICT" }],
+      "rationale": "Concrete craft instruction replacing fabrication or anxiety wording.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-xiu3-002",
+      "text": "潮湿木板容易腐朽",
+      "coverage_targets": ["xiu3"],
+      "target_carriers": [{ "text": "腐朽", "source_pinyin": "fu3 xiu3", "source": "CC-CEDICT" }],
+      "rationale": "Concrete material-state sentence replacing mortality-related wording.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    },
+    {
+      "id": "authored-hou3-002",
+      "text": "走廊里突然传来吼声",
+      "coverage_targets": ["hou3"],
+      "target_carriers": [{ "text": "吼声", "source_pinyin": "hou3 sheng1", "source": "CC-CEDICT" }],
+      "rationale": "Concrete auditory scene avoiding person-directed anger.",
+      "reviews": { "linguistic": "pending", "naturalness": "pending", "user_burden": "pending", "safety": "pending", "product": "pending" }
+    }
+  ]
+}

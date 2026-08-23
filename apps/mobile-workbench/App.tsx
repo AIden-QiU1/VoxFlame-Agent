@@ -57,9 +57,9 @@ import {
 } from './src/training/mobile-training-feedback'
 import { buildMobilePreparedMaterialExercises } from './src/training/prepared-material-practice'
 import {
+  getMobileCollectionPlanId,
   isMobileCollectionPreflightReady,
   MOBILE_COLLECTION_PLANS,
-  type MobileCollectionPlanId,
 } from './src/training/collection-protocol'
 import { useMobileMemoryEditor } from './src/memory/use-mobile-memory-editor'
 import type {
@@ -1169,7 +1169,6 @@ function PracticeScreen({
   const [environmentReady, setEnvironmentReady] = useState(false)
   const [distanceReady, setDistanceReady] = useState(false)
   const [consentReady, setConsentReady] = useState(false)
-  const [collectionPlanId, setCollectionPlanId] = useState<MobileCollectionPlanId>('baseline')
   const [ageBand, setAgeBand] = useState('')
   const [sex, setSex] = useState('')
   const materialExercises = useMemo(
@@ -1182,6 +1181,11 @@ function PracticeScreen({
   const selectedCategory = catalog.categories.find(
     (category) => category.id === catalog.selectedCategory,
   )
+  const collectionPlanId = getMobileCollectionPlanId({
+    category: selectedCategory?.id,
+    usesPreparedMaterial,
+  })
+  const collectionPlan = MOBILE_COLLECTION_PLANS.find((plan) => plan.id === collectionPlanId)
   const targetText = practiceText.trim() || selectedExercise?.text || preparedLines[0] || '输入想练习的一句话'
   const effectiveExercise: MobileTrainingExercise = practiceText.trim()
     ? {
@@ -1383,24 +1387,10 @@ function PracticeScreen({
               <Text style={styles.mutedText}>我同意本次录音用于训练</Text>
             </Pressable>
           </View>
-          <Text style={styles.taskCardEyebrow}>采集计划</Text>
-          <View accessibilityRole="tablist" style={styles.segmentedTabs}>
-            {MOBILE_COLLECTION_PLANS.map((plan) => (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected: collectionPlanId === plan.id }}
-                disabled={queue.isRecording}
-                key={plan.id}
-                onPress={() => setCollectionPlanId(plan.id)}
-                style={[styles.segmentedTab, collectionPlanId === plan.id ? styles.segmentedTabActive : null]}
-              >
-                <Text style={[styles.segmentedTabText, collectionPlanId === plan.id ? styles.segmentedTabTextActive : null]}>{plan.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.mutedText}>
-            {MOBILE_COLLECTION_PLANS.find((plan) => plan.id === collectionPlanId)?.description}
-          </Text>
+          <Text style={styles.taskCardEyebrow}>本次任务</Text>
+          <Text style={styles.taskCardTitle}>{collectionPlan?.label ?? '常用表达'}</Text>
+          <Text style={styles.mutedText}>{collectionPlan?.description}</Text>
+          <Text style={styles.mutedText}>任务由当前题库或自定义材料自动确定，避免录音被分到错误区域。</Text>
           <View style={styles.inlineFields}>
             <View style={styles.inlineField}>
               <Text style={styles.fieldLabel}>年龄段</Text>

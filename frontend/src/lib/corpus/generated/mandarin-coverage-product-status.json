@@ -1,0 +1,58 @@
+{
+  "kind": "voxflame_mandarin_coverage_product_status",
+  "generated_at": "2026-08-23T06:55:44.319Z",
+  "policy": {
+    "default_recording_uses_approved_core_only": true,
+    "edge_targets_are_specialist_optional_only": true,
+    "disputed_targets_are_never_shown": true,
+    "existing_training_prompts_and_recordings_are_preserved": true,
+    "ledger_review_and_approved_export_must_be_synchronized": true,
+    "planned_reinforcement_slots_are_not_completed_recordings": true,
+    "human_spoken_text_and_audio_alignment_required_for_actual_recording_coverage": true,
+    "dual_review_audio_integrity_failure_blocks_consensus_coverage_claims": true
+  },
+  "current_prompt_corpus": {
+    "items": 9107,
+    "missing_syllable_tone_targets": 217,
+    "below_minimum_syllable_tone_targets": 456,
+    "robust_syllable_tone_targets": 569
+  },
+  "core_gap_phase1": {
+    "targets": 88,
+    "targets_with_three_candidates": 88,
+    "review_candidates": 263,
+    "approved_prompts": 0,
+    "approved_targets": 0,
+    "status": "awaiting_human_review"
+  },
+  "below_minimum_reinforcement": {
+    "targets": 456,
+    "default_planned_targets": 455,
+    "selected_prompts": 835,
+    "planned_recording_slots": 2998,
+    "fully_allocated_targets": 309,
+    "partially_allocated_targets": 146,
+    "prompt_diversity_below_minimum_targets": 455,
+    "disputed_held_targets": 1,
+    "actual_confirmed_recording_hits": null,
+    "status": "collection_plan_ready"
+  },
+  "actual_collection_evidence": {
+    "full_review_queue_items": 1185,
+    "full_review_approved_items": 0,
+    "coverage_eligible_recordings": 0,
+    "dual_sample_items": 60,
+    "dual_consensus_items": 0,
+    "dual_audio_verified_consensus_items": 0,
+    "audio_integrity_gate_passed": false,
+    "audio_status_counts": {
+      "audio_missing": 11,
+      "ok": 49
+    },
+    "status": "awaiting_human_spoken_text_review"
+  },
+  "held_targets": {
+    "edge_missing": 121,
+    "disputed_missing": 8
+  }
+}

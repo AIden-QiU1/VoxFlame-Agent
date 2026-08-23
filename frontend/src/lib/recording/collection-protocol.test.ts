@@ -3,14 +3,31 @@ import test from 'node:test'
 
 import {
   COLLECTION_PLANS,
+  getCollectionPlanIdForTopic,
   isCollectionPreflightReady,
 } from './collection-protocol'
 
-test('collection plans cover baseline, anchor, reading, and natural speech', () => {
+test('collection tasks cover linguistic baseline, gaps, real use, connected speech, natural speech, and retest', () => {
   assert.deepEqual(
     COLLECTION_PLANS.map((plan) => plan.id),
-    ['baseline', 'anchor', 'reading', 'natural_speech'],
+    [
+      'baseline_words',
+      'targeted_gap',
+      'functional_speech',
+      'connected_reading',
+      'natural_speech',
+      'anchor_retest',
+    ],
   )
+})
+
+test('recording task is derived from the actual topic instead of a free metadata selector', () => {
+  assert.equal(getCollectionPlanIdForTopic('daily-mobility'), 'functional_speech')
+  assert.equal(getCollectionPlanIdForTopic('medical-help'), 'functional_speech')
+  assert.equal(getCollectionPlanIdForTopic('pronunciation-reading'), 'connected_reading')
+  assert.equal(getCollectionPlanIdForTopic('custom-material'), 'connected_reading')
+  assert.equal(getCollectionPlanIdForTopic('phonology-training'), 'targeted_gap')
+  assert.equal(getCollectionPlanIdForTopic('assessment-screening'), 'baseline_words')
 })
 
 test('recording is blocked until the three preflight checks are complete', () => {
