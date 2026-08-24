@@ -40,3 +40,27 @@ test('reports presence separately from robust repeated coverage', () => {
   assert.equal(report.coverage.common_syllables.robust, 2)
   assert.deepEqual(report.coverage.common_syllables.missing, ['zhuang'])
 })
+
+test('keeps verified recording targets separate from generic polyphonic annotation', () => {
+  const report = auditEntries([
+    {
+      text: '心脏',
+      category: '音系强化',
+      recording_readiness: 'ready_for_recording',
+      coverage_targets: ['zang4'],
+    },
+  ], { syllables: ['xin', 'zang'], syllable_tones: ['xin1', 'zang1', 'zang4'] }, { minimumHits: 1 })
+
+  assert.equal(report.coverage.common_syllable_tones.missing.includes('zang4'), true)
+  assert.equal(report.coverage.explicit_recording_targets.missing.includes('zang4'), false)
+})
+
+test('explicit recording target counts preserve one count per item, not generic syllable hits', () => {
+  const report = auditEntries([
+    { text: '阿胶', recording_readiness: 'ready_for_recording', coverage_targets: ['e1'] },
+    { text: '阿胶已经开封', recording_readiness: 'ready_for_recording', coverage_targets: ['e1'] },
+  ], { syllables: ['e'], syllable_tones: ['e1'] }, { minimumHits: 2 })
+
+  assert.equal(report.coverage.explicit_recording_targets.present, 1)
+  assert.equal(report.coverage.explicit_recording_targets.robust, 1)
+})

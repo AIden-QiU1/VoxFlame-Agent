@@ -16,6 +16,7 @@ test('training upload metadata keeps useful labels and drops device/user details
       user_agent: 'browser-secret-details',
       microphone_label: 'USB microphone',
       audio_quality_reasons: ['kept for transport only'],
+      pronunciation_targets: ['zang4'],
     }),
     {
       target_text: '你好',
@@ -24,6 +25,7 @@ test('training upload metadata keeps useful labels and drops device/user details
       etiology: 'stroke',
       age_band: '60–69',
       sex: 'female',
+      pronunciation_targets: ['zang4'],
     },
   )
 })

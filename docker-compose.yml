@@ -153,10 +153,9 @@ services:
       - no_proxy=127.0.0.1,localhost,livekit-server
       - DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
       - DASHSCOPE_TIMEOUT_SECONDS=15
-      - QWEN_HTTP_ASR_URL=${QWEN_HTTP_ASR_URL:-http://127.0.0.1:18000/transcribe}
+      - QWEN_HTTP_ASR_URL=${QWEN_HTTP_ASR_URL:-http://127.0.0.1:8001/transcribe}
       - QWEN_HTTP_ASR_LANGUAGE=${QWEN_HTTP_ASR_LANGUAGE:-Chinese}
       - QWEN_HTTP_ASR_TIMEOUT_SECONDS=${QWEN_HTTP_ASR_TIMEOUT_SECONDS:-30}
-      - QWEN_HTTP_ASR_USER_IDS=${QWEN_HTTP_ASR_USER_IDS:-64758dee-5026-4b53-a063-1d02d0834f67}
     depends_on:
       - livekit-server
     restart: unless-stopped

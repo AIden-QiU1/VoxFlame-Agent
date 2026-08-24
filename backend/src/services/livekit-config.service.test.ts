@@ -5,6 +5,7 @@ import {
   LiveKitConfigService,
 } from './livekit-config.service'
 import { LiveKitSessionService } from './livekit-session.service'
+import { resolveAsrAccountId } from './asr-account-routing.service'
 import {
   deriveRtcBrowserWebSocketUrl,
   RtcOrchestrationService,
@@ -67,6 +68,20 @@ async function withEnvAsync(
 }
 
 async function runLiveKitConfigTests(): Promise<void> {
+  assert.equal(
+    resolveAsrAccountId({
+      userId: '64758dee-5026-4b53-a063-1d02d0834f67',
+      email: '2307294809@qq.com',
+    }),
+    '2307294809',
+  )
+  assert.equal(
+    resolveAsrAccountId({
+      userId: 'new-stable-user-id',
+      email: 'member@example.com',
+    }),
+    'new-stable-user-id',
+  )
   assert.equal(
     deriveRtcBrowserWebSocketUrl('ws://localhost:7880', 'http://localhost:3000'),
     'ws://localhost:7880',
@@ -218,12 +233,19 @@ async function runLiveKitConfigTests(): Promise<void> {
     apiKey: 'test_api_key',
     apiSecret: 'test_api_secret',
     agentName: 'voxflame-agent',
+    authenticatedUserId: '64758dee-5026-4b53-a063-1d02d0834f67',
+    asrAccountId: '2307294809',
   })
 
   assert.equal(session.roomName, 'voxflame-room-1')
   assert.equal(session.participantName, 'voxflame-user-42')
   assert.equal(session.participantAttributes['vox.mode'], 'communication')
   assert.equal(session.agentDispatch?.agentName, 'voxflame-agent')
+  assert.equal(JSON.parse(session.participantMetadata).asr_account_id, undefined)
+  assert.equal(
+    JSON.parse(session.agentDispatch?.metadata ?? '{}').asr_account_id,
+    '2307294809',
+  )
 
   const verifier = new TokenVerifier('test_api_key', 'test_api_secret')
   const grants = await verifier.verify(session.participantToken)
@@ -272,6 +294,13 @@ async function runLiveKitConfigTests(): Promise<void> {
 
         assert.equal(result.executionBackend, 'livekit')
         assert.equal(result.transport.agentDispatch?.agentName, 'voxflame-agent')
+        assert.equal(
+          Object.prototype.hasOwnProperty.call(
+            result.transport.agentDispatch ?? {},
+            'metadata',
+          ),
+          false,
+        )
         assert.equal(fetchCalls, 0)
       } finally {
         globalThis.fetch = originalFetch

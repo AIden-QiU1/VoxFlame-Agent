@@ -5,7 +5,6 @@ import {
   isReviewerEmailAllowed,
   normalizeReviewerEmail,
   parseReviewerAllowlist,
-  resolveDualAnnotatorRole,
 } from './reviewer-access-core.ts'
 
 test('reviewer allowlist normalizes case and common separators', () => {
@@ -27,11 +26,4 @@ test('reviewer access requires an exact normalized email match', () => {
   const allowlist = 'reviewer@example.com, other@example.com'
   assert.equal(isReviewerEmailAllowed('REVIEWER@example.com', allowlist), true)
   assert.equal(isReviewerEmailAllowed('reviewer+extra@example.com', allowlist), false)
-})
-
-test('dual annotator role is assigned by separate allowlists and never defaults', () => {
-  assert.equal(resolveDualAnnotatorRole('a@example.com', 'a@example.com', 'b@example.com'), 'annotator_a')
-  assert.equal(resolveDualAnnotatorRole('b@example.com', 'a@example.com', 'b@example.com'), 'annotator_b')
-  assert.equal(resolveDualAnnotatorRole('other@example.com', 'a@example.com', 'b@example.com'), null)
-  assert.equal(resolveDualAnnotatorRole('same@example.com', 'same@example.com', 'same@example.com'), null)
 })

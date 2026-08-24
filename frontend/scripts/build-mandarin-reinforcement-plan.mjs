@@ -22,7 +22,12 @@ const linguisticIndex = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
 const plan = buildMandarinReinforcementPlan({
   ledger,
   linguisticIndex,
-  exercises: MANDARIN_TRAINING_EXERCISES,
+  // Recording-ready gap packs use a separate collection lane; keep this
+  // planning artifact scoped to the 9,107-item base corpus.
+  exercises: MANDARIN_TRAINING_EXERCISES.filter((exercise) => (
+    !exercise.id.startsWith('coverage-recording-gap-')
+    && !exercise.id.startsWith('coverage-recording-reinforcement-')
+  )),
 })
 
 fs.writeFileSync(outputPath, `${JSON.stringify(plan, null, 2)}\n`, 'utf8')

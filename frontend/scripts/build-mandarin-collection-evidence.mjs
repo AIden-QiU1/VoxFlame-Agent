@@ -10,20 +10,28 @@ function value(name) {
   return index >= 0 ? process.argv[index + 1] : undefined
 }
 
+function values(name) {
+  return process.argv.flatMap((argument, index) => argument === name ? [process.argv[index + 1]] : []).filter(Boolean)
+}
+
 const referencePath = value('--reference')
 const spokenPath = value('--spoken-review')
-const dualPath = value('--dual-review')
-const audioPath = value('--audio-verification')
 const outputPath = value('--output')
-if (!referencePath || !spokenPath || !dualPath || !audioPath || !outputPath) {
-  throw new Error('usage: build-mandarin-collection-evidence --reference <reference.json> --spoken-review <queue.json> --dual-review <queue.json> --audio-verification <report.json> --output <evidence.json>')
+const manifestPaths = values('--manifest')
+if (!referencePath || !outputPath) {
+  throw new Error('usage: build-mandarin-collection-evidence --reference <reference.json> [--spoken-review <queue.json>] [--manifest <manifest.jsonl> ...] --output <evidence.json>')
+}
+
+function readJsonl(filePath) {
+  return fs.readFileSync(filePath, 'utf8').split(/\r?\n/u).filter(Boolean).map((line, index) => {
+    try { return JSON.parse(line) } catch (error) { throw new Error(`${filePath}:${index + 1}: ${error.message}`) }
+  })
 }
 
 const payload = buildMandarinCollectionEvidence({
   reference: JSON.parse(fs.readFileSync(referencePath, 'utf8')),
-  spokenQueue: JSON.parse(fs.readFileSync(spokenPath, 'utf8')),
-  dualQueue: JSON.parse(fs.readFileSync(dualPath, 'utf8')),
-  audioVerification: JSON.parse(fs.readFileSync(audioPath, 'utf8')),
+  spokenQueue: spokenPath ? JSON.parse(fs.readFileSync(spokenPath, 'utf8')) : null,
+  manifestRows: manifestPaths.flatMap(readJsonl),
 })
 fs.mkdirSync(path.dirname(outputPath), { recursive: true })
 fs.writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')

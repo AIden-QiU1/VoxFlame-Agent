@@ -51,6 +51,8 @@ test('status is built only from synchronized ledger and review targets', () => {
   assert.equal(payload.held_targets.edge_missing, 1)
   assert.equal(payload.below_minimum_reinforcement.actual_confirmed_recording_hits, null)
   assert.equal(payload.actual_collection_evidence.status, 'evidence_not_loaded')
+  assert.equal(payload.actual_collection_evidence.explicit_recording_targets, null)
+  assert.deepEqual(payload.recording_ready_total, { items: 0, unique_texts: 0, targets: 0 })
 })
 
 test('stale review targets fail instead of reaching the product UI', () => {
@@ -79,15 +81,40 @@ test('actual collection evidence remains separate from planned reinforcement', (
         full_queue_items: 1185,
         full_queue_approved_items: 0,
         coverage_eligible_recordings: 0,
-        dual_sample_items: 60,
-        dual_consensus_items: 0,
-        dual_audio_verified_consensus_items: 0,
-        audio_integrity_gate_passed: false,
-        audio_status_counts: { audio_missing: 11, ok: 49 },
+        manifest_collection_eligible_recordings: 0,
+        manifest_collection_quality_statuses: {},
+      },
+      coverage: {
+        collected_audio_with_target: {
+          coverage: { explicit_recording_targets: { present: 0, robust: 0, expected: 1 } },
+        },
       },
     },
   })
   assert.equal(payload.below_minimum_reinforcement.planned_recording_slots, 0)
   assert.equal(payload.actual_collection_evidence.coverage_eligible_recordings, 0)
-  assert.equal(payload.actual_collection_evidence.audio_integrity_gate_passed, false)
+  assert.equal(payload.actual_collection_evidence.manifest_collection_eligible_recordings, 0)
+  assert.deepEqual(payload.actual_collection_evidence.explicit_recording_targets, { present: 0, robust: 0, expected: 1 })
+})
+
+test('recording-ready packs expose explicit target evidence without claiming real recordings', () => {
+  const payload = buildCoverageProductStatus({
+    ...fixtures(),
+    recordingCoreGap: {
+      summary: { recording_ready_items: 2, recording_ready_targets: 1, words: 1, short_sentences: 1 },
+      items: [
+        { text: '藏好', target: 'zang4', coverage_targets: ['zang4'], recording_readiness: 'ready_for_recording' },
+        { text: '藏好', target: 'zang4', coverage_targets: ['zang4'], recording_readiness: 'ready_for_recording' },
+      ],
+    },
+  })
+  assert.deepEqual(payload.recording_core_gap.explicit_target_coverage, {
+    target_count: 1,
+    targets: ['zang4'],
+    items_with_explicit_targets: 2,
+    all_items_have_non_empty_target: true,
+    all_items_are_recording_ready: true,
+  })
+  assert.equal(payload.actual_collection_evidence.status, 'evidence_not_loaded')
+  assert.deepEqual(payload.recording_ready_total, { items: 2, unique_texts: 1, targets: 1 })
 })

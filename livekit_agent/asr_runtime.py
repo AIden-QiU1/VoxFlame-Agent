@@ -95,6 +95,19 @@ def get_authenticated_user_id(ctx: VoxFlameSessionContext) -> str | None:
     return None
 
 
+def get_asr_account_id(ctx: VoxFlameSessionContext) -> str | None:
+    for payload in (ctx.dispatch_payload, ctx.participant_payload):
+        value = payload.get("asr_account_id")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    attribute_value = ctx.raw_attributes.get("vox.asr_account_id")
+    if isinstance(attribute_value, str) and attribute_value.strip():
+        return attribute_value.strip()
+
+    return get_authenticated_user_id(ctx)
+
+
 def should_use_qwen_http_asr(config: LiveKitAgentConfig, ctx: VoxFlameSessionContext) -> bool:
     if not config.qwen_http_asr_url:
         return False
@@ -102,11 +115,7 @@ def should_use_qwen_http_asr(config: LiveKitAgentConfig, ctx: VoxFlameSessionCon
     if ctx.mode not in HTTP_ASR_SUPPORTED_MODES:
         return False
 
-    if not config.qwen_http_asr_user_ids:
-        return False
-
-    authenticated_user_id = get_authenticated_user_id(ctx)
-    return authenticated_user_id in config.qwen_http_asr_user_ids
+    return get_authenticated_user_id(ctx) is not None and get_asr_account_id(ctx) is not None
 
 
 def frame_to_pcm_bytes(frame: Any) -> bytes:
@@ -429,6 +438,7 @@ class QwenRealtimeASRClient:
 @dataclass
 class QwenHttpASRClient:
     url: str
+    account_id: str
     language: str
     sample_rate: int
     request_timeout_seconds: float
@@ -437,6 +447,7 @@ class QwenHttpASRClient:
 
     _buffer: bytearray = field(default_factory=bytearray)
     _session_payload: dict[str, Any] | None = None
+    _http_client: Any | None = None
     fallback_active: bool = False
 
     @property
@@ -483,7 +494,7 @@ class QwenHttpASRClient:
 
         self.fallback_active = False
         try:
-            transcript = await self._transcribe(pcm_bytes)
+            transcript, routing_metadata = await self._transcribe(pcm_bytes)
         except Exception as exc:
             if await self._fallback_to_realtime(pcm_bytes, exc):
                 return
@@ -494,6 +505,7 @@ class QwenHttpASRClient:
                 "type": "conversation.item.input_audio_transcription.completed",
                 "transcript": transcript,
                 "provider": self.provider_name,
+                **routing_metadata,
             }
         )
 
@@ -505,6 +517,9 @@ class QwenHttpASRClient:
 
     async def stop(self) -> None:
         self._buffer.clear()
+        if self._http_client is not None:
+            await self._http_client.aclose()
+            self._http_client = None
         if self.fallback_client is not None:
             await self.fallback_client.stop()
 
@@ -546,9 +561,7 @@ class QwenHttpASRClient:
 
         return True
 
-    async def _transcribe(self, pcm_bytes: bytes) -> str:
-        import httpx
-
+    async def _transcribe(self, pcm_bytes: bytes) -> tuple[str, dict[str, Any]]:
         wav_bytes = pcm_bytes_to_wav_bytes(
             pcm_bytes,
             sample_rate=self.sample_rate,
@@ -563,9 +576,15 @@ class QwenHttpASRClient:
             )
         }
         data = {"language": self.language}
+        headers = {"X-Account-ID": self.account_id}
 
-        async with httpx.AsyncClient(timeout=self.request_timeout_seconds) as client:
-            response = await client.post(self.url, data=data, files=files)
+        client = self._get_http_client()
+        response = await client.post(
+            self.url,
+            headers=headers,
+            data=data,
+            files=files,
+        )
 
         response.raise_for_status()
         content_type = response.headers.get("content-type", "")
@@ -580,7 +599,32 @@ class QwenHttpASRClient:
         transcript = extract_http_asr_transcript(payload)
         if not transcript:
             raise RuntimeError("HTTP ASR response did not include transcript text")
-        return transcript
+
+        routing_metadata: dict[str, Any] = {}
+        if isinstance(payload, dict):
+            response_account_id = payload.get("account_id")
+            if not isinstance(response_account_id, str) or not response_account_id.strip():
+                raise RuntimeError("HTTP ASR response did not include account_id")
+            if response_account_id.strip() != self.account_id:
+                raise RuntimeError("HTTP ASR response account_id did not match request")
+
+            model_version = payload.get("model_version")
+            if isinstance(model_version, str) and model_version.strip():
+                routing_metadata["model_version"] = model_version.strip()
+            for key in ("personalized", "fallback"):
+                if isinstance(payload.get(key), bool):
+                    routing_metadata[key] = payload[key]
+
+        return transcript, routing_metadata
+
+    def _get_http_client(self) -> Any:
+        if self._http_client is None:
+            import httpx
+
+            self._http_client = httpx.AsyncClient(
+                timeout=self.request_timeout_seconds,
+            )
+        return self._http_client
 
 
 @dataclass
@@ -634,6 +678,9 @@ class LiveKitASRRuntime:
 
         if self.client is None:
             if use_http_asr:
+                account_id = get_asr_account_id(self.ctx)
+                if account_id is None:
+                    raise RuntimeError("HTTP ASR selected without an authenticated account ID")
                 fallback_client = None
                 if self.config.dashscope_api_key:
                     fallback_client = QwenRealtimeASRClient(
@@ -645,6 +692,7 @@ class LiveKitASRRuntime:
                     )
                 self.client = QwenHttpASRClient(
                     url=self.config.qwen_http_asr_url or "",
+                    account_id=account_id,
                     language=self.config.qwen_http_asr_language,
                     sample_rate=self.config.dashscope_asr_sample_rate,
                     request_timeout_seconds=self.config.qwen_http_asr_timeout_seconds,
@@ -1249,6 +1297,11 @@ class LiveKitASRRuntime:
                     is_final=True,
                     source=asr_source,
                     client_capture_id=final_capture_external_id,
+                    asr_metadata={
+                        key: payload[key]
+                        for key in ("model_version", "personalized", "fallback")
+                        if key in payload
+                    },
                 )
             )
             await self.on_final_transcript(transcript)

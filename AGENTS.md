@@ -76,6 +76,7 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 - 应用侧研究统一进入 `research/`，按 `voice-agent / agent-systems / speech-health / product-psychology / product-engineering` 五个主题组织；不要再在 `docs/` 新增长期平级研究稿。涉及语音的通用 Agent 研究必须同时补跨模态对照，不得把文本 Agent 结论直接当作语音能力证据。
 - `references/clear-vox-model` 是模型代码和实验记录的上游 submodule；原始实验事实留在上游，应用侧只记录固定 commit、限制、决策状态和验证门槛。
 - 研究结论必须先进入 `research/APPLICATION_FEEDBACK_REGISTRY.md`；`planned / blocked / diagnostic-only` 或低于实验门槛的候选不得直接进入部署。
+- 普通话录音语料遵循 `research/RESEARCH_HARNESS.md` 的可复现证据门：来源、整词/整句读音命中、简体/现代用字、长度/标点/重复、商业/敏感污染和目标映射是机器可验证硬规则；“自然度/产品价值/用户负担”没有量表、评定者一致性和可复现函数时，不得作为录音区硬门。录音区可见不等于训练导入，人工 `spoken_text` 诊断不得阻塞有效音频 + target 的采集统计。
 - 论文、专利、公开数据/代码、产品默认能力或新用户/新场景扩展，发布前必须通过 `research/` 证据包的 `authority_gate`；未通过只能保持 `internal_only` / `hold`，不能把单篇论文、专家观点、内部 demo 或单点反馈当作权威验证。
 - 国内论文、专利、软件著作权和产品都必须有 `outcome-review` 初步审查报告；报告只能给出材料缺口和改进建议，不替代中国版权保护中心/国家版权局、CNIPA、专利代理师、律师或期刊同行评审。
 - 更新 submodule 不等于更新应用模型；仍需显式 owner、最小切片、回退和应用验证。

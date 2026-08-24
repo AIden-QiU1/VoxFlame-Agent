@@ -21,8 +21,9 @@ test('current corpus preserves the 9107-item product pool while removing only fi
 
   assert.equal(generatedItems.length, 8771)
   assert.equal(new Set(generatedItems.map((item) => item.text)).size, 8771)
-  assert.equal(index.summary.indexed_items, 9107)
-  assert.equal(index.summary.indexed_items - generatedItems.length, 336)
+  // The 9,107-item base pool is preserved; recording-ready packs are additive.
+  assert.equal(index.summary.indexed_items, 9675)
+  assert.equal(index.summary.indexed_items - generatedItems.length, 904)
   assert.equal(removedPackages.length, 5)
   assert.equal(generatedItems.some((item) => blockedPackage.test(item.text)), false)
 })
@@ -39,8 +40,10 @@ test('full-phonology artifacts keep every target and do not promote pending cand
   const reinforcementReview = readJson(path.join(evidenceDir, 'mandarin-reinforcement-context-review.json'))
   const reinforcementWorkspace = readJson(path.join(generatedDir, 'mandarin-reinforcement-review-workspace.json'))
   const spokenTextWorkspace = readJson(path.join(generatedDir, 'mandarin-spoken-text-review-workspace.json'))
-  const dualWorkspace = readJson(path.join(generatedDir, 'mandarin-dual-spoken-text-review-workspace.json'))
   const reinforcementAuthored = readJson(path.join(frontendDir, 'src/lib/corpus/mandarin-reinforcement-authored-candidates.json'))
+  const recordingReinforcement = readJson(path.join(generatedDir, 'mandarin-recording-reinforcement-corpus.json'))
+  const recordingCoreGap = readJson(path.join(generatedDir, 'mandarin-recording-core-gap-corpus.json'))
+  const recordingOpenResearch = readJson(path.join(generatedDir, 'mandarin-recording-open-research-corpus.json'))
   const collectionEvidence = readJson(path.join(evidenceDir, 'mandarin-collection-evidence.json'))
   const missing = ledger.targets.filter((target) => target.coverage_status === 'missing')
   const missingTiers = Object.fromEntries(
@@ -72,6 +75,24 @@ test('full-phonology artifacts keep every target and do not promote pending cand
   assert.equal(edge.items.length, 121)
   assert.equal(approved.items.length, 0)
   assert.equal(reinforcement.targets.length, 456)
+  assert.equal(recordingReinforcement.summary.recording_ready_items, 291)
+  assert.equal(recordingReinforcement.items.every((item) => item.recording_readiness === 'ready_for_recording'), true)
+  const coreMissingTargets = new Set(missing.filter((target) => target.tier === 'core').map((target) => target.syllable_tone))
+  const recordingCoreTargets = new Set(recordingCoreGap.items.flatMap((item) => item.coverage_targets ?? []))
+  assert.equal(recordingCoreGap.summary.recording_ready_items, 263)
+  assert.equal(recordingCoreGap.summary.recording_ready_targets, 88)
+  assert.deepEqual(recordingCoreTargets, coreMissingTargets)
+  assert.equal(recordingCoreGap.items.every((item) => item.recording_readiness === 'ready_for_recording'), true)
+  assert.equal(recordingOpenResearch.summary.recording_ready_items, 14)
+  assert.equal(recordingOpenResearch.summary.recording_ready_targets, 15)
+  assert.equal(recordingOpenResearch.items.every((item) => item.recording_readiness === 'ready_for_recording'), true)
+  assert.equal(recordingOpenResearch.items.every((item) => item.source.includes('open research corpus')), true)
+  assert.equal(recordingOpenResearch.items.every((item) => item.target && item.coverage_targets?.includes(item.target)), true)
+  const belowMinimumTargets = new Set(reinforcement.targets
+    .filter((target) => target.status !== 'held_disputed')
+    .map((target) => target.syllable_tone))
+  const recordingReinforcementTargets = new Set(recordingReinforcement.items.flatMap((item) => item.coverage_targets ?? []))
+  assert.equal([...recordingReinforcementTargets].every((target) => belowMinimumTargets.has(target)), true)
   assert.equal(reinforcement.summary.default_planned_targets, 455)
   assert.equal(reinforcement.summary.disputed_held_targets, 1)
   assert.equal(reinforcement.targets.every((target) => target.actual_confirmed_recording_hits === null), true)
@@ -134,10 +155,10 @@ test('full-phonology artifacts keep every target and do not promote pending cand
   assert.equal(collectionEvidence.kind, 'voxflame_mandarin_collection_evidence')
   assert.equal(collectionEvidence.review.full_queue_items, 1185)
   assert.equal(collectionEvidence.review.full_queue_approved_items, 0)
-  assert.equal(collectionEvidence.review.coverage_eligible_recordings, 0)
-  assert.equal(collectionEvidence.review.dual_sample_items, 60)
-  assert.equal(collectionEvidence.review.audio_integrity_gate_passed, false)
-  assert.equal(collectionEvidence.coverage.dual_consensus_audio_verified.summary.entries, 0)
+  assert.equal(collectionEvidence.review.coverage_eligible_recordings, 1180)
+  assert.equal(collectionEvidence.review.manifest_collection_eligible_recordings, 1180)
+  assert.equal(collectionEvidence.policy.human_spoken_text_is_required_for_coverage, false)
+  assert.equal(collectionEvidence.policy.audio_text_alignment_is_required_for_coverage, false)
   assert.equal(reinforcementProductIndex.kind, 'voxflame_mandarin_reinforcement_product_index')
   assert.equal(spokenTextWorkspace.workspace_id, 'spoken-text')
   assert.equal(spokenTextWorkspace.items.length, 1185)
@@ -145,10 +166,26 @@ test('full-phonology artifacts keep every target and do not promote pending cand
   assert.equal(spokenTextWorkspace.items.every((item) => item.asr_hint_role === 'non_authoritative_hint'), true)
   assert.equal(spokenTextWorkspace.items.every((item) => item.spoken_text === null), true)
   assert.equal(spokenTextWorkspace.items.every((item) => item.audio_text_alignment === 'pending'), true)
-  assert.equal(dualWorkspace.workspace_id, 'dual-spoken-text')
-  assert.equal(dualWorkspace.items.length, 60)
-  assert.equal(dualWorkspace.policy.independent_annotators, 2)
-  assert.equal(dualWorkspace.policy.asr_is_not_shown_in_review_item, true)
-  assert.equal(dualWorkspace.policy.training_import_allowed, false)
-  assert.equal(dualWorkspace.items.every((item) => item.annotator_a.status === 'pending' && item.annotator_b.status === 'pending'), true)
+})
+
+test('recording-ready coverage keeps explicit polyphonic targets separate from generic pinyin', () => {
+  const core = readJson(path.join(generatedDir, 'mandarin-recording-core-gap-corpus.json'))
+  const explicitTargets = new Set(core.items.flatMap((item) => item.coverage_targets ?? []))
+  for (const target of ['e1', 'ga1', 'ga2', 'lei1', 'zang4', 'zha2']) {
+    assert.equal(explicitTargets.has(target), true)
+  }
+  assert.equal(core.items.every((item) => item.recording_readiness === 'ready_for_recording'), true)
+  assert.equal(core.items.every((item) => item.target && item.coverage_targets?.includes(item.target)), true)
+})
+
+test('removed dual-review branch cannot re-enter the active corpus workflow', () => {
+  const forbiddenPaths = [
+    path.join(frontendDir, 'src/app/corpus-review/dual-spoken-text'),
+    path.join(frontendDir, 'src/components/corpus-review/MandarinDualReviewWorkbench.tsx'),
+    path.join(frontendDir, 'scripts/build-mandarin-dual-review-workspace.mjs'),
+    path.join(frontendDir, 'scripts/mandarin-dual-review-core.test.mjs'),
+    path.join(frontendDir, 'scripts/validate-mandarin-dual-review.mjs'),
+    path.join(generatedDir, 'mandarin-dual-spoken-text-review-workspace.json'),
+  ]
+  assert.equal(forbiddenPaths.every((filePath) => !fs.existsSync(filePath)), true)
 })

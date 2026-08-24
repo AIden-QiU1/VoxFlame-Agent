@@ -13,6 +13,7 @@ import {
   RtcSurface,
 } from '../services/rtc-orchestration.service'
 import { authMiddleware } from '../middlewares/auth.middleware'
+import { resolveAsrAccountId } from '../services/asr-account-routing.service'
 
 const router = Router()
 const rtcService = new RtcOrchestrationService()
@@ -245,6 +246,13 @@ router.get('/graphs', async (_req: Request, res: Response) => {
 
 router.post('/session/start', async (req: Request, res: Response) => {
   try {
+    const authenticatedUserId = req.user?.id ?? null
+    const asrAccountId = authenticatedUserId
+      ? resolveAsrAccountId({
+          userId: authenticatedUserId,
+          email: req.user?.email,
+        })
+      : null
     const result = await rtcService.startSession({
       requestId:
         typeof req.body?.requestId === 'string' ? req.body.requestId : undefined,
@@ -258,7 +266,8 @@ router.post('/session/start', async (req: Request, res: Response) => {
       mode: parseMode(req.body?.mode),
       intent: parseSessionIntent(req.body?.intent),
       userUid: parseOptionalInteger(req.body?.userUid),
-      authenticatedUserId: req.user?.id ?? null,
+      authenticatedUserId,
+      asrAccountId,
       botUid: parseOptionalInteger(req.body?.botUid),
       timeoutSeconds: parseOptionalInteger(req.body?.timeoutSeconds),
       properties: parsePropertyOverrides(req.body?.properties),

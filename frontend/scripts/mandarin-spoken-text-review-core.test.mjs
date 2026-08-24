@@ -12,7 +12,7 @@ import {
 function baseQueue(item = {}) {
   return {
     kind: 'voxflame_mandarin_spoken_text_review_queue',
-    status: 'human_review_required_not_for_training',
+    status: 'optional_quality_review_not_for_training',
     source_manifest_files: ['manifest.jsonl'],
     items: [{
       recording_id: 'rec-1',

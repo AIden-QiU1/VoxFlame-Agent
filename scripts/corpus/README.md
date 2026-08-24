@@ -244,9 +244,23 @@ node frontend/scripts/audit-mandarin-coverage.mjs \
   --output /tmp/voxflame-collected-and-model-coverage.json
 ```
 
-覆盖报告只能决定“下一批优先补什么”，不能单独证明微调有效。新增语料仍需人工实际转写、audio-text 完整性检查、speaker-disjoint 固定评测和目标用户完成率/疲劳验证。
+覆盖报告只能决定“下一批优先补什么”，不能单独证明微调有效。新增语料进入录音区只要求可执行题面具备非空 `target`；录音覆盖只按有效音频、非空 `target`、授权与上传契约计数。录音后的错读、漏读、空白过长和不可用音频进入质量诊断；`spoken_text`/audio-text 对齐是可选诊断，不是录音或覆盖前置条件。模型训练导入仍需独立的 speaker-disjoint 固定评测和目标用户完成率/疲劳验证。
 
-应用录音的实际 `spoken_text` 必须走独立人工复核旁路。先从 manifest 生成队列（不会改写原 manifest 或音频）：
+录音就绪题面另行审计时，必须同时报告普通字形注音和题面自带的明确 `coverage_targets`：
+
+```bash
+node frontend/scripts/audit-mandarin-coverage.mjs \
+  --reference frontend/src/lib/corpus/generated/mandarin-common-syllable-reference.json \
+  --recording-corpus frontend/src/lib/corpus/generated/mandarin-recording-core-gap-corpus.json \
+  --recording-corpus frontend/src/lib/corpus/generated/mandarin-recording-reinforcement-corpus.json \
+  --recording-corpus frontend/src/lib/corpus/generated/mandarin-recording-open-research-corpus.json \
+  --minimum-hits 20 \
+  --output /tmp/voxflame-recording-ready-coverage.json
+```
+
+`recording_ready_corpus.coverage.common_syllable_tones` 是通用字形注音结果；`explicit_recording_targets` 是来源已提供整词/整句读音证据的目标结果。多音字不得用通用注音覆盖替代明确目标，也不得把录音就绪题面当成真实录音。
+
+应用录音的实际 `spoken_text` 可以走独立人工诊断旁路。先从 manifest 生成队列（不会改写原 manifest 或音频）：
 
 ```bash
 node frontend/scripts/build-mandarin-spoken-text-review-queue.mjs \
@@ -256,7 +270,7 @@ node frontend/scripts/validate-mandarin-spoken-text-review.mjs \
   --input /tmp/mandarin-spoken-text-review.json
 ```
 
-复核员只填写 `spoken_text`、`spoken_text_status`、`audio_text_alignment`、`reviewed_by` 和 `reviewed_at`。ASR 只作为 `asr_hint`，不能直接升级为实际转写；只有 `approved + confirmed` 条目进入覆盖审计：
+诊断员只在需要时填写 `spoken_text`、`spoken_text_status`、`audio_text_alignment`、`reviewed_by` 和 `reviewed_at`。ASR 只作为 `asr_hint`，不能直接升级为实际转写；这些字段只用于质量分层与复录提示，不改变录音覆盖资格：
 
 ```bash
 node frontend/scripts/audit-mandarin-coverage.mjs \

@@ -183,6 +183,7 @@ export function auditEntries(entries, reference, { minimumHits = 20 } = {}) {
   const tonePairs = new Map()
   const categories = new Map()
   const positions = new Map()
+  const explicitRecordingTargets = new Map()
   let syllableCount = 0
   let thirdToneSequences = 0
   let yiSandhi = 0
@@ -212,6 +213,17 @@ export function auditEntries(entries, reference, { minimumHits = 20 } = {}) {
       increment(positions, `${syllable.position}:${syllable.final}`)
     }
     for (const pair of annotation.tonePairs) increment(tonePairs, pair)
+
+    // Recording-ready packs may carry a verified whole-word or whole-sentence
+    // reading that differs from the generic grapheme-to-pinyin fallback (for
+    // example, polyphonic characters such as 阿胶/心脏/炸鱼). Keep this as a
+    // separate, auditable coverage channel instead of silently replacing the
+    // ordinary linguistic annotation for every prompt.
+    if (entry.recording_readiness === 'ready_for_recording' && Array.isArray(entry.coverage_targets)) {
+      for (const target of new Set(entry.coverage_targets.filter((value) => typeof value === 'string' && value.trim()))) {
+        increment(explicitRecordingTargets, target)
+      }
+    }
   }
 
   const referenceSyllables = reference?.syllables ?? []
@@ -230,6 +242,7 @@ export function auditEntries(entries, reference, { minimumHits = 20 } = {}) {
       tones: inventoryCoverage(['0', '1', '2', '3', '4'], tones, minimumHits),
       common_syllables: inventoryCoverage(referenceSyllables, syllables, minimumHits),
       common_syllable_tones: inventoryCoverage(referenceSyllableTones, syllableTones, minimumHits),
+      explicit_recording_targets: inventoryCoverage(referenceSyllableTones, explicitRecordingTargets, minimumHits),
       citation_tone_pairs: inventoryCoverage(
         ['1', '2', '3', '4'].flatMap((left) => ['1', '2', '3', '4', '0'].map((right) => `${left}-${right}`)),
         tonePairs,

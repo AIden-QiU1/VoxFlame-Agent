@@ -19,7 +19,7 @@ if (payload.kind !== 'voxflame_mandarin_spoken_text_review_queue') throw new Err
 const workspace = {
   ...payload,
   title: '真实录音复核',
-  description: '人工填写实际说出内容并确认音频对应；未通过复核不会计入音系覆盖或训练。',
+  description: '可选质量诊断：人工填写实际说出内容，辅助定位错读、漏读和音频异常；不阻塞录音覆盖统计。',
   workspace_id: 'spoken-text',
   review_scope: 'historical_recordings',
 }

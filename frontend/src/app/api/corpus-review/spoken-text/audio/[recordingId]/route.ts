@@ -51,7 +51,7 @@ export async function GET(
 ) {
   const access = await getCorpusReviewerAccess()
   if (!access.authenticated) return NextResponse.json({ error: 'authentication_required' }, { status: 401 })
-  if (!access.authorized && !access.dualAnnotatorRole) {
+  if (!access.authorized) {
     return NextResponse.json({ error: 'reviewer_access_required' }, { status: 403 })
   }
   const recordingId = decodeURIComponent(context.params.recordingId)

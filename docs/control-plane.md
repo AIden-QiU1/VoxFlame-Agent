@@ -128,6 +128,16 @@
 
 当前执行面拓扑事实源已经切到 `self-hosted livekit-server + livekit_agent`。
 
+### 个性化 ASR 账户路由
+
+- Owner 链路：`Backend auth/RTC orchestration -> livekit_agent -> 8001 ASR model gateway`。
+- 已认证的 `communication / training` 会话统一进入网关；应用不再维护逐用户 ASR 白名单。
+- Backend 从已验证 Supabase 身份生成稳定 `asr_account_id`：历史数字 QQ 邮箱沿用数字前缀，其他账号使用不可变 user UUID。该值由服务端产生并进入签名的 agent dispatch metadata，不接受前端自报。
+- `livekit_agent` 复用会话级 HTTP 连接池，发送 multipart WAV 和 `X-Account-ID`。账户未注册时由 8001 返回公共模型 `fallback=true`；网关不可用时回退 DashScope realtime ASR。
+- 8001 的账户注册表是模型选择、线上最佳版本和实验晋升的唯一事实源。新增用户或替换模型只更新该注册表，不修改 VoxFlame 代码、环境变量或容器。
+- 网关响应必须返回与请求一致的 `account_id`；错配或缺失视为失败。浏览器只消费 `model_version / personalized / fallback` 诊断，不接收 `asr_account_id`。
+- 最小 live smoke：三个已注册账户分别返回 `personalized=true/fallback=false`，一个未注册账户返回 `personalized=false/fallback=true`，并验证 8001 故障时 DashScope 回退。
+
 ## 建议的数据模型
 
 后续控制面讨论尽量围绕下面几个对象，而不是围绕“某个 hook”或“某个按钮”展开：

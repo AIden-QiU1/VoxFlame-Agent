@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -16,6 +18,7 @@ from asr_runtime import (
     build_livekit_audio_apm_options,
     extract_http_asr_transcript,
     frame_to_pcm_bytes,
+    get_asr_account_id,
     pcm_bytes_to_wav_bytes,
     should_use_qwen_http_asr,
     is_repetitive_transcript_noise,
@@ -53,7 +56,6 @@ def create_config() -> LiveKitAgentConfig:
         qwen_http_asr_url=None,
         qwen_http_asr_language="Chinese",
         qwen_http_asr_timeout_seconds=30.0,
-        qwen_http_asr_user_ids=frozenset(),
         livekit_audio_apm_enabled=True,
         livekit_audio_apm_echo_cancellation=False,
         livekit_audio_apm_noise_suppression=True,
@@ -131,6 +133,37 @@ class FakeFallbackASRClient:
         return
 
 
+class FakeHttpResponse:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self._payload = payload
+        self.headers = {"content-type": "application/json"}
+
+    def raise_for_status(self) -> None:
+        return
+
+    def json(self) -> dict[str, object]:
+        return self._payload
+
+    @property
+    def text(self) -> str:
+        return json.dumps(self._payload, ensure_ascii=False)
+
+
+class FakeHttpClient:
+    response_payload: dict[str, object] = {}
+    requests: list[dict[str, object]] = []
+
+    def __init__(self, *, timeout: float) -> None:
+        self.timeout = timeout
+
+    async def post(self, url: str, **kwargs: object) -> FakeHttpResponse:
+        self.requests.append({"url": url, **kwargs})
+        return FakeHttpResponse(self.response_payload)
+
+    async def aclose(self) -> None:
+        return
+
+
 class TestASRRuntime(unittest.TestCase):
     def test_with_model_query_appends_model_when_missing(self) -> None:
         url = with_model_query(
@@ -146,13 +179,12 @@ class TestASRRuntime(unittest.TestCase):
         self.assertEqual(payload["sample_rate"], 16000)
         self.assertEqual(payload["input_audio_transcription"]["language"], "zh")
 
-    def test_should_use_qwen_http_asr_for_configured_communication_and_training_user(self) -> None:
+    def test_should_use_qwen_http_asr_for_all_authenticated_communication_and_training_users(self) -> None:
         config = create_config()
         config = type(config)(
             **{
                 **config.__dict__,
-                "qwen_http_asr_url": "http://127.0.0.1:18000/transcribe",
-                "qwen_http_asr_user_ids": frozenset({"64758dee-5026-4b53-a063-1d02d0834f67"}),
+                "qwen_http_asr_url": "http://127.0.0.1:8001/transcribe",
             }
         )
         matching_ctx = type(
@@ -170,7 +202,10 @@ class TestASRRuntime(unittest.TestCase):
             (),
             {
                 "mode": "communication",
-                "participant_payload": {"authenticated_user_id": "other-user"},
+                "participant_payload": {
+                    "authenticated_user_id": "other-user",
+                    "asr_account_id": "other-user",
+                },
                 "dispatch_payload": {},
                 "raw_attributes": {},
             },
@@ -195,11 +230,48 @@ class TestASRRuntime(unittest.TestCase):
                 "raw_attributes": {},
             },
         )()
+        anonymous_ctx = type(
+            "Ctx",
+            (),
+            {
+                "mode": "communication",
+                "participant_payload": {},
+                "dispatch_payload": {},
+                "raw_attributes": {},
+            },
+        )()
 
         self.assertTrue(should_use_qwen_http_asr(config, matching_ctx))
         self.assertTrue(should_use_qwen_http_asr(config, training_ctx))
-        self.assertFalse(should_use_qwen_http_asr(config, other_ctx))
+        self.assertTrue(should_use_qwen_http_asr(config, other_ctx))
         self.assertFalse(should_use_qwen_http_asr(config, quick_talk_ctx))
+        self.assertFalse(should_use_qwen_http_asr(config, anonymous_ctx))
+
+    def test_get_asr_account_id_prefers_gateway_key_and_falls_back_to_authenticated_id(self) -> None:
+        routed_ctx = type(
+            "Ctx",
+            (),
+            {
+                "participant_payload": {
+                    "authenticated_user_id": "supabase-user-id",
+                    "asr_account_id": "2307294809",
+                },
+                "dispatch_payload": {},
+                "raw_attributes": {},
+            },
+        )()
+        fallback_ctx = type(
+            "Ctx",
+            (),
+            {
+                "participant_payload": {"authenticated_user_id": "supabase-user-id"},
+                "dispatch_payload": {},
+                "raw_attributes": {},
+            },
+        )()
+
+        self.assertEqual(get_asr_account_id(routed_ctx), "2307294809")
+        self.assertEqual(get_asr_account_id(fallback_ctx), "supabase-user-id")
 
     def test_pcm_bytes_to_wav_bytes_writes_standard_wav_header(self) -> None:
         wav_bytes = pcm_bytes_to_wav_bytes(b"\x01\x00" * 160, sample_rate=16000)
@@ -227,15 +299,20 @@ class TestASRRuntime(unittest.TestCase):
 
         client = QwenHttpASRClient(
             url="http://asr.example/transcribe",
+            account_id="2307294809",
             language="Chinese",
             sample_rate=16000,
             request_timeout_seconds=3,
             event_handler=handle_event,
         )
 
-        async def fake_transcribe(pcm_bytes: bytes) -> str:
+        async def fake_transcribe(pcm_bytes: bytes) -> tuple[str, dict[str, object]]:
             self.assertGreater(len(pcm_bytes), 0)
-            return "刷牙"
+            return "刷牙", {
+                "model_version": "exp24-2307294809-r784-step84-beam5-rank0",
+                "personalized": True,
+                "fallback": False,
+            }
 
         client._transcribe = fake_transcribe  # type: ignore[method-assign]
 
@@ -249,6 +326,124 @@ class TestASRRuntime(unittest.TestCase):
         self.assertEqual(events[-1]["type"], "conversation.item.input_audio_transcription.completed")
         self.assertEqual(events[-1]["transcript"], "刷牙")
         self.assertEqual(events[-1]["provider"], "qwen_http_asr")
+        self.assertEqual(events[-1]["model_version"], "exp24-2307294809-r784-step84-beam5-rank0")
+        self.assertTrue(events[-1]["personalized"])
+        self.assertFalse(events[-1]["fallback"])
+
+    def test_qwen_http_asr_client_sends_trusted_account_header_and_reads_routing_result(self) -> None:
+        async def handle_event(_payload: dict[str, object]) -> None:
+            return
+
+        client = QwenHttpASRClient(
+            url="http://127.0.0.1:8001/transcribe",
+            account_id="2307294809",
+            language="Chinese",
+            sample_rate=16000,
+            request_timeout_seconds=3,
+            event_handler=handle_event,
+        )
+        FakeHttpClient.requests = []
+        FakeHttpClient.response_payload = {
+            "text": "我要喝水",
+            "account_id": "2307294809",
+            "model_version": "exp24-2307294809-r784-step84-beam5-rank0",
+            "personalized": True,
+            "fallback": False,
+        }
+
+        with patch.dict(sys.modules, {"httpx": SimpleNamespace(AsyncClient=FakeHttpClient)}):
+            transcript, metadata = asyncio.run(client._transcribe(b"\x01\x00" * 160))
+
+        self.assertEqual(transcript, "我要喝水")
+        self.assertEqual(metadata["model_version"], "exp24-2307294809-r784-step84-beam5-rank0")
+        self.assertTrue(metadata["personalized"])
+        self.assertFalse(metadata["fallback"])
+        self.assertEqual(len(FakeHttpClient.requests), 1)
+        request = FakeHttpClient.requests[0]
+        self.assertEqual(request["url"], "http://127.0.0.1:8001/transcribe")
+        self.assertEqual(request["headers"], {"X-Account-ID": "2307294809"})
+        self.assertEqual(request["data"], {"language": "Chinese"})
+        self.assertIn("audio", request["files"])
+
+    def test_qwen_http_asr_client_rejects_response_for_another_account(self) -> None:
+        async def handle_event(_payload: dict[str, object]) -> None:
+            return
+
+        client = QwenHttpASRClient(
+            url="http://127.0.0.1:8001/transcribe",
+            account_id="2307294809",
+            language="Chinese",
+            sample_rate=16000,
+            request_timeout_seconds=3,
+            event_handler=handle_event,
+        )
+        FakeHttpClient.requests = []
+        FakeHttpClient.response_payload = {
+            "text": "错误路由",
+            "account_id": "2187054680",
+            "personalized": True,
+            "fallback": False,
+        }
+
+        with patch.dict(sys.modules, {"httpx": SimpleNamespace(AsyncClient=FakeHttpClient)}):
+            with self.assertRaisesRegex(RuntimeError, "account_id did not match"):
+                asyncio.run(client._transcribe(b"\x01\x00" * 160))
+
+    def test_qwen_http_asr_client_requires_account_id_in_response(self) -> None:
+        async def handle_event(_payload: dict[str, object]) -> None:
+            return
+
+        client = QwenHttpASRClient(
+            url="http://127.0.0.1:8001/transcribe",
+            account_id="2307294809",
+            language="Chinese",
+            sample_rate=16000,
+            request_timeout_seconds=3,
+            event_handler=handle_event,
+        )
+        FakeHttpClient.requests = []
+        FakeHttpClient.response_payload = {
+            "text": "缺少账户契约",
+            "personalized": False,
+            "fallback": True,
+        }
+
+        with patch.dict(sys.modules, {"httpx": SimpleNamespace(AsyncClient=FakeHttpClient)}):
+            with self.assertRaisesRegex(RuntimeError, "did not include account_id"):
+                asyncio.run(client._transcribe(b"\x01\x00" * 160))
+
+    def test_qwen_http_asr_client_reuses_connection_until_stop(self) -> None:
+        async def handle_event(_payload: dict[str, object]) -> None:
+            return
+
+        client = QwenHttpASRClient(
+            url="http://127.0.0.1:8001/transcribe",
+            account_id="new-user-id",
+            language="Chinese",
+            sample_rate=16000,
+            request_timeout_seconds=3,
+            event_handler=handle_event,
+        )
+        FakeHttpClient.requests = []
+        FakeHttpClient.response_payload = {
+            "text": "公共识别",
+            "account_id": "new-user-id",
+            "personalized": False,
+            "fallback": True,
+        }
+
+        async def run_client() -> None:
+            await client._transcribe(b"\x01\x00" * 160)
+            first_http_client = client._http_client
+            await client._transcribe(b"\x01\x00" * 160)
+            self.assertIs(client._http_client, first_http_client)
+            await client.stop()
+            self.assertIsNone(client._http_client)
+
+        with patch.dict(sys.modules, {"httpx": SimpleNamespace(AsyncClient=FakeHttpClient)}):
+            asyncio.run(run_client())
+
+        self.assertEqual(len(FakeHttpClient.requests), 2)
 
     def test_qwen_http_asr_client_falls_back_to_realtime_on_failure(self) -> None:
         events: list[dict[str, object]] = []
@@ -259,6 +454,7 @@ class TestASRRuntime(unittest.TestCase):
 
         client = QwenHttpASRClient(
             url="http://asr.example/transcribe",
+            account_id="2307294809",
             language="Chinese",
             sample_rate=16000,
             request_timeout_seconds=3,
@@ -266,7 +462,7 @@ class TestASRRuntime(unittest.TestCase):
             fallback_client=fallback,  # type: ignore[arg-type]
         )
 
-        async def fake_transcribe(_pcm_bytes: bytes) -> str:
+        async def fake_transcribe(_pcm_bytes: bytes) -> tuple[str, dict[str, object]]:
             raise RuntimeError("timeout")
 
         client._transcribe = fake_transcribe  # type: ignore[method-assign]

@@ -39,7 +39,6 @@ export interface LiveKitTransportRuntime {
   participantAttributes: Record<string, string>
   agentDispatch: {
     agentName: string
-    metadata: string
   } | null
 }
 

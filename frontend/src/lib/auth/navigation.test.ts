@@ -53,5 +53,4 @@ test('isProtectedPath keeps active nested route trees behind authentication', ()
 
 test('corpus spoken-text review remains a protected nested route', () => {
   assert.equal(isProtectedPath('/corpus-review/spoken-text'), true)
-  assert.equal(isProtectedPath('/corpus-review/dual-spoken-text'), true)
 })

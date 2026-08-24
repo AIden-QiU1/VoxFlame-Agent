@@ -33,6 +33,8 @@
 
 ## 2. 关键原则
 
+普通话录音语料的候选筛选、覆盖统计和质量状态遵循 [`research/speech-health/MANDARIN_RECORDING_CORPUS_EVIDENCE_GATE.md`](../research/speech-health/MANDARIN_RECORDING_CORPUS_EVIDENCE_GATE.md)。其中来源、整词/整句读音、文本污染、长度/重复和目标映射是可复现硬规则；没有量表和一致性证据的自然度/产品判断不得成为录音前置硬门。
+
 ### 2.1 环境优于提示词
 
 稳定知识应落在仓库环境里，而不是依赖某一轮对话记忆。

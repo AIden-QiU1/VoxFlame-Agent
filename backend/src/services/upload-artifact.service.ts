@@ -168,7 +168,7 @@ function toErrorMessage(error: unknown): string {
   return 'unknown_error'
 }
 
-function buildRecordingManifestEntry(
+export function buildRecordingManifestEntry(
   contributorId: string,
   audioPath: string,
   text: string,

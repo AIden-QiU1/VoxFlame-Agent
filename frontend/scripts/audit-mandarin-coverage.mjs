@@ -4,10 +4,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { auditEntries } from './mandarin-coverage-core.mjs'
+import { collectionEligibility } from './mandarin-collection-evidence-core.mjs'
 import {
-  consensusEntriesFromDualQueue,
   reviewEntriesFromQueue,
-  validateMandarinDualReviewQueue,
   validateMandarinSpokenTextReviewQueue,
 } from './mandarin-spoken-text-review-core.mjs'
 
@@ -68,6 +67,16 @@ function manifestReport(paths) {
     const text = row.prompt?.text ?? row.metadata?.target_text ?? row.metadata?.exercise_text
     return text ? [{ text, category: row.prompt?.category ?? row.metadata?.exercise_category ?? '未分区' }] : []
   })
+  const eligibleRows = deduped.map((row) => ({ row, eligibility: collectionEligibility(row) }))
+  const validAudioEntries = eligibleRows
+    .filter(({ eligibility }) => eligibility.eligible)
+    .map(({ eligibility }) => ({
+      text: eligibility.target,
+      category: eligibility.category,
+      quality_status: eligibility.quality_status,
+      coverage_targets: eligibility.coverage_targets,
+      recording_readiness: 'ready_for_recording',
+    }))
   const explicitSpokenText = deduped.filter((row) => typeof row.metadata?.spoken_text === 'string' && row.metadata.spoken_text.trim()).length
   const rawTranscript = deduped.filter((row) => typeof row.transcript?.raw === 'string' && row.transcript.raw.trim()).length
   const audioDurationMs = deduped.reduce((total, row) => total + Number(row.audio?.duration_ms ?? row.metadata?.duration_ms ?? 0), 0)
@@ -95,8 +104,25 @@ function manifestReport(paths) {
       audio_quality_dispositions: count(deduped.map((row) => row.metadata?.audio_quality_disposition ?? 'missing')),
       capture_transports: count(deduped.map((row) => row.audio?.capture_transport ?? row.metadata?.capture_transport ?? 'missing')),
       categories: count(entries.map((entry) => entry.category)),
+      valid_audio_with_target: validAudioEntries.length,
+      collection_eligibility_rejections: count(
+        eligibleRows.flatMap(({ eligibility }) => eligibility.reasons),
+      ),
+      quality_statuses: count(validAudioEntries.map((entry) => entry.quality_status)),
     },
+    collectionCoverageEntries: validAudioEntries,
   }
+}
+
+function qualityStatus(row) {
+  const metadata = row.metadata ?? {}
+  const reasons = Array.isArray(metadata.audio_quality_reasons) ? metadata.audio_quality_reasons : []
+  const errorTags = Array.isArray(row.evaluation?.error_tags) ? row.evaluation.error_tags : []
+  if (reasons.includes('speech_too_short_or_too_quiet') || reasons.includes('input_level_quiet')) return 'unusable_audio'
+  if (reasons.includes('too_much_silence') || Number(metadata.silence_ratio ?? 0) >= 0.72) return 'long_silence'
+  if (errorTags.some((tag) => String(tag).startsWith('missing:'))) return 'suspected_omission'
+  if (errorTags.some((tag) => String(tag).startsWith('extra:'))) return 'suspected_misread'
+  return 'valid'
 }
 
 function modelManifestReport(paths) {
@@ -131,11 +157,11 @@ const outputPath = value('--output')
 const manifestPaths = values('--manifest')
 const modelManifestPaths = values('--model-manifest')
 const spokenReviewPaths = values('--spoken-review')
-const dualReviewPaths = values('--dual-review')
+const recordingCorpusPaths = values('--recording-corpus')
 const minimumHits = Number(value('--minimum-hits') ?? 20)
 
-if (!referencePath || !outputPath || (!corpusPath && manifestPaths.length === 0 && modelManifestPaths.length === 0 && spokenReviewPaths.length === 0 && dualReviewPaths.length === 0)) {
-  throw new Error('usage: audit-mandarin-coverage --reference <json> --output <json> [--corpus <json>] [--manifest <app-jsonl> ...] [--spoken-review <queue.json> ...] [--dual-review <queue.json> ...] [--model-manifest <train-jsonl> ...] [--minimum-hits <n>]')
+if (!referencePath || !outputPath || (!corpusPath && manifestPaths.length === 0 && modelManifestPaths.length === 0 && spokenReviewPaths.length === 0 && recordingCorpusPaths.length === 0)) {
+  throw new Error('usage: audit-mandarin-coverage --reference <json> --output <json> [--corpus <json>] [--recording-corpus <json> ...] [--manifest <app-jsonl> ...] [--spoken-review <queue.json> ...] [--model-manifest <train-jsonl> ...] [--minimum-hits <n>]')
 }
 
 const reference = readJson(referencePath)
@@ -159,11 +185,26 @@ if (corpusPath) {
   report.prompt_corpus = auditEntries(entries, reference, { minimumHits })
 }
 
+if (recordingCorpusPaths.length > 0) {
+  const entries = recordingCorpusPaths.flatMap(corpusEntries)
+  report.recording_ready_corpus = {
+    quality: {
+      corpus_files: recordingCorpusPaths.length,
+      items: entries.length,
+      unique_texts: new Set(entries.map((entry) => String(entry.text ?? '').trim()).filter(Boolean)).size,
+      explicit_target_items: entries.filter((entry) => Array.isArray(entry.coverage_targets) && entry.coverage_targets.length > 0).length,
+      source_files: recordingCorpusPaths,
+    },
+    coverage: auditEntries(entries, reference, { minimumHits }),
+  }
+}
+
 if (manifestPaths.length > 0) {
   const manifest = manifestReport(manifestPaths)
   report.collected_manifests = {
     quality: manifest.quality,
     coverage: auditEntries(manifest.entries, reference, { minimumHits }),
+    collection_coverage: auditEntries(manifest.collectionCoverageEntries, reference, { minimumHits }),
   }
 }
 
@@ -194,30 +235,6 @@ if (spokenReviewPaths.length > 0) {
     coverage: auditEntries(entries, reference, { minimumHits }),
   }
 }
-
-if (dualReviewPaths.length > 0) {
-  const queues = dualReviewPaths.map((filePath) => readJson(filePath))
-  const validation = queues.map(validateMandarinDualReviewQueue)
-  const invalid = validation.flatMap((result, index) => result.valid ? [] : result.errors.map((error) => `${dualReviewPaths[index]}: ${error}`))
-  if (invalid.length > 0) throw new Error(`invalid dual spoken_text review queue:\n${invalid.join('\n')}`)
-  const reviewedByRecording = new Map()
-  for (const queue of queues) {
-    for (const entry of consensusEntriesFromDualQueue(queue)) {
-      if (entry.recording_id && !reviewedByRecording.has(entry.recording_id)) reviewedByRecording.set(entry.recording_id, entry)
-    }
-  }
-  const entries = [...reviewedByRecording.values()]
-  report.dual_human_spoken_text_reviews = {
-    quality: {
-      queue_files: dualReviewPaths.length,
-      queue_items: queues.reduce((total, queue) => total + queue.items.length, 0),
-      consensus_eligible_items: entries.length,
-      training_import_allowed: false,
-    },
-    coverage: auditEntries(entries, reference, { minimumHits }),
-  }
-}
-
 
 if (modelManifestPaths.length > 0) {
   const modelManifest = modelManifestReport(modelManifestPaths)

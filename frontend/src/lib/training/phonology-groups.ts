@@ -1,12 +1,16 @@
 import PHONOLOGY_INDEX from '@/lib/corpus/generated/mandarin-phonology-index.json'
 import COVERAGE_STATUS from '@/lib/corpus/generated/mandarin-coverage-product-status.json'
 import REINFORCEMENT_PRODUCT_INDEX from '@/lib/corpus/generated/mandarin-reinforcement-product-index.json'
+import RECORDING_CORE_GAP_CORPUS from '@/lib/corpus/generated/mandarin-recording-core-gap-corpus.json'
+import RECORDING_REINFORCEMENT_CORPUS from '@/lib/corpus/generated/mandarin-recording-reinforcement-corpus.json'
+import RECORDING_OPEN_RESEARCH_CORPUS from '@/lib/corpus/generated/mandarin-recording-open-research-corpus.json'
 import type { MandarinTrainingExercise } from '@/lib/corpus/mandarin-training'
 
 
 export const PHONOLOGY_GROUP_IDS = [
   'all',
   'coverage-core',
+  'coverage-open-research',
   'coverage-reinforcement',
   'labial',
   'tongue-tip-mid',
@@ -19,7 +23,10 @@ export const PHONOLOGY_GROUP_IDS = [
 ] as const
 
 export type PhonologyGroupId = (typeof PHONOLOGY_GROUP_IDS)[number]
-export type PhonologyTargetGroupId = Exclude<PhonologyGroupId, 'all' | 'coverage-core' | 'coverage-reinforcement'>
+export type PhonologyTargetGroupId = Exclude<PhonologyGroupId, 'all' | 'coverage-core' | 'coverage-open-research' | 'coverage-reinforcement'>
+
+/** The targeted-gap recorder opens on machine-checked core prompts so new coverage is immediately discoverable. */
+export const DEFAULT_PHONOLOGY_GROUP_ID: PhonologyGroupId = 'coverage-core'
 
 export interface PhonologyGroupMeta {
   id: PhonologyGroupId
@@ -51,6 +58,15 @@ const REINFORCEMENT_PROMPTS = new Map(
     ...prompt,
   }]),
 )
+const RECORDING_CORE_GAP_IDS = new Set(
+  (RECORDING_CORE_GAP_CORPUS as { items: Array<{ id: string }> }).items.map((item) => item.id),
+)
+const RECORDING_REINFORCEMENT_IDS = new Set(
+  (RECORDING_REINFORCEMENT_CORPUS as { items: Array<{ id: string }> }).items.map((item) => item.id),
+)
+const RECORDING_OPEN_RESEARCH_IDS = new Set(
+  (RECORDING_OPEN_RESEARCH_CORPUS as { items: Array<{ id: string }> }).items.map((item) => item.id),
+)
 
 function reinforcementPriority(exerciseId: string): number {
   return REINFORCEMENT_PROMPTS.get(exerciseId)?.planned_recording_slots ?? 0
@@ -60,8 +76,14 @@ export const PHONOLOGY_GROUPS: PhonologyGroupMeta[] = [
   {
     id: 'coverage-core',
     label: '核心补音',
-    shortLabel: '审核后推荐',
-    description: '只显示通过语言学、自然度、用户负担、安全、许可和产品审核的核心缺口词句。',
+    shortLabel: '缺口优先录',
+    description: '显示通过可复现语言学、文本与工程门的核心音节—声调缺口词句；先录音，再按错读、漏读和空白过长做质检。',
+  },
+  {
+    id: 'coverage-open-research',
+    label: '开放研究补充',
+    shortLabel: '长尾补充录',
+    description: '显示来源可追溯、通过机器语言学与安全门的开放研究补充句；它们不是教材原文，也不代表训练导入批准。',
   },
   {
     id: 'coverage-reinforcement',
@@ -104,16 +126,20 @@ export function filterExercisesByPhonologyGroup(
   }
 
   if (groupId === 'coverage-core') {
-    return exercises.filter((exercise) => exercise.id.startsWith('coverage-gap-'))
+    return exercises.filter((exercise) => RECORDING_CORE_GAP_IDS.has(exercise.id) || exercise.id.startsWith('coverage-gap-'))
   }
 
   if (groupId === 'coverage-reinforcement') {
     return exercises
-      .filter((exercise) => REINFORCEMENT_PROMPTS.has(exercise.id))
+      .filter((exercise) => REINFORCEMENT_PROMPTS.has(exercise.id) || RECORDING_REINFORCEMENT_IDS.has(exercise.id))
       .sort((left, right) => (
         reinforcementPriority(right.id) - reinforcementPriority(left.id)
           || left.id.localeCompare(right.id, 'zh-CN')
       ))
+  }
+
+  if (groupId === 'coverage-open-research') {
+    return exercises.filter((exercise) => RECORDING_OPEN_RESEARCH_IDS.has(exercise.id))
   }
 
   return exercises.filter((exercise) => (
@@ -127,13 +153,19 @@ export function getPhonologyFocusForGroup(
 ): string | null {
   const targets = getPhonologyExerciseTargets(exerciseId)
   if (groupId === 'coverage-core') {
-    return exerciseId.startsWith('coverage-gap-') ? '经审核的核心音节—声调缺口' : null
+    return RECORDING_CORE_GAP_IDS.has(exerciseId) || exerciseId.startsWith('coverage-gap-')
+      ? '核心音节—声调缺口（录音就绪）'
+      : null
   }
   if (groupId === 'coverage-reinforcement') {
     const prompt = REINFORCEMENT_PROMPTS.get(exerciseId)
+    if (RECORDING_REINFORCEMENT_IDS.has(exerciseId)) return '低频目标（录音就绪）'
     return prompt
       ? `低频目标 ${prompt.low_frequency_targets.slice(0, 4).join(' / ')}${prompt.low_frequency_targets.length > 4 ? ' 等' : ''}`
       : null
+  }
+  if (groupId === 'coverage-open-research') {
+    return RECORDING_OPEN_RESEARCH_IDS.has(exerciseId) ? '开放研究补充（录音就绪）' : null
   }
   if (groupId === 'all') {
     return targets[0]?.focus ?? null

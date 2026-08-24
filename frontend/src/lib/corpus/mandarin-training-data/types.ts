@@ -17,6 +17,9 @@ export interface MandarinTrainingExercise {
   id: string
   text: string
   category: MandarinTrainingCategory
+  prompt_type?: 'word' | 'short_sentence'
+  target?: string
+  coverage_targets?: string[]
 }
 
 export interface MandarinTrainingCategoryMeta {

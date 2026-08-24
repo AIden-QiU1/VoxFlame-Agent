@@ -116,13 +116,13 @@ export interface SpokenTextReviewItem {
 
 export interface SpokenTextReviewWorkspace {
   kind: 'voxflame_mandarin_spoken_text_review_queue'
-  status: 'human_review_required_not_for_training'
+  status: 'optional_quality_review_not_for_training'
   generated_at: string
   source_manifest_files: string[]
   policy: {
     asr_is_hint_only: true
-    human_spoken_text_required_for_coverage: true
-    audio_text_alignment_required_for_coverage: true
+    human_spoken_text_required_for_coverage: false
+    audio_text_alignment_required_for_coverage: false
     original_manifest_and_audio_are_immutable: true
     training_import_allowed: false
   }
@@ -131,35 +131,4 @@ export interface SpokenTextReviewWorkspace {
   description?: string
   workspace_id?: 'spoken-text'
   review_scope?: 'historical_recordings'
-}
-
-export type DualAnnotationStatus = 'pending' | 'completed' | 'unavailable'
-export type DualAnnotatorRole = 'annotator_a' | 'annotator_b'
-
-export interface MandarinDualReviewItem {
-  review_item_id: string
-  recording_id: string
-  audio_locator: string
-  audio_filename: string
-  prompt_text: string
-  category: string
-  quality_disposition: string
-  duration_ms: number
-  annotator_a: { status: DualAnnotationStatus; spoken_text: string | null; reviewed_by: string | null; reviewed_at: string | null; note: string | null }
-  annotator_b: { status: DualAnnotationStatus; spoken_text: string | null; reviewed_by: string | null; reviewed_at: string | null; note: string | null }
-  agreement_status: 'pending' | 'agree' | 'disagree' | 'adjudicated'
-  consensus: { status: 'pending' | 'approved'; spoken_text: string | null; reviewed_by: string | null; reviewed_at: string | null; note: string | null }
-}
-
-export interface MandarinDualReviewWorkspace {
-  kind: 'voxflame_mandarin_dual_spoken_text_review_queue'
-  status: 'human_review_required_not_for_training'
-  generated_at: string
-  source_manifest_files: string[]
-  sample_seed: string
-  policy: { independent_annotators: 2; asr_is_not_shown_in_review_item: true; disagreements_require_adjudication: true; consensus_required_for_coverage: true; original_manifest_and_audio_are_immutable: true; training_import_allowed: false }
-  items: MandarinDualReviewItem[]
-  title?: string
-  description?: string
-  workspace_id?: 'dual-spoken-text'
 }

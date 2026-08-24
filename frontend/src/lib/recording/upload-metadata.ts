@@ -30,6 +30,7 @@ const ALLOWED_METADATA_KEYS = new Set([
   'speech_patterns',
   'articulation_tips',
   'pronunciation_summary',
+  'pronunciation_targets',
 ])
 
 function isFiniteNumber(value: unknown): value is number {

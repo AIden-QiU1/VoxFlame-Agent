@@ -1,40 +1,64 @@
 # 当前任务状态
 
-> 最后更新: 2026-08-23
+> 最后更新: 2026-08-24
+
+## 2026-08-24 个性化 ASR 统一账户网关
+
+- 已彻底移除应用侧逐用户 ASR 白名单和旧 18000 入口；所有已认证的 `communication / training` 会话统一调用 `http://127.0.0.1:8001/transcribe`，未认证与 `quick_talk` 不进入该远端账户链路。
+- Backend 从 Supabase 已验证身份生成稳定 `asr_account_id`：历史数字 QQ 邮箱沿用数字前缀，其他账户使用不可变 user UUID。该键由服务端生成，只进入签发给 LiveKit agent 的 dispatch metadata，不进入 participant token metadata/attributes，也不接受前端自报账户号。
+- `livekit_agent` 以 `X-Account-ID` 发送账户键；8001 独占用户注册、个性化/公共 fallback、线上最佳模型和实验晋升。以后新增或替换个性化模型只改模型服务注册表，不改 VoxFlame 代码、环境变量或容器。
+- HTTP 返回的 `account_id` 若与请求不一致会被拒绝；前端诊断只收到 `model_version / personalized / fallback`，不收到模型账户键。8001 失败继续回退 DashScope realtime ASR。
+- HTTP 客户端按 LiveKit 会话复用连接，避免每句话重复建立 TCP 连接；会话结束显式关闭。
+- 验证通过：LiveKit agent 全量 80 项（1 项 worker-only skip）、Backend TypeScript build、RTC/LiveKit 契约测试、compose 展开和 `git diff --check`。仓库搜索确认旧白名单与旧端口引用为 0。
+- 尚未完成：当前主机 `127.0.0.1:8001/health` 实测 connection refused。现有 `127.0.0.1:18000` 由外部 SSH 会话监听，health 正常，但用 2187054680、2307294809、3083029019 与未知账户分别做真实 WAV smoke 时都只返回转写正文，缺少 `account_id/model_version/personalized/fallback`，说明它仍是旧接口而非新账户网关。
+- 部署边界：暂不重启仍在服务的旧 `livekit-agent`，避免把线上从可用 18000 切到不可达 8001。先将远端新服务 8001 映射为本机可达的 8001，并确认三账户个性化与未知账户公共 fallback 契约，再执行 `sudo scripts/docker-rebuild-core-fast.sh backend`（若 backend 镜像包含本次 RTC 变更）和 `sudo scripts/docker-rebuild-core-fast.sh` 支持的 livekit-agent 最小重建路径；若脚本无 agent 单服务模式，则用 `sudo docker compose build livekit-agent && sudo docker compose up -d --no-deps livekit-agent`。
+
+## 2026-08-24 Web “重录这一句”替换语义修复
+
+- 根因：结果页展示时录音已经进入自动保存，旧按钮又因全局上传态被禁用；即使稍后能点，也只是再次开始录音，不会撤回上一版，可能让同一句同时留下两条样本。
+- 现已把“重录”收口为替换操作：保存中的样本先等待保存完成并撤回，已上传或本机排队的样本先撤回，只有撤回成功才自动进入原句重录；撤回失败不开始新录音。
+- 交互同步显示“正在替换 / 正在撤回旧录音”，替换期间锁住继续、不收录和重复重录，并明确说明最终只保留新录音。
+- 验证：新增替换策略 4 项回归测试通过，TypeScript、前端 product-message 检查、Next production build 和 `git diff --check` 通过；Playwright 未登录访问 `/contribute/topic/daily-mobility` 正确回跳并保留 `next`，console 0 error。真实账号、麦克风、上传与撤回闭环仍需设备 smoke。
+- 全量验证已恢复：`npm test` 91 项通过；录音就绪题面由独立 gate 校验，不删除基础题库或历史来源。
+- 2026-08-24 继续产品化：音系强化录音页默认打开“核心补音”组，首屏明确展示全部 568 条录音就绪补音的拆分（核心 263、开放研究 14、低频补强 291）；新增独立“开放研究补充”组显示 14 条非教材、非训练导入批准的长尾补充句；“低频补强”仍单独显示 291 条录音就绪题面。“训练导入审核 0 条”与“录音就绪题面已开放”在界面上分开表达。新增完整性回归确认核心录音包 263 条恰好覆盖台账 88 个 core 缺口，低频补强只引用 below-minimum 目标。
 
 ## 2026-08-22 普通话语言学覆盖与录音区持续优化
 
 - 核心目标：录音区以语言学和目标用户证据为根本依据，持续完成 `现有微调/采集诊断 -> 缺口驱动补料 -> 准确分区 -> 用户友好采集 -> 固定评测复盘`；SOP 只作现场操作参考，不定义覆盖完整性。
 - 已建立四层覆盖模型：音系库存、常用合法音节/音节—声调、连续语流、任务与真实沟通场景；主任务分区与可叠加语言学标签分开，禁止用“句库总量”或“各音出现一次”宣称全面覆盖。
 - 新增可重复工具：`frontend/scripts/mandarin-coverage-core.mjs`、参考集合生成、现役题库导出、应用/模型 manifest 审计 CLI 和回归测试。版本化参考集合来自 `pinyin-data` commit `923b108d...`，包含 402 个常用无调音节和 1242 个常用音节—声调形式，并保留上游 410 行待复核/争议限制。
-- 题库基线：9107 条唯一题目；相对 9112 仅退出 5 条明确“学习包”商业污染，历史录音、manifest 和原始来源未删除。声母 `22/22`，规范化韵母 `38/39`；常用无调音节 `386/402`，音节—声调 `1025/1242`。达到每项至少 20 次的比例分别为 `79.1%` 与 `45.8%`，主要缺口是长尾音节—声调，不是总量。
+- 题库基线：9107 条基础题面，另有 263 条核心补音和 291 条低频补强录音就绪题面；相对 9112 仅退出 5 条明确“学习包”商业污染，历史录音、manifest 和原始来源未删除。基础台账声母 `22/22`，规范化韵母 `38/39`；常用无调音节 `386/402`，音节—声调 `1025/1242`。主要缺口是长尾音节—声调，不是总量。
 - 数量口径已用回归测试固定：`mandarin-training-real.json` 为 8771 条外部生成子池，前端合并 336 条人工策划/固定评估项后才是现役 9107 条；8771 不是再次删除 336 条。全台账有 9 个 disputed tier，其中 8 个属于 217 个完全缺失项，另 1 个已出现但低于 20 次。
-- 应用采集基线：10 个 manifest 原始 1421 行，按 `recording_id` 去重为 1185 条、约 2.568 小时、9 名说话人/48 sessions；常用无调音节覆盖 `339/402`，音节—声调 `708/1242`；独立人工 `spoken_text` 为 0，只有 166 条标为高置信，必须先建复核/候选/排除队列。
+- 应用采集基线：10 个 manifest 原始 1421 行，按 `recording_id` 去重为 1185 条、约 2.568 小时、9 名说话人/48 sessions；按有效音频、非空 target、授权 scope 与上传契约计入 1180 条 collected，质量异常只分层不删除；常用无调音节覆盖 `339/402`，音节—声调 `708/1242`。
 - 微调诊断边界：CLEAR-VOX-MODEL 固定记录确认主 CDSD 为 `112424/14032/14100`，明确错配清理有效，但按高 CER 删除重度说话人、标准拼音 CTC 和机械最小对立增强均未形成稳定突破。当前机器未挂载 `/qiu/data/.../cdsd`，本轮不能声称逐条审过主微调集；审计 CLI 已支持 `--model-manifest`，数据挂载后补跑。
 - 研究与应用决策已登记为 `RF-011 validate`。当前主线是语言学与目标用户逐条审核 263 条核心候选，再做小规模采集和固定 speaker-disjoint 微调消融；人工实际转写工具保留为旁路，不再抢占全音系列语料建设主线。
-- 2026-08-23 已完成任务/标签旁路索引：`frontend/src/lib/corpus/generated/mandarin-linguistic-index.json` 覆盖现役 `9107/9107` 条，保留正常题面、原文和原类别；仅 5 条确认商业污染退出。每条只有一个互斥 `task_id`，可叠加声母、韵母、声调、音节—声调、位置和连续语流标签。现役统计为 `connected_reading 4947 / targeted_gap 2972 / functional_speech 1168 / baseline_words 20`。
+- 2026-08-24 已完成任务/标签旁路索引；当前索引覆盖基础题面与补音题面共 `9675/9675` 条，保留正常题面、原文和原类别；仅 5 条确认商业污染退出。每条只有一个互斥 `task_id`，可叠加声母、韵母、声调、音节—声调、位置和连续语流标签。
 - 2026-08-23 已建立候选人工复核门禁：`frontend/scripts/validate-mandarin-review-queue.mjs` 要求语言学、自然度、安全、许可、任务五项审核；Tatoeba 300 条候选当前 `pending 1500/1500`，生产导入数为 0。该门禁只新增校验，不修改或删除题库、录音和候选原文。
 - 2026-08-23 已增加评测结构门禁：`frontend/scripts/validate-mandarin-evaluation-report.mjs` 强制固定 speaker-disjoint 测试集、总体/最差说话人/短句 CER、严重度/长度分层、P95 延迟、用户成功/跳过/疲劳指标和回退动作；没有真实结果时只能保持 `validate`，不能宣称模型提升。
 - 2026-08-23 已按反馈清理前端生成题库中的 5 条“学习包”类课程/考试营销噪声；清理审计总数为 209 条，新增项均为 `commercial_or_advertising`。该操作不删除历史录音、manifest 或原始来源，仅阻止污染题面进入用户录音区。
 - 2026-08-23 已同步重建 1242 项全量覆盖目标台账：现役题库为 `569 robust / 456 below_minimum / 217 missing`；217 个硬缺口按现代词、实际使用证据和默认用户负担收紧为 `88 core / 121 edge / 8 disputed`。`chun3 / heng4 / long4 / ming3 / nüe4 / zei2` 等主要依赖贬损、地域、醉酒、虐待或犯罪承载词的形式转入边缘专项；它们仍在全音台账，不从语言学库存删除。
-- 核心第一阶段已为 88 个默认核心硬缺口各准备 3 条候选，共 `263` 条唯一文本（`88` 词、`175` 短句；1 条短句同时覆盖两个目标）。选择策略固定为每目标 `1 个整词锚点 + 2 个句境`；开放句必须命中可接受的多字整词并记录整词拼音，不能靠单字/专名字形凑覆盖。六项审核均为 pending，生产导出严格为 `0` 条。
+- 核心第一阶段仍保留原始 263 条候选审核包作为历史证据；另生成 `mandarin-recording-core-gap-corpus.json`，按可复现语言学/工程 gate 放行 `263` 条录音题面（`88` 词、`175` 短句、`88` 个核心目标），真正接入音系强化录音区。录音区不等待六项主观审核或人工 `spoken_text`；后者仅为可选质量诊断。
 - 2026-08-23 继续按用户负担优化核心候选：将 `歹徒/懒惰/醉醺醺/挣扎/产卵/烫伤` 等默认词锚点替换为同音目标下的 `好歹/掌舵/烟熏/炸鱼/鹅卵石/烫发` 等中性现代词；挑衅、指人评价、灾难语义和明显翻译腔句进入永久拦截。人工短句现强制提供句内整词与整词拼音证据，175/175 均已满足；当前候选快照为 `2026-08-23T03:34:40.850Z`，仍为 263 条且全部 pending。
-- 2026-08-23 已为 456 个 `below_minimum` 音节—声调建立独立补强计划：455 个默认核心目标进入调度，1 个争议目标下线；从现役 9107 条安全题库选出 835 条题面，分配 2998 个未来采集槽位，309 项完整分配、146 项因题面稀少部分分配。计划明确把题面命中、未来槽位和人工确认真实录音分开；455 项题面多样性仍低于 20 次门槛，不能宣称覆盖完成。
-- 录音区新增“低频补强”组，可跨原主题调用上述 835 条现役题面，并按计划槽位优先；原有八个音系练习组不变，“核心补音”继续只读六项审核通过的正式导出（当前 0）。完整审计计划保留为 1.7MB 旁路产物，浏览器只加载约 120KB 的轻量产品索引。
-- 本切片验证：普通话语料脚本 75/75、Web 85/85、Python 语料测试 6/6、TypeScript、Next production build 24/24 页面、AI docs harness 和 `git diff --check` 通过；Playwright 未登录 smoke 正确回跳并保留审核路径，受保护 API 返回 401、console 0 错误/警告；授权审核者真实交互仍需白名单账号验证。
+- 2026-08-23 已为 456 个 `below_minimum` 音节—声调建立基础题库补强计划：455 个默认核心目标进入调度，1 个争议目标下线；基础安全题库选出 835 条题面，分配 2998 个未来采集槽位。随后从 346 条低频语境候选中按机器门放行 291 条新增录音就绪题面，覆盖 116 个目标；计划槽位和真实录音仍严格分开。
+- 录音区“低频补强”组同时包含 835 条基础计划题面和 291 条机器校验录音就绪题面，并按录音就绪优先；原有八个音系练习组不变。完整审计计划保留为旁路产物，浏览器只加载轻量产品索引。
+- 本切片验证：普通话语料脚本 75/75、Web 91/91、采集证据/产品状态/录音 gate 回归、TypeScript、Next production build 24/24 页面、AI docs harness 和 `git diff --check` 通过；Playwright 未登录 smoke 正确回跳并保留审核路径，受保护 API 返回 401、console 0 错误/警告；授权审核者真实交互仍需白名单账号验证。
 - 边缘专项单列 121 项，争议 8 项保持下线。地域/轻声口径冲突、只有词典证据和高负担承载形式不进入默认录音。CC-CEDICT 另发现 311 个核心基线外词音（225 轻声、68 额外声调、18 额外词汇音节），只进入发现审核表，不扩张当前覆盖分母。
 - 已生成 `mandarin-core-gap-phase1-review.tsv`：263 行按每批 30 条分成 9 批，包含目标音、文本、来源、整词读音证据和六项审核栏，供语言学与目标用户复核；TSV 不直接进入生产。
 - 2026-08-23 已把同一 263 条候选产品化为站内 `/corpus-review` 审稿台：9 批导航、搜索/状态筛选、六项审核、本机自动保存和 decision JSON 导出均已完成。页面/API 需登录，服务端 `VOXFLAME_CORPUS_REVIEWER_EMAILS` 精确白名单控制候选读取；浏览器不能直接写仓库或生产语料。
 - 2026-08-23 已为 146 个安全题面不足的低频目标重扫完整 Tatoeba 普通话快照并建立独立低频语境审稿任务：严格用户负担门后保留 346 条唯一待审句、354 个目标—句分配，118 个目标达到每音 3 条候选，28 个目标仍需补写；全部六项 `pending`，生产 0。候选层收紧不修改 9107 条现役题库、历史录音、manifest 或来源。
 - 2026-08-23 低频补写 brief 已产品化进入同一 `/corpus-review`：当前 28 个目标均进入结构化专家路线，记录风险类别、允许证据、默认录音政策和下一动作；支持目标音/承载词/拼音搜索与独立 authoring worksheet 导出，不提供浏览器直写生产。学习包及 `挨骂 / 殡仪 / 娼妓 / 排尿 / 奴役` 等高负担承载词被拦截，音系目标本身仍完整保留在 1242 项台账。
 - decision JSON 已有独立校验/合并 CLI：拒绝过期来源快照、未知或重复 ID、非法状态和无说明的改写/拒绝。真实候选快照的临时往返验证确认只提交 1 条决定时仅 1 条进入批准导出，其余候选保持未动；临时产物已删除。正式审核仍全为 pending，生产导出仍为 0。
-- Web 录音区已接入产品状态与安全导出：原有按音组练习保留；“核心补音”只读取语言学、自然度、用户负担、安全、许可、产品六项全批准内容，0 条时禁用并明确说明；边缘与争议不混入默认推荐。
-- 2026-08-23 已完成真实应用录音人工 `spoken_text` 复核旁路的第一版：从全部 10 个历史 manifest 去重生成 1185 条待复核项，ASR 仅保留为 `asr_hint`，实际文本和 audio-text 对应均为 `pending`；校验器拒绝用户/设备/存储路径字段，并把只有 `approved + confirmed` 的条目接入覆盖审计。当前没有任何条目进入训练或覆盖统计。
-- 2026-08-23 已把真实录音复核闭环生成正式证据包：1185 条全量队列全部 pending，另按类别/音频质量确定性分层抽取 60 条双人复核样本；本机音频核验为 49 条可访问、11 条缺失，完整性门未通过，双人一致性覆盖资格为 0。`mandarin-collection-evidence.json` 与前端产品状态严格区分 2998 个计划槽位、0 条人工确认录音和 0 条双人一致性覆盖，不删除原 manifest 或历史录音记录。
-- 2026-08-23 已将 1185 条历史录音接入受保护的 `/corpus-review/spoken-text` 人工复核工作区：审核邮箱白名单、受控音频 API、不透明 `recording_id`、ASR 非权威提示、人工 `spoken_text` 与 audio-text 对应确认、本机草稿和决定 JSON 导出均已产品化；工作区 `training_import_allowed=false`，浏览器不能直写生产，所有条目仍 pending。
+- Web 录音区已接入产品状态与安全导出：原有按音组练习保留；录音就绪的核心/开放研究/低频补强题面按机器语言学、来源、长度、安全和显式 target gate 开放，六项人工审核只决定训练导入 approved corpus，不阻塞录音；边缘与争议不混入默认推荐。
+- 2026-08-23 已完成真实应用录音人工 `spoken_text` 复核旁路的第一版：从全部 10 个历史 manifest 去重生成 1185 条待复核项，ASR 仅保留为 `asr_hint`，实际文本和 audio-text 对应均为 `pending`；校验器拒绝用户/设备/存储路径字段。人工复核仍是可选质量旁路，不进入默认覆盖门或训练导入。
+- 2026-08-23 已生成 1185 条可选 spoken-text 诊断队列；`mandarin-collection-evidence.json` 现按 manifest 契约计入 1180 条 collected，并将错读/漏读/长空白/不可用音频分层，不删除原 manifest 或历史录音记录。旧复核支线已删除，不参与任何现役统计。
+- 2026-08-23 已将 1185 条历史录音接入受保护的 `/corpus-review/spoken-text` 人工复核工作区：审核邮箱白名单、受控音频 API、不透明 `recording_id`、ASR 非权威提示、人工 `spoken_text` 与 audio-text 对应确认、本机草稿和决定 JSON 导出均已产品化；工作区 `training_import_allowed=false`，浏览器不能直写生产；它是可选质量旁路，不是录音前置条件。
 - 2026-08-23 已补齐真实录音决定离线收口：`validate-mandarin-spoken-text-review` + `merge-mandarin-spoken-text-review-decisions` 强制精确队列快照、审核者/时间、人工文本与音频对应门，并以稀疏补丁合并；未提交录音保持 pending，合并产物仍禁止训练导入。
-- 2026-08-23 已将 60 条双人样本产品化为 `/corpus-review/dual-spoken-text`：A/B 角色由两组互斥服务端白名单分配，单账号不能同时伪造两位审核者；页面只提交当前角色标注，`merge-mandarin-dual-review-annotations` 只稀疏更新对应角色，agreement/consensus 仍由离线工具决定。当前 60 条均 pending，音频完整性为 49 可访问、11 缺失。
-- 本轮验证通过：普通话语料脚本 75 项、前端测试 85 项、Python 语料测试 6 项、TypeScript、Next production build（24/24 页面）、AI docs 和 `git diff --check`。Playwright 已确认未登录访问 `/corpus-review` 与 `/corpus-review/spoken-text` 正确回跳并保留 `next`，受保护 API 返回 401，console 为 0 errors/0 warnings；授权审核者页面仍需配置白名单并用真实账号补 smoke。
+- 历史 spoken_text 工作区仅作为可选质量旁路保留，不是录音区或采集覆盖硬门。采集统计改为有效音频 + 非空 target；ASR 只能提示疑似错读/漏读，异常按 `valid / suspected_misread / suspected_omission / long_silence / unusable_audio` 分层，不自动删除样本。旧复核机制不再存在于现役链路。
+- 双人复核已实际从工作树移除：相关页面、路由、脚本、测试、统计/证据包和生成 JSON 均已删除；`git status` 中的 `D` 仅表示删除尚未提交，不表示文件仍在运行。harness 已明确禁止将双人复核、人工 spoken_text 或音频—文本确认作为录音、覆盖或训练导入前置条件。
+- 本轮验证通过：普通话相关定向测试、前端测试、TypeScript、Next production build、AI docs harness 和 `git diff --check`。产品状态新增唯一总计 `recording_ready_total = 568 条 / 568 个唯一文本 / 206 个显式目标`，页面直接消费该事实源；新增开放研究补充包 14 条、覆盖 15 个目标；正式覆盖证据 `mandarin-recording-ready-coverage.json` 现记录 568 条录音就绪题面。Playwright 已确认未登录访问目标录音页会回跳并保留 `next`；真实账号录音和授权审核者交互仍未完成。
+- 2026-08-24 完成覆盖口径修正：`audit-mandarin-coverage.mjs` 新增 `--recording-corpus`，对录音就绪题面同时报告普通字形注音与显式 `coverage_targets`；多音字不再因通用 pinyin 默认读音把明确目标误报为缺失。录音就绪仍不等于真实录音，真实覆盖仍只由 manifest 的有效音频 + 非空 target + 授权/上传契约计数。
+- 2026-08-24 重算历史 manifest 证据：`build-mandarin-collection-evidence.mjs` 已对 10 个本地 manifest 重新生成采集证据，采集资格仍为 1180 条；历史 `prompt.target_focus` 中的“补稳/收住”反馈标签不符合音节—声调格式，已过滤为非显式目标，历史录音显式音节目标覆盖为 0。新增题面的目标链路已补后端 manifest 回归测试，确认 `pronunciation_targets` 写入 `prompt.target_focus` 且设备字段不进入 manifest。下一步必须用真实新增题面录音重算显式覆盖，不能用计划题面数量替代。
+- 2026-08-24 新增可复跑收口命令 `cd frontend && npm run rebuild:mandarin-recording-evidence`：读取两组本地 OSS manifest，派生重建 `mandarin-collection-evidence.json`、`mandarin-recording-ready-coverage.json`、`mandarin-speaker-disjoint-split.json` 和 `mandarin-coverage-product-status.json`；不写入音频、manifest、题库或来源。当前重建结果：1421 行 / 1185 去重 / 1180 采集资格，显式音节—声调目标 0/1242，speaker-disjoint 为 555/429/196、交集 0；真实新增题面录音后直接重跑即可得到真实覆盖。
 
 ## 2026-08-21 沟通入口信息架构收口
 
@@ -311,15 +335,9 @@
    - 当前阻塞项：权威 NS 仍是 `eleven.dnspod.net`、`rich.dnspod.net`，公网 A 仍解析到 `111.230.35.89`；CAM 子账号缺腾讯云 Domain 权限，无法代改注册商 NS。需要用户在腾讯云域名控制台把 NS 改为 `ns1.qeodns.com`、`ns2.qeodns.com`
    - NS 生效后再继续：启用 EdgeOne HTTPS 证书，验证 EdgeOne 响应头，定位源站实例 / Lighthouse 防火墙并限制源站直连
 
-0. 2026-06-28 已把 `2307294809@qq.com` 的沟通页与训练 / 评测页 ASR 路由接到 cpu1 本机 HTTP ASR 服务
-   - 账号 userId：`64758dee-5026-4b53-a063-1d02d0834f67`
-   - [livekit_agent/asr_runtime.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/asr_runtime.py) 的 `QWEN_HTTP_ASR_*` 命中范围已从仅 `communication` 放开到 `communication + training`，因此沟通页和训练评测页共用同一条账号级 HTTP ASR 路由
-   - [docker-compose.yml](/home/ubuntu/VoxFlame-Agent/docker-compose.yml) 中 `livekit-agent` 改为 `network_mode: host`，默认 `QWEN_HTTP_ASR_URL=http://127.0.0.1:18000/transcribe`，默认 `QWEN_HTTP_ASR_USER_IDS=64758dee-5026-4b53-a063-1d02d0834f67`
-   - 因为 `environment` 会覆盖 `livekit_agent/.env`，compose 默认白名单也必须保留该 userId；只改 `livekit_agent/.env` 不足以让容器命中账号路由
-   - `backend` 默认 `LIVEKIT_AGENT_HEALTH_URL` 已改为 `http://host.docker.internal:8081/`，以便 backend 仍在 bridge 网络时检查 host-network 的 livekit-agent
-   - 重启后本机 ASR health 一度返回 `{"status":"ok","backend":"transformers"}`，3 秒评估筛查 WAV 单次转写返回 `发扬`，成功样本耗时约 `0.639s` 和 `1.850s`
-   - 但 `127.0.0.1:18000/transcribe` 连续请求测试出现过瞬时 `connection refused`，随后 `/health` 又恢复；这更像 ASR 服务自身的连续请求 / worker 稳定性问题，不是 VoxFlame 路由逻辑问题。HTTP ASR 失败时 livekit_agent 会按已有逻辑回退 DashScope realtime ASR
-   - 已验证：`python3 -m unittest livekit_agent.tests.test_asr_runtime`、`docker compose config | rg -n "QWEN_HTTP_ASR|network_mode|LIVEKIT_AGENT_HEALTH_URL|LIVEKIT_URL"`、本机 `curl /health` 与单条 `/transcribe`
+0. 2026-06-28 的单账号 HTTP ASR 试接已于 2026-08-24 被统一账户网关取代
+   - 旧的应用侧账号白名单和单账号部署方式已删除，不再作为维护或扩容入口。
+   - 现役契约见本文件顶部“个性化 ASR 统一账户网关”；所有已认证账户统一进入 8001，由模型服务决定个性化或公共 fallback。
 
 0. 2026-06-14 已重新拉取 2026-05-24 之后的 OSS 训练数据增量
    - 使用脚本 [download_oss_by_account.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/download_oss_by_account.ts) 按 `--since 2026-05-24T00:00:00+08:00` 拉取，不覆盖旧目录
@@ -335,7 +353,7 @@
    - 带标点或自然停顿的句子优先在开头 / 标点边界收口，不再为了长度把一句话中间硬断开；只有无标点超长文本才按 20 字左右硬切
    - 前端 [prepared-expression-practice.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/prepared-expression-practice.ts) 继续用 `document_content` 全量生成训练 exercises，保证训练页可练句拼回去等于原材料全文
    - 新增 [prepared-expression.service.test.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/prepared-expression.service.test.ts) 和更新 [prepared-expression-practice.test.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/prepared-expression-practice.test.ts) 覆盖全文不丢、无标点长句硬切和 section metadata 保留
-   - 当前运行中的 `livekit-agent` 容器里 `QWEN_HTTP_ASR_URL` 与 `QWEN_HTTP_ASR_USER_IDS` 均为空；`2307294809@qq.com` 对应 userId `64758dee-5026-4b53-a063-1d02d0834f67` 的私有 HTTP ASR 云部署路由当前没有启用
+   - 当时的单账号私有 ASR 部署状态已失效；现役统一账户网关状态见本文件顶部。
    - 已验证：
    - `cd frontend && npm run build`
    - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --experimental-strip-types -e "import('./src/lib/training/prepared-expression-practice.test.ts').catch((error) => { console.error(error); process.exit(1); })"`

@@ -71,7 +71,6 @@ export interface MobileWorkbenchLiveKitRuntime {
   participantAttributes: Record<string, string>
   agentDispatch: {
     agentName: string
-    metadata: string
   } | null
 }
 

@@ -179,7 +179,8 @@ export function buildMandarinReinforcementPlan({
       maximum_planned_recording_slots_per_prompt: maxPlannedRecordingsPerPrompt,
       planned_slots_are_future_assignments_not_completed_recordings: true,
       recording_slots_do_not_increase_prompt_diversity: true,
-      actual_coverage_requires_human_confirmed_spoken_text_and_audio_text_alignment: true,
+      valid_audio_and_non_empty_target_define_actual_collection_coverage: true,
+      spoken_text_and_audio_text_alignment_are_optional_quality_diagnostics: true,
       sparse_targets_require_new_prompt_authoring_and_human_review: true,
     },
     source: {

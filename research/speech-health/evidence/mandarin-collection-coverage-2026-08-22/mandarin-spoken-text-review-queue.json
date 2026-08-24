@@ -1,6 +1,6 @@
 {
   "kind": "voxflame_mandarin_spoken_text_review_queue",
-  "status": "human_review_required_not_for_training",
+  "status": "optional_quality_review_not_for_training",
   "generated_at": "2026-08-23T06:52:37.580Z",
   "source_manifest_files": [
     "manifest.jsonl",
@@ -16,8 +16,8 @@
   ],
   "policy": {
     "asr_is_hint_only": true,
-    "human_spoken_text_required_for_coverage": true,
-    "audio_text_alignment_required_for_coverage": true,
+    "human_spoken_text_required_for_coverage": false,
+    "audio_text_alignment_required_for_coverage": false,
     "original_manifest_and_audio_are_immutable": true,
     "training_import_allowed": false
   },

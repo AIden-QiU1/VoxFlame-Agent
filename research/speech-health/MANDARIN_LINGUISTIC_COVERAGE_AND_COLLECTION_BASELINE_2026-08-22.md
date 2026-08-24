@@ -32,7 +32,7 @@
 | --- | --- | --- | --- | --- |
 | Lee & Zee, *Standard Chinese (Beijing)*, JIPA, DOI `10.1017/S0025100303001208` | 2003；2026-08-22 下载原文，4 页，SHA-256 `fbfca75de9c066825c6b94fffa5718b63976cdcb760fea62c1650971fb0edddf` | 同行评审的一级语音学描述 | 辅音、元音/复韵、四本调、轻声条件、三声变调与儿化等音系层事实 | 描述北京受教育青年语音，不能单独代表所有普通话地区、年龄和病因人群 |
 | `mozillazg/pinyin-data` 的 `kMandarin_8105.txt` | commit `923b108d...`，源文件 SHA-256 `1b1546f6...`，MIT | 可版本化的规范汉字常用读音工程参考 | 由 2013《通用规范汉字表》8105 字的最常用读音生成 402 个无调音节和 1242 个音节—声调形式的可复跑基线 | 上游有 410 行标记待验证/争议；是常用字单一常用读音，不是完整词典、词频或所有多音词读音 |
-| 前端现役题库与音系索引 | 本仓库 2026-08-23 工作树 | 本地实现事实 | 当前 9107 条题目、9 个主题；5 条明确“学习包”商业污染已从前端题面副本退出 | “音系强化”原句池不是完整音系覆盖；总量和主题分类不能证明采集计划均衡 |
+| 前端现役题库与音系索引 | 本仓库 2026-08-24 工作树 | 本地实现事实 | 9107 条基础题面 + 263 条核心补音 + 291 条低频补强 + 14 条开放研究补充录音就绪题面，共 9675 条索引项；5 条明确“学习包”商业污染已从前端题面副本退出 | “音系强化”原句池不是完整音系覆盖；总量和主题分类不能证明采集计划均衡 |
 | CC-CEDICT | 2026-08-22 快照，SHA-256 `f552a8f4...`，CC BY-SA 4.0 | 开放现代汉语词典候选源 | 建立“音节—声调 → 汉字 → 现代词语”承载层，并发现核心参考之外的词汇读音 | 词典含专名、方言、古语、拟声、轻声和待核条目，不定义普通话完整库存，不能直接上线 |
 | 本机去标识化应用 manifest | 10 个文件；记录时间截至 2026-06-14 | 真实应用采集事实 | 可审计目标文本、ASR、质量、授权、类别与音频时长 | 含历史快照重复；没有独立人工 `spoken_text`；不等于模型主训练集 |
 | CLEAR-VOX-MODEL EXP-1/2/13/17 与主索引 | submodule `0997c0d` | 固定实验事实 | 明确错配清理有价值；高 CER 不能直接删重度说话人；标准拼音 CTC、机械最小对立文本增强没有稳定突破 | 当前机器未挂载 `/qiu/data/.../cdsd` 主训练 JSONL，本轮不能逐条复算其语言学覆盖 |
@@ -47,7 +47,7 @@
 
 | 指标 | 结果 | 解释 |
 | --- | ---: | --- |
-| 题目 | 9107 条，全部文本唯一 | 相比 9112 仅退出 5 条“学习包”商业污染；历史录音、manifest 和原始来源未删除 |
+| 题目 | 9107 条基础题面，另有 568 条录音就绪补音题面 | 相比 9112 仅退出 5 条“学习包”商业污染；新增补音为旁路录音资产，历史录音、manifest 和原始来源未删除 |
 | 声母 | `22/22` present；`22/22` robust | 一级声母库存不是当前主要缺口 |
 | 规范化韵母 | `38/39` present；`37/39` robust | `ê` 缺失，`ueng` 低于 20 次；是否纳入产品必采仍需词汇与专家复核 |
 | 常用无调音节 | `386/402 = 96.0%` present；`318/402 = 79.1%` robust | 缺 16 个；另有 68 个仅低频出现 |
@@ -65,15 +65,15 @@
 | 说话人 / session / 音频 | 9 / 48 / 约 2.568 小时 | 规模不足以代表构音障碍人群，只能做管线与早期覆盖诊断 |
 | 常用无调音节 | `339/402 = 84.3%` present；`141/402 = 35.1%` robust | 已采覆盖明显低于题库，推荐逻辑没有按个人/群体缺口闭环 |
 | 常用音节—声调形式 | `708/1242 = 57.0%` present；`135/1242 = 10.9%` robust | 需要按缺口推荐，而不是在大池中随机轮换 |
-| 独立人工实际转写 | `0/1185` | Critical：当前只有目标文本与部分 ASR 原始结果，不能可靠刻画真实说出内容 |
+| 独立人工实际转写 | `0/1185` | 质量诊断尚未完成；不影响有效音频 + `target` 的采集覆盖统计 |
 | ASR 原始结果 | `810/1185 = 68.4%` | 可做诊断候选，不能替代人工 `spoken_text` |
 | 质量状态 | 仅 166 条 `high_confidence`；798 条 `review`；64 条 `low_confidence`；157 条缺状态 | 进入微调前必须建立显式候选/复核/排除队列 |
 
-真实覆盖复核已形成可重复证据包：[mandarin-spoken-text-review-queue.json](evidence/mandarin-collection-coverage-2026-08-22/mandarin-spoken-text-review-queue.json) 包含 1185 条去标识化全量人工复核项，当前全部 `pending`，覆盖资格为 0；[mandarin-dual-spoken-text-review-queue.json](evidence/mandarin-collection-coverage-2026-08-22/mandarin-dual-spoken-text-review-queue.json) 按类别与音频质量确定性分层抽取 60 条双人复核样本。音频完整性核验结果为 49 条可访问、11 条在当前本地材料中缺失，故双人样本完整性门未通过、一致性覆盖资格为 0。该结果只记录复核阻断，不删除历史 manifest 或录音记录。
+真实录音质量诊断已形成可重复证据包：[mandarin-spoken-text-review-queue.json](evidence/mandarin-collection-coverage-2026-08-22/mandarin-spoken-text-review-queue.json) 包含 1185 条去标识化可选诊断项。采集覆盖不依赖人工文本；当前按有效音频、非空 `target`、授权 scope 与上传契约计入 1180 条 collected。该结果只记录质量诊断，不删除历史 manifest 或录音记录。
 
-这批历史录音现已生成受保护的 `/corpus-review/spoken-text` 复核工作区（`mandarin-spoken-text-review-workspace.json`）。审核者只能通过服务端白名单访问不透明 `recording_id` 对应的受控音频，ASR 只作为非权威提示；人工 `spoken_text`、音频—文本对应确认和审核状态均由人工填写。本机草稿与决定 JSON 不会直接写生产语料，工作区的 `training_import_allowed` 固定为 `false`。在全量复核、双人抽样音频完整性和一致性门通过前，任何历史录音都不计入真实音系覆盖或训练导入。
-浏览器导出的决定包还必须经过 `validate-mandarin-spoken-text-review` 与 `merge-mandarin-spoken-text-review-decisions`：决定包的 `source_generated_at` 必须精确匹配队列快照，提交项必须有审核者/时间，批准必须同时具备人工文本和 `confirmed` 对应；合并采用稀疏补丁，未提交项保持原状态，合并产物仍禁止训练导入。
-双人样本另有受保护的 `/corpus-review/dual-spoken-text` 工作区。A/B 角色来自两组互斥服务端邮箱白名单；单个账号无法同时获得两个角色。每位审核者只能导出自己的稀疏标注决定，`merge-mandarin-dual-review-annotations` 只更新对应角色，不能直接改变 `agreement_status` 或 `consensus`。双方一致、分歧和仲裁仍必须经过离线校验，且音频完整性门失败时不计入一致性覆盖。
+这批历史录音现已生成受保护的 `/corpus-review/spoken-text` 可选诊断工作区（`mandarin-spoken-text-review-workspace.json`）。审核者只能通过服务端白名单访问不透明 `recording_id` 对应的受控音频，ASR 只作为非权威提示；人工 `spoken_text` 和音频—文本对应确认用于定位错读、漏读等质量问题，不改变采集覆盖资格。本机草稿与决定 JSON 不会直接写生产语料，工作区的 `training_import_allowed` 固定为 `false`。
+浏览器导出的决定包仍可经过 `validate-mandarin-spoken-text-review` 与 `merge-mandarin-spoken-text-review-decisions` 做离线诊断收口；它不阻塞录音、不改变有效音频 + `target` 的覆盖统计，也不允许直接训练导入。
+双人复核已从当前产品、脚本、统计路径和证据包移除，不参与录音、采集覆盖或训练导入；历史原始材料不因该支线而删除。
 
 ## 分区模型
 
@@ -101,7 +101,7 @@
 
 ### 现役旁路索引与人工复核门禁
 
-现有题库已经生成 [mandarin-linguistic-index.json](../../frontend/src/lib/corpus/generated/mandarin-linguistic-index.json) 旁路索引，覆盖现役 9107/9107 条。它保留正常题目、原文本和原始主题类别；仅已确认的 5 条“学习包”商业污染不再进入前端题面。每条记录只有一个互斥 `task_id`，同时可以拥有多个声母、韵母、声调、音节—声调、声调对、音节位置和连续语流标签。
+现有题库已经生成 [mandarin-linguistic-index.json](../../frontend/src/lib/corpus/generated/mandarin-linguistic-index.json) 旁路索引，覆盖基础题面和新增补音共 9675 条。它保留正常题目、原文本和原始主题类别；仅已确认的 5 条“学习包”商业污染不再进入前端题面。每条记录只有一个互斥 `task_id`，同时可以拥有多个声母、韵母、声调、音节—声调、声调对、音节位置和连续语流标签。
 
 当前按真实入口映射的任务统计为：
 
@@ -120,16 +120,16 @@ Tatoeba 300 条候选的人工复核门禁已建立，当前 300/300 条均为 `
 
 [mandarin-coverage-target-ledger.json](../../frontend/src/lib/corpus/generated/mandarin-coverage-target-ledger.json) 已逐项记录 1242 个核心音节—声调的当前命中数、覆盖状态、承载汉字、CC-CEDICT 现代词候选、按整句实际读音验证的 Tatoeba 候选，以及 `core / edge / disputed` 产品路由。分层只决定推荐风险，不替代语言学终审。
 
-- 现役 9107 条题库（8771 条外部生成子池 + 336 条人工策划/固定评估项）：`569 robust / 456 below_minimum / 217 missing`。相对历史 9112 条只退出 5 条“学习包”商业污染；不能把生成子池数量误读为正常语料被额外删除。
+- 基础题库仍为 9107 条（8771 条外部生成子池 + 336 条人工策划/固定评估项），另有 263 条核心补音和 291 条低频补强录音就绪题面；覆盖台账对基础题库仍为 `569 robust / 456 below_minimum / 217 missing`。相对历史 9112 条只退出 5 条“学习包”商业污染；不能把生成子池数量误读为正常语料被额外删除。
 - 217 个硬缺口经同步重建后分为 `88 core / 121 edge / 8 disputed`。默认核心必须有非高负担现代词承载、整词读音证据及现役题库或开放句料使用证据；只凭“搜到一句”、单字字形命中、专名或纯词典冷门词不再进入默认核心。主要依赖贬损、地域、醉酒、虐待或犯罪承载词的形式保留在全音台账，但路由到边缘专项。
 - 核心第一阶段：[mandarin-core-gap-phase1-review.json](evidence/mandarin-collection-coverage-2026-08-22/mandarin-core-gap-phase1-review.json) 为 88 个核心硬缺口各准备 3 个不同候选，共 263 条唯一文本（88 词、175 短句；1 条短句同时覆盖两个目标）。选择结构固定为每目标 `1 个整词锚点 + 2 个句境`；全部 175 条句境都必须记录句内连续整词及其整词拼音，缺证据的人工句不会进入候选池。词锚点优先中性现代承载词，已将 `歹徒/懒惰/醉醺醺/挣扎/产卵/烫伤` 等高负担默认锚点替换为同音目标下的 `好歹/掌舵/烟熏/炸鱼/鹅卵石/烫发`。六项审核均为 `pending`，因此 [mandarin-approved-core-gap-corpus.json](../../frontend/src/lib/corpus/generated/mandarin-approved-core-gap-corpus.json) 当前严格导出 0 条。
 - 边缘专项：[mandarin-edge-gap-review.json](evidence/mandarin-collection-coverage-2026-08-22/mandarin-edge-gap-review.json) 单列 121 个硬缺口；包括只有词典证据、地域/轻声口径冲突、感叹/专门用途或默认用户负担偏高的承载形式。
 - 争议读音：8 个硬缺口保持下线，语言学审核前不进入任何用户任务。
 - 核心参考之外：[mandarin-lexical-extension-review.json](evidence/mandarin-collection-coverage-2026-08-22/mandarin-lexical-extension-review.json) 发现 311 个词汇读音形式（225 轻声、68 个既有音节额外声调、18 个额外词汇音节）。它们只作发现审核，不计入当前覆盖分母。
 
-录音区已接入安全发布状态：原有按音组练习完整保留；“核心补音”只读取六项审核全部通过的导出；边缘音不进入默认推荐，争议项永不展示。界面当前如实显示“候选 88/88 项备齐、已批准 0 条”，不会把研究候选误当生产语料。台账、候选、批准导出和产品状态必须具有同一来源指纹与目标集合，否则构建失败。
+录音区已接入安全发布状态：原有按音组练习完整保留，并将“核心补音”（263 条）、“开放研究补充”（14 条）和“低频补强”（291 条）作为互斥可见任务组；开放研究补充单独标为非教材来源、非训练导入批准。边缘音不进入默认推荐，争议项永不展示。界面当前如实显示“候选 88/88 项备齐、已批准 0 条”，不会把研究候选误当生产语料。台账、候选、批准导出和产品状态必须具有同一来源指纹与目标集合，否则构建失败。
 
-456 个 `below_minimum` 目标另有独立的 [mandarin-below-minimum-reinforcement-plan.json](../../frontend/src/lib/corpus/generated/mandarin-below-minimum-reinforcement-plan.json) 采集调度产物。它不新增或删除原题库，只从现役 9107 条安全题面中选择可复用材料：455 个默认核心目标进入计划，1 个争议目标保持下线；共选出 835 条题面、分配 2998 个未来采集槽位，309 项完整分配建议槽位，146 项因安全题面不足只做部分分配。产品端使用轻量 [mandarin-reinforcement-product-index.json](../../frontend/src/lib/corpus/generated/mandarin-reinforcement-product-index.json)，避免将完整研究字段打入浏览器包。
+456 个 `below_minimum` 目标仍有独立的 [mandarin-below-minimum-reinforcement-plan.json](../../frontend/src/lib/corpus/generated/mandarin-below-minimum-reinforcement-plan.json) 采集调度产物：基础题库调度仍为 835 条题面、2998 个未来采集槽位。另从 346 条低频语境候选中按同一机器语言/安全/长度/来源门放行 291 条新增录音就绪题面，覆盖 116 个目标；它们进入独立 `mandarin-recording-reinforcement-corpus.json`，不把计划槽位误报为已录音。
 
 这里的单位必须保持分离：`current_prompt_hits / prompt_deficit_to_minimum` 描述题面多样性，`planned_recording_slots` 只描述未来采集调度，`actual_confirmed_recording_hits` 当前保持 `null`。重复安排同一题面不会提高题面多样性，也不能在录音完成前提高真实覆盖。455 个默认低频目标的题面多样性仍低于 20 次门槛；后续补写必须继续经过语言学、自然度、用户负担、安全、许可和产品审核。
 
@@ -166,7 +166,7 @@ CC-CEDICT 与完整 Tatoeba 导出随后被用于构建词语承载层和第一�
   -> 语言学与质量缺口
   -> 授权语料候选 + 人工复核
   -> 小规模采集（固定 speaker/session/anchor）
-  -> 人工 spoken_text + 音频完整性门
+  -> 可选 spoken_text 质量诊断 + 音频质量分层
   -> 固定 CDSD baseline 的增量消融微调
   -> overall / worst speaker / severity / 1–3字 / 音系混淆 / 延迟
   -> 目标用户真实沟通成功率与疲劳
@@ -180,6 +180,6 @@ CC-CEDICT 与完整 Tatoeba 导出随后被用于构建词语承载层和第一�
 ## 决策
 
 - 状态：`validate`
-- 最小切片：已完成覆盖审计、全量目标台账、证据收紧后的核心/边缘/争议分层、263 条核心待审候选、六项发布门、456 个低频目标采集调度、346 条低频语境候选、28 个结构化专家 brief、1185 条人工转写复核队列、60 条双人抽样、受保护的 `/corpus-review/spoken-text` 与 `/corpus-review/dual-spoken-text` 工作区及录音区真实覆盖状态；下一切片是补齐 11 条抽样音频或重采可用样本，再由两位独立审核者完成转写、一致性/仲裁和候选审核，不扩大未审核生产语料。
+- 最小切片：已完成覆盖审计、全量目标台账、证据收紧后的核心/边缘/争议分层、263 条核心待审候选、291 条低频补强录音就绪题面、14 条开放研究补充录音就绪题面、六项发布门、456 个低频目标采集调度、346 条低频语境候选、28 个结构化专家 brief、1185 条可选 spoken-text 诊断队列、受保护的 `/corpus-review/spoken-text` 工作区、录音区真实覆盖状态和 speaker-disjoint 数据切分；下一切片是直接采集新增 568 条补音并按错读、漏读、长空白和不可用音频做质量分层，再完成固定测试集模型评测，不把人工诊断或切分产物变成覆盖/收益前置。
 - 回退方式：审计和新标签均为离线旁路，不改变现役录音/上传合同；删除生成报告即可回退。
 - 验证信号：覆盖缺口可复跑；模型主 manifest 挂载后能用同一 CLI 审计；语言学专家抽检一致性；用户完成率、跳过率、休息率；固定模型消融不回退。

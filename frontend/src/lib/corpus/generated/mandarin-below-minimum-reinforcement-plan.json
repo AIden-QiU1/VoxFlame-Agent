@@ -1,6 +1,6 @@
 {
   "kind": "voxflame_mandarin_below_minimum_reinforcement_plan",
-  "generated_at": "2026-08-23T03:55:32.611Z",
+  "generated_at": "2026-08-24T03:50:10.473Z",
   "policy": {
     "linguistic_ledger_is_primary": true,
     "uses_only_current_active_prompts": true,
@@ -9,13 +9,14 @@
     "maximum_planned_recording_slots_per_prompt": 4,
     "planned_slots_are_future_assignments_not_completed_recordings": true,
     "recording_slots_do_not_increase_prompt_diversity": true,
-    "actual_coverage_requires_human_confirmed_spoken_text_and_audio_text_alignment": true,
+    "valid_audio_and_non_empty_target_define_actual_collection_coverage": true,
+    "spoken_text_and_audio_text_alignment_are_optional_quality_diagnostics": true,
     "sparse_targets_require_new_prompt_authoring_and_human_review": true
   },
   "source": {
     "current_prompt_items": 9107,
     "ledger_generated_at": "2026-08-23T03:08:02.373Z",
-    "linguistic_index_generated_at": "2026-08-23T02:16:28.820Z",
+    "linguistic_index_generated_at": "2026-08-24T03:46:29.349Z",
     "minimum_hits": 20
   },
   "summary": {

@@ -1,6 +1,6 @@
 {
   "kind": "voxflame_mandarin_reinforcement_product_index",
-  "generated_at": "2026-08-23T03:55:32.611Z",
+  "generated_at": "2026-08-24T03:50:10.473Z",
   "source_kind": "voxflame_mandarin_below_minimum_reinforcement_plan",
   "policy": {
     "active_safe_prompts_only": true,

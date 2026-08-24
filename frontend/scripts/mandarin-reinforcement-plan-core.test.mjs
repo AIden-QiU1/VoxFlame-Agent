@@ -44,6 +44,7 @@ test('reinforcement plan uses active safe prompts without calling planned slots 
   assert.equal(plan.targets.find((target) => target.syllable_tone === 'shan1').status, 'collection_slots_allocated')
   assert.equal(plan.targets.find((target) => target.syllable_tone === 'zhuai1').status, 'held_disputed')
   assert.equal(plan.policy.planned_slots_are_future_assignments_not_completed_recordings, true)
+  assert.equal(plan.policy.valid_audio_and_non_empty_target_define_actual_collection_coverage, true)
   assert.equal(plan.targets.every((target) => target.actual_confirmed_recording_hits === null), true)
   const productIndex = buildMandarinReinforcementProductIndex(plan)
   assert.deepEqual(Object.keys(productIndex.items), ['safe'])

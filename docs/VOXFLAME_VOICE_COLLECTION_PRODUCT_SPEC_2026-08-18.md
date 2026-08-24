@@ -54,7 +54,7 @@
 - `audio_text_alignment`：材料 ID 与录音 100% 对齐；错配为 Critical，整批回查。
 - `raw_master_preserved`：原始母版 100% 保留；任何格式转换不得覆盖母版，训练副本需能通过 recording ID 追溯。
 - `usable_recording_ratio`：首批目标 >95%；设备问题补采，构音差异不因“说得不标准”淘汰。
-- `transcript_review`：首批至少 20% 双人复核，稳定后不低于 10%。
+- `transcript_review`：录音后可按质量问题抽查实际转写；抽查比例、阈值和停止条件必须在对应证据包中版本化，不能阻塞有效音频 + `target` 的采集。
 - `speaker_split`：训练/验证/测试按 `speaker_id` 隔离，不能把同人音频拆到不同集合。
 - `session_anchor_coverage`：首批目标 >90% 的说话人完成至少两次 Anchor；低于目标只标记缺失，不伪造样本。
 - `inappropriate_content`：不收录与目标任务无关的广告导流、色情、直接暴力/血腥、严重 ASR 破损和可识别个人敏感信息。普通医疗求助和真实障碍表达不因敏感词误删。

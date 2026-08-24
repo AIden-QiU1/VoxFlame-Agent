@@ -17,61 +17,3334 @@
       "label": "双唇与唇齿音",
       "shortLabel": "b p m f",
       "description": "练双唇闭合、送气和下唇接触上齿。",
-      "count": 252
+      "count": 281
     },
     {
       "id": "tongue-tip-mid",
       "label": "舌尖中音",
       "shortLabel": "d t n l",
       "description": "练舌尖抵住上齿龈后的阻塞、送气和鼻音。",
-      "count": 725
+      "count": 775
     },
     {
       "id": "velar",
       "label": "舌根音",
       "shortLabel": "g k h",
       "description": "练舌根抬起后的阻塞、送气和摩擦。",
-      "count": 196
+      "count": 205
     },
     {
       "id": "palatal",
       "label": "舌面音",
       "shortLabel": "j q x",
       "description": "练舌面前部接近硬腭时的细致控制。",
-      "count": 518
+      "count": 551
     },
     {
       "id": "sibilants",
       "label": "平舌与翘舌音",
       "shortLabel": "z c s / zh ch sh r",
       "description": "对照平舌和翘舌位置，减少连续语流中的混淆。",
-      "count": 1445
+      "count": 1517
     },
     {
       "id": "nasal-finals",
       "label": "前后鼻韵母",
       "shortLabel": "n / ng 韵尾",
       "description": "练前鼻音和后鼻音韵尾的收束位置。",
-      "count": 2041
+      "count": 2175
     },
     {
       "id": "compound-finals",
       "label": "复韵母",
       "shortLabel": "ai ei ao ou 等",
       "description": "练口形在一个音节内平稳滑动，不吞掉韵尾。",
-      "count": 1472
+      "count": 1569
     },
     {
       "id": "tones",
       "label": "声调与变调",
       "shortLabel": "四声 / 一不变调",
       "description": "练四声对比、三声连读，以及“一”“不”的语流变调。",
-      "count": 2235
+      "count": 2377
     }
   ],
-  "indexed_exercise_count": 2973,
-  "source_exercise_count": 2973,
+  "indexed_exercise_count": 3186,
+  "source_exercise_count": 3235,
   "items": {
+    "coverage-recording-gap-sentence-10280146": [
+      {
+        "id": "compound-finals",
+        "focus": "ao / ia / ou / ei / ua",
+        "score": 6
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / l",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-10303602": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 一字变调",
+        "score": 6
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh / z",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uo / ai",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-1102436": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ia / ou / ai",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / an",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-13549567": [
+      {
+        "id": "compound-finals",
+        "focus": "uo / ao / ai",
+        "score": 6
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / d / n",
+        "score": 6
+      }
+    ],
+    "coverage-recording-gap-sentence-13972589": [
+      {
+        "id": "labial",
+        "focus": "b / m / p",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "iao / ao",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-1505020": [
+      {
+        "id": "compound-finals",
+        "focus": "ai / ia / ao",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "q / j / x",
+        "score": 4
+      },
+      {
+        "id": "velar",
+        "focus": "h",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-1584111": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "iang / un / ang / eng",
+        "score": 5
+      },
+      {
+        "id": "velar",
+        "focus": "g / h",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-2250635": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 不字变调",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "un / ong / en / ing",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "q / x",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-2440699": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "j / x",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-2757108": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ong / an / eng / ing",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ua / uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-332603": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "an / ian / in / ong",
+        "score": 5
+      },
+      {
+        "id": "palatal",
+        "focus": "j / x",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-332742": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "n / l / d",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "c / s",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-333374": [
+      {
+        "id": "compound-finals",
+        "focus": "ie / ao / ou / uo / ai",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "an / ong / en / ing",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-3338901": [
+      {
+        "id": "sibilants",
+        "focus": "sh / ch / r",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d / n",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-334882": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / l",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-335486": [
+      {
+        "id": "nasal-finals",
+        "focus": "iang / ing / ang / in",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / n / d",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-336183": [
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / l / d",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ang / in",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-343998": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 一字变调",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / eng / iang / ing / ang",
+        "score": 5
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d / l",
+        "score": 5
+      }
+    ],
+    "coverage-recording-gap-sentence-345277": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / eng / en",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ie / uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-346693": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读 / 一字变调",
+        "score": 8
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "in / en / ang",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "z / zh / s",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-346835": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / ao / ou",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "eng / uan / uang",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-347415": [
+      {
+        "id": "compound-finals",
+        "focus": "ie / ei / uo",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "q / j / x",
+        "score": 4
+      },
+      {
+        "id": "labial",
+        "focus": "b",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-350674": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / uan / ang",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / z",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-353692": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 一字变调",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ei / ia",
+        "score": 3
+      },
+      {
+        "id": "labial",
+        "focus": "b / m",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-358981": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "an / iang",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ie / uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-380719": [
+      {
+        "id": "nasal-finals",
+        "focus": "uan / an / en",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "ch / r",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-4117357": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / ie",
+        "score": 2
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / z",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-414151": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / l / n",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "iao / ai / ao",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-4262102": [
+      {
+        "id": "nasal-finals",
+        "focus": "ing / an / ong / ian",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / l",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-4262103": [
+      {
+        "id": "nasal-finals",
+        "focus": "ing / an / ong / ian",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / l",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-430661": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ao / ei",
+        "score": 2
+      },
+      {
+        "id": "labial",
+        "focus": "b",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-431002": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "an / un / uang",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d / l",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-433470": [
+      {
+        "id": "nasal-finals",
+        "focus": "uan / eng / en / ang",
+        "score": 5
+      },
+      {
+        "id": "palatal",
+        "focus": "q / x / j",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-464754": [
+      {
+        "id": "palatal",
+        "focus": "j / q / x",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "in / ing / ang",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-466234": [
+      {
+        "id": "sibilants",
+        "focus": "c / zh / sh / z",
+        "score": 6
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比 / 一字变调",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uo / ao",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-469426": [
+      {
+        "id": "nasal-finals",
+        "focus": "un / en / ong / ing",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / c",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-476650": [
+      {
+        "id": "tongue-tip-mid",
+        "focus": "n / d",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ang / ong",
+        "score": 2
+      },
+      {
+        "id": "sibilants",
+        "focus": "z / sh",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-6111937": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / en / an",
+        "score": 3
+      },
+      {
+        "id": "labial",
+        "focus": "p / m",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-676993": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / uo / ai",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / en / in",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-6940192": [
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / d",
+        "score": 6
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "c / sh / s",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-796917": [
+      {
+        "id": "nasal-finals",
+        "focus": "ian / en / ang / iang / ing",
+        "score": 7
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "j / q",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-805226": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d / l",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "iao",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-832799": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / z",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uo / ie",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-834381": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "un / ong",
+        "score": 2
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / r",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-875262": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读 / 不字变调",
+        "score": 8
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / zh / z",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ao / ou / ai / uo",
+        "score": 5
+      }
+    ],
+    "coverage-recording-gap-sentence-9049749": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ei / ao",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / ing / uang",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ang1-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / ang",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uai / ou",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ang1-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "ing / uan / ang / in",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "iao / ao",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ang4-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "un / ian / ong / uan / ang / an",
+        "score": 6
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d / l",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "ch / r",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ang4-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 一字变调",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "uan / ian / eng / ang / an",
+        "score": 5
+      },
+      {
+        "id": "sibilants",
+        "focus": "z / sh / r",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ao1-001": [
+      {
+        "id": "labial",
+        "focus": "m / b / p",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uai / ao",
+        "score": 2
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / ing",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-bei0-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ei / ou",
+        "score": 2
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / uan",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-bo3-001": [
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / l",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / ie",
+        "score": 2
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "uan / ian",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-bo3-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "an / ang / ian",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / ie",
+        "score": 2
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-bo4-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读 / 一字变调",
+        "score": 8
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ao / ei",
+        "score": 2
+      },
+      {
+        "id": "labial",
+        "focus": "b",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-can3-001": [
+      {
+        "id": "sibilants",
+        "focus": "zh / ch / s / z / c",
+        "score": 6
+      },
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ang / ong / an",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-can3-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "in / ian / eng / an",
+        "score": 5
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / ie",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-chai2-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 一字变调",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / ai / uo",
+        "score": 5
+      },
+      {
+        "id": "velar",
+        "focus": "h",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-che3-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / uan",
+        "score": 3
+      },
+      {
+        "id": "palatal",
+        "focus": "j / q",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-che3-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / ian",
+        "score": 4
+      },
+      {
+        "id": "labial",
+        "focus": "b / m",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-cheng3-001": [
+      {
+        "id": "sibilants",
+        "focus": "zh / z / ch",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ei / ou",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-cheng3-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d / n",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / eng",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-chong4-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "ian / ing / en / ong / in",
+        "score": 6
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "palatal",
+        "focus": "q / j",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-chong4-002": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "uan / en / ong / in",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / ch",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-chuo1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "labial",
+        "focus": "b / p",
+        "score": 3
+      },
+      {
+        "id": "palatal",
+        "focus": "q",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-chuo1-002": [
+      {
+        "id": "sibilants",
+        "focus": "ch / zh",
+        "score": 3
+      },
+      {
+        "id": "labial",
+        "focus": "b / p",
+        "score": 2
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / ang",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ci1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / ou / ia",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / an / in",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-cuan4-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "ing / uan",
+        "score": 3
+      },
+      {
+        "id": "palatal",
+        "focus": "q / j",
+        "score": 2
+      },
+      {
+        "id": "sibilants",
+        "focus": "c / sh",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-cuan4-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "en / ian / in / uan",
+        "score": 5
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / c",
+        "score": 3
+      },
+      {
+        "id": "palatal",
+        "focus": "j",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-cuo1-001": [
+      {
+        "id": "tones",
+        "focus": "一字变调",
+        "score": 5
+      },
+      {
+        "id": "palatal",
+        "focus": "j / q",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ia / ie / uo",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-cuo1-002": [
+      {
+        "id": "palatal",
+        "focus": "x / q / j",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / ie / uo",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ong / en",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-dai3-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / ong",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-dai3-002": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / an / ang",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ao / ai",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-duo4-001": [
+      {
+        "id": "sibilants",
+        "focus": "z / ch / zh",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / uan / ang / eng",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / uo",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-duo4-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "in / ian / ang",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-e1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "iao / ai",
+        "score": 2
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / eng",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-e1-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "iao / ao",
+        "score": 3
+      },
+      {
+        "id": "labial",
+        "focus": "m / f / b",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-fei3-001": [
+      {
+        "id": "compound-finals",
+        "focus": "ai / ei / ia",
+        "score": 4
+      },
+      {
+        "id": "labial",
+        "focus": "b / f",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-fei3-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ei / ie",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / c",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ga1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "in / an / en",
+        "score": 4
+      },
+      {
+        "id": "labial",
+        "focus": "m / f",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ga1-002": [
+      {
+        "id": "compound-finals",
+        "focus": "ai / ia",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "z / r",
+        "score": 2
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / t",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ga2-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / n / t",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ga2-002": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ang / ian / ing",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "n / t / d",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-gong3-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "uan / ong / en",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-gong3-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "en / ong / ing",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ia / uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ha2-001": [
+      {
+        "id": "tones",
+        "focus": "一字变调",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ang / ian / un",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "ch / zh",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-ha2-002": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "velar",
+        "focus": "h",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / iao",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-han1-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "an / eng / ian / iang",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-hao1-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 4
+      },
+      {
+        "id": "velar",
+        "focus": "k / h",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ao",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-hong3-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "en / eng / in / ong / uan",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ia / ai",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-hong3-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "ing / eng / ong / uan",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / z",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-hong4-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ie / ai",
+        "score": 2
+      },
+      {
+        "id": "labial",
+        "focus": "m / b",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-hong4-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "uan / ong / ang / en",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh / r",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-hou3-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 一字变调",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "uan / en / eng",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "ch / zh / sh",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-hou3-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "ang / an / uan / eng",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "z / r / ch / sh",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / t",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-kua3-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ua / iao",
+        "score": 2
+      },
+      {
+        "id": "palatal",
+        "focus": "j / q",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-kui3-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / ei",
+        "score": 3
+      },
+      {
+        "id": "velar",
+        "focus": "h / k",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-kui3-002": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / ei",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / zh",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-kun3-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / iang / un / ang",
+        "score": 4
+      },
+      {
+        "id": "labial",
+        "focus": "b",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-kun3-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "ian / un / ang / eng",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "palatal",
+        "focus": "x",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-la3-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / eng / in",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / d",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-la3-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "en / uan / eng",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / ai",
+        "score": 2
+      },
+      {
+        "id": "labial",
+        "focus": "m / b",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-lei1-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / eng / in / ian",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "q / j",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-lei1-002": [
+      {
+        "id": "tones",
+        "focus": "一字变调",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / l",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / ou",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-lin1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / l",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-lin1-002": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ao / ai",
+        "score": 2
+      },
+      {
+        "id": "labial",
+        "focus": "b",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-luan3-001": [
+      {
+        "id": "sibilants",
+        "focus": "z / zh / sh",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "uan",
+        "score": 2
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-luan3-002": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / uan",
+        "score": 2
+      },
+      {
+        "id": "palatal",
+        "focus": "j / q",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-luo1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uo / ie",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ong / ian / ing / an",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-luo1-002": [
+      {
+        "id": "compound-finals",
+        "focus": "uo / ai",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh / s",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / t / l",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-luo3-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ong / an / eng / ing",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ua / uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-mang3-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / ang",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ie / uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-mang3-002": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ong / uan / ang",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / l / t",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-men4-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "ang / ian / ong / en",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "j / q / x",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-men4-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "in / ian / en",
+        "score": 6
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-nei3-001": [
+      {
+        "id": "tones",
+        "focus": "不字变调",
+        "score": 5
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ao / ei",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / n",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-niang4-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "eng / un / iang",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / r / z",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ua / ai",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-niang4-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "uan / eng / un / iang / in / ang / an",
+        "score": 7
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d / n",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / z",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-nie1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / n / t",
+        "score": 4
+      },
+      {
+        "id": "velar",
+        "focus": "k / h",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-nie1-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / n / t",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / iang / ian",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-nie4-001": [
+      {
+        "id": "tones",
+        "focus": "一字变调",
+        "score": 5
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh / z",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uo / ie",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-nie4-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "ing / ong / ian",
+        "score": 3
+      },
+      {
+        "id": "palatal",
+        "focus": "q / j",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ie / ia",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-piao3-001": [
+      {
+        "id": "compound-finals",
+        "focus": "uai / ai / ao / iao",
+        "score": 5
+      },
+      {
+        "id": "labial",
+        "focus": "b / p",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-piao3-002": [
+      {
+        "id": "compound-finals",
+        "focus": "iao / ai",
+        "score": 3
+      },
+      {
+        "id": "labial",
+        "focus": "p / b / f",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "z",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-pie1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / ie",
+        "score": 2
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ang / ian",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-pie1-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "en / un / ong / ian / eng",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / ie / ou",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-po0-001": [
+      {
+        "id": "compound-finals",
+        "focus": "ai / iao / ua",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "in / ian / ang",
+        "score": 3
+      },
+      {
+        "id": "labial",
+        "focus": "p",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-po0-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 一字变调",
+        "score": 6
+      },
+      {
+        "id": "labial",
+        "focus": "p / b",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "q",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-qiao4-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "uan / an / en",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-qiao4-002": [
+      {
+        "id": "compound-finals",
+        "focus": "ou / ie / iao",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / ang / an",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-qin3-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "in / an / ang / un / eng",
+        "score": 5
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / zh",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-qin3-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / in / an",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "q / j",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-qiu3-001": [
+      {
+        "id": "sibilants",
+        "focus": "zh / sh / r / ch",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / ang",
+        "score": 2
+      },
+      {
+        "id": "palatal",
+        "focus": "j / q",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-qiu3-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou / ei",
+        "score": 2
+      },
+      {
+        "id": "palatal",
+        "focus": "q / x",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-rao2-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / d / t",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh / r",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-rao2-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "ian / ing / uan / an",
+        "score": 4
+      },
+      {
+        "id": "labial",
+        "focus": "p / f",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / ch / r",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-reng1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / ong / eng",
+        "score": 4
+      },
+      {
+        "id": "labial",
+        "focus": "b / p",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-reng1-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uai / iao",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-rong3-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "en / ing / ong / ang",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh / r / ch",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-rong3-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "ing / an / ong / ang / uan",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / r / ch",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-rui3-001": [
+      {
+        "id": "sibilants",
+        "focus": "sh / r / zh / c",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / ong / ian",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-rui3-002": [
+      {
+        "id": "sibilants",
+        "focus": "sh / r / zh / ch / s",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / eng / ong",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-san3-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / ang / an",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "ch / sh / s",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-sao4-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / ang / uan",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "s / zh / ch",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-sao4-002": [
+      {
+        "id": "compound-finals",
+        "focus": "ao / ou / ai",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / s",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / ong",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-shai1-001": [
+      {
+        "id": "sibilants",
+        "focus": "sh / z",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / uo",
+        "score": 2
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / ong",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-shuai3-001": [
+      {
+        "id": "sibilants",
+        "focus": "s / sh",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / an / ang",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-shuai3-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ie / uai / iao",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / n",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-sui3-001": [
+      {
+        "id": "sibilants",
+        "focus": "zh / s",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / en / ang / ing",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-tang1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读 / 一字变调",
+        "score": 8
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / ang",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-tang1-002": [
+      {
+        "id": "sibilants",
+        "focus": "ch / z / c / zh / sh",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ang / an",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-tang4-001": [
+      {
+        "id": "tongue-tip-mid",
+        "focus": "t / d",
+        "score": 3
+      },
+      {
+        "id": "labial",
+        "focus": "m / f",
+        "score": 2
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "uan / ang",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-tang4-002": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / ang",
+        "score": 2
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / t",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-tian3-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "compound-finals",
+        "focus": "iao / ai / ou / ie",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "x / q",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-tuan1-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / d / t",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / uan",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-wa4-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "uang / ing",
+        "score": 3
+      },
+      {
+        "id": "palatal",
+        "focus": "j / x",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh / z",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-wai1-001": [
+      {
+        "id": "compound-finals",
+        "focus": "ua / ou / ie / ai",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "q / x",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-wai1-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / an / ing",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ai / ie",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-xia1-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "an / ong / ing / ang",
+        "score": 4
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-xiao2-001": [
+      {
+        "id": "tones",
+        "focus": "不字变调",
+        "score": 5
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / un / iang",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ao / iao",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-xiao2-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "ing / en / ong / un",
+        "score": 5
+      },
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "palatal",
+        "focus": "q / x",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-xiu3-001": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "palatal",
+        "focus": "q / j / x",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uo / iao",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-xiu3-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比 / 三声连读",
+        "score": 6
+      },
+      {
+        "id": "labial",
+        "focus": "m / b / f",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "ch / sh / r",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-xun1-001": [
+      {
+        "id": "compound-finals",
+        "focus": "uai / ou / uo",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / an / un",
+        "score": 3
+      },
+      {
+        "id": "palatal",
+        "focus": "j / x",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-yu1-001": [
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / l / n",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "an",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-yu1-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / d / n",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-yuan1-001": [
+      {
+        "id": "sibilants",
+        "focus": "sh / zh",
+        "score": 4
+      },
+      {
+        "id": "labial",
+        "focus": "f / b",
+        "score": 2
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "en / uan",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-yuan1-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "uan / ian",
+        "score": 2
+      },
+      {
+        "id": "palatal",
+        "focus": "x / q",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-zang4-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "in / ang / eng / ong",
+        "score": 4
+      },
+      {
+        "id": "sibilants",
+        "focus": "z / zh",
+        "score": 3
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / t / d",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-zang4-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "iang / un / ong / in / ang",
+        "score": 5
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / z",
+        "score": 2
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "l / d",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-zha2-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读 / 一字变调",
+        "score": 7
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian / en",
+        "score": 2
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "d / l",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-zha2-002": [
+      {
+        "id": "tones",
+        "focus": "四声对比",
+        "score": 4
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ing / uan / ang",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "zh / sh",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-zhou3-001": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 4
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou",
+        "score": 3
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / zh / s",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-zuan1-001": [
+      {
+        "id": "nasal-finals",
+        "focus": "uan / in / iang",
+        "score": 3
+      },
+      {
+        "id": "palatal",
+        "focus": "x / j",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "iao / ao",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-sentence-authored-zuan1-002": [
+      {
+        "id": "nasal-finals",
+        "focus": "ang / uang / uan / in / eng",
+        "score": 6
+      },
+      {
+        "id": "sibilants",
+        "focus": "z / ch",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-ang1-肮脏": [
+      {
+        "id": "nasal-finals",
+        "focus": "ang",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-can3-惨淡": [
+      {
+        "id": "nasal-finals",
+        "focus": "an",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-chai2-火柴": [
+      {
+        "id": "compound-finals",
+        "focus": "uo / ai",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-chong4-冲劲": [
+      {
+        "id": "nasal-finals",
+        "focus": "ong / in",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-cuo1-切磋": [
+      {
+        "id": "compound-finals",
+        "focus": "ie / uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-dai3-好歹": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ao / ai",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-fei3-不菲": [
+      {
+        "id": "labial",
+        "focus": "b / f",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-ga2-牛轧糖": [
+      {
+        "id": "tongue-tip-mid",
+        "focus": "n / t",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-gong3-巩固": [
+      {
+        "id": "velar",
+        "focus": "g",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-hao1-好好儿": [
+      {
+        "id": "compound-finals",
+        "focus": "ao",
+        "score": 2
+      },
+      {
+        "id": "velar",
+        "focus": "h",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-hong3-哄劝": [
+      {
+        "id": "nasal-finals",
+        "focus": "ong / uan",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-kui3-傀儡": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-word-kun3-捆绑": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "un / ang",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-lao4-奶酪": [
+      {
+        "id": "compound-finals",
+        "focus": "ai / ao",
+        "score": 2
+      },
+      {
+        "id": "tongue-tip-mid",
+        "focus": "n / l",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-luo1-啰唆": [
+      {
+        "id": "compound-finals",
+        "focus": "uo",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-luo3-裸眼": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-word-men4-沉闷": [
+      {
+        "id": "nasal-finals",
+        "focus": "en",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-niang4-酝酿": [
+      {
+        "id": "nasal-finals",
+        "focus": "un / iang",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-peng1-烹饪": [
+      {
+        "id": "nasal-finals",
+        "focus": "eng / en",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-piao3-漂白": [
+      {
+        "id": "compound-finals",
+        "focus": "iao / ai",
+        "score": 2
+      },
+      {
+        "id": "labial",
+        "focus": "p / b",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-pie3-左撇子": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "uo / ie",
+        "score": 2
+      },
+      {
+        "id": "sibilants",
+        "focus": "z",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-po0-婆婆": [
+      {
+        "id": "labial",
+        "focus": "p",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-qiao4-陡峭": [
+      {
+        "id": "compound-finals",
+        "focus": "ou / iao",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-rong3-冗长": [
+      {
+        "id": "nasal-finals",
+        "focus": "ong / ang",
+        "score": 2
+      },
+      {
+        "id": "sibilants",
+        "focus": "r / ch",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-rui3-石蕊": [
+      {
+        "id": "sibilants",
+        "focus": "sh / r",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-san3-雨伞": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-word-sang3-嗓音": [
+      {
+        "id": "nasal-finals",
+        "focus": "ang / in",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-sao4-扫帚": [
+      {
+        "id": "compound-finals",
+        "focus": "ao / ou",
+        "score": 2
+      },
+      {
+        "id": "sibilants",
+        "focus": "s / zh",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-shai1-筛子": [
+      {
+        "id": "sibilants",
+        "focus": "sh / z",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-shao2-勺子": [
+      {
+        "id": "sibilants",
+        "focus": "sh / z",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-shuai3-甩掉": [
+      {
+        "id": "compound-finals",
+        "focus": "uai / iao",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-song3-耸肩": [
+      {
+        "id": "nasal-finals",
+        "focus": "ong / ian",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-tian3-腼腆": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 3
+      },
+      {
+        "id": "nasal-finals",
+        "focus": "ian",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-wai1-歪斜": [
+      {
+        "id": "compound-finals",
+        "focus": "ai / ie",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-xiu3-腐朽": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 3
+      }
+    ],
+    "coverage-recording-gap-word-xun1-烟熏": [
+      {
+        "id": "nasal-finals",
+        "focus": "an / un",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-zang4-心脏": [
+      {
+        "id": "nasal-finals",
+        "focus": "in / ang",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-zhou3-手肘": [
+      {
+        "id": "tones",
+        "focus": "三声连读",
+        "score": 3
+      },
+      {
+        "id": "compound-finals",
+        "focus": "ou",
+        "score": 2
+      },
+      {
+        "id": "sibilants",
+        "focus": "sh / zh",
+        "score": 2
+      }
+    ],
+    "coverage-recording-gap-word-zuan1-钻进": [
+      {
+        "id": "nasal-finals",
+        "focus": "uan / in",
+        "score": 2
+      }
+    ],
     "音系强化_source_0001": [
       {
         "id": "nasal-finals",
@@ -189,23 +3462,6 @@
         "id": "sibilants",
         "focus": "zh / sh / z",
         "score": 4
-      }
-    ],
-    "音系强化_source_0008": [
-      {
-        "id": "nasal-finals",
-        "focus": "ing / ang / in / iang",
-        "score": 4
-      },
-      {
-        "id": "tones",
-        "focus": "四声对比",
-        "score": 4
-      },
-      {
-        "id": "tongue-tip-mid",
-        "focus": "t / d / l",
-        "score": 3
       }
     ],
     "音系强化_source_0009": [

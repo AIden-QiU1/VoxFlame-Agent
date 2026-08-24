@@ -20,18 +20,3 @@ export function isReviewerEmailAllowed(
   if (!normalizedEmail) return false
   return parseReviewerAllowlist(allowlistValue).has(normalizedEmail)
 }
-
-export type DualAnnotatorRole = 'annotator_a' | 'annotator_b'
-
-export function resolveDualAnnotatorRole(
-  email: string | null | undefined,
-  annotatorAAllowlist: string | null | undefined,
-  annotatorBAllowlist: string | null | undefined,
-): DualAnnotatorRole | null {
-  const isA = isReviewerEmailAllowed(email, annotatorAAllowlist)
-  const isB = isReviewerEmailAllowed(email, annotatorBAllowlist)
-  if (isA && isB) return null
-  if (isA) return 'annotator_a'
-  if (isB) return 'annotator_b'
-  return null
-}

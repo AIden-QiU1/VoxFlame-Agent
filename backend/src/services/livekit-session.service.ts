@@ -13,6 +13,7 @@ export interface LiveKitSessionInput {
   roomName: string
   userUid: number
   authenticatedUserId?: string | null
+  asrAccountId?: string | null
   userDisplayName?: string | null
   timeoutSeconds: number
   intent: RtcResolvedSessionIntent
@@ -189,6 +190,7 @@ export class LiveKitSessionService {
         ...(input.authenticatedUserId
           ? { authenticated_user_id: input.authenticatedUserId }
           : {}),
+        ...(input.asrAccountId ? { asr_account_id: input.asrAccountId } : {}),
         participant_identity: this.buildParticipantIdentity(
           input.userUid,
           input.requestId,

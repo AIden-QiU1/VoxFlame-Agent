@@ -173,6 +173,12 @@ class DataContractTests(unittest.TestCase):
             "我想挂号",
             is_final=False,
             client_capture_id="capture-1",
+            asr_metadata={
+                "account_id": "must-not-leak",
+                "model_version": "public-fallback-v1",
+                "personalized": False,
+                "fallback": True,
+            },
         )
 
         self.assertEqual(payload["type"], "transcript")
@@ -181,6 +187,10 @@ class DataContractTests(unittest.TestCase):
         self.assertEqual(payload["client_capture_id"], "capture-1")
         self.assertEqual(payload["metadata"]["client_capture_id"], "capture-1")
         self.assertEqual(payload["metadata"]["type"], "user_transcript_output")
+        self.assertEqual(payload["metadata"]["model_version"], "public-fallback-v1")
+        self.assertFalse(payload["metadata"]["personalized"])
+        self.assertTrue(payload["metadata"]["fallback"])
+        self.assertNotIn("account_id", payload["metadata"])
 
     def test_build_voice_profile_updated_output_matches_frontend_reducer_shape(self) -> None:
         payload = build_voice_profile_updated_output(

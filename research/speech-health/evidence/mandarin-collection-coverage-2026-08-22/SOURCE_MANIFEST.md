@@ -10,7 +10,10 @@
 | Tatoeba 普通 sentences export 首次下载 | 文件损坏，未使用 | 不完整压缩文件 | 2026-08-22 | N/A | 已放弃，不能当作已读取语料；改用 detailed export 并完整校验 |
 | 教育部门旧“汉语拼音方案”候选链接 | HTTP 404 | 未取得原文 | 2026-08-22 | N/A | 失败，不作为已读证据；后续寻找现行官方入口 |
 | 教育部门旧普通话纲要候选链接 | HTTP 404 | 未取得原文 | 2026-08-22 | N/A | 失败，不作为已读证据 |
+| `sawcordwell/HSK-Vocab` GitHub repository | GitHub API metadata and repository files successfully read; default branch `master`; repository license `CC0-1.0`; README and `hsk_1.csv` read | README SHA-256 `451a3d408dcebe4ab7a56b213f2334aa7ba3e297324ed531b96a4fd5bff1cdae`; `hsk_1.csv` SHA-256 `c7b6cdaaec8b122804af2fd410422dc4faa99a34f7f291c560e6964627efcbc5`; accessed 2026-08-24 | 词汇/等级参考，不能作为教材短句或朗读作品来源 | README states lists were generated from third-party PDFs and may contain unchecked errors; no sentence-level material; not imported into production |
+| `gigacool/hanyu-shuiping-kaoshi` GitHub repository | GitHub API metadata and `LICENSE`/`README.md`/sample `hsk.json` content successfully read; default branch `master`; repository license `MIT` | LICENSE SHA-256 `d5256d24ce5c976038cf80c49962d448b0733fc86ae789f12a4a8e156ac725f7`; README SHA-256 `b8b2bdec115c7de5125a89a8d0512c0d26e43507570acf08f5f238e400775b30`; accessed 2026-08-24 | 词汇/等级参考，不能作为教材短句或朗读作品来源 | README says translations derive from CEDICT and declares a separate CC BY-NC distribution note; repository MIT does not by itself clear all embedded data rights; no production import |
 | 本机 CDSD 路径 `/qiu/data/dysarthria-dataset-train-val-infer-jsonl/cdsd` | 当前机器不可访问 | N/A | 2026-08-22 | N/A | 只能读取固定 EXP 事实，不能声称逐条审计主微调集 |
+| `Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci` | GitHub 仓库、README 与 `corpus_sentences.csv` 成功读取；仓库 MIT | README SHA-256 `2438b1a0b9d8bceed48a02add80c6739e75bc2ea98a82cb032583997f7fbe849`; `corpus_sentences.csv` SHA-256 `6acb1e6584d3b9f1b8b7120a9a7ca9a54584450975b0dbe83204662f0086965c`; 访问 2026-08-24 | 开放研究朗读语料参考；195 句中仅 14 句通过本项目机器 gate，覆盖 15 个目标；不是教材，不直接代表训练导入批准 |
 
 基线报告只保存聚合覆盖和质量统计，不复制用户 ID、逐条转写、设备标识或原始音频。
 

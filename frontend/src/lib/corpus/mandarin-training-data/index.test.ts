@@ -61,6 +61,13 @@ test('Mandarin training corpus stays within the guided prompt size', () => {
 
   for (const exercise of nonAssessmentPrompts) {
     const length = visibleChineseLength(exercise.text)
+    if (exercise.prompt_type === 'word') {
+      assert.ok(
+        length >= 2 && length <= 6,
+        `${exercise.id} should be 2-6 chars as a word prompt, got ${length}: ${exercise.text}`,
+      )
+      continue
+    }
     assert.ok(
       length >= 7 && length <= 18,
       `${exercise.id} should be 7-18 chars, got ${length}: ${exercise.text}`,
@@ -82,6 +89,27 @@ test('Mandarin training corpus target text is Simplified Chinese only', () => {
     const leaked = TRADITIONAL_CHINESE_BLOCKLIST.filter((char) => exercise.text.includes(char))
     assert.deepEqual(leaked, [], `${exercise.id} contains Traditional Chinese: ${exercise.text}`)
   }
+})
+
+test('recording-ready core gap corpus is visible with target metadata', () => {
+  const coreGap = MANDARIN_TRAINING_EXERCISES.filter((exercise) => exercise.id.startsWith('coverage-recording-gap-'))
+  assert.equal(coreGap.length, 263)
+  assert.equal(new Set(coreGap.flatMap((exercise) => exercise.coverage_targets ?? [])).size, 88)
+  assert.equal(coreGap.every((exercise) => exercise.target && exercise.prompt_type), true)
+})
+
+test('recording-ready reinforcement corpus is visible without human transcript fields', () => {
+  const reinforcement = MANDARIN_TRAINING_EXERCISES.filter((exercise) => exercise.id.startsWith('coverage-recording-reinforcement-'))
+  assert.equal(reinforcement.length, 291)
+  assert.equal(new Set(reinforcement.flatMap((exercise) => exercise.coverage_targets ?? [])).size, 116)
+  assert.equal(reinforcement.every((exercise) => exercise.target && exercise.prompt_type), true)
+})
+
+test('open research recording corpus is visible with explicit target metadata', () => {
+  const openResearch = MANDARIN_TRAINING_EXERCISES.filter((exercise) => exercise.id.startsWith('coverage-recording-open-research-'))
+  assert.equal(openResearch.length, 14)
+  assert.equal(new Set(openResearch.flatMap((exercise) => exercise.coverage_targets ?? [])).size, 15)
+  assert.equal(openResearch.every((exercise) => exercise.target && exercise.prompt_type), true)
 })
 
 test('Modern article reading corpus excludes page and training-site noise', () => {

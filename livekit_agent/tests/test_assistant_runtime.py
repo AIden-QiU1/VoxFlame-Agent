@@ -49,7 +49,6 @@ def create_config() -> LiveKitAgentConfig:
         qwen_http_asr_url=None,
         qwen_http_asr_language="Chinese",
         qwen_http_asr_timeout_seconds=30.0,
-        qwen_http_asr_user_ids=frozenset(),
         livekit_audio_apm_enabled=True,
         livekit_audio_apm_echo_cancellation=False,
         livekit_audio_apm_noise_suppression=True,

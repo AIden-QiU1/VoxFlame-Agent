@@ -51,8 +51,8 @@ const workspace = {
   title: isReinforcement ? '低频语境审稿台' : '核心补音语料审稿台',
   eyebrow: '普通话全音系列 · 内部工具',
   description: isReinforcement
-    ? '审核现役题面不足的音节—声调语境；候选全部来自完整开放句料重排，未通过六项审核不会进入录音区。'
-    : '审核完全缺失的核心音节—声调候选；未通过六项审核不会进入录音区。',
+    ? '研究旁路：查看现役题面不足的音节—声调语境；它不阻塞录音区。'
+    : '研究旁路：查看完全缺失的核心音节—声调候选；机器门之外的意见不阻塞录音区。',
   decision_kind: payload.decision_kind ?? 'voxflame_mandarin_core_gap_review_decisions',
   target_count: payload.summary.core_missing_targets ?? payload.summary.target_count ?? payload.target_status.length,
   target_label: isReinforcement ? '低频目标' : '核心缺口',

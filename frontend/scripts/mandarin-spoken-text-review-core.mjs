@@ -5,9 +5,7 @@
 
 export const SPOKEN_TEXT_REVIEW_STATUSES = ['pending', 'approved', 'uncertain', 'unusable']
 export const AUDIO_TEXT_ALIGNMENT_STATUSES = ['pending', 'confirmed', 'mismatch', 'unusable']
-export const QUEUE_STATUS = 'human_review_required_not_for_training'
-export const DUAL_REVIEW_STATUSES = ['pending', 'completed', 'unavailable']
-export const AGREEMENT_STATUSES = ['pending', 'agree', 'disagree', 'adjudicated']
+export const QUEUE_STATUS = 'optional_quality_review_not_for_training'
 
 const FORBIDDEN_ITEM_KEYS = new Set([
   'user_id',
@@ -41,20 +39,6 @@ export function normalizeReviewedMandarinText(value) {
     .normalize('NFKC')
     .replace(/[，。！？；：、,.!?;:\s\u3000“”‘’「」『』《》〈〉【】（）()]/gu, '')
     .trim()
-}
-
-function validateDualAnnotation(annotation, prefix, errors) {
-  if (!DUAL_REVIEW_STATUSES.includes(annotation?.status)) {
-    errors.push(`${prefix}.status must be one of ${DUAL_REVIEW_STATUSES.join(', ')}`)
-  }
-  if (annotation?.status === 'pending' && annotation?.spoken_text !== null && annotation?.spoken_text !== undefined) {
-    errors.push(`${prefix}.pending annotation cannot contain spoken_text`)
-  }
-  if (annotation?.status === 'completed') {
-    if (!isNonEmptyString(annotation?.spoken_text)) errors.push(`${prefix}.completed annotation requires spoken_text`)
-    if (!isNonEmptyString(annotation?.reviewed_by)) errors.push(`${prefix}.completed annotation requires reviewed_by`)
-    if (!isIsoTimestamp(annotation?.reviewed_at)) errors.push(`${prefix}.completed annotation requires reviewed_at ISO timestamp`)
-  }
 }
 
 function hasForbiddenKey(value) {
@@ -270,206 +254,6 @@ export function mergeMandarinSpokenTextDecisions(reviewQueue, decisions) {
   }
 }
 
-export function validateMandarinDualReviewQueue(payload) {
-  const errors = []
-  if (payload?.kind !== 'voxflame_mandarin_dual_spoken_text_review_queue') {
-    errors.push('kind must be voxflame_mandarin_dual_spoken_text_review_queue')
-  }
-  if (payload?.status !== QUEUE_STATUS) errors.push(`queue status must remain ${QUEUE_STATUS}`)
-  if (!Array.isArray(payload?.source_manifest_files) || payload.source_manifest_files.length === 0) {
-    errors.push('source_manifest_files must be a non-empty array')
-  }
-  if (!Array.isArray(payload?.items)) {
-    errors.push('items must be an array')
-    return { valid: false, errors, summary: null }
-  }
-
-  const ids = new Set()
-  let agreementCounts = Object.fromEntries(AGREEMENT_STATUSES.map((status) => [status, 0]))
-  let consensusEligible = 0
-  for (const [index, item] of payload.items.entries()) {
-    const prefix = `items[${index}]`
-    if (!isNonEmptyString(item?.review_item_id)) errors.push(`${prefix}.review_item_id is required`)
-    if (ids.has(item?.review_item_id)) errors.push(`${prefix}.review_item_id is duplicated: ${item.review_item_id}`)
-    ids.add(item?.review_item_id)
-    if (!isNonEmptyString(item?.recording_id)) errors.push(`${prefix}.recording_id is required`)
-    if (!isNonEmptyString(item?.audio_locator) || /[\\/]/u.test(item.audio_locator)) errors.push(`${prefix}.audio_locator must be opaque`)
-    if (!isNonEmptyString(item?.prompt_text)) errors.push(`${prefix}.prompt_text is required`)
-    validateDualAnnotation(item?.annotator_a, `${prefix}.annotator_a`, errors)
-    validateDualAnnotation(item?.annotator_b, `${prefix}.annotator_b`, errors)
-    if (!AGREEMENT_STATUSES.includes(item?.agreement_status)) {
-      errors.push(`${prefix}.agreement_status must be one of ${AGREEMENT_STATUSES.join(', ')}`)
-    }
-    agreementCounts[item?.agreement_status] = (agreementCounts[item?.agreement_status] ?? 0) + 1
-
-    const aText = normalizeReviewedMandarinText(item?.annotator_a?.spoken_text)
-    const bText = normalizeReviewedMandarinText(item?.annotator_b?.spoken_text)
-    const bothCompleted = item?.annotator_a?.status === 'completed' && item?.annotator_b?.status === 'completed'
-    if (item?.agreement_status === 'agree') {
-      if (!bothCompleted || !aText || aText !== bText) errors.push(`${prefix}.agree requires two completed identical normalized transcriptions`)
-      if (item?.consensus?.status !== 'approved') errors.push(`${prefix}.agree requires consensus.status=approved`)
-    }
-    if (item?.agreement_status === 'disagree' && aText && bText && aText === bText) {
-      errors.push(`${prefix}.disagree cannot contain identical normalized transcriptions`)
-    }
-    if (item?.agreement_status === 'adjudicated') {
-      if (!isNonEmptyString(item?.consensus?.spoken_text)) errors.push(`${prefix}.adjudicated requires consensus.spoken_text`)
-      if (!isNonEmptyString(item?.consensus?.reviewed_by)) errors.push(`${prefix}.adjudicated requires consensus.reviewed_by`)
-      if (!isIsoTimestamp(item?.consensus?.reviewed_at)) errors.push(`${prefix}.adjudicated requires consensus.reviewed_at`)
-      if (item?.consensus?.status !== 'approved') errors.push(`${prefix}.adjudicated requires consensus.status=approved`)
-    }
-    if (item?.agreement_status === 'agree' || item?.agreement_status === 'adjudicated') consensusEligible += 1
-  }
-  return {
-    valid: errors.length === 0,
-    errors,
-    summary: {
-      items: payload.items.length,
-      unique_review_items: ids.size,
-      agreement_status_counts: agreementCounts,
-      consensus_eligible_items: consensusEligible,
-      coverage_eligible_items: consensusEligible,
-      training_import_allowed: false,
-    },
-  }
-}
-
-export function consensusEntriesFromDualQueue(payload) {
-  if (!Array.isArray(payload?.items)) return []
-  return payload.items.flatMap((item) => {
-    if (item.agreement_status === 'agree' && item.consensus?.status === 'approved') {
-      return [{ text: item.consensus.spoken_text, category: item.category ?? '未分区', recording_id: item.recording_id, review_source: 'dual_human_spoken_text_review' }]
-    }
-    if (item.agreement_status === 'adjudicated' && item.consensus?.status === 'approved') {
-      return [{ text: item.consensus.spoken_text, category: item.category ?? '未分区', recording_id: item.recording_id, review_source: 'adjudicated_human_spoken_text_review' }]
-    }
-    return []
-  })
-}
-
-/** Validate one annotator's sparse patch without allowing the other role to be impersonated. */
-export function validateMandarinDualAnnotationDecisionExport(payload, reviewQueue) {
-  const errors = []
-  if (payload?.kind !== 'voxflame_mandarin_dual_spoken_text_annotation_decisions') {
-    errors.push('kind must be voxflame_mandarin_dual_spoken_text_annotation_decisions')
-  }
-  if (payload?.source_generated_at !== reviewQueue?.generated_at) {
-    errors.push('source_generated_at does not match the dual review queue')
-  }
-  if (!isNonEmptyString(payload?.reviewer)) errors.push('reviewer is required')
-  if (!['annotator_a', 'annotator_b'].includes(payload?.annotator_role)) {
-    errors.push('annotator_role must be annotator_a or annotator_b')
-  }
-  if (!isIsoTimestamp(payload?.exported_at)) errors.push('exported_at must be an ISO timestamp')
-  if (!Array.isArray(payload?.items)) return { valid: false, errors: [...errors, 'items must be an array'], summary: null }
-
-  const knownIds = new Set((reviewQueue?.items ?? []).map((item) => item.review_item_id))
-  const seen = new Set()
-  const statusCounts = Object.fromEntries(DUAL_REVIEW_STATUSES.map((status) => [status, 0]))
-  for (const [index, item] of payload.items.entries()) {
-    const prefix = `items[${index}]`
-    if (!isNonEmptyString(item?.review_item_id)) errors.push(`${prefix}.review_item_id is required`)
-    if (!knownIds.has(item?.review_item_id)) errors.push(`${prefix}.review_item_id is not in the dual review queue`)
-    if (seen.has(item?.review_item_id)) errors.push(`${prefix}.review_item_id is duplicated: ${item?.review_item_id}`)
-    seen.add(item?.review_item_id)
-    if (!DUAL_REVIEW_STATUSES.includes(item?.status)) errors.push(`${prefix}.status is invalid`)
-    statusCounts[item?.status] = (statusCounts[item?.status] ?? 0) + 1
-    if (item?.status === 'pending' && item?.spoken_text !== null && item?.spoken_text !== undefined) {
-      errors.push(`${prefix}.pending annotation cannot contain spoken_text`)
-    }
-    if (item?.status === 'completed') {
-      if (!isNonEmptyString(item?.spoken_text)) errors.push(`${prefix}.completed annotation requires spoken_text`)
-      if (!isIsoTimestamp(item?.reviewed_at)) errors.push(`${prefix}.completed annotation requires reviewed_at`)
-    }
-    if (!isNonEmptyString(item?.reviewed_by) || item.reviewed_by !== payload.reviewer) {
-      errors.push(`${prefix}.reviewed_by must match reviewer`)
-    }
-    if (item?.status === 'unavailable' && !isNonEmptyString(item?.note)) {
-      errors.push(`${prefix}.unavailable annotation requires note`)
-    }
-  }
-  return {
-    valid: errors.length === 0,
-    errors,
-    summary: {
-      exported_items: payload.items.length,
-      unique_items: seen.size,
-      status_counts: statusCounts,
-      untouched_review_items: Math.max(0, knownIds.size - seen.size),
-      training_import_allowed: false,
-    },
-  }
-}
-
-export function mergeMandarinDualAnnotationDecisions(reviewQueue, decisions) {
-  const validation = validateMandarinDualAnnotationDecisionExport(decisions, reviewQueue)
-  if (!validation.valid) throw new Error(`invalid dual annotation decisions:\n${validation.errors.join('\n')}`)
-  const byId = new Map(decisions.items.map((item) => [item.review_item_id, item]))
-  return {
-    ...reviewQueue,
-    generated_at: new Date().toISOString(),
-    policy: { ...reviewQueue.policy, training_import_allowed: false },
-    review_import: {
-      source_generated_at: decisions.source_generated_at,
-      reviewer: decisions.reviewer,
-      annotator_role: decisions.annotator_role,
-      exported_at: decisions.exported_at,
-      imported_at: new Date().toISOString(),
-      decision_items: decisions.items.length,
-    },
-    items: reviewQueue.items.map((item) => {
-      const decision = byId.get(item.review_item_id)
-      if (!decision) return item
-      return {
-        ...item,
-        [decisions.annotator_role]: {
-          status: decision.status,
-          spoken_text: decision.spoken_text ?? null,
-          reviewed_by: decision.reviewed_by,
-          reviewed_at: decision.reviewed_at,
-          note: decision.note ?? null,
-        },
-      }
-    }),
-  }
-}
-
-export function buildMandarinDualReviewQueue(rows, { sourceManifestFiles = [], sampleSeed = 'mandarin-dual-review-v1' } = {}) {
-  const items = rows.map((row) => {
-    const recordingId = row.recording_id ?? row.metadata?.recording_id
-    return {
-      review_item_id: `${sampleSeed}-${recordingId}`,
-      recording_id: recordingId,
-      audio_locator: String(recordingId),
-      audio_filename: pathBasename(row.audio?.path),
-      prompt_text: String(row.prompt?.text ?? row.metadata?.target_text ?? row.metadata?.exercise_text).trim(),
-      category: row.prompt?.category ?? row.metadata?.exercise_category ?? '未分区',
-      quality_disposition: row.metadata?.audio_quality_disposition ?? 'missing',
-      duration_ms: Number(row.audio?.duration_ms ?? row.metadata?.duration_ms ?? 0),
-      annotator_a: { status: 'pending', spoken_text: null, reviewed_by: null, reviewed_at: null, note: null },
-      annotator_b: { status: 'pending', spoken_text: null, reviewed_by: null, reviewed_at: null, note: null },
-      agreement_status: 'pending',
-      consensus: { status: 'pending', spoken_text: null, reviewed_by: null, reviewed_at: null, note: null },
-    }
-  })
-  return {
-    kind: 'voxflame_mandarin_dual_spoken_text_review_queue',
-    status: QUEUE_STATUS,
-    generated_at: new Date().toISOString(),
-    source_manifest_files: sourceManifestFiles.map(pathBasename),
-    sample_seed: sampleSeed,
-    policy: {
-      independent_annotators: 2,
-      asr_is_not_shown_in_review_item: true,
-      disagreements_require_adjudication: true,
-      consensus_required_for_coverage: true,
-      original_manifest_and_audio_are_immutable: true,
-      training_import_allowed: false,
-    },
-    items,
-  }
-}
-
 export function buildMandarinSpokenTextReviewQueue(rows, { sourceManifestFiles = [] } = {}) {
   const uniqueRows = new Map()
   for (const row of rows) {
@@ -509,8 +293,8 @@ export function buildMandarinSpokenTextReviewQueue(rows, { sourceManifestFiles =
     source_manifest_files: sourceManifestFiles.map(pathBasename),
     policy: {
       asr_is_hint_only: true,
-      human_spoken_text_required_for_coverage: true,
-      audio_text_alignment_required_for_coverage: true,
+      human_spoken_text_required_for_coverage: false,
+      audio_text_alignment_required_for_coverage: false,
       original_manifest_and_audio_are_immutable: true,
       training_import_allowed: false,
     },

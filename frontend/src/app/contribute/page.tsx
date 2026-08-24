@@ -82,8 +82,13 @@ import {
 import { buildTrainingSampleLineage } from '@/lib/training/training-sample-lineage'
 import { selectTrainingExercises } from '@/lib/training/training-exercise-selection'
 import {
+  planTrainingAttemptReplacement,
+  type TrainingAttemptUploadStatus,
+} from '@/lib/training/training-attempt-replacement'
+import {
   PHONOLOGY_GROUPS,
   MANDARIN_COVERAGE_PRODUCT_STATUS,
+  DEFAULT_PHONOLOGY_GROUP_ID,
   filterExercisesByPhonologyGroup,
   getPhonologyExerciseTargets,
   getPhonologyFocusForGroup,
@@ -91,16 +96,6 @@ import {
   type PhonologyGroupId,
 } from '@/lib/training/phonology-groups'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
-
-type AttemptUploadStatus =
-  | 'idle'
-  | 'saving'
-  | 'uploaded'
-  | 'retrying'
-  | 'auth_required'
-  | 'failed'
-  | 'discarding'
-  | 'discarded'
 
 type AttemptSaveTrigger = 'auto' | 'manual'
 type CollectionFlowStep = 'prepare' | 'record' | 'review'
@@ -132,7 +127,7 @@ interface PracticeAttempt {
   feedback: MandarinTrainingFeedback
   sampleQuality: TrainingSampleQuality
   recording: VoxFlameRecordingEnvelope | null
-  uploadStatus: AttemptUploadStatus
+  uploadStatus: TrainingAttemptUploadStatus
   uploadReceipt: UploadReceipt | null
 }
 
@@ -166,7 +161,7 @@ type TrainingActivitySnapshot = WorkspaceMemorySnapshot['training_activity']
 const DEFAULT_VISIBLE_SENTENCES = 60
 const SEARCH_VISIBLE_SENTENCES = 80
 
-const UPLOAD_STATUS_LABELS: Record<AttemptUploadStatus, string> = {
+const UPLOAD_STATUS_LABELS: Record<TrainingAttemptUploadStatus, string> = {
   idle: '这条录音还没进入保存流程',
   saving: '正在自动保存',
   uploaded: '已写入训练语料',
@@ -256,6 +251,9 @@ function buildUploadMetadata(
     exercise_id: exercise.id,
     exercise_category: exercise.category,
     target_text: exercise.text,
+    ...(exercise.coverage_targets && exercise.coverage_targets.length > 0
+      ? { pronunciation_targets: exercise.coverage_targets }
+      : {}),
     spoken_text: transcript,
     feedback_status: feedback.status,
     clarity_score: getClarityScore(feedback.status),
@@ -652,10 +650,10 @@ export default function ContributePage() {
               >
                 <p className="text-sm font-semibold text-gray-900">{targetedGapPlan.label}</p>
                 <p className="mt-2 text-pretty text-sm leading-6 text-gray-600">
-                  核心缺口候选已备齐 {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.targets_with_three_candidates}/{MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.targets} 项；只有人工审核通过的词句才会开放录音。
+                  核心补音题面已备齐 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_core_gap.recording_ready_targets}/{MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.targets} 项；机器语言学与工程门通过即可开放录音。
                 </p>
                 <p className="mt-3 text-xs leading-5 text-stone-600 tabular-nums">
-                  当前已批准 {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.approved_prompts} 条 · 边缘专项 {MANDARIN_COVERAGE_PRODUCT_STATUS.held_targets.edge_missing} 项不进入默认推荐
+                  训练导入审核 {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.approved_prompts} 条；录音就绪题面已开放 · 边缘专项 {MANDARIN_COVERAGE_PRODUCT_STATUS.held_targets.edge_missing} 项不进入默认推荐
                 </p>
                 <p className="mt-4 text-sm font-semibold text-stone-900">录 5–10 句 →</p>
               </Link>
@@ -830,7 +828,9 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const [selectedExerciseId, setSelectedExerciseId] = useState(
     '',
   )
-  const [selectedPhonologyGroupId, setSelectedPhonologyGroupId] = useState<PhonologyGroupId>('all')
+  const [selectedPhonologyGroupId, setSelectedPhonologyGroupId] = useState<PhonologyGroupId>(
+    topicSelection.category === '音系强化' ? DEFAULT_PHONOLOGY_GROUP_ID : 'all',
+  )
   const [exerciseQuery, setExerciseQuery] = useState('')
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [sessionPracticedExerciseIds, setSessionPracticedExerciseIds] = useState<string[]>([])
@@ -848,10 +848,12 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const [ageBand, setAgeBand] = useState<string>('unspecified')
   const [sex, setSex] = useState<TrainingUploadLabels['sex']>('unspecified')
   const [collectionFlowStep, setCollectionFlowStep] = useState<CollectionFlowStep>('prepare')
+  const [isReplacingAttempt, setIsReplacingAttempt] = useState(false)
 
   const disconnectRef = useRef(disconnect)
   disconnectRef.current = disconnect
   const discardedAttemptIdsRef = useRef<Set<number>>(new Set())
+  const pendingReplacementExerciseRef = useRef<PracticeExercise | null>(null)
   const recordingExerciseRef = useRef<PracticeExercise | null>(null)
 
   const canSaveTrainingSample = hasRequiredLegalConsent(user)
@@ -1209,7 +1211,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
     setSessionPracticedExerciseIds([])
     setAssessmentAttemptsByExercise({})
-    setSelectedPhonologyGroupId('all')
+    setSelectedPhonologyGroupId(topicSelection.category === '音系强化' ? DEFAULT_PHONOLOGY_GROUP_ID : 'all')
     setAttempt(null)
     setCollectionFlowStep('prepare')
     void refreshLocalQueueCount()
@@ -1349,12 +1351,51 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     }
   }, [collectionPreflightReady, currentExercise, isProcessing, isUploading, startRecording])
 
+  const removeAttemptFromProgress = useCallback((attemptToRemove: PracticeAttempt) => {
+    setSessionPracticedExerciseIds((currentIds) => (
+      currentIds.filter((exerciseId) => exerciseId !== attemptToRemove.exercise.id)
+    ))
+    if (isAssessmentTopic) {
+      setAssessmentAttemptsByExercise((current) => {
+        const next = { ...current }
+        delete next[attemptToRemove.exercise.id]
+        return next
+      })
+    }
+  }, [isAssessmentTopic])
+
+  const startReplacementRecording = useCallback(async (exerciseToRetry: PracticeExercise) => {
+    setSelectedExerciseId(exerciseToRetry.id)
+    setAttempt(null)
+    setCollectionFlowStep('record')
+    recordingExerciseRef.current = exerciseToRetry
+
+    try {
+      await startRecording()
+      setNotice({
+        tone: 'info',
+        message: '正在重新录这一句，完成后只保留新录音。',
+      })
+    } catch (error) {
+      recordingExerciseRef.current = null
+      console.error('[contribute] retry recording failed:', error)
+      setNotice({
+        tone: 'error',
+        message: '重新录音没有启动，请再点一次开始录音；之前的录音不会重复收录。',
+      })
+    } finally {
+      pendingReplacementExerciseRef.current = null
+      setIsReplacingAttempt(false)
+    }
+  }, [startRecording])
+
   const handleRetryCurrentExercise = useCallback(async () => {
-    if (isRecording || isProcessing || isUploading) {
+    if (isRecording || isProcessing || isReplacingAttempt) {
       return
     }
 
-    const exerciseToRetry = attempt?.exercise ?? currentExercise
+    const attemptToReplace = attempt
+    const exerciseToRetry = attemptToReplace?.exercise ?? currentExercise
     if (!exerciseToRetry) {
       return
     }
@@ -1368,30 +1409,84 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       return
     }
 
-    setSelectedExerciseId(exerciseToRetry.id)
-    setAttempt(null)
-    setNotice(null)
-    setCollectionFlowStep('record')
-    recordingExerciseRef.current = exerciseToRetry
+    const replacementPlan = planTrainingAttemptReplacement(
+      attemptToReplace?.uploadStatus ?? 'idle',
+      Boolean(attemptToReplace?.recording),
+    )
 
-    try {
-      await startRecording()
-    } catch (error) {
-      recordingExerciseRef.current = null
-      console.error('[contribute] retry recording failed:', error)
+    if (replacementPlan === 'wait_for_discard') {
+      setNotice({
+        tone: 'info',
+        message: '旧录音正在撤回，完成后请再点一次重录。',
+      })
+      return
+    }
+
+    if (replacementPlan === 'start_without_discard' || !attemptToReplace?.recording) {
+      setIsReplacingAttempt(true)
+      await startReplacementRecording(exerciseToRetry)
+      return
+    }
+
+    pendingReplacementExerciseRef.current = exerciseToRetry
+    setIsReplacingAttempt(true)
+    discardedAttemptIdsRef.current.add(attemptToReplace.createdAt)
+    setAttempt((current) => (
+      current?.createdAt === attemptToReplace.createdAt
+        ? { ...current, uploadStatus: 'discarding' }
+        : current
+    ))
+    setNotice({
+      tone: 'info',
+      message: replacementPlan === 'wait_for_save_then_discard'
+        ? '正在完成旧录音的撤回，完成后会自动重新录这一句。'
+        : '正在撤回旧录音，完成后会自动重新录这一句。',
+    })
+
+    if (replacementPlan === 'wait_for_save_then_discard') {
+      return
+    }
+
+    const result = await discardUploadedRecording({
+      recordingId: attemptToReplace.recording.recordingId,
+      contributionId: attemptToReplace.uploadReceipt?.contributionId ?? null,
+      storagePath: attemptToReplace.uploadReceipt?.storagePath ?? null,
+    })
+
+    if (!result.ok) {
+      discardedAttemptIdsRef.current.delete(attemptToReplace.createdAt)
+      pendingReplacementExerciseRef.current = null
+      setIsReplacingAttempt(false)
+      setAttempt((current) => (
+        current?.createdAt === attemptToReplace.createdAt
+          ? { ...current, uploadStatus: attemptToReplace.uploadStatus }
+          : current
+      ))
       setNotice({
         tone: 'error',
-        message: '录音失败，请重试。',
+        message: result.errorMessage || '旧录音撤回失败，系统没有开始重录，请稍后再试。',
       })
+      return
     }
+
+    if (userId) {
+      removeUploadedTrainingRecord(userId, attemptToReplace.recording.recordingId)
+    }
+
+    discardedAttemptIdsRef.current.delete(attemptToReplace.createdAt)
+    removeAttemptFromProgress(attemptToReplace)
+    await startReplacementRecording(exerciseToRetry)
   }, [
-    attempt?.exercise,
+    attempt,
     collectionPreflightReady,
     currentExercise,
+    discardUploadedRecording,
     isProcessing,
     isRecording,
-    isUploading,
-    startRecording,
+    isReplacingAttempt,
+    removeAttemptFromProgress,
+    startReplacementRecording,
+    userId,
   ])
 
   const handleContinueAfterAttempt = useCallback(() => {
@@ -1508,11 +1603,46 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     const wasDiscarded = discardedAttemptIdsRef.current.has(attemptToPersist.createdAt)
 
     if (wasDiscarded) {
-      await discardUploadedRecording({
+      const discardResult = await discardUploadedRecording({
         recordingId: attemptToPersist.recording.recordingId,
         contributionId: result.receipt?.contributionId ?? null,
         storagePath: result.receipt?.storagePath ?? null,
       })
+
+      if (!discardResult.ok) {
+        discardedAttemptIdsRef.current.delete(attemptToPersist.createdAt)
+        pendingReplacementExerciseRef.current = null
+        setIsReplacingAttempt(false)
+        setAttempt((current) => {
+          if (!current || current.createdAt !== attemptToPersist.createdAt) {
+            return current
+          }
+
+          return {
+            ...current,
+            uploadStatus: result.status,
+            uploadReceipt: result.receipt ?? null,
+          }
+        })
+        setNotice({
+          tone: 'error',
+          message: discardResult.errorMessage || '旧录音撤回失败，系统没有开始重录，请稍后再试。',
+        })
+        return
+      }
+
+      if (userId) {
+        removeUploadedTrainingRecord(userId, attemptToPersist.recording.recordingId)
+      }
+
+      const replacementExercise = pendingReplacementExerciseRef.current
+      if (replacementExercise) {
+        discardedAttemptIdsRef.current.delete(attemptToPersist.createdAt)
+        removeAttemptFromProgress(attemptToPersist)
+        await startReplacementRecording(replacementExercise)
+        return
+      }
+
       setAttempt((current) => {
         if (!current || current.createdAt !== attemptToPersist.createdAt) {
           return current
@@ -1580,6 +1710,8 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     canSaveTrainingSample,
     collectionPlanId,
     discardUploadedRecording,
+    removeAttemptFromProgress,
+    startReplacementRecording,
     trainingUploadLabels,
     uploadRecording,
     userId,
@@ -2110,15 +2242,36 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
           {collectionFlowStep === 'review' && attempt ? (
             <section aria-labelledby="collection-review-heading" className="rounded-3xl border border-emerald-200 bg-white p-5 shadow-sm sm:p-7">
-              <div role="status" aria-live="polite" className="flex items-start gap-4 rounded-2xl bg-emerald-50 px-4 py-4 sm:px-5">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
-                  <Check className="size-6" aria-hidden="true" />
+              <div
+                role="status"
+                aria-live="polite"
+                className={cn(
+                  'flex items-start gap-4 rounded-2xl px-4 py-4 sm:px-5',
+                  isReplacingAttempt ? 'bg-amber-50' : 'bg-emerald-50',
+                )}
+              >
+                <span className={cn(
+                  'flex size-11 shrink-0 items-center justify-center rounded-full text-white',
+                  isReplacingAttempt ? 'bg-amber-700' : 'bg-emerald-600',
+                )}>
+                  {isReplacingAttempt
+                    ? <RotateCcw className="size-6" aria-hidden="true" />
+                    : <Check className="size-6" aria-hidden="true" />}
                 </span>
                 <div>
-                  <p className="text-sm font-medium text-emerald-800">录音成功</p>
-                  <h2 id="collection-review-heading" className="mt-1 text-balance text-xl font-semibold text-emerald-950">很好，这一句已经完整收下了</h2>
-                  <p className="mt-1 text-pretty text-sm leading-6 text-emerald-800">
-                    {attempt.uploadStatus === 'saving'
+                  <p className={cn('text-sm font-medium', isReplacingAttempt ? 'text-amber-900' : 'text-emerald-800')}>
+                    {isReplacingAttempt ? '正在替换' : '录音成功'}
+                  </p>
+                  <h2
+                    id="collection-review-heading"
+                    className={cn('mt-1 text-balance text-xl font-semibold', isReplacingAttempt ? 'text-amber-950' : 'text-emerald-950')}
+                  >
+                    {isReplacingAttempt ? '先撤回旧录音，再重新录这一句' : '很好，这一句已经完整收下了'}
+                  </h2>
+                  <p className={cn('mt-1 text-pretty text-sm leading-6', isReplacingAttempt ? 'text-amber-900' : 'text-emerald-800')}>
+                    {isReplacingAttempt
+                      ? '正在撤回旧录音，完成后会自动回到这一句开始重录。'
+                      : attempt.uploadStatus === 'saving'
                       ? '正在自动保存，你可以先确认系统听到的内容。'
                       : attempt.uploadStatus === 'uploaded'
                         ? '已经安全保存到你的训练数据中。'
@@ -2158,7 +2311,8 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 <button
                   type="button"
                   onClick={handleContinueAfterAttempt}
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-700 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                  disabled={isReplacingAttempt}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-700 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300"
                 >
                   继续下一句
                   <ChevronRight className="size-4" aria-hidden="true" />
@@ -2166,17 +2320,20 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                 <button
                   type="button"
                   onClick={() => void handleRetryCurrentExercise()}
-                  disabled={isUploading || isProcessing || isRecording}
+                  disabled={isProcessing || isRecording || isReplacingAttempt || attempt.uploadStatus === 'discarding'}
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-800 transition-colors duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <RotateCcw className="size-4" aria-hidden="true" />
-                  重录这一句
+                  {isReplacingAttempt ? '正在撤回旧录音…' : '重录这一句'}
                 </button>
               </div>
+              <p className="mt-3 text-pretty text-xs leading-5 text-stone-500">
+                重录会先撤回当前版本，再保存新录音，不会同时留下两条。
+              </p>
               <button
                 type="button"
                 onClick={() => void handleDiscardAttempt()}
-                disabled={attempt.uploadStatus === 'discarding' || attempt.uploadStatus === 'discarded'}
+                disabled={isReplacingAttempt || attempt.uploadStatus === 'discarding' || attempt.uploadStatus === 'discarded'}
                 className="mt-3 min-h-11 w-full text-sm font-medium text-stone-600 underline-offset-4 hover:text-stone-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 这条不收录
@@ -2563,11 +2720,11 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                           <div>
                             <p className="text-balance text-sm font-semibold text-stone-950">全音系补料进度</p>
                             <p className="mt-1 max-w-2xl text-pretty text-sm leading-6 text-stone-600">
-                              核心缺口先准备自然、低负担的词语和短句；边缘音单独审核，争议读音不会出现在录音任务里。
+                            核心缺口先准备自然、低负担的词语和短句；机器语言学校验通过后即可录音，录音结果再重点检查错读、漏读和空白过长。
                             </p>
                           </div>
                           <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 tabular-nums">
-                            已批准 {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.approved_prompts} 条
+                            录音就绪补音 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_ready_total.items} 条
                           </span>
                         </div>
                         <dl className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -2591,10 +2748,15 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                           </div>
                         </dl>
                         <div className="mt-3 rounded-xl bg-stone-50 px-3 py-3">
+                          <p className="text-xs font-medium text-stone-700 tabular-nums">
+                            核心补音 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_core_gap.recording_ready_items} ·
+                            开放研究补充 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_open_research.recording_ready_items} ·
+                            低频补强 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_reinforcement.recording_ready_items}
+                          </p>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-xs text-stone-500">低频补强计划</p>
                             <p className="text-xs font-medium text-stone-700 tabular-nums">
-                              {MANDARIN_COVERAGE_PRODUCT_STATUS.below_minimum_reinforcement.selected_prompts} 条现役题面
+                              {MANDARIN_COVERAGE_PRODUCT_STATUS.below_minimum_reinforcement.selected_prompts + MANDARIN_COVERAGE_PRODUCT_STATUS.recording_reinforcement.recording_ready_items} 条现役题面
                             </p>
                           </div>
                           <p className="mt-1 text-pretty text-sm leading-6 text-stone-700">
@@ -2603,6 +2765,12 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                           </p>
                           <p className="mt-1 text-pretty text-xs leading-5 text-stone-500">
                             这 {MANDARIN_COVERAGE_PRODUCT_STATUS.below_minimum_reinforcement.prompt_diversity_below_minimum_targets} 项的题面多样性仍低于门槛；待采集计划不是已确认录音覆盖。
+                          </p>
+                          <p className="mt-1 text-pretty text-xs leading-5 text-stone-500">
+                            另有 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_reinforcement.recording_ready_items} 条机器校验通过的新增补强题面已直接开放录音。
+                          </p>
+                          <p className="mt-1 text-pretty text-xs leading-5 text-stone-500">
+                            另有 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_open_research.recording_ready_items} 条开放研究补充句已开放录音，覆盖 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_open_research.recording_ready_targets} 个长尾目标；它们不是教材原文，也不等于训练导入批准。
                           </p>
                         </div>
                         <div className="mt-3 rounded-xl bg-stone-50 px-3 py-3">
@@ -2613,15 +2781,18 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                             </p>
                           </div>
                           <p className="mt-1 text-pretty text-sm leading-6 text-stone-700">
-                            已建立 {MANDARIN_COVERAGE_PRODUCT_STATUS.actual_collection_evidence.full_review_queue_items ?? 0} 条人工转写复核队列，只有“人工转写通过 + 音频对应确认”才计入音系覆盖。
+                            按有效音频、非空 target 和授权上传契约计入；人工转写只是可选质量诊断，不阻塞覆盖统计。
                           </p>
                           <p className="mt-1 text-pretty text-xs leading-5 text-stone-500">
-                            双人抽样 {MANDARIN_COVERAGE_PRODUCT_STATUS.actual_collection_evidence.dual_sample_items ?? 0} 条；音频完整性门：{MANDARIN_COVERAGE_PRODUCT_STATUS.actual_collection_evidence.audio_integrity_gate_passed ? '通过' : '未通过'}。这不是模型效果或完整覆盖声明。
+                            质量异常会进入错读、漏读、长空白或不可用音频分层；这不是模型效果或完整覆盖声明。
+                          </p>
+                          <p className="mt-1 text-pretty text-xs leading-5 text-stone-500">
+                            其中显式音节—声调目标已写入的真实录音：{MANDARIN_COVERAGE_PRODUCT_STATUS.actual_collection_evidence.explicit_recording_targets?.present ?? 0} 项；录音就绪题面数量不等于已录音数量。
                           </p>
                         </div>
                         {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.approved_prompts === 0 ? (
                           <p className="mt-3 rounded-xl bg-amber-50 px-3 py-3 text-pretty text-xs leading-5 text-amber-950">
-                            语言学、自然度、用户负担、安全、许可和产品审核尚未完成。审核前不会让你朗读这些候选。
+                            这些是已通过机器语言学校验和内容安全检查的录音候选。人工 spoken_text 和 ASR 不作为录音前置条件；录音后只按有效音频与 target 进入错读、漏读、长空白和不可用音频分层。
                           </p>
                         ) : null}
                       </div>
@@ -2643,7 +2814,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                       >
                         {phonologyGroupOptions.map((group) => {
                           const isActive = group.id === selectedPhonologyGroupId
-                          const isUnavailable = group.id === 'coverage-core' && group.count === 0
+                          const isUnavailable = group.count === 0
                           return (
                             <button
                               key={group.id}
@@ -2663,7 +2834,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                                 <span className="text-xs tabular-nums text-stone-500">{group.count}</span>
                               </span>
                               <span className="mt-1 block text-xs leading-5 text-stone-600 text-pretty">
-                                {isUnavailable ? '待人工审核后开放' : group.shortLabel}
+                                {isUnavailable ? '当前没有可录题目' : group.shortLabel}
                               </span>
                             </button>
                           )
@@ -2763,11 +2934,11 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                     <button
                       type="button"
                       onClick={handleRetryCurrentExercise}
-                      disabled={isUploading || isProcessing || isRecording}
+                      disabled={isProcessing || isRecording || isReplacingAttempt || attempt.uploadStatus === 'discarding'}
                       className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <RotateCcw className="h-4 w-4" />
-                      重录这一句
+                      {isReplacingAttempt ? '正在撤回旧录音…' : '重录这一句'}
                     </button>
                   ) : null}
                 </div>
@@ -2995,7 +3166,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                       <button
                         type="button"
                         onClick={() => void handleDiscardAttempt()}
-                        disabled={attempt.uploadStatus === 'discarding' || attempt.uploadStatus === 'discarded'}
+                        disabled={isReplacingAttempt || attempt.uploadStatus === 'discarding' || attempt.uploadStatus === 'discarded'}
                         className="rounded-full px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-white hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         不收录
@@ -3003,11 +3174,15 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                       <button
                         type="button"
                         onClick={handleRetryCurrentExercise}
-                        disabled={isUploading || isProcessing || isRecording}
+                        disabled={isProcessing || isRecording || isReplacingAttempt || attempt.uploadStatus === 'discarding'}
                         className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 transition hover:border-stone-400 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <RotateCcw className="h-4 w-4" />
-                        {isAssessmentTopic ? '重录当前词' : '重录这一句'}
+                        {isReplacingAttempt
+                          ? '正在撤回旧录音…'
+                          : isAssessmentTopic
+                            ? '重录当前词'
+                            : '重录这一句'}
                       </button>
                     </div>
                     </div>
