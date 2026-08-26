@@ -66,6 +66,7 @@ import type {
   MobileTrainingCategory,
   MobileTrainingExercise,
 } from './src/training/training-catalog'
+import { buildMobileQuickExpressionPhrases } from './src/communication/quick-expression'
 
 const LOCAL_PREPARED_LINES = [
   '请等我说完，我会用手机把重点给你看。',
@@ -94,6 +95,8 @@ const MOBILE_COMMUNICATION_SCENES: Array<{
 ]
 
 type MobileTaskRoute =
+  | 'communication_home'
+  | 'communication_quick'
   | 'communication_setup'
   | 'communication_live'
   | 'practice_home'
@@ -212,7 +215,8 @@ export default function App() {
   })
   const [activeSurfaceId, setActiveSurfaceId] =
     useState<MobileWorkbenchSurfaceId>('communication')
-  const [taskRoute, setTaskRoute] = useState<MobileTaskRoute>('communication_setup')
+  const [taskRoute, setTaskRoute] = useState<MobileTaskRoute>('communication_home')
+  const [showSignedOutQuickExpression, setShowSignedOutQuickExpression] = useState(false)
   const [practiceText, setPracticeText] = useState('')
   const [displayPhrase, setDisplayPhrase] = useState('')
   const [confirmedOutput, setConfirmedOutput] = useState('')
@@ -244,6 +248,12 @@ export default function App() {
   const quickPhrases = workspace.readModel.quickPhrases.length > 0
     ? workspace.readModel.quickPhrases
     : LOCAL_QUICK_PHRASES
+  const quickExpressionPhrases = useMemo(
+    () => buildMobileQuickExpressionPhrases(
+      auth.status === 'signed_in' ? workspace.readModel.quickPhrases : [],
+    ),
+    [auth.status, workspace.readModel.quickPhrases],
+  )
 
   useEffect(() => {
     if (liveKitRoom.latestAssistantTranscript) {
@@ -425,17 +435,26 @@ export default function App() {
 
     setActiveSurfaceId(surfaceId)
     if (surfaceId === 'communication') {
-      setTaskRoute(communicationScene ? 'communication_live' : 'communication_setup')
+      setTaskRoute(communicationScene ? 'communication_live' : 'communication_home')
     } else if (surfaceId === 'practice') {
       setTaskRoute('practice_home')
     }
   }
 
   if (!auth.session) {
+    if (showSignedOutQuickExpression) {
+      return (
+        <StandaloneQuickExpressionScreen
+          onBack={() => setShowSignedOutQuickExpression(false)}
+          phrases={quickExpressionPhrases}
+        />
+      )
+    }
     return (
       <LoginScreen
         apiConfigured={Boolean(config.apiBaseUrl)}
         auth={auth}
+        onOpenQuickExpression={() => setShowSignedOutQuickExpression(true)}
         phoneAuthEnabled={config.phoneAuthEnabled}
       />
     )
@@ -458,8 +477,19 @@ export default function App() {
           style={styles.content}
         >
           {activeSurfaceId === 'communication' ? (
-            taskRoute === 'communication_setup' ? (
+            taskRoute === 'communication_home' ? (
+              <CommunicationHomeScreen
+                onOpenAssistant={() => setTaskRoute('communication_setup')}
+                onOpenQuick={() => setTaskRoute('communication_quick')}
+              />
+            ) : taskRoute === 'communication_quick' ? (
+              <QuickExpressionScreen
+                onBack={() => setTaskRoute('communication_home')}
+                phrases={quickExpressionPhrases}
+              />
+            ) : taskRoute === 'communication_setup' ? (
               <CommunicationSetupScreen
+                onBack={() => setTaskRoute('communication_home')}
                 onSceneChange={selectCommunicationScene}
                 scenes={MOBILE_COMMUNICATION_SCENES}
               />
@@ -574,10 +604,12 @@ export default function App() {
 function LoginScreen({
   apiConfigured,
   auth,
+  onOpenQuickExpression,
   phoneAuthEnabled,
 }: {
   apiConfigured: boolean
   auth: ReturnType<typeof useMobileAuth>
+  onOpenQuickExpression(): void
   phoneAuthEnabled: boolean
 }) {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
@@ -664,6 +696,13 @@ function LoginScreen({
         <Text style={styles.loginCopy}>
           沟通、练习和准备材料，都在这里。
         </Text>
+
+        <View style={styles.signedOutQuickCard}>
+          <Text style={styles.taskCardEyebrow}>现在就要表达</Text>
+          <Text style={styles.taskCardTitle}>不用登录，直接让手机替你说</Text>
+          <Text style={styles.taskCardCopy}>本机朗读、复制或大字展示，不连接助手，也不上传声音。</Text>
+          <PrimaryButton label="打开快速表达" onPress={onOpenQuickExpression} />
+        </View>
 
         <View style={styles.loginCard}>
           {phoneAuthEnabled && authMode === 'login' ? (
@@ -849,15 +888,205 @@ function AppHeader({ email, status }: { email: string; status: string }) {
   )
 }
 
+function CommunicationHomeScreen({
+  onOpenAssistant,
+  onOpenQuick,
+}: {
+  onOpenAssistant(): void
+  onOpenQuick(): void
+}) {
+  return (
+    <View style={styles.screen}>
+      <View style={styles.heroHeading}>
+        <Text style={styles.eyebrow}>沟通</Text>
+        <Text style={styles.pageTitle}>你现在想怎么表达？</Text>
+        <Text style={styles.pageCopy}>选一种方式直接进入，不需要先进入另一种模式。</Text>
+      </View>
+      <Pressable
+        accessibilityHint="不连接助手，使用本机朗读和大字展示"
+        accessibilityRole="button"
+        onPress={onOpenQuick}
+        style={({ pressed }) => [styles.modeCard, styles.modeCardAccent, pressed ? styles.pressed : null]}
+      >
+        <Text style={styles.modeCardEyebrow}>立即可用</Text>
+        <Text style={styles.modeCardTitle}>快速表达</Text>
+        <Text style={styles.modeCardCopy}>点一句或自己输入，让手机直接替你说；也可以复制或给对方看。</Text>
+        <Text style={styles.modeCardAction}>进入快速表达 ›</Text>
+      </Pressable>
+      <Pressable
+        accessibilityHint="选择场景并进入语音沟通助手"
+        accessibilityRole="button"
+        onPress={onOpenAssistant}
+        style={({ pressed }) => [styles.modeCard, styles.modeCardDark, pressed ? styles.pressed : null]}
+      >
+        <Text style={[styles.modeCardEyebrow, styles.modeCardEyebrowDark]}>需要理解和纠错</Text>
+        <Text style={[styles.modeCardTitle, styles.modeCardTitleDark]}>语音助手</Text>
+        <Text style={[styles.modeCardCopy, styles.modeCardCopyDark]}>需要语音识别、意图纠错、记忆或连续对话时再连接助手。</Text>
+        <Text style={[styles.modeCardAction, styles.modeCardActionDark]}>选择沟通场景 ›</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+function StandaloneQuickExpressionScreen({
+  onBack,
+  phrases,
+}: {
+  onBack(): void
+  phrases: Array<{ id: string; text: string }>
+}) {
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ExpoStatusBar style="dark" />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <ScrollView
+        contentContainerStyle={[styles.pageContent, styles.standaloneQuickPage]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <QuickExpressionScreen onBack={onBack} phrases={phrases} />
+      </ScrollView>
+    </SafeAreaView>
+  )
+}
+
+function QuickExpressionScreen({
+  onBack,
+  phrases,
+}: {
+  onBack(): void
+  phrases: Array<{ id: string; text: string }>
+}) {
+  const [draft, setDraft] = useState('')
+  const [showPartnerView, setShowPartnerView] = useState(false)
+  const [outputStatus, setOutputStatus] = useState<string | null>(null)
+
+  useEffect(() => () => {
+    Speech.stop()
+  }, [])
+
+  const speakText = (text: string): void => {
+    const value = text.trim()
+    if (!value) {
+      setOutputStatus('先选择或输入一句要说的话。')
+      return
+    }
+    Speech.stop()
+    Speech.speak(value, {
+      language: 'zh-CN',
+      rate: 0.92,
+      onDone: () => setOutputStatus('已经说完。'),
+      onError: () => setOutputStatus('朗读中断了，可以再点一次。'),
+    })
+    setOutputStatus('正在用本机语音说出这句话。')
+  }
+
+  const usePhrase = (text: string): void => {
+    setDraft(text)
+    speakText(text)
+  }
+
+  const speak = (): void => {
+    speakText(draft)
+  }
+
+  const copy = async (): Promise<void> => {
+    const text = draft.trim()
+    if (!text) {
+      setOutputStatus('先选择或输入一句要复制的话。')
+      return
+    }
+    await Clipboard.setStringAsync(text)
+    setOutputStatus('已复制，可以粘贴到其他应用。')
+  }
+
+  return (
+    <View style={styles.screen}>
+      <Pressable accessibilityRole="button" onPress={onBack} style={styles.textAction}>
+        <Text style={styles.textActionText}>← 返回沟通方式</Text>
+      </Pressable>
+      <View style={styles.heroHeading}>
+        <Text style={styles.eyebrow}>快速表达</Text>
+        <Text style={styles.pageTitle}>点一句，直接替你说出来</Text>
+        <Text style={styles.pageCopy}>不连接助手，也不上传声音。适合问候、出行和临时求助。</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>马上要用</Text>
+        <View style={styles.quickPhraseGrid}>
+          {phrases.map((phrase) => (
+            <Pressable
+              accessibilityHint="立即用本机语音朗读这句话"
+              accessibilityRole="button"
+              key={phrase.id}
+              onPress={() => usePhrase(phrase.text)}
+              style={({ pressed }) => [
+                styles.quickPhraseButton,
+                draft.trim() === phrase.text ? styles.quickPhraseButtonActive : null,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              <Text style={styles.quickPhraseButtonText}>{phrase.text}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>自己输入一句</Text>
+        <TextInput
+          accessibilityLabel="快速表达文字"
+          multiline
+          onChangeText={setDraft}
+          placeholder="输入要让手机替你说的话"
+          placeholderTextColor={COLORS.subtle}
+          style={styles.practiceInput}
+          value={draft}
+        />
+        <PrimaryButton disabled={!draft.trim()} label="语音发送" onPress={speak} />
+        <View style={styles.outputActions}>
+          <SecondaryButton disabled={!draft.trim()} label="给对方看" onPress={() => setShowPartnerView(true)} />
+          <SecondaryButton disabled={!draft.trim()} label="复制" onPress={() => void copy()} />
+        </View>
+        {outputStatus ? <Text accessibilityLiveRegion="polite" style={styles.outputStatus}>{outputStatus}</Text> : null}
+      </View>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setShowPartnerView(false)}
+        transparent={false}
+        visible={showPartnerView}
+      >
+        <SafeAreaView style={styles.partnerView}>
+          <Text style={styles.partnerLabel}>请看这句话</Text>
+          <Text selectable style={styles.partnerText}>{draft.trim()}</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowPartnerView(false)}
+            style={styles.partnerCloseButton}
+          >
+            <Text style={styles.partnerCloseText}>返回快速表达</Text>
+          </Pressable>
+        </SafeAreaView>
+      </Modal>
+    </View>
+  )
+}
+
 function CommunicationSetupScreen({
+  onBack,
   onSceneChange,
   scenes,
 }: {
+  onBack(): void
   onSceneChange(scene: MobileWorkbenchScene): void
   scenes: Array<{ id: MobileWorkbenchScene; label: string; description: string }>
 }) {
   return (
     <View style={styles.screen}>
+      <Pressable accessibilityRole="button" onPress={onBack} style={styles.textAction}>
+        <Text style={styles.textActionText}>← 返回沟通方式</Text>
+      </Pressable>
       <View style={styles.heroHeading}>
         <Text style={styles.eyebrow}>沟通准备</Text>
         <Text style={styles.pageTitle}>这一次，你要和谁沟通？</Text>
@@ -966,6 +1195,20 @@ function CommunicationScreen({
     setOutputStatus('已复制，可以粘贴到其他应用。')
   }
 
+  const sendConfirmedOutput = async (): Promise<void> => {
+    const text = confirmedOutput.trim()
+    if (!text) {
+      setOutputStatus('先写好要发送的一句话。')
+      return
+    }
+    if (!connected) {
+      setOutputStatus('先开始沟通，再把文字发给助手。')
+      return
+    }
+    const sent = await onSendText(text)
+    setOutputStatus(sent ? '已发给助手。' : '发送没有完成，请重试。')
+  }
+
   return (
     <View style={styles.screen}>
       <Pressable accessibilityRole="button" onPress={onBack} style={styles.textAction}>
@@ -998,21 +1241,28 @@ function CommunicationScreen({
         {errorMessage ? <InlineMessage tone="danger" text={errorMessage} /> : null}
       </View></> : null}
 
-      {scene && (connected || liveTranscript || confirmedOutput) ? (
+      {scene ? (
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>实时理解</Text>
-          <Text style={styles.liveTranscript}>
-            {liveTranscript || '开始说话后，系统听到的内容会出现在这里。'}
-          </Text>
-          <Text style={styles.fieldLabel}>给对方看的这一句</Text>
+          <Text style={styles.cardLabel}>文字沟通</Text>
+          {connected || liveTranscript ? (
+            <Text style={styles.liveTranscript}>
+              {liveTranscript || '开始说话后，系统听到的内容会出现在这里。'}
+            </Text>
+          ) : null}
+          <Text style={styles.fieldLabel}>输入或修改一句话</Text>
           <TextInput
             accessibilityLabel="确认输出"
             multiline
             onChangeText={onConfirmedOutputChange}
-            placeholder="助手整理后的文本会出现在这里，也可以直接输入。"
+            placeholder="可以直接输入；助手整理后的文字也会出现在这里。"
             placeholderTextColor={COLORS.subtle}
             style={styles.practiceInput}
             value={confirmedOutput}
+          />
+          <PrimaryButton
+            disabled={!connected || !confirmedOutput.trim()}
+            label={connected ? '发给助手' : '开始沟通后可发送'}
+            onPress={() => void sendConfirmedOutput()}
           />
           <View style={styles.outputActions}>
             <SecondaryButton label="给对方看" onPress={() => setShowPartnerView(true)} />
@@ -2222,6 +2472,7 @@ const styles = StyleSheet.create({
   appShell: { flex: 1 },
   content: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingBottom: 32 },
+  standaloneQuickPage: { paddingTop: 18 },
   screen: { gap: 18 },
   header: {
     alignItems: 'center',
@@ -2258,6 +2509,36 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
   },
+  modeCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 10,
+    minHeight: 190,
+    padding: 20,
+  },
+  modeCardAccent: { backgroundColor: COLORS.accentSoft, borderColor: '#E7BCA4' },
+  modeCardDark: { backgroundColor: COLORS.ink, borderColor: COLORS.ink },
+  modeCardEyebrow: { color: COLORS.accent, fontSize: 12, fontWeight: '800' },
+  modeCardEyebrowDark: { color: '#F1B99D' },
+  modeCardTitle: { color: COLORS.ink, fontSize: 25, fontWeight: '800', lineHeight: 33 },
+  modeCardTitleDark: { color: '#FFFFFF' },
+  modeCardCopy: { color: COLORS.muted, fontSize: 15, lineHeight: 23 },
+  modeCardCopyDark: { color: '#D6CEC6' },
+  modeCardAction: { color: COLORS.accent, fontSize: 14, fontWeight: '800', marginTop: 'auto' },
+  modeCardActionDark: { color: '#F1B99D' },
+  quickPhraseGrid: { gap: 8 },
+  quickPhraseButton: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 56,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  quickPhraseButtonActive: { backgroundColor: COLORS.accentSoft, borderColor: '#E7BCA4' },
+  quickPhraseButtonText: { color: COLORS.ink, fontSize: 15, fontWeight: '700', lineHeight: 22 },
   communicationCard: {
     backgroundColor: COLORS.surface,
     borderColor: COLORS.border,
@@ -2383,6 +2664,16 @@ const styles = StyleSheet.create({
   taskCardEyebrow: { color: COLORS.accent, fontSize: 12, fontWeight: '800' },
   taskCardTitle: { color: COLORS.ink, fontSize: 21, fontWeight: '800', lineHeight: 29 },
   taskCardCopy: { color: COLORS.muted, fontSize: 14, lineHeight: 22 },
+  signedOutQuickCard: {
+    backgroundColor: COLORS.accentSoft,
+    borderColor: '#E7BCA4',
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 10,
+    marginBottom: 16,
+    padding: 18,
+    width: '100%',
+  },
   checkRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   checkButton: { alignItems: 'center', backgroundColor: COLORS.surfaceMuted, borderColor: COLORS.border, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 9 },
   checkMark: { color: COLORS.accent, fontSize: 17, fontWeight: '800' },

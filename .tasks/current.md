@@ -2,13 +2,13 @@
 
 > 最后更新: 2026-08-26
 
-## 2026-08-26 App parity release chain (item 1 in progress)
+## 2026-08-26 App 完整替代 Web 七步优化
 
-- User authorized submitting the existing Mobile/Web/backend/agent work together. Release branch: `release/mobile-parity-0.1.4`, merged with `origin/main` without conflicts.
-- Mobile version is `0.1.4`; Android `versionCode=5`; iOS `buildNumber=5`.
-- Local verification passed: Mobile check/typecheck/training test and Android/iOS export; Frontend 95 tests, TypeScript and Next production build; Backend build and service tests; LiveKit agent 80 tests with one worker-only skip; AI docs harness. The initial `ten-framework/ai_agents` unittest path was invalid; the real `livekit_agent/tests` suite was then run successfully.
-- Known non-blocking warnings: frontend Node ESM module-type warnings, PWA chunk precache warning, stale Browserslist data, Expo TLS warning, and repository-wide whitespace warnings in imported evidence/generated artifacts. No root `VERSION` or `CHANGELOG.md` exists; Mobile package/app version files are the release version source.
-- Remaining item 1 gates: complete structural review despite missing installed gstack checklist, push/create PR, wait for CI, obtain pre-merge confirmation, merge `main`, rebuild/publish APK, and verify public metadata/hash/download URL.
+- 第 1 项已完成：Mobile parity 通过 PR #17 合入 `main`，版本为 `0.1.4`、Android `versionCode=5`、iOS `buildNumber=5`；新版 APK 已构建并发布到 `https://voxember.com/download/android`。GitHub Actions 因账号 billing lock 未启动，按用户授权以完整本地验证替代 CI 后直接合并。
+- 第 2 项已完成代码切片：Mobile 沟通首页明确分成“快速表达 / 语音助手”；未登录用户也能直接进入快速表达，通用短句点击即本机朗读，并支持自定义文字、本机 TTS、复制和全屏给对方看，不创建 RTC、不上传声音。登录后会去重合并 workspace 个人短句；只有主动进入语音助手并开始沟通才建立 RTC，自定义文字可明确发送给 agent。
+- 第 2 项验证通过：`npm run test:communication`、`npm run test:training`、`npm run check`、`npm run typecheck`、Android/iOS production export、`git diff --check`。真实 TTS、剪贴板、LiveKit 文字发送与触控体验留在第 7 项 Android/iPhone 真机全流程统一验收。
+- 下一步严格进入第 3 项：重做手机训练首页，明确展示“马上录、自己的材料、8 个主题”，包括现代文章朗读；第 4–7 项尚未开始。
+- 已知非阻塞警告：Expo export 继承了当前 shell 的 `NODE_TLS_REJECT_UNAUTHORIZED=0` 并打印 TLS warning；双平台 bundle 均成功。
 
 ## 2026-08-26 Web 训练录音区产品化重构
 

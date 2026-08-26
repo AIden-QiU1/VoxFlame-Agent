@@ -76,6 +76,7 @@ assert(packageJson.name === '@voxflame/mobile-workbench', 'package name must sta
 assert(packageJson.version === appJson.expo?.version, 'package and Expo versions must match')
 assert(packageJson.dependencies?.['@react-native-async-storage/async-storage'] === '2.2.0', 'AsyncStorage must stay on the Expo SDK 55 compatible version')
 assert(packageJson.scripts?.check === 'node scripts/check-mobile-workbench.mjs', 'mobile check script is missing')
+assert(packageJson.scripts?.['test:communication'] === 'node scripts/test-mobile-quick-expression.mjs', 'mobile communication regression script is missing')
 assert(packageJson.scripts?.['test:training'] === 'node scripts/test-mobile-training-feedback.mjs', 'mobile training regression script is missing')
 assert(packageJson.scripts?.web === undefined, 'web script must stay disabled until web dependencies are explicit')
 assert(packageJson.scripts?.['export:android'] === 'expo export --platform android', 'android export smoke script is missing')
@@ -176,6 +177,7 @@ assert(sourceText.includes('PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT'), 
 for (const requiredFile of [
   'src/auth/mobile-supabase-client.ts',
   'src/auth/use-mobile-auth.ts',
+  'src/communication/quick-expression.ts',
   'src/workspace/use-mobile-workspace.ts',
   'src/api/mobile-upload-client.ts',
   'src/realtime/use-mobile-rtc-session.ts',
@@ -190,6 +192,7 @@ for (const requiredFile of [
   'scripts/save-expo-token.sh',
   'scripts/with-expo-token.sh',
   'scripts/test-mobile-training-feedback.mjs',
+  'scripts/test-mobile-quick-expression.mjs',
 ]) {
   assert(existsSync(path.join(appRoot, requiredFile)), `missing required mobile file: ${requiredFile}`)
 }
@@ -245,6 +248,8 @@ for (const surface of ['communication', 'practice', 'memory', 'device']) {
 
 const appSource = readFileSync(path.join(appRoot, 'App.tsx'), 'utf8')
 for (const taskRoute of [
+  'communication_home',
+  'communication_quick',
   'communication_setup',
   'communication_live',
   'practice_home',
@@ -256,6 +261,8 @@ for (const taskRoute of [
 assert(!appSource.includes("| 'material'\n"), 'custom material must not return as a top-level mobile task route')
 assert(appSource.includes("type MobileCollectionSource = 'catalog' | 'prepared_material'"), 'data entry must own catalog and custom-material sources')
 for (const taskScreen of [
+  'function CommunicationHomeScreen',
+  'function QuickExpressionScreen',
   'function CommunicationSetupScreen',
   'function CommunicationScreen',
   'function PracticeHomeScreen',
@@ -263,6 +270,8 @@ for (const taskScreen of [
 ]) {
   assert(appSource.includes(taskScreen), `missing separated mobile task screen: ${taskScreen}`)
 }
+assert(appSource.includes('不连接助手，也不上传声音'), 'quick expression must disclose its local-only boundary')
+assert(appSource.includes('onOpenQuickExpression'), 'signed-out users must be able to open quick expression')
 
 assert(!sourceText.includes(`from '@/`), 'Metro runtime must not depend on tsconfig-only @ alias imports')
 

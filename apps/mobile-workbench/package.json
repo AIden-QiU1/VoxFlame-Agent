@@ -28,6 +28,7 @@
     "build:all:preview": "bash scripts/with-expo-token.sh npx --yes eas-cli@latest build --platform all --profile preview",
     "build:android:china-store": "bash scripts/with-expo-token.sh npx --yes eas-cli@latest build --platform android --profile chinaStore",
     "typecheck": "tsc --noEmit",
+    "test:communication": "node scripts/test-mobile-quick-expression.mjs",
     "test:training": "node scripts/test-mobile-training-feedback.mjs",
     "check": "node scripts/check-mobile-workbench.mjs",
     "smoke:real-workspace": "node scripts/smoke-real-workspace.mjs",
