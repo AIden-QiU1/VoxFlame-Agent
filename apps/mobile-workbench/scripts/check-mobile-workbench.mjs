@@ -272,6 +272,15 @@ for (const taskScreen of [
 }
 assert(appSource.includes('不连接助手，也不上传声音'), 'quick expression must disclose its local-only boundary')
 assert(appSource.includes('onOpenQuickExpression'), 'signed-out users must be able to open quick expression')
+for (const practiceHomeToken of [
+  '马上录',
+  '自己的材料',
+  '按主题选择',
+  '现代文章朗读',
+  'collectionCategories.length',
+]) {
+  assert(appSource.includes(practiceHomeToken), `mobile practice home is missing: ${practiceHomeToken}`)
+}
 
 assert(!sourceText.includes(`from '@/`), 'Metro runtime must not depend on tsconfig-only @ alias imports')
 
