@@ -9,9 +9,12 @@ interface TrainingTopicPageProps {
   params: {
     topicId: string
   }
+  searchParams?: {
+    new?: string
+  }
 }
 
-export default function TrainingTopicPage({ params }: TrainingTopicPageProps) {
+export default function TrainingTopicPage({ params, searchParams }: TrainingTopicPageProps) {
   if (params.topicId === 'assessment-screening') {
     redirect('/assessment')
   }
@@ -20,5 +23,10 @@ export default function TrainingTopicPage({ params }: TrainingTopicPageProps) {
     notFound()
   }
 
-  return <TrainingRecorderPage topicId={params.topicId as TrainingTopicId} />
+  return (
+    <TrainingRecorderPage
+      topicId={params.topicId as TrainingTopicId}
+      wantsNewMaterial={params.topicId === 'custom-material' && searchParams?.new === '1'}
+    />
+  )
 }

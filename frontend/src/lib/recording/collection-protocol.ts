@@ -28,9 +28,9 @@ export const COLLECTION_PLANS: readonly CollectionPlan[] = [
   },
   {
     id: 'targeted_gap',
-    label: '补齐声音',
-    userLabel: '补齐还缺的声音',
-    description: '按语言学覆盖缺口推荐经过审核的自然字词和短句；边缘音与争议读音不会混入默认任务。',
+    label: '系统易漏听字词',
+    userLabel: '让系统多认识一些说法',
+    description: '练系统过去较少见、容易听错的自然字词和短句；按平时方式说，不需要刻意纠正发音。',
     durationLabel: '5–10 条',
     materialPrefix: 'coverage-gap',
     availability: 'available',

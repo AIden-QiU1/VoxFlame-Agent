@@ -14,7 +14,7 @@ export const MOBILE_COLLECTION_PLANS: readonly {
   description: string
 }[] = [
   { id: 'baseline_words', label: '基础字词', description: '固定高频字词，建立声、韵、调和短词起点。' },
-  { id: 'targeted_gap', label: '补齐声音', description: '按已确认的覆盖缺口录自然字词和短句。' },
+  { id: 'targeted_gap', label: '系统易漏听字词', description: '练系统较少见、容易听错的自然字词和短句；按平时方式说即可。' },
   { id: 'functional_speech', label: '常用表达', description: '录日常、出行、求助、工作等真实会用到的话。' },
   { id: 'connected_reading', label: '连续朗读', description: '按自己的节奏朗读，保留真实停顿和回读。' },
   { id: 'natural_speech', label: '自然说话', description: '围绕熟悉任务自由表达，不要求逐字一致。' },

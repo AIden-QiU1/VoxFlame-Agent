@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import {
+  type ChangeEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -13,17 +14,22 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  FileText,
   Mic,
   PlayCircle,
   RotateCcw,
   Sparkles,
+  UploadCloud,
 } from 'lucide-react'
 import { MicrophoneInputFeedback } from '@/components/runtime/MicrophoneInputFeedback'
 import { useAuth } from '@/hooks/useAuth'
 import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
 import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
 import { type UploadReceipt, useVoiceUpload } from '@/hooks/useVoiceUpload'
-import { saveWorkspaceUserProfileMemory } from '@/lib/memory/workspace-client'
+import {
+  savePreparedExpressionAsset,
+  saveWorkspaceUserProfileMemory,
+} from '@/lib/memory/workspace-client'
 import {
   LEGAL_CONSENT_VERSION,
   hasRequiredLegalConsent,
@@ -227,6 +233,10 @@ function formatRecordingTime(totalSeconds: number): string {
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`
+}
+
+function stripFileExtension(filename: string): string {
+  return filename.replace(/\.[^/.]+$/, '')
 }
 
 function usesGuidedCollectionFlow(isAssessmentTopic: boolean): boolean {
@@ -539,7 +549,7 @@ function mapTrainingReports(
 }
 
 export default function ContributePage() {
-  const { user, userId, isLoading, isAuthenticated } = useAuth({
+  const { userId, isLoading, isAuthenticated } = useAuth({
     redirectToLogin: true,
     nextPath: '/contribute',
   })
@@ -584,155 +594,181 @@ export default function ContributePage() {
     && category !== readingCategory
     && category !== phonologyCategory
   ))
-  const functionalPlan = getCollectionPlan('functional_speech')
-  const targetedGapPlan = getCollectionPlan('targeted_gap')
-  const connectedReadingPlan = getCollectionPlan('connected_reading')
+  const featuredCategories = [phonologyCategory, readingCategory].filter(
+    (category): category is NonNullable<typeof category> => Boolean(category),
+  )
 
   return (
     <div className="min-h-dvh bg-stone-50">
       <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
           <div>
             <Link href="/practice" className="inline-flex min-h-11 items-center text-sm font-medium text-amber-700 hover:text-amber-800">
               ← 返回练习选择
             </Link>
-            <h1 className="text-balance text-2xl font-semibold text-gray-900">训练与数据录入</h1>
+            <h1 className="text-balance text-2xl font-semibold text-gray-900">录下你真正会说的话</h1>
             <p className="mt-1 text-sm text-gray-600 text-pretty">
-              选择一个主题，再进入只保留目标句、录音和反馈的专注工作台。
+              从一句有用的话开始，或者带上自己的材料。每句都能回听、重录或不收录。
             </p>
-          </div>
-          <div className="hidden rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700 sm:block">
-            当前账号：{user?.email || '已登录用户'}
           </div>
         </div>
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-8">
-        <section id="training-topics" className="scroll-mt-4 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-orange-700">今天录什么</p>
-              <h2 className="mt-2 text-balance text-2xl font-semibold text-gray-900">先选一个任务，录几句就可以</h2>
-              <p className="mt-2 max-w-3xl text-pretty text-sm leading-6 text-gray-600">
-                系统会在后台检查声音覆盖；你只需要按平时的方式说，累了可以随时结束。
-              </p>
+        <section id="training-topics" className="scroll-mt-4 space-y-4">
+          <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-amber-800">马上开始</p>
+                <h2 className="mt-2 text-balance text-2xl font-semibold text-gray-900">先录几句今天用得上的话</h2>
+                <p className="mt-2 max-w-2xl text-pretty text-sm leading-6 text-gray-600">
+                  不用挑发音难度，也不用一次录完。系统会优先给你还没录过的句子。
+                </p>
+              </div>
+              <span className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
+                建议 {dailyPracticeSlogan}
+              </span>
             </div>
-            <div className="rounded-full bg-stone-100 px-4 py-2 text-sm text-gray-700">
-              今天目标：{dailyPracticeSlogan}
-            </div>
-          </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-3">
             {recommendedCategory ? (() => {
               const meta = MANDARIN_TRAINING_CATEGORY_META[recommendedCategory]
               return (
                 <Link
                   href={getTrainingTopicHref(getTrainingTopicIdForCategory(recommendedCategory))}
-                  className="block rounded-[22px] border border-amber-300 bg-amber-50 px-5 py-5 text-left shadow-sm transition-colors duration-150 hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 lg:col-span-1"
+                  className="mt-5 grid min-h-44 gap-5 rounded-3xl border border-amber-300 bg-amber-50 p-5 transition-colors duration-150 hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 sm:grid-cols-[1fr_auto] sm:items-end sm:p-6"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{functionalPlan.label}</p>
-                      <p className="mt-2 text-pretty text-sm leading-6 text-gray-600">{functionalPlan.userLabel}，先从日常与出行开始。</p>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-800">推荐从这里开始</span>
+                      <span className="text-xs font-medium text-stone-600">{meta.label}</span>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700 tabular-nums">可录 {meta.corpusCount} 句</span>
                     </div>
-                    <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-800">推荐</span>
+                    <h3 className="mt-4 text-balance text-2xl font-semibold text-stone-950">日常真正会用到的话</h3>
+                    <p className="mt-2 max-w-2xl text-pretty text-sm leading-6 text-stone-700">
+                      见面、出门、乘车、点餐和付款。按你平时的方式说，录 8–15 句就算完成一轮。
+                    </p>
+                    <p className="mt-3 line-clamp-1 text-sm text-stone-600">例如：{meta.examples.join(' · ')}</p>
                   </div>
-                  <p className="mt-4 text-xs leading-5 text-stone-600">{meta.examples.slice(0, 2).join(' · ')}</p>
-                  <p className="mt-4 text-sm font-semibold text-amber-900">录 8–15 句，可随时结束 →</p>
+                  <span className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-700 px-5 py-3 text-sm font-semibold text-white">
+                    录第一句
+                    <ChevronRight className="size-4" aria-hidden="true" />
+                  </span>
                 </Link>
               )
             })() : null}
 
-            {phonologyCategory ? (
-              <Link
-                href={getTrainingTopicHref(getTrainingTopicIdForCategory(phonologyCategory))}
-                className="block rounded-[22px] border border-stone-200 bg-white px-5 py-5 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
-              >
-                <p className="text-sm font-semibold text-gray-900">{targetedGapPlan.label}</p>
-                <p className="mt-2 text-pretty text-sm leading-6 text-gray-600">
-                  核心补音题面已备齐 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_core_gap.recording_ready_targets}/{MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.targets} 项；机器语言学与工程门通过即可开放录音。
-                </p>
-                <p className="mt-3 text-xs leading-5 text-stone-600 tabular-nums">
-                  训练导入审核 {MANDARIN_COVERAGE_PRODUCT_STATUS.core_gap_phase1.approved_prompts} 条；录音就绪题面已开放 · 边缘专项 {MANDARIN_COVERAGE_PRODUCT_STATUS.held_targets.edge_missing} 项不进入默认推荐
-                </p>
-                <p className="mt-4 text-sm font-semibold text-stone-900">录 5–10 句 →</p>
-              </Link>
-            ) : null}
-
-            {readingCategory ? (
-              <Link
-                href={getTrainingTopicHref(getTrainingTopicIdForCategory(readingCategory))}
-                className="block rounded-[22px] border border-stone-200 bg-white px-5 py-5 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
-              >
-                <p className="text-sm font-semibold text-gray-900">{connectedReadingPlan.label}</p>
-                <p className="mt-2 text-pretty text-sm leading-6 text-gray-600">{connectedReadingPlan.userLabel}，保留真实停顿和回读。</p>
-                <p className="mt-4 text-sm font-semibold text-stone-900">每段 20–60 秒 →</p>
-              </Link>
-            ) : null}
-          </div>
-
-          <div className="mt-3 space-y-3">
-
-            {preparedExpression ? (
-              <Link
-                href={getTrainingTopicHref('custom-material')}
-                className="block rounded-[22px] border border-stone-200 bg-white px-5 py-5 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">自定义训练</p>
-                    <p className="mt-2 text-sm leading-6 text-gray-600">
-                      {preparedExpression.title}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">
-                    {preparedExpressionExercises.length} 句
-                  </span>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-gray-700">
-                  直接围绕当前加载材料切句训练。
-                </p>
-              </Link>
-            ) : (
-              <Link
-                href="/memory#memory-custom-material-editor"
-                className="block rounded-[22px] border border-dashed border-stone-300 bg-stone-50 px-5 py-5 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
-              >
-                <p className="text-sm font-semibold text-gray-900">用自己的材料朗读</p>
-                <p className="mt-3 text-sm leading-6 text-gray-600">
-                  还没有当前加载材料。先去记忆页选一份材料，再回来分段朗读。
-                </p>
-              </Link>
-            )}
-
-          </div>
-
-          <details className="mt-4 rounded-2xl border border-stone-200 bg-stone-50">
-            <summary className="flex min-h-14 cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
-              <span>按场景选择常用表达</span>
-              <span className="text-xs font-normal text-stone-500">{additionalCategories.length} 个场景</span>
-            </summary>
-            <div className="space-y-2 border-t border-stone-200 p-4">
-              {additionalCategories.map((category) => {
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {featuredCategories.map((category) => {
                 const meta = MANDARIN_TRAINING_CATEGORY_META[category]
+                const isPhonology = category === phonologyCategory
                 return (
                   <Link
                     key={category}
                     href={getTrainingTopicHref(getTrainingTopicIdForCategory(category))}
-                    className="block rounded-2xl border border-stone-200 bg-white px-4 py-4 text-left transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                    className="rounded-2xl border border-stone-200 bg-white p-5 transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
                   >
-                    <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
-                    <p className="mt-2 line-clamp-2 text-pretty text-sm leading-6 text-gray-600">{meta.description}</p>
-                    <p className="mt-3 text-xs text-stone-500">{meta.corpusCount} 条 · {meta.shortLabel}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-medium text-amber-800">{meta.label}</p>
+                        <h3 className="text-balance text-lg font-semibold text-stone-950">
+                          {isPhonology ? '让系统多认识一些说法' : '按自己的节奏读一段'}
+                        </h3>
+                        <p className="mt-2 text-pretty text-sm leading-6 text-stone-600">
+                          {isPhonology
+                            ? '录系统较少见、容易听错的自然字词和短句，不需要模仿标准发音。'
+                            : '用现代短句练连续表达，保留真实停顿和回读。'}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700 tabular-nums">
+                        可录 {meta.corpusCount} 句
+                      </span>
+                    </div>
+                    <p className="mt-4 text-sm font-semibold text-amber-800">开始录音 →</p>
                   </Link>
                 )
               })}
             </div>
-          </details>
+          </div>
 
-          <p className="mt-4 rounded-2xl bg-stone-50 px-4 py-3 text-pretty text-xs leading-5 text-stone-600">
-            基础字词在“20 词筛查”中完成；自然说话和稳定复测需要专用提示与固定材料，验证完成前不会用普通朗读题代替。
-          </p>
+          <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex items-start gap-4">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                  <FileText className="size-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-amber-800">用自己的内容</p>
+                  <h2 className="mt-1 text-balance text-xl font-semibold text-stone-950">
+                    {preparedExpression ? `继续录《${preparedExpression.title}》` : '上传或粘贴一份材料'}
+                  </h2>
+                  <p className="mt-2 text-pretty text-sm leading-6 text-stone-600">
+                    {preparedExpression
+                      ? `已经自动切成 ${preparedExpressionExercises.length} 句，可以直接继续，也可以换一份新材料。`
+                      : '支持 .txt / .md，也可以直接粘贴。保存后会自动切成适合逐句录音的训练材料。'}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {preparedExpression ? (
+                      <Link
+                        href={getTrainingTopicHref('custom-material')}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white"
+                      >
+                        继续录 {preparedExpressionExercises.length} 句
+                        <ChevronRight className="size-4" aria-hidden="true" />
+                      </Link>
+                    ) : null}
+                    <Link
+                      href={`${getTrainingTopicHref('custom-material')}?new=1`}
+                      className={cn(
+                        'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold',
+                        preparedExpression
+                          ? 'border border-stone-300 bg-white text-stone-800'
+                          : 'bg-stone-900 text-white',
+                      )}
+                    >
+                      <UploadCloud className="size-4" aria-hidden="true" />
+                      {preparedExpression ? '换一份材料' : '添加我的材料'}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-balance text-lg font-semibold text-stone-950">按沟通场景选择</h2>
+                  <p className="mt-1 text-pretty text-sm text-stone-500">每个主题都列出当前可录句数。</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-600">{additionalCategories.length} 个主题</span>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                {additionalCategories.map((category) => {
+                  const meta = MANDARIN_TRAINING_CATEGORY_META[category]
+                  return (
+                    <Link
+                      key={category}
+                      href={getTrainingTopicHref(getTrainingTopicIdForCategory(category))}
+                      className="flex min-h-16 items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-4 py-3 transition-colors duration-150 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-stone-950">{meta.label}</span>
+                        <span className="mt-1 block truncate text-xs text-stone-500">{meta.examples.slice(0, 2).join(' · ')}</span>
+                      </span>
+                      <span className="shrink-0 text-xs font-medium text-stone-600 tabular-nums">可录 {meta.corpusCount} 句</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </section>
+          </div>
+
+          <div className="rounded-2xl border border-stone-200 bg-stone-100 px-4 py-3">
+            <div>
+              <p className="text-pretty text-xs leading-5 text-stone-600">
+                想先了解系统目前能听清哪些字词？可返回“练习选择”完成 20 词筛查。这里专注录真实表达和训练材料。
+              </p>
+            </div>
+          </div>
         </section>
 
         <details className="rounded-2xl border border-stone-200 bg-white">
@@ -784,7 +820,13 @@ export default function ContributePage() {
   )
 }
 
-export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) {
+export function TrainingRecorderPage({
+  topicId,
+  wantsNewMaterial = false,
+}: {
+  topicId: TrainingTopicId
+  wantsNewMaterial?: boolean
+}) {
   const topicSelection = useMemo(
     () => resolveTrainingTopicSelection(topicId),
     [topicId],
@@ -793,7 +835,9 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const returnLabel = topicId === 'assessment-screening' ? '返回练习选择' : '返回主题选择'
   const { user, userId, session, isLoading, isAuthenticated } = useAuth({
     redirectToLogin: true,
-    nextPath: getTrainingTopicHref(topicId),
+    nextPath: wantsNewMaterial
+      ? `${getTrainingTopicHref(topicId)}?new=1`
+      : getTrainingTopicHref(topicId),
   })
   const {
     status,
@@ -849,12 +893,19 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   const [sex, setSex] = useState<TrainingUploadLabels['sex']>('unspecified')
   const [collectionFlowStep, setCollectionFlowStep] = useState<CollectionFlowStep>('prepare')
   const [isReplacingAttempt, setIsReplacingAttempt] = useState(false)
+  const [isMaterialEditorOpen, setIsMaterialEditorOpen] = useState(wantsNewMaterial)
+  const [materialTitle, setMaterialTitle] = useState('')
+  const [materialContent, setMaterialContent] = useState('')
+  const [materialSource, setMaterialSource] = useState('manual_input')
+  const [materialStatus, setMaterialStatus] = useState<string | null>(null)
+  const [isSavingMaterial, setIsSavingMaterial] = useState(false)
 
   const disconnectRef = useRef(disconnect)
   disconnectRef.current = disconnect
   const discardedAttemptIdsRef = useRef<Set<number>>(new Set())
   const pendingReplacementExerciseRef = useRef<PracticeExercise | null>(null)
   const recordingExerciseRef = useRef<PracticeExercise | null>(null)
+  const materialFileInputRef = useRef<HTMLInputElement | null>(null)
 
   const canSaveTrainingSample = hasRequiredLegalConsent(user)
   const collectionPreflightReady = isCollectionPreflightReady({
@@ -885,6 +936,8 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
   }, [preparedExpression?.summary, preparedExpressionDocument])
   const selectedCategory = topicSelection.category ?? MANDARIN_TRAINING_CATEGORIES[0]
   const practiceMode: PracticeSourceMode = topicSelection.practiceMode
+  const showMaterialEditor = practiceMode === 'prepared_content'
+    && (isMaterialEditorOpen || !hasPreparedContent)
   const collectionPlanId: CollectionPlanId = getCollectionPlanIdForTopic(topicId)
   const collectionPlan = getCollectionPlan(collectionPlanId)
   const isAssessmentTopic =
@@ -1286,6 +1339,77 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
       URL.revokeObjectURL(playbackUrl)
     }
   }, [attempt?.recording?.audio.blob])
+
+  const handleMaterialFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    try {
+      const content = await file.text()
+      setMaterialContent(content)
+      setMaterialSource(file.name)
+      setMaterialTitle((current) => current.trim() || stripFileExtension(file.name))
+      setMaterialStatus('材料已经读进来了，确认内容后保存即可。')
+    } catch (error) {
+      console.error('[contribute] read material failed:', error)
+      setMaterialStatus('文件读取失败了，请换一个 .txt 或 .md 文件再试。')
+    } finally {
+      event.target.value = ''
+    }
+  }, [])
+
+  const handleSaveMaterial = useCallback(async () => {
+    if (!userId || !isAuthenticated) {
+      setMaterialStatus('登录后才能保存材料。')
+      return
+    }
+
+    const content = materialContent.trim()
+    if (!content) {
+      setMaterialStatus('先上传文件，或者粘贴一段想录的内容。')
+      return
+    }
+
+    setIsSavingMaterial(true)
+    setMaterialStatus(null)
+
+    try {
+      await savePreparedExpressionAsset(userId, {
+        title: materialTitle.trim() || '我的训练材料',
+        source: materialSource,
+        content,
+        make_active: true,
+      })
+      const refreshedSnapshot = await refreshWorkspaceSnapshot()
+      const refreshedExercises = buildPreparedExpressionPracticeExercises(
+        refreshedSnapshot?.prepared_expression,
+      )
+      setMaterialStatus(
+        refreshedExercises.length > 0
+          ? `已经自动切成 ${refreshedExercises.length} 句，可以开始录了。`
+          : '材料已经保存，但还没有切出可录句子。可以补充完整句子后再试。',
+      )
+      if (refreshedExercises.length > 0) {
+        setIsMaterialEditorOpen(false)
+        setCollectionFlowStep('prepare')
+        setSelectedExerciseId(refreshedExercises[0].id)
+      }
+    } catch (error) {
+      console.error('[contribute] save material failed:', error)
+      setMaterialStatus('材料保存失败了，请稍后再试。')
+    } finally {
+      setIsSavingMaterial(false)
+    }
+  }, [
+    isAuthenticated,
+    materialContent,
+    materialSource,
+    materialTitle,
+    refreshWorkspaceSnapshot,
+    userId,
+  ])
 
   const moveExercise = useCallback((offset: number) => {
     if (isRecording || isProcessing || !visibleExercises.length || !currentExercise) {
@@ -1917,6 +2041,108 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
     return null
   }
 
+  const materialEditor = showMaterialEditor ? (
+    <section aria-labelledby="material-editor-heading" className="rounded-3xl border border-amber-200 bg-white p-5 shadow-sm sm:p-7">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-amber-800">我的材料</p>
+          <h2 id="material-editor-heading" className="mt-2 text-balance text-2xl font-semibold text-stone-950">上传或粘贴，自动切成逐句录音</h2>
+          <p className="mt-2 max-w-2xl text-pretty text-sm leading-6 text-stone-600">
+            适合演讲稿、就医说明、工作汇报或想反复练习的一段话。保存后会成为当前材料。
+          </p>
+        </div>
+        {hasPreparedContent ? (
+          <button
+            type="button"
+            onClick={() => setIsMaterialEditorOpen(false)}
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700"
+          >
+            返回当前材料
+          </button>
+        ) : null}
+      </div>
+
+      {materialStatus ? (
+        <div role="status" aria-live="polite" className="mt-5 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+          {materialStatus}
+        </div>
+      ) : null}
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+        <label className="block space-y-2">
+          <span className="text-sm font-medium text-stone-800">材料名称</span>
+          <input
+            value={materialTitle}
+            onChange={(event) => setMaterialTitle(event.target.value)}
+            placeholder="例如：下周汇报 / 就医说明"
+            className="h-12 w-full rounded-xl border border-stone-300 bg-white px-4 text-sm text-stone-950 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => materialFileInputRef.current?.click()}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-stone-300 bg-stone-50 px-5 py-3 text-sm font-semibold text-stone-800 hover:border-amber-300 hover:bg-amber-50"
+        >
+          <UploadCloud className="size-4" aria-hidden="true" />
+          上传 .txt / .md
+        </button>
+        <input
+          ref={materialFileInputRef}
+          type="file"
+          accept=".md,.txt,.text"
+          onChange={(event) => void handleMaterialFileChange(event)}
+          className="hidden"
+        />
+      </div>
+
+      <label className="mt-4 block space-y-2">
+        <span className="text-sm font-medium text-stone-800">材料内容</span>
+        <textarea
+          value={materialContent}
+          onChange={(event) => {
+            setMaterialContent(event.target.value)
+            setMaterialSource('manual_input')
+          }}
+          placeholder="把你真正想说、想练的一段内容粘贴在这里。"
+          className="min-h-56 w-full rounded-2xl border border-stone-300 bg-stone-50 px-4 py-4 text-sm leading-7 text-stone-950 outline-none focus:border-amber-500 focus:bg-white focus:ring-1 focus:ring-amber-500"
+        />
+      </label>
+
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-pretty text-sm text-stone-500">系统会按标点和段落切句；保存后仍可在记忆区继续管理原文。</p>
+        <button
+          type="button"
+          onClick={() => void handleSaveMaterial()}
+          disabled={isSavingMaterial || !materialContent.trim()}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-700 px-6 py-3 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+        >
+          {isSavingMaterial ? '正在切分材料…' : '保存并生成录音句子'}
+          <ChevronRight className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+    </section>
+  ) : null
+
+  if (showMaterialEditor) {
+    return (
+      <div className="min-h-dvh bg-stone-50">
+        <header className="border-b border-stone-200 bg-white">
+          <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
+            <Link href={returnHref} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-amber-700 hover:text-amber-800">
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              {returnLabel}
+            </Link>
+            <h1 className="mt-1 text-balance text-2xl font-semibold text-stone-950">用自己的材料录音</h1>
+            <p className="mt-1 text-pretty text-sm text-stone-600">把原文带进来，系统会自动切句，再进入同一个录音流程。</p>
+          </div>
+        </header>
+        <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+          {materialEditor}
+        </main>
+      </div>
+    )
+  }
+
   if (!currentExercise) {
     return (
       <div className="min-h-dvh bg-stone-50">
@@ -1933,30 +2159,13 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
           </div>
         </header>
 
-        <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-10">
-          <section className="rounded-[28px] border border-dashed border-stone-300 bg-white px-6 py-8 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">当前主题还没准备好可录句子</h2>
-            <p className="mt-3 text-sm leading-7 text-gray-600">
-              {practiceMode === 'prepared_content'
-                ? '自定义训练只围绕记忆区当前加载的参考材料工作。先去记忆页选一份材料设为当前加载，再回来录音。'
-                : '这一组主题暂时还没有可用句子。'}
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              {practiceMode === 'prepared_content' ? (
-                <Link
-                  href="/memory#memory-custom-material-editor"
-                  className="inline-flex items-center rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white"
-                >
-                  去记忆页准备材料
-                </Link>
-              ) : null}
-              <Link
-                href={returnHref}
-                className="inline-flex items-center rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-700"
-              >
-                回到主题选择
-              </Link>
-            </div>
+        <main className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+          <section className="rounded-3xl border border-dashed border-stone-300 bg-white px-6 py-8 shadow-sm">
+            <h2 className="text-balance text-xl font-semibold text-gray-900">当前主题还没准备好可录句子</h2>
+            <p className="mt-3 text-pretty text-sm leading-7 text-gray-600">这一组主题暂时还没有可用句子。</p>
+            <Link href={returnHref} className="mt-5 inline-flex min-h-11 items-center rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-700">
+              回到主题选择
+            </Link>
           </section>
         </main>
       </div>
@@ -2041,10 +2250,24 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
 
           {collectionFlowStep === 'prepare' ? (
             <section aria-labelledby="collection-prepare-heading" className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-              <p className="text-sm font-medium text-amber-800">第 1 步</p>
-              <h2 id="collection-prepare-heading" className="mt-2 text-balance text-2xl font-semibold text-stone-950">
-                准备好后再开始
-              </h2>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-amber-800">第 1 步</p>
+                  <h2 id="collection-prepare-heading" className="mt-2 text-balance text-2xl font-semibold text-stone-950">
+                    准备好后再开始
+                  </h2>
+                </div>
+                {practiceMode === 'prepared_content' ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsMaterialEditorOpen(true)}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:border-amber-300 hover:bg-amber-50"
+                  >
+                    <UploadCloud className="size-4" aria-hidden="true" />
+                    换一份材料
+                  </button>
+                ) : null}
+              </div>
               <p className="mt-2 text-pretty text-sm leading-6 text-stone-600">
                 只确认两件事。构音方式不是重录理由，按你平时说话的方式录就好。
               </p>
@@ -2724,7 +2947,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                             </p>
                           </div>
                           <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 tabular-nums">
-                            录音就绪补音 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_ready_total.items} 条
+                            系统覆盖字词 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_ready_total.items} 条
                           </span>
                         </div>
                         <dl className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -2749,7 +2972,7 @@ export function TrainingRecorderPage({ topicId }: { topicId: TrainingTopicId }) 
                         </dl>
                         <div className="mt-3 rounded-xl bg-stone-50 px-3 py-3">
                           <p className="text-xs font-medium text-stone-700 tabular-nums">
-                            核心补音 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_core_gap.recording_ready_items} ·
+                            系统易漏听 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_core_gap.recording_ready_items} ·
                             开放研究补充 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_open_research.recording_ready_items} ·
                             低频补强 {MANDARIN_COVERAGE_PRODUCT_STATUS.recording_reinforcement.recording_ready_items}
                           </p>

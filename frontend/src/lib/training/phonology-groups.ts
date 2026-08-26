@@ -75,9 +75,9 @@ function reinforcementPriority(exerciseId: string): number {
 export const PHONOLOGY_GROUPS: PhonologyGroupMeta[] = [
   {
     id: 'coverage-core',
-    label: '核心补音',
-    shortLabel: '缺口优先录',
-    description: '显示通过可复现语言学、文本与工程门的核心音节—声调缺口词句；先录音，再按错读、漏读和空白过长做质检。',
+    label: '系统易漏听',
+    shortLabel: '优先让系统认识',
+    description: '优先练系统当前较少见、容易听错的字词和短句；按平时方式说即可，不把方言或个人发音当成缺陷。',
   },
   {
     id: 'coverage-open-research',
