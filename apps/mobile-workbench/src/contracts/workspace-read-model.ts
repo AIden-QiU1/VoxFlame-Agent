@@ -25,6 +25,12 @@ export interface MobilePreparedExpressionSnapshot {
   scene: string | null
   document_content: string
   reference_lines: string[]
+  practice_lines: Array<{
+    id: string
+    text: string
+    section_id: string
+    section_title: string
+  }>
   fallback_phrases: string[]
   hotwords: string[]
   sections: MobilePreparedExpressionSection[]

@@ -19,6 +19,8 @@ import {
 } from 'react-native'
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar'
 import * as Clipboard from 'expo-clipboard'
+import * as DocumentPicker from 'expo-document-picker'
+import { File } from 'expo-file-system'
 import * as Speech from 'expo-speech'
 
 import { getMobileRuntimeConfig } from './src/api/mobile-config'
@@ -218,6 +220,7 @@ export default function App() {
   const [taskRoute, setTaskRoute] = useState<MobileTaskRoute>('communication_home')
   const [showSignedOutQuickExpression, setShowSignedOutQuickExpression] = useState(false)
   const [collectionEntrySource, setCollectionEntrySource] = useState<MobileCollectionSource>('catalog')
+  const [selectedPreparedExpression, setSelectedPreparedExpression] = useState<MobileWorkspaceSnapshotContract['prepared_expression']>(null)
   const [practiceText, setPracticeText] = useState('')
   const [displayPhrase, setDisplayPhrase] = useState('')
   const [confirmedOutput, setConfirmedOutput] = useState('')
@@ -529,6 +532,7 @@ export default function App() {
               <PracticeHomeScreen
                 catalog={trainingCatalog}
                 dailyTarget={workspace.readModel.dailyTargetCount}
+                materialLibrary={memoryEditor.library}
                 onOpenAssessment={() => {
                   const assessment = trainingCatalog.categories.find((category) => category.kind === 'assessment')
                   if (assessment) {
@@ -538,10 +542,19 @@ export default function App() {
                 }}
                 onOpenCollection={(categoryId, source = 'catalog') => {
                   setCollectionEntrySource(source)
+                  setSelectedPreparedExpression(null)
                   if (categoryId) void trainingCatalog.selectCategory(categoryId)
                   setTaskRoute('collection')
                 }}
                 onOpenMaterials={() => changeSurface('memory')}
+                onSelectMaterial={async (assetId) => {
+                  const nextSnapshot = await memoryEditor.activateMaterial(assetId)
+                  if (!nextSnapshot) return
+                  setSelectedPreparedExpression(nextSnapshot.prepared_expression)
+                  workspace.refresh()
+                  setCollectionEntrySource('prepared_material')
+                  setTaskRoute('collection')
+                }}
                 preparedExpression={workspace.snapshot?.prepared_expression ?? null}
               />
             ) : (
@@ -549,7 +562,7 @@ export default function App() {
               dailyTarget={workspace.readModel.dailyTargetCount}
               onPracticeTextChange={setPracticeText}
               practiceText={practiceText}
-              preparedExpression={workspace.snapshot?.prepared_expression ?? null}
+              preparedExpression={selectedPreparedExpression ?? workspace.snapshot?.prepared_expression ?? null}
               preparedLines={preparedLines}
               profileEtiology={workspace.snapshot?.user_profile_memory.etiology ?? ''}
               profileSeverity={workspace.snapshot?.user_profile_memory.severity ?? ''}
@@ -1323,16 +1336,20 @@ function CommunicationScreen({
 function PracticeHomeScreen({
   catalog,
   dailyTarget,
+  materialLibrary,
   onOpenAssessment,
   onOpenCollection,
   onOpenMaterials,
+  onSelectMaterial,
   preparedExpression,
 }: {
   catalog: ReturnType<typeof useMobileTrainingCatalog>
   dailyTarget: number
+  materialLibrary: ReturnType<typeof useMobileMemoryEditor>['library']
   onOpenAssessment(): void
   onOpenCollection(categoryId?: string, source?: MobileCollectionSource): void
   onOpenMaterials(): void
+  onSelectMaterial(assetId: string): Promise<void>
   preparedExpression: MobileWorkspaceSnapshotContract['prepared_expression']
 }) {
   const collectionCategories = catalog.categories.filter((category) => category.kind === 'collection')
@@ -1363,6 +1380,33 @@ function PracticeHomeScreen({
         <Text style={styles.taskCardCopy}>见面、出门、乘车、点餐和付款。按平时的方式说，不用一次录完。</Text>
         <Text style={styles.practiceStartAction}>录第一句 ›</Text>
       </Pressable>
+      {(materialLibrary?.assets.length ?? 0) > 1 ? (
+        <View style={styles.materialChoiceList}>
+          <Text style={styles.cardLabel}>选择一份材料</Text>
+          {materialLibrary?.assets.map((asset) => {
+            const active = materialLibrary.active_asset_id === asset.draft.id
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                key={asset.draft.id}
+                onPress={() => void onSelectMaterial(asset.draft.id)}
+                style={({ pressed }) => [
+                  styles.materialChoiceRow,
+                  active ? styles.materialChoiceRowActive : null,
+                  pressed ? styles.pressed : null,
+                ]}
+              >
+                <View style={styles.categoryCopy}>
+                  <Text style={styles.categoryTitle}>{asset.draft.title}</Text>
+                  <Text numberOfLines={1} style={styles.mutedText}>{asset.structured.summary}</Text>
+                </View>
+                <Text style={active ? styles.activeBadge : styles.categoryCount}>{active ? '当前' : '选择'}</Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      ) : null}
 
       <Pressable
         accessibilityHint={materialExercises.length > 0 ? '继续录自己的材料' : '查看自己的材料录音入口'}
@@ -1942,6 +1986,8 @@ function MemoryScreen({
   const [materialId, setMaterialId] = useState<string | undefined>()
   const [materialTitle, setMaterialTitle] = useState('')
   const [materialContent, setMaterialContent] = useState('')
+  const [materialSource, setMaterialSource] = useState('manual_input')
+  const [materialStatus, setMaterialStatus] = useState<string | null>(null)
   const [profileDocument, setProfileDocument] = useState('')
   const [profileScenarios, setProfileScenarios] = useState('')
   const [profileStrategies, setProfileStrategies] = useState('')
@@ -1961,6 +2007,44 @@ function MemoryScreen({
     setMaterialId(asset?.draft.id)
     setMaterialTitle(asset?.draft.title ?? '')
     setMaterialContent(asset?.draft.content ?? '')
+    setMaterialSource(asset?.draft.source ?? 'manual_input')
+    setMaterialStatus(null)
+  }
+
+  const importMaterialFile = async (): Promise<void> => {
+    setMaterialStatus(null)
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/plain', 'text/markdown'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      })
+      if (result.canceled) return
+      const asset = result.assets[0]
+      if (!asset) return
+      if (typeof asset.size === 'number' && asset.size > 512_000) {
+        setMaterialStatus('文件超过 500 KB，请换一份更短的 .txt 或 .md。')
+        return
+      }
+      const lowerName = asset.name.toLowerCase()
+      if (!lowerName.endsWith('.txt') && !lowerName.endsWith('.md') && !lowerName.endsWith('.text')) {
+        setMaterialStatus('请选择 .txt 或 .md 文本文件。')
+        return
+      }
+      const content = await new File(asset.uri).text()
+      if (!content.trim()) {
+        setMaterialStatus('这个文件没有可用文字。')
+        return
+      }
+      setMaterialContent(content)
+      setMaterialSource(asset.name)
+      if (!materialTitle.trim()) {
+        setMaterialTitle(asset.name.replace(/\.(?:md|txt|text)$/i, ''))
+      }
+      setMaterialStatus('文件已读入，保存后会由同一套规则自动切句。')
+    } catch {
+      setMaterialStatus('文件读取失败，请换一份 .txt 或 .md 再试。')
+    }
   }
 
   const saveMaterial = async (): Promise<void> => {
@@ -1969,11 +2053,13 @@ function MemoryScreen({
       id: materialId,
       title: materialTitle.trim(),
       content: materialContent.trim(),
+      source: materialSource,
       make_active: !materialId,
     })
     if (saved) {
       editMaterial(undefined)
       onRefresh()
+      setMaterialStatus('材料已保存并完成统一切句，可以在训练页直接录音。')
     }
   }
 
@@ -2106,7 +2192,23 @@ function MemoryScreen({
         <View style={styles.editorPanel}>
           <Text style={styles.cardTitle}>{materialId ? '编辑材料' : '新增材料'}</Text>
           <TextInput accessibilityLabel="材料标题" editable={!busy} onChangeText={setMaterialTitle} placeholder="例如：下次复诊要说的话" placeholderTextColor={COLORS.subtle} style={styles.input} value={materialTitle} />
-          <TextInput accessibilityLabel="材料正文" editable={!busy} multiline onChangeText={setMaterialContent} placeholder="粘贴或输入完整材料" placeholderTextColor={COLORS.subtle} style={[styles.practiceInput, styles.materialInput]} value={materialContent} />
+          <SecondaryButton disabled={busy} label="从手机导入 .txt / .md" onPress={() => void importMaterialFile()} />
+          <TextInput
+            accessibilityLabel="材料正文"
+            editable={!busy}
+            multiline
+            onChangeText={(value) => {
+              setMaterialContent(value)
+              setMaterialSource('manual_input')
+              setMaterialStatus(null)
+            }}
+            placeholder="粘贴或输入完整材料"
+            placeholderTextColor={COLORS.subtle}
+            style={[styles.practiceInput, styles.materialInput]}
+            value={materialContent}
+          />
+          <Text style={styles.mutedText}>系统会按与 Web 相同的标点、段落和长度规则切句。</Text>
+          {materialStatus ? <Text accessibilityLiveRegion="polite" style={styles.outputStatus}>{materialStatus}</Text> : null}
           <View style={styles.actionRow}>
             {materialId ? <SecondaryButton label="取消编辑" onPress={() => editMaterial(undefined)} /> : null}
             <PrimaryButton disabled={busy || !materialTitle.trim() || !materialContent.trim()} label={busy ? '正在保存…' : '保存材料'} onPress={() => void saveMaterial()} />
@@ -2754,6 +2856,9 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   materialAction: { color: COLORS.accent, fontSize: 14, fontWeight: '800', marginTop: 4 },
+  materialChoiceList: { gap: 8 },
+  materialChoiceRow: { alignItems: 'center', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', minHeight: 64, padding: 13 },
+  materialChoiceRowActive: { backgroundColor: COLORS.successSoft, borderColor: '#B8D4C7' },
   practiceTopicList: { gap: 9 },
   practiceTopicRow: {
     alignItems: 'center',

@@ -1,6 +1,7 @@
 import type {
   MobilePreparedExpressionLibrary,
   MobileUserProfileMemory,
+  MobileWorkspaceSnapshotContract,
 } from '../contracts/workspace-read-model'
 import type {
   MobileAuthTokenProvider,
@@ -59,7 +60,7 @@ export async function fetchMobilePreparedExpressionLibrary(
 
 export async function saveMobilePreparedExpression(
   userId: string,
-  input: { id?: string; title: string; scene?: string | null; content: string; make_active?: boolean },
+  input: { id?: string; title: string; scene?: string | null; source?: string; content: string; make_active?: boolean },
   options: MobileWorkbenchClientOptions,
 ): Promise<MobilePreparedExpressionLibrary> {
   const payload = await requestJson<{
@@ -75,14 +76,21 @@ export async function activateMobilePreparedExpression(
   userId: string,
   assetId: string,
   options: MobileWorkbenchClientOptions,
-): Promise<MobilePreparedExpressionLibrary> {
+): Promise<{
+  library: MobilePreparedExpressionLibrary
+  workspaceSnapshot: MobileWorkspaceSnapshotContract
+}> {
   const payload = await requestJson<{
     prepared_expression_library: MobilePreparedExpressionLibrary
+    workspace_snapshot: MobileWorkspaceSnapshotContract
   }>(options, `/memory/workspace/${userId}/prepared-expressions/active`, {
     method: 'PUT',
     body: JSON.stringify({ user_id: userId, asset_id: assetId }),
   })
-  return payload.prepared_expression_library
+  return {
+    library: payload.prepared_expression_library,
+    workspaceSnapshot: payload.workspace_snapshot,
+  }
 }
 
 export async function deleteMobilePreparedExpression(

@@ -75,6 +75,7 @@ for (const pattern of rawUserErrorPatterns) {
 assert(packageJson.name === '@voxflame/mobile-workbench', 'package name must stay scoped to mobile workbench')
 assert(packageJson.version === appJson.expo?.version, 'package and Expo versions must match')
 assert(packageJson.dependencies?.['@react-native-async-storage/async-storage'] === '2.2.0', 'AsyncStorage must stay on the Expo SDK 55 compatible version')
+assert(packageJson.dependencies?.['expo-document-picker'], 'Expo document picker is required for native material import')
 assert(packageJson.scripts?.check === 'node scripts/check-mobile-workbench.mjs', 'mobile check script is missing')
 assert(packageJson.scripts?.['test:communication'] === 'node scripts/test-mobile-quick-expression.mjs', 'mobile communication regression script is missing')
 assert(packageJson.scripts?.['test:training'] === 'node scripts/test-mobile-training-feedback.mjs', 'mobile training regression script is missing')
@@ -221,6 +222,10 @@ for (const requiredToken of [
   'latestAssistantTranscript',
   'expo-speech',
   'expo-clipboard',
+  'expo-document-picker',
+  'copyToCacheDirectory: true',
+  'new File(asset.uri).text()',
+  'source: materialSource',
   '/training/catalog',
   "training_flow: flow",
   'characterEditDistance',

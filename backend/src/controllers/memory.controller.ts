@@ -248,8 +248,12 @@ export class MemoryController {
         authenticatedUserId,
         asset_id,
       );
+      const workspaceSnapshot = await SupabaseService.getInstance().getWorkspaceMemorySnapshot(
+        authenticatedUserId,
+      );
       res.json({
         prepared_expression_library: library,
+        workspace_snapshot: workspaceSnapshot,
         active_prepared_expression_asset: library.active_asset_id
           ? library.assets.find((asset) => asset.draft.id === library.active_asset_id) ?? null
           : null,

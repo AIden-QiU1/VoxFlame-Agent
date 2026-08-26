@@ -36,6 +36,12 @@ const PREPARED_EXPRESSION_FIXTURE: PreparedExpressionSnapshot = {
   fallback_phrases: ['燃言最核心做三件事。'],
   asr_hotword_entries: [],
   reference_lines: ['燃言最核心做三件事：实时辅助沟通、语句训练反馈、个人记忆管理。'],
+  practice_lines: [
+    { id: 'speech-1:opening:0', text: '现在屏幕上的文字，就是燃言实时转写的结果。', section_id: 'opening', section_title: '开场' },
+    { id: 'speech-1:product:1', text: '燃言最核心做三件事：实时辅助沟通、', section_id: 'product', section_title: '产品定义' },
+    { id: 'speech-1:product:2', text: '语句训练反馈、个人记忆管理。', section_id: 'product', section_title: '产品定义' },
+    { id: 'speech-1:paragraph-3:3', text: '最后我想特别谢谢邱生峰，一直支持我们。', section_id: 'paragraph-3', section_title: '第 3 段' },
+  ],
   training_reports: {
     daily_summary: null,
     weekly_summary: {
@@ -115,6 +121,10 @@ test('buildPreparedExpressionPracticeExercises hard-splits only unpunctuated ove
   const exercises = buildPreparedExpressionPracticeExercises({
     ...PREPARED_EXPRESSION_FIXTURE,
     document_content: '这是一个没有任何标点的超长训练材料需要被切成自然长度',
+    practice_lines: [
+      { id: 'long:0', text: '这是一个没有任何标点的超长训练材料需要被', section_id: 'long', section_title: '长句' },
+      { id: 'long:1', text: '切成自然长度', section_id: 'long', section_title: '长句' },
+    ],
     sections: [],
   })
 
@@ -146,15 +156,16 @@ test('buildPreparedExpressionPracticeExercises keeps section metadata when a lin
     exercises[2].preparedExpressionHighRiskPhrases,
     ['实时辅助沟通', '个人记忆管理'],
   )
-  assert.equal(exercises[3].preparedExpressionSectionId, 'document-paragraph-3')
+  assert.equal(exercises[3].preparedExpressionSectionId, 'paragraph-3')
   assert.equal(exercises[3].preparedExpressionAnchorLine, '最后我想特别谢谢邱生峰，一直支持我们。')
-  assert.deepEqual(exercises[3].preparedExpressionKeywords, ['邱生峰', '燃言', '构音障碍'])
+  assert.deepEqual(exercises[3].preparedExpressionKeywords, ['燃言', '构音障碍', '邱生峰'])
 })
 
 test('buildPreparedExpressionPracticeExercises falls back to section lines when document_content is missing', () => {
   const exercises = buildPreparedExpressionPracticeExercises({
     ...PREPARED_EXPRESSION_FIXTURE,
     document_content: '',
+    practice_lines: [],
   })
 
   assert.equal(exercises.length, 2)

@@ -72,6 +72,11 @@ export interface PreparedExpressionAsset {
   training_reports: PreparedExpressionTrainingReports | null;
 }
 
+export interface PreparedExpressionPracticeLine {
+  text: string;
+  paragraphIndex: number;
+}
+
 const COMMON_STOPWORDS = new Set([
   '大家',
   '我们',
@@ -374,6 +379,15 @@ function mergeClausesIntoPracticeLines(clauses: string[]): string[] {
 
 function splitSentences(text: string): string[] {
   return mergeClausesIntoPracticeLines(splitIntoClauses(text));
+}
+
+/** Single source of truth for Web and Mobile prepared-material recording lines. */
+export function buildPreparedExpressionPracticeLines(
+  content: string,
+): PreparedExpressionPracticeLine[] {
+  return splitParagraphs(content).flatMap((paragraph, paragraphIndex) => (
+    splitSentences(paragraph).map((text) => ({ text, paragraphIndex }))
+  ));
 }
 
 function buildHeuristicSectionTitle(index: number, paragraph: string): string {

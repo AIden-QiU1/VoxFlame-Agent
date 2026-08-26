@@ -11,6 +11,7 @@ import {
 import {
   buildAsrHotwordEntries,
   buildPreparedExpressionCorrectionPairs,
+  buildPreparedExpressionPracticeLines,
   buildPreparedExpressionReferenceLines,
   createPreparedExpressionAssetFromDraft,
   normalizePreparedExpressionAsset,
@@ -292,6 +293,12 @@ export interface WorkspaceMemorySnapshot {
     fallback_phrases: string[];
     asr_hotword_entries: PreparedExpressionAsrHotwordEntry[];
     reference_lines: string[];
+    practice_lines: Array<{
+      id: string;
+      text: string;
+      section_id: string;
+      section_title: string;
+    }>;
     training_reports: {
       daily_summary: {
         summary: string;
@@ -2415,6 +2422,17 @@ export class SupabaseService {
       ],
       80,
     );
+    const practiceLines = buildPreparedExpressionPracticeLines(asset.draft.content).map(
+      (line, index) => {
+        const section = sections[line.paragraphIndex] ?? sections[0];
+        return {
+          id: `${template.id}:${section?.id ?? `paragraph-${line.paragraphIndex + 1}`}:${index}`,
+          text: line.text,
+          section_id: section?.id ?? `paragraph-${line.paragraphIndex + 1}`,
+          section_title: section?.title ?? `第 ${line.paragraphIndex + 1} 段`,
+        };
+      },
+    );
     const weeklySummary = asset.training_reports?.weeklySummary ?? null;
     const dailySummary = asset.training_reports?.dailySummary ?? null;
 
@@ -2455,6 +2473,7 @@ export class SupabaseService {
       ),
       asr_hotword_entries: buildAsrHotwordEntries(template.hotwords),
       reference_lines: referenceLines,
+      practice_lines: practiceLines,
       training_reports: asset.training_reports
         ? {
             daily_summary: dailySummary

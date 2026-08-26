@@ -75,7 +75,7 @@ export function useMobileMemoryEditor(params: {
     status,
     errorMessage,
     refresh,
-    async saveMaterial(input: { id?: string; title: string; scene?: string | null; content: string; make_active?: boolean }) {
+    async saveMaterial(input: { id?: string; title: string; scene?: string | null; source?: string; content: string; make_active?: boolean }) {
       const userId = params.userId
       if (!userId || !clientOptions) return false
       const next = await mutate(() => saveMobilePreparedExpression(userId, input, clientOptions))
@@ -85,11 +85,11 @@ export function useMobileMemoryEditor(params: {
     },
     async activateMaterial(assetId: string) {
       const userId = params.userId
-      if (!userId || !clientOptions) return false
+      if (!userId || !clientOptions) return null
       const next = await mutate(() => activateMobilePreparedExpression(userId, assetId, clientOptions))
-      if (!next) return false
-      setLibrary(next)
-      return true
+      if (!next) return null
+      setLibrary(next.library)
+      return next.workspaceSnapshot
     },
     async deleteMaterial(assetId: string) {
       const userId = params.userId

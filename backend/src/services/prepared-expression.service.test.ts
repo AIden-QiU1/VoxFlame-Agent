@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildPreparedExpressionDraft,
+  buildPreparedExpressionPracticeLines,
   buildPreparedExpressionTemplateFromDraft,
 } from './prepared-expression.service';
 
@@ -38,5 +39,13 @@ assert.deepEqual(longUnpunctuatedTemplate.sections[0]?.practiceLines, [
   '这是一个没有任何标点的超长训练材料需要被',
   '切成自然长度',
 ]);
+
+assert.deepEqual(
+  buildPreparedExpressionPracticeLines('第一段材料需要完整切句，而且保持自然长度。\n第二段也要进入同一份录音清单。'),
+  [
+    { text: '第一段材料需要完整切句，而且保持自然长度。', paragraphIndex: 0 },
+    { text: '第二段也要进入同一份录音清单。', paragraphIndex: 1 },
+  ],
+);
 
 console.log('prepared-expression.service.test passed');
