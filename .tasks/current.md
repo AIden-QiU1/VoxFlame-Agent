@@ -2,6 +2,14 @@
 
 > 最后更新: 2026-08-26
 
+## 2026-08-26 App parity release chain (item 1 in progress)
+
+- User authorized submitting the existing Mobile/Web/backend/agent work together. Release branch: `release/mobile-parity-0.1.4`, merged with `origin/main` without conflicts.
+- Mobile version is `0.1.4`; Android `versionCode=5`; iOS `buildNumber=5`.
+- Local verification passed: Mobile check/typecheck/training test and Android/iOS export; Frontend 95 tests, TypeScript and Next production build; Backend build and service tests; LiveKit agent 80 tests with one worker-only skip; AI docs harness. The initial `ten-framework/ai_agents` unittest path was invalid; the real `livekit_agent/tests` suite was then run successfully.
+- Known non-blocking warnings: frontend Node ESM module-type warnings, PWA chunk precache warning, stale Browserslist data, Expo TLS warning, and repository-wide whitespace warnings in imported evidence/generated artifacts. No root `VERSION` or `CHANGELOG.md` exists; Mobile package/app version files are the release version source.
+- Remaining item 1 gates: complete structural review despite missing installed gstack checklist, push/create PR, wait for CI, obtain pre-merge confirmation, merge `main`, rebuild/publish APK, and verify public metadata/hash/download URL.
+
 ## 2026-08-26 Web 训练录音区产品化重构
 
 - `/contribute` 不再用三个并列的工程分类占据首屏，改为“马上录几句今天用得上的话 / 用自己的内容 / 按沟通场景选择”三层任务入口；推荐动作直接进入日常表达，低频说明收进次级信息。
