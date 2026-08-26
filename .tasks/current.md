@@ -9,6 +9,9 @@
 - 第 2 项验证通过：`npm run test:communication`、`npm run test:training`、`npm run check`、`npm run typecheck`、Android/iOS production export、`git diff --check`。真实 TTS、剪贴板、LiveKit 文字发送与触控体验留在第 7 项 Android/iPhone 真机全流程统一验收。
 - 第 3 项已完成代码切片：手机训练首页改为“马上录 / 自己的材料 / 按主题选择”三层；8 个正式 collection 类别及真实可录句数直接来自 `/training/catalog`，现代文章朗读明确显示“连续朗读”标识。推荐入口直达“日常与出行”；有自有材料时直达逐句录音，无材料时转到“准备”页添加，20 词筛查保留为次级入口。
 - 第 3 项验证通过：Mobile communication/training tests、check、typecheck、Android/iOS production export、`git diff --check`。下一步严格进入第 4 项材料选择、手机文件导入和统一切句；第 5–7 项尚未开始。
+- 第 4 项已完成代码切片：Mobile 准备页可用 Android/iOS 系统文件选择器导入 `.txt/.md`（500 KB 上限）、自动带入文件名和正文并保存到现有材料库；训练首页多份材料可直接选择，激活 API 同时返回新的 workspace snapshot，避免异步刷新时录错材料。
+- 切句唯一事实源已收口到 backend `prepared-expression.service`：workspace `prepared_expression.practice_lines` 直接返回逐句录音清单和段落关联，Web/Mobile 都只消费该协议；两端旧的原文切句算法已删除，滚动部署期间仅回退既有结构化 section 行。
+- 第 4 项验证通过：backend prepared-expression 回归与 build、Web 材料练习 5 项回归/TypeScript/production build（24/24 页面）、Mobile tests/check/typecheck/Android+iOS export、`git diff --check`。下一步严格进入第 5 项录后确认、严格重录替换、不收录；第 6–7 项尚未开始。
 - 已知非阻塞警告：Expo export 继承了当前 shell 的 `NODE_TLS_REJECT_UNAUTHORIZED=0` 并打印 TLS warning；双平台 bundle 均成功。
 
 ## 2026-08-26 Web 训练录音区产品化重构

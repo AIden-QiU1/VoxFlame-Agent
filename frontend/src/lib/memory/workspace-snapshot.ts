@@ -92,6 +92,12 @@ export interface PreparedExpressionSnapshot {
   fallback_phrases: string[]
   asr_hotword_entries: PreparedExpressionAsrHotwordEntry[]
   reference_lines: string[]
+  practice_lines: Array<{
+    id: string
+    text: string
+    section_id: string
+    section_title: string
+  }>
   training_reports: PreparedExpressionTrainingReportsSnapshot | null
   sections: PreparedExpressionSectionSnapshot[]
   updated_at: string
