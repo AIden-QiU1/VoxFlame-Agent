@@ -1,19 +1,7 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { buildLoginPath, resolveExternalOrigin } from '@/lib/auth/navigation'
-
-const PROTECTED_PATH_PREFIXES = ['/contribute', '/memory', '/chat', '/settings']
-
-function requiresAuth(request: NextRequest): boolean {
-    const { pathname, searchParams } = request.nextUrl
-
-    if (PROTECTED_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-        return true
-    }
-
-    return pathname === '/' && searchParams.get('mode') === 'communicate'
-}
+import { buildLoginPath, isProtectedPath, resolveExternalOrigin } from '@/lib/auth/navigation'
 
 export async function middleware(request: NextRequest) {
     let response = NextResponse.next({
@@ -49,7 +37,7 @@ export async function middleware(request: NextRequest) {
     // Refresh Session if expired
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (requiresAuth(request) && !user) {
+    if (isProtectedPath(request.nextUrl.pathname) && !user) {
         const nextValue = `${request.nextUrl.pathname}${request.nextUrl.search}`
         const loginPath = buildLoginPath(nextValue)
         const loginUrl = new URL(

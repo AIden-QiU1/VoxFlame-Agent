@@ -1,16 +1,16 @@
 {
   "kind": "targeted_severe_training_corpus_cleanup",
-  "removed_count": 204,
+  "removed_count": 209,
   "reason_counts": {
     "adult_or_sexual": 5,
     "asr_disfluency_or_duplication": 152,
-    "commercial_or_advertising": 38,
+    "commercial_or_advertising": 43,
     "crime_violence_or_accident": 6,
     "severe_broken_fragment": 3
   },
   "category_counts": {
     "会议与协作": 129,
-    "现代文章朗读": 48,
+    "现代文章朗读": 53,
     "音系强化": 27
   },
   "policy": {
@@ -1242,6 +1242,36 @@
       "id": "音系强化_source_0273",
       "category": "音系强化",
       "text": "建议感兴趣的读者订阅学习",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0053",
+      "category": "现代文章朗读",
+      "text": "软考各科目自学必备学习包",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0054",
+      "category": "现代文章朗读",
+      "text": "主管护师学习包",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0055",
+      "category": "现代文章朗读",
+      "text": "初级护师学习包",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0056",
+      "category": "现代文章朗读",
+      "text": "中医护师学习包",
+      "reason": "commercial_or_advertising"
+    },
+    {
+      "id": "现代文章朗读_source_0057",
+      "category": "现代文章朗读",
+      "text": "主管中医护师学习包",
       "reason": "commercial_or_advertising"
     }
   ]

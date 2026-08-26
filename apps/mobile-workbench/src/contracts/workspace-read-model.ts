@@ -28,10 +28,85 @@ export interface MobilePreparedExpressionSnapshot {
   fallback_phrases: string[]
   hotwords: string[]
   sections: MobilePreparedExpressionSection[]
+  rehearsal_count: number
+  low_confidence_sections: number
+  training_reports: MobileTrainingReports | null
   updated_at: string
 }
 
+export interface MobileTrainingSummaryWindow {
+  summary: string
+  sample_count: number
+  mismatch_pairs: Array<{ target: string; heard: string; occurrenceCount: number }>
+  next_focus: string[]
+  stable_wins: string[]
+  pronunciation_patterns: string[]
+  support_strategies: string[]
+  generated_at: string
+}
+
+export interface MobileTrainingReports {
+  daily_summary: MobileTrainingSummaryWindow | null
+  weekly_summary: MobileTrainingSummaryWindow | null
+  training_plan: {
+    summary: string
+    items: string[]
+    generated_at: string
+  } | null
+}
+
+export interface MobilePreparedExpressionAsset {
+  draft: {
+    id: string
+    title: string
+    scene: string | null
+    source: string
+    content: string
+    updated_at: string
+  }
+  structured: {
+    id: string
+    title: string
+    summary: string
+    scene: string | null
+    source: string
+    hotwords: string[]
+    highRiskPhrases: string[]
+    fallbackPhrases: string[]
+    sections: Array<{
+      id: string
+      title: string
+      summary: string
+      anchorLine: string
+      practiceLines: string[]
+      highRiskPhrases: string[]
+      fallbackPhrases: string[]
+      hotwords: string[]
+      basePriority: number
+    }>
+  }
+  training_reports: MobileTrainingReports | null
+}
+
+export interface MobilePreparedExpressionLibrary {
+  active_asset_id: string | null
+  assets: MobilePreparedExpressionAsset[]
+  updated_at: string
+}
+
+export interface MobileUserProfileMemory {
+  etiology?: string
+  severity?: string
+  document?: string
+  summary?: string
+  common_scenarios?: string[]
+  risky_terms?: string[]
+  support_strategies?: string[]
+  updated_at?: string
+}
+
 export interface MobileWorkspaceSnapshotContract {
+  user_profile_memory: MobileUserProfileMemory
   preparation: {
     overview: string
     immediate_goal: string | null

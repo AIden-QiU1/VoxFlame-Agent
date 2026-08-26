@@ -71,7 +71,6 @@ export interface MobileWorkbenchLiveKitRuntime {
   participantAttributes: Record<string, string>
   agentDispatch: {
     agentName: string
-    metadata: string
   } | null
 }
 
@@ -166,6 +165,7 @@ export interface MobileWorkbenchRecorderQueueItem {
   contributorId: string
   text: string
   sentenceId?: string
+  recognizedText?: string | null
   source?: string
   surface: MobileWorkbenchSurfaceId
   metadata: Record<string, unknown>

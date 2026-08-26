@@ -3,6 +3,31 @@ import { ossService } from './oss.service'
 
 type JsonRecord = Record<string, unknown>
 
+const UPLOAD_METADATA_KEYS = new Set([
+  // Training labels and target/transcript separation.
+  'kind', 'sentence_id', 'target_text', 'spoken_text', 'recognized_text',
+  'prompt_aligned_transcript', 'etiology', 'severity', 'age_band', 'sex',
+  'consent_scope', 'consent_version', 'collection_plan_id',
+  // Retry de-duplication and prompt lineage.
+  'recording_id', 'session_id', 'prompt_group_key', 'prompt_fingerprint',
+  'recording_dedupe_key', 'duplicate_policy', 'repeated_prompt_strategy',
+  // Operational audio/quality fields needed for QC and manifest export.
+  'mode', 'source_surface', 'collection_mode', 'source', 'timestamp',
+  'audio_format', 'sample_rate', 'channel_count', 'duration_ms',
+  'file_size_bytes', 'capture_transport', 'speech_duration_ms',
+  'leading_silence_ms', 'trailing_silence_ms', 'silence_ratio',
+  'input_level_rms', 'input_level_peak', 'audio_quality_disposition',
+  'audio_quality_reasons', 'confidence', 'confidence_source', 'latency_ms',
+  // Training feedback retained for review/reporting, not default model input.
+  'exercise_id', 'exercise_text', 'exercise_category', 'feedback_status',
+  'clarity_score', 'alignment_score', 'alignment_status', 'alignment_tier',
+  'alignment_summary', 'alignment_reasons', 'transcript_coverage_ratio',
+  'missing_chars', 'extra_chars', 'speech_patterns', 'articulation_tips',
+  'pronunciation_summary', 'pronunciation_targets',
+  'prepared_expression_id', 'prepared_expression_section_id',
+  'prepared_expression_section_title',
+])
+
 export interface UploadCompletePayload {
   contributorId: string
   audioPath: string
@@ -66,9 +91,53 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function isSafeMetadataValue(value: unknown): boolean {
+  if (typeof value === 'string') {
+    return value.trim().length > 0
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value)
+  }
+
+  if (typeof value === 'boolean') {
+    return true
+  }
+
+  return Array.isArray(value)
+    && value.length <= 32
+    && value.every((item) => typeof item === 'string' && item.trim().length > 0)
+}
+
+/**
+ * Enforce the dataset metadata boundary server-side. The client allow-list is
+ * only a UX/privacy convenience; uploads can also come from old clients or
+ * manually crafted requests.
+ */
+export function sanitizeUploadMetadata(metadata: Record<string, unknown> | undefined): JsonRecord {
+  return Object.fromEntries(
+    Object.entries(metadata ?? {})
+      .filter(([key, value]) => UPLOAD_METADATA_KEYS.has(key) && isSafeMetadataValue(value))
+      .map(([key, value]) => [
+        key,
+        typeof value === 'string' ? value.trim() : value,
+      ]),
+  )
+}
+
 function readString(metadata: Record<string, unknown> | undefined, key: string): string | undefined {
   const value = metadata?.[key]
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function firstNonEmptyString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim()
+    }
+  }
+
+  return ''
 }
 
 function readNumber(metadata: Record<string, unknown> | undefined, key: string): number | undefined {
@@ -99,7 +168,7 @@ function toErrorMessage(error: unknown): string {
   return 'unknown_error'
 }
 
-function buildRecordingManifestEntry(
+export function buildRecordingManifestEntry(
   contributorId: string,
   audioPath: string,
   text: string,
@@ -525,13 +594,19 @@ async function deleteContribution(contributorId: string, contributionId: string)
 export class UploadArtifactService {
   async persistCompletedUpload(payload: UploadCompletePayload): Promise<UploadArtifactResult> {
     const manifestPath = `dataset/${payload.contributorId}/manifest.jsonl`
+    const sanitizedMetadata = sanitizeUploadMetadata({
+      ...(payload.metadata || {}),
+      target_text: firstNonEmptyString(payload.metadata?.target_text, payload.text),
+      recognized_text: firstNonEmptyString(payload.recognizedText, payload.metadata?.recognized_text),
+      spoken_text: firstNonEmptyString(payload.metadata?.spoken_text, payload.recognizedText),
+    })
     const manifestEntry = buildRecordingManifestEntry(
       payload.contributorId,
       payload.audioPath,
       payload.text,
       payload.recognizedText,
       typeof payload.duration === 'number' ? payload.duration : null,
-      payload.metadata || {},
+      sanitizedMetadata,
     )
 
     let existing: ContributionRecord | null = null
@@ -551,10 +626,10 @@ export class UploadArtifactService {
     }
 
     const currentMetadata = existing?.metadata ?? {}
-    const mergedMetadata = {
+    const mergedMetadata = sanitizeUploadMetadata({
       ...currentMetadata,
-      ...(payload.metadata || {}),
-    }
+      ...sanitizedMetadata,
+    })
     const existingReceipt = readUploadReceipt(currentMetadata)
     let manifestAlreadySynced = hasManifestReceipt(
       existingReceipt,

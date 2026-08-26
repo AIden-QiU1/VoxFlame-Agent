@@ -1,6 +1,120 @@
 # 当前任务状态
 
-> 最后更新: 2026-08-13
+> 最后更新: 2026-08-26
+
+## 2026-08-26 App parity release chain (item 1 in progress)
+
+- User authorized submitting the existing Mobile/Web/backend/agent work together. Release branch: `release/mobile-parity-0.1.4`, merged with `origin/main` without conflicts.
+- Mobile version is `0.1.4`; Android `versionCode=5`; iOS `buildNumber=5`.
+- Local verification passed: Mobile check/typecheck/training test and Android/iOS export; Frontend 95 tests, TypeScript and Next production build; Backend build and service tests; LiveKit agent 80 tests with one worker-only skip; AI docs harness. The initial `ten-framework/ai_agents` unittest path was invalid; the real `livekit_agent/tests` suite was then run successfully.
+- Known non-blocking warnings: frontend Node ESM module-type warnings, PWA chunk precache warning, stale Browserslist data, Expo TLS warning, and repository-wide whitespace warnings in imported evidence/generated artifacts. No root `VERSION` or `CHANGELOG.md` exists; Mobile package/app version files are the release version source.
+- Remaining item 1 gates: complete structural review despite missing installed gstack checklist, push/create PR, wait for CI, obtain pre-merge confirmation, merge `main`, rebuild/publish APK, and verify public metadata/hash/download URL.
+
+## 2026-08-26 Web 训练录音区产品化重构
+
+- `/contribute` 不再用三个并列的工程分类占据首屏，改为“马上录几句今天用得上的话 / 用自己的内容 / 按沟通场景选择”三层任务入口；推荐动作直接进入日常表达，低频说明收进次级信息。
+- 8 个公共主题均直接显示题库事实源中的可录句数：日常与出行 40、看病与求助 56、人群与角色 67、设备与数字 154、现代文章朗读 4947、会议与协作 771、车载与导航 80、音系强化 3540；自定义材料显示实际切分后的句数。
+- 自定义材料不再要求用户先理解并绕去记忆页：`/contribute/topic/custom-material?new=1` 可直接上传 `.txt/.md` 或粘贴原文，保存到现有 workspace 材料事实源、自动设为当前材料并复用现役标点/段落切句器进入三步录音流程；已有材料仍可继续录或换新。
+- 记忆区仍是个人材料的持久维护事实源，没有新增平级存储或兼容路径；录音、上传、撤回和重录语义保持不变。
+- 验证：Web 95 项测试、TypeScript、production build（24/24 页面）、`git diff --check` 通过；Playwright 在 390×844 下确认 `/contribute` 与新材料入口未登录时保留精确 `next`，console 0 error/warning。登录后的主题视觉、真实文件保存/自动切句与麦克风录音仍需授权账号设备 smoke。
+
+## 2026-08-25 “补齐声音”用户语义纠偏
+
+- 用户入口不再把音系覆盖任务称为“补齐声音 / 核心补音”；统一改为“系统易漏听字词 / 系统易漏听”，明确不足属于系统理解覆盖，不属于用户声音。
+- `/contribute` 主题卡移除 `88/88`、机器门、训练导入审核和边缘专项等研发台账文案，只说明用户价值：让系统认识较少见、容易听错的自然字词和短句；按平时方式说，不需要模仿标准发音，可随时结束。
+- Web 录音页分组、Mobile collection protocol 与内部语料审核任务标签同步；底层 `targeted_gap` ID 和数据路由保持不变，没有新增兼容层或采集功能。
+- 验证：Web 定向测试 11 项、TypeScript、production build（24/24 页面）、Mobile check/typecheck、AI docs harness、`git diff --check` 通过；Playwright 未登录 `/contribute` 正确回跳 `/login?next=%2Fcontribute`，console 0 error/warning。登录后的卡片视觉 smoke 仍需授权账号。
+
+## 2026-08-24 个性化 ASR 统一账户网关
+
+- 已彻底移除应用侧逐用户 ASR 白名单和旧 18000 入口；所有已认证的 `communication / training` 会话统一调用 `http://127.0.0.1:8001/transcribe`，未认证与 `quick_talk` 不进入该远端账户链路。
+- Backend 从 Supabase 已验证身份生成稳定 `asr_account_id`：历史数字 QQ 邮箱沿用数字前缀，其他账户使用不可变 user UUID。该键由服务端生成，只进入签发给 LiveKit agent 的 dispatch metadata，不进入 participant token metadata/attributes，也不接受前端自报账户号。
+- `livekit_agent` 以 `X-Account-ID` 发送账户键；8001 独占用户注册、个性化/公共 fallback、线上最佳模型和实验晋升。以后新增或替换个性化模型只改模型服务注册表，不改 VoxFlame 代码、环境变量或容器。
+- HTTP 返回的 `account_id` 若与请求不一致会被拒绝；前端诊断只收到 `model_version / personalized / fallback`，不收到模型账户键。8001 失败继续回退 DashScope realtime ASR。
+- HTTP 客户端按 LiveKit 会话复用连接，避免每句话重复建立 TCP 连接；会话结束显式关闭。
+- 验证通过：LiveKit agent 全量 80 项（1 项 worker-only skip）、Backend TypeScript build、RTC/LiveKit 契约测试、compose 展开和 `git diff --check`。仓库搜索确认旧白名单与旧端口引用为 0。
+- 尚未完成：当前主机 `127.0.0.1:8001/health` 实测 connection refused。现有 `127.0.0.1:18000` 由外部 SSH 会话监听，health 正常，但用 2187054680、2307294809、3083029019 与未知账户分别做真实 WAV smoke 时都只返回转写正文，缺少 `account_id/model_version/personalized/fallback`，说明它仍是旧接口而非新账户网关。
+- 部署边界：暂不重启仍在服务的旧 `livekit-agent`，避免把线上从可用 18000 切到不可达 8001。先将远端新服务 8001 映射为本机可达的 8001，并确认三账户个性化与未知账户公共 fallback 契约，再执行 `sudo scripts/docker-rebuild-core-fast.sh backend`（若 backend 镜像包含本次 RTC 变更）和 `sudo scripts/docker-rebuild-core-fast.sh` 支持的 livekit-agent 最小重建路径；若脚本无 agent 单服务模式，则用 `sudo docker compose build livekit-agent && sudo docker compose up -d --no-deps livekit-agent`。
+
+## 2026-08-24 Web “重录这一句”替换语义修复
+
+- 根因：结果页展示时录音已经进入自动保存，旧按钮又因全局上传态被禁用；即使稍后能点，也只是再次开始录音，不会撤回上一版，可能让同一句同时留下两条样本。
+- 现已把“重录”收口为替换操作：保存中的样本先等待保存完成并撤回，已上传或本机排队的样本先撤回，只有撤回成功才自动进入原句重录；撤回失败不开始新录音。
+- 交互同步显示“正在替换 / 正在撤回旧录音”，替换期间锁住继续、不收录和重复重录，并明确说明最终只保留新录音。
+- 验证：新增替换策略 4 项回归测试通过，TypeScript、前端 product-message 检查、Next production build 和 `git diff --check` 通过；Playwright 未登录访问 `/contribute/topic/daily-mobility` 正确回跳并保留 `next`，console 0 error。真实账号、麦克风、上传与撤回闭环仍需设备 smoke。
+- 全量验证已恢复：`npm test` 91 项通过；录音就绪题面由独立 gate 校验，不删除基础题库或历史来源。
+- 2026-08-24 继续产品化：音系强化录音页默认打开“核心补音”组，首屏明确展示全部 568 条录音就绪补音的拆分（核心 263、开放研究 14、低频补强 291）；新增独立“开放研究补充”组显示 14 条非教材、非训练导入批准的长尾补充句；“低频补强”仍单独显示 291 条录音就绪题面。“训练导入审核 0 条”与“录音就绪题面已开放”在界面上分开表达。新增完整性回归确认核心录音包 263 条恰好覆盖台账 88 个 core 缺口，低频补强只引用 below-minimum 目标。
+
+## 2026-08-22 普通话语言学覆盖与录音区持续优化
+
+- 核心目标：录音区以语言学和目标用户证据为根本依据，持续完成 `现有微调/采集诊断 -> 缺口驱动补料 -> 准确分区 -> 用户友好采集 -> 固定评测复盘`；SOP 只作现场操作参考，不定义覆盖完整性。
+- 已建立四层覆盖模型：音系库存、常用合法音节/音节—声调、连续语流、任务与真实沟通场景；主任务分区与可叠加语言学标签分开，禁止用“句库总量”或“各音出现一次”宣称全面覆盖。
+- 新增可重复工具：`frontend/scripts/mandarin-coverage-core.mjs`、参考集合生成、现役题库导出、应用/模型 manifest 审计 CLI 和回归测试。版本化参考集合来自 `pinyin-data` commit `923b108d...`，包含 402 个常用无调音节和 1242 个常用音节—声调形式，并保留上游 410 行待复核/争议限制。
+- 题库基线：9107 条基础题面，另有 263 条核心补音和 291 条低频补强录音就绪题面；相对 9112 仅退出 5 条明确“学习包”商业污染，历史录音、manifest 和原始来源未删除。基础台账声母 `22/22`，规范化韵母 `38/39`；常用无调音节 `386/402`，音节—声调 `1025/1242`。主要缺口是长尾音节—声调，不是总量。
+- 数量口径已用回归测试固定：`mandarin-training-real.json` 为 8771 条外部生成子池，前端合并 336 条人工策划/固定评估项后才是现役 9107 条；8771 不是再次删除 336 条。全台账有 9 个 disputed tier，其中 8 个属于 217 个完全缺失项，另 1 个已出现但低于 20 次。
+- 应用采集基线：10 个 manifest 原始 1421 行，按 `recording_id` 去重为 1185 条、约 2.568 小时、9 名说话人/48 sessions；按有效音频、非空 target、授权 scope 与上传契约计入 1180 条 collected，质量异常只分层不删除；常用无调音节覆盖 `339/402`，音节—声调 `708/1242`。
+- 微调诊断边界：CLEAR-VOX-MODEL 固定记录确认主 CDSD 为 `112424/14032/14100`，明确错配清理有效，但按高 CER 删除重度说话人、标准拼音 CTC 和机械最小对立增强均未形成稳定突破。当前机器未挂载 `/qiu/data/.../cdsd`，本轮不能声称逐条审过主微调集；审计 CLI 已支持 `--model-manifest`，数据挂载后补跑。
+- 研究与应用决策已登记为 `RF-011 validate`。当前主线是语言学与目标用户逐条审核 263 条核心候选，再做小规模采集和固定 speaker-disjoint 微调消融；人工实际转写工具保留为旁路，不再抢占全音系列语料建设主线。
+- 2026-08-24 已完成任务/标签旁路索引；当前索引覆盖基础题面与补音题面共 `9675/9675` 条，保留正常题面、原文和原类别；仅 5 条确认商业污染退出。每条只有一个互斥 `task_id`，可叠加声母、韵母、声调、音节—声调、位置和连续语流标签。
+- 2026-08-23 已建立候选人工复核门禁：`frontend/scripts/validate-mandarin-review-queue.mjs` 要求语言学、自然度、安全、许可、任务五项审核；Tatoeba 300 条候选当前 `pending 1500/1500`，生产导入数为 0。该门禁只新增校验，不修改或删除题库、录音和候选原文。
+- 2026-08-23 已增加评测结构门禁：`frontend/scripts/validate-mandarin-evaluation-report.mjs` 强制固定 speaker-disjoint 测试集、总体/最差说话人/短句 CER、严重度/长度分层、P95 延迟、用户成功/跳过/疲劳指标和回退动作；没有真实结果时只能保持 `validate`，不能宣称模型提升。
+- 2026-08-23 已按反馈清理前端生成题库中的 5 条“学习包”类课程/考试营销噪声；清理审计总数为 209 条，新增项均为 `commercial_or_advertising`。该操作不删除历史录音、manifest 或原始来源，仅阻止污染题面进入用户录音区。
+- 2026-08-23 已同步重建 1242 项全量覆盖目标台账：现役题库为 `569 robust / 456 below_minimum / 217 missing`；217 个硬缺口按现代词、实际使用证据和默认用户负担收紧为 `88 core / 121 edge / 8 disputed`。`chun3 / heng4 / long4 / ming3 / nüe4 / zei2` 等主要依赖贬损、地域、醉酒、虐待或犯罪承载词的形式转入边缘专项；它们仍在全音台账，不从语言学库存删除。
+- 核心第一阶段仍保留原始 263 条候选审核包作为历史证据；另生成 `mandarin-recording-core-gap-corpus.json`，按可复现语言学/工程 gate 放行 `263` 条录音题面（`88` 词、`175` 短句、`88` 个核心目标），真正接入音系强化录音区。录音区不等待六项主观审核或人工 `spoken_text`；后者仅为可选质量诊断。
+- 2026-08-23 继续按用户负担优化核心候选：将 `歹徒/懒惰/醉醺醺/挣扎/产卵/烫伤` 等默认词锚点替换为同音目标下的 `好歹/掌舵/烟熏/炸鱼/鹅卵石/烫发` 等中性现代词；挑衅、指人评价、灾难语义和明显翻译腔句进入永久拦截。人工短句现强制提供句内整词与整词拼音证据，175/175 均已满足；当前候选快照为 `2026-08-23T03:34:40.850Z`，仍为 263 条且全部 pending。
+- 2026-08-23 已为 456 个 `below_minimum` 音节—声调建立基础题库补强计划：455 个默认核心目标进入调度，1 个争议目标下线；基础安全题库选出 835 条题面，分配 2998 个未来采集槽位。随后从 346 条低频语境候选中按机器门放行 291 条新增录音就绪题面，覆盖 116 个目标；计划槽位和真实录音仍严格分开。
+- 录音区“低频补强”组同时包含 835 条基础计划题面和 291 条机器校验录音就绪题面，并按录音就绪优先；原有八个音系练习组不变。完整审计计划保留为旁路产物，浏览器只加载轻量产品索引。
+- 本切片验证：普通话语料脚本 75/75、Web 91/91、采集证据/产品状态/录音 gate 回归、TypeScript、Next production build 24/24 页面、AI docs harness 和 `git diff --check` 通过；Playwright 未登录 smoke 正确回跳并保留审核路径，受保护 API 返回 401、console 0 错误/警告；授权审核者真实交互仍需白名单账号验证。
+- 边缘专项单列 121 项，争议 8 项保持下线。地域/轻声口径冲突、只有词典证据和高负担承载形式不进入默认录音。CC-CEDICT 另发现 311 个核心基线外词音（225 轻声、68 额外声调、18 额外词汇音节），只进入发现审核表，不扩张当前覆盖分母。
+- 已生成 `mandarin-core-gap-phase1-review.tsv`：263 行按每批 30 条分成 9 批，包含目标音、文本、来源、整词读音证据和六项审核栏，供语言学与目标用户复核；TSV 不直接进入生产。
+- 2026-08-23 已把同一 263 条候选产品化为站内 `/corpus-review` 审稿台：9 批导航、搜索/状态筛选、六项审核、本机自动保存和 decision JSON 导出均已完成。页面/API 需登录，服务端 `VOXFLAME_CORPUS_REVIEWER_EMAILS` 精确白名单控制候选读取；浏览器不能直接写仓库或生产语料。
+- 2026-08-23 已为 146 个安全题面不足的低频目标重扫完整 Tatoeba 普通话快照并建立独立低频语境审稿任务：严格用户负担门后保留 346 条唯一待审句、354 个目标—句分配，118 个目标达到每音 3 条候选，28 个目标仍需补写；全部六项 `pending`，生产 0。候选层收紧不修改 9107 条现役题库、历史录音、manifest 或来源。
+- 2026-08-23 低频补写 brief 已产品化进入同一 `/corpus-review`：当前 28 个目标均进入结构化专家路线，记录风险类别、允许证据、默认录音政策和下一动作；支持目标音/承载词/拼音搜索与独立 authoring worksheet 导出，不提供浏览器直写生产。学习包及 `挨骂 / 殡仪 / 娼妓 / 排尿 / 奴役` 等高负担承载词被拦截，音系目标本身仍完整保留在 1242 项台账。
+- decision JSON 已有独立校验/合并 CLI：拒绝过期来源快照、未知或重复 ID、非法状态和无说明的改写/拒绝。真实候选快照的临时往返验证确认只提交 1 条决定时仅 1 条进入批准导出，其余候选保持未动；临时产物已删除。正式审核仍全为 pending，生产导出仍为 0。
+- Web 录音区已接入产品状态与安全导出：原有按音组练习保留；录音就绪的核心/开放研究/低频补强题面按机器语言学、来源、长度、安全和显式 target gate 开放，六项人工审核只决定训练导入 approved corpus，不阻塞录音；边缘与争议不混入默认推荐。
+- 2026-08-23 已完成真实应用录音人工 `spoken_text` 复核旁路的第一版：从全部 10 个历史 manifest 去重生成 1185 条待复核项，ASR 仅保留为 `asr_hint`，实际文本和 audio-text 对应均为 `pending`；校验器拒绝用户/设备/存储路径字段。人工复核仍是可选质量旁路，不进入默认覆盖门或训练导入。
+- 2026-08-23 已生成 1185 条可选 spoken-text 诊断队列；`mandarin-collection-evidence.json` 现按 manifest 契约计入 1180 条 collected，并将错读/漏读/长空白/不可用音频分层，不删除原 manifest 或历史录音记录。旧复核支线已删除，不参与任何现役统计。
+- 2026-08-23 已将 1185 条历史录音接入受保护的 `/corpus-review/spoken-text` 人工复核工作区：审核邮箱白名单、受控音频 API、不透明 `recording_id`、ASR 非权威提示、人工 `spoken_text` 与 audio-text 对应确认、本机草稿和决定 JSON 导出均已产品化；工作区 `training_import_allowed=false`，浏览器不能直写生产；它是可选质量旁路，不是录音前置条件。
+- 2026-08-23 已补齐真实录音决定离线收口：`validate-mandarin-spoken-text-review` + `merge-mandarin-spoken-text-review-decisions` 强制精确队列快照、审核者/时间、人工文本与音频对应门，并以稀疏补丁合并；未提交录音保持 pending，合并产物仍禁止训练导入。
+- 历史 spoken_text 工作区仅作为可选质量旁路保留，不是录音区或采集覆盖硬门。采集统计改为有效音频 + 非空 target；ASR 只能提示疑似错读/漏读，异常按 `valid / suspected_misread / suspected_omission / long_silence / unusable_audio` 分层，不自动删除样本。旧复核机制不再存在于现役链路。
+- 双人复核已实际从工作树移除：相关页面、路由、脚本、测试、统计/证据包和生成 JSON 均已删除；`git status` 中的 `D` 仅表示删除尚未提交，不表示文件仍在运行。harness 已明确禁止将双人复核、人工 spoken_text 或音频—文本确认作为录音、覆盖或训练导入前置条件。
+- 本轮验证通过：普通话相关定向测试、前端测试、TypeScript、Next production build、AI docs harness 和 `git diff --check`。产品状态新增唯一总计 `recording_ready_total = 568 条 / 568 个唯一文本 / 206 个显式目标`，页面直接消费该事实源；新增开放研究补充包 14 条、覆盖 15 个目标；正式覆盖证据 `mandarin-recording-ready-coverage.json` 现记录 568 条录音就绪题面。Playwright 已确认未登录访问目标录音页会回跳并保留 `next`；真实账号录音和授权审核者交互仍未完成。
+- 2026-08-24 完成覆盖口径修正：`audit-mandarin-coverage.mjs` 新增 `--recording-corpus`，对录音就绪题面同时报告普通字形注音与显式 `coverage_targets`；多音字不再因通用 pinyin 默认读音把明确目标误报为缺失。录音就绪仍不等于真实录音，真实覆盖仍只由 manifest 的有效音频 + 非空 target + 授权/上传契约计数。
+- 2026-08-24 重算历史 manifest 证据：`build-mandarin-collection-evidence.mjs` 已对 10 个本地 manifest 重新生成采集证据，采集资格仍为 1180 条；历史 `prompt.target_focus` 中的“补稳/收住”反馈标签不符合音节—声调格式，已过滤为非显式目标，历史录音显式音节目标覆盖为 0。新增题面的目标链路已补后端 manifest 回归测试，确认 `pronunciation_targets` 写入 `prompt.target_focus` 且设备字段不进入 manifest。下一步必须用真实新增题面录音重算显式覆盖，不能用计划题面数量替代。
+- 2026-08-24 新增可复跑收口命令 `cd frontend && npm run rebuild:mandarin-recording-evidence`：读取两组本地 OSS manifest，派生重建 `mandarin-collection-evidence.json`、`mandarin-recording-ready-coverage.json`、`mandarin-speaker-disjoint-split.json` 和 `mandarin-coverage-product-status.json`；不写入音频、manifest、题库或来源。当前重建结果：1421 行 / 1185 去重 / 1180 采集资格，显式音节—声调目标 0/1242，speaker-disjoint 为 555/429/196、交集 0；真实新增题面录音后直接重跑即可得到真实覆盖。
+
+## 2026-08-21 沟通入口信息架构收口
+
+- 沟通入口已拆成独立信息流：`/communicate` 只负责选择“快速表达 / 日常沟通”，不再把一个模式嵌入另一个页面。
+- 快速表达独立为 `/communicate/quick`，保持本机朗读、通用短语和个人短语；日常沟通独立为 `/communicate/assistant`，由鉴权保护并保留正确登录回跳。
+- 两个工作界面都能回到 `/communicate` 重新选择；首页所有“现在沟通”入口统一进入选择页。
+- `useAuth` 的公共快速表达超时竞态不再决定工作界面；日常沟通使用受保护路由，避免已登录用户因 session 恢复时序被误送到登录页。
+- 验证通过：frontend TypeScript、78 项测试、production build、lint（仅保留既有其他文件 warnings）、AI docs harness、`git diff --check`；Playwright 在开发端口 `3200` 验证选择页、快速表达页和未登录日常沟通回跳 `/login?next=%2Fcommunicate%2Fassistant`。
+
+## 2026-08-21 Web 数据录入分步引导
+
+- `/contribute` 主题入口已收成单列信息流：默认突出“日常与出行”和自定义材料，其余主题按需展开，不再一次铺开所有类型。
+- 普通数据录入主题页已改为三步单列流程：`准备 -> 录一句 -> 确认结果`。每一步只显示当前任务；采集计划、年龄段、性别、换句和本轮信息均为按需展开。
+- 录音成功后进入独立结果步骤，以明确正向反馈确认录音已收下，并保留系统听到、回听、继续下一句、重录和不收录。
+- 修正自动切到下一句后“重录这一句”可能录到新句的问题；重录现在固定使用结果对应的原句。没有生成完整录音文件时不会显示成功反馈。
+- 验证通过：frontend `npx tsc --noEmit`、78 项测试、production build、lint（仅保留仓库其他文件既有 warnings）和 `git diff --check`。Playwright 已确认 `/contribute` 未登录时正确跳转 `/login?next=%2Fcontribute`；真实账号下的麦克风与上传仍需设备 smoke。
+
+## 2026-08-18 语音采集产品化与 App 构建
+
+- 已读取并对照 `燃言_构音障碍普通话语音采集标准化SOP_v1.0.docx`，新增 [docs/VOXFLAME_VOICE_COLLECTION_PRODUCT_SPEC_2026-08-18.md](../docs/VOXFLAME_VOICE_COLLECTION_PRODUCT_SPEC_2026-08-18.md)。流程覆盖采集前环境/距离/同意、单任务录音、回放/撤回、Anchor/自然表达、语料覆盖、硬件 P0/G1 验收和不合时宜语料排除。
+- 元数据按用户要求收口：默认训练字段为音频、目标文本、实际转写、严重程度、病种、年龄段、性别；`recording_id`/上传状态/质检字段只为追踪，不作模型特征。
+- Web `/contribute/topic/[topicId]` 和 Mobile 筛查/数据录入加入采集前环境、距离和授权确认；Mobile profile 中已有病种/严重程度可进入上传标签，年龄段/性别为可选输入；目标文本与实际转写保持分离。Web/Mobile 上传均有 metadata 白名单，浏览器 UA、麦克风设备 ID/名称和内部 capture/context 字段不会默认进入训练资产。
+- Mobile 训练录音先写入本机 queue，LiveKit 连接仅用于实时转写；连接失败或断网不再阻塞录音，录音仍可回放、撤回并在网络恢复后补登。
+- Mobile 已加入 baseline/anchor/reading/natural_speech 采集计划选择；逐项真机、输入设备 A/B 和发布门记录在 `docs/VOXFLAME_VOICE_COLLECTION_DEVICE_ACCEPTANCE_CHECKLIST_2026-08-18.md`，原始母版与训练副本的保存边界也已写明。
+- 验证通过：Web 78 tests、frontend `npx tsc --noEmit`、frontend production build、Backend build/upload-metadata/LiveKit tests、Mobile `npm run typecheck`/`npm run check`/`npm run test:training`、`bash scripts/check_ai_docs.sh` 和 `git diff --check`。
+- Android EAS preview 已提交，构建链接：`https://expo.dev/accounts/qiuds-team/projects/voxflame-mobile-workbench/builds/f032fbea-6a23-424d-8585-3f7bed07d022`。Apple 组织团队已确认（Team ID `J2QXFF775Q`），iOS 签名命令见 [docs/VOXFLAME_APPLE_DEVELOPER_INPUT_CHECKLIST_2026-08-18.md](../docs/VOXFLAME_APPLE_DEVELOPER_INPUT_CHECKLIST_2026-08-18.md)，需用户本机输入 Apple 密码/验证码。
+
+## 2026-08-18 Codex 插件连接问题
+
+- 已确认不是项目 `scripts/start_agent.sh` 路径问题：仓库当前没有该脚本，且本次故障发生在 VS Code Codex app-server / ChatGPT 服务链路，不是 VoxFlame TEN/livekit 运行时。
+- 已确认旧代理路径：历史 VS Code settings 曾设置 `http.proxy=http://127.0.0.1:7897` 并注入终端代理；当前 cpu1 无 7897 listener。仅设置 `http.proxySupport: off` 不够：Codex 扩展源码会直接读取 `http.proxy` 并将其注入 app-server 的 `HTTP_PROXY/HTTPS_PROXY`。已在 `/home/ubuntu/.vscode-server/data/User/settings.json` 固定 `http.proxy: ""`、`http.proxyStrictSSL: true` 和 `http.proxySupport: off`，并已终止旧 VS Code Server 进程；重新连接后需复查新日志。
+- 已确认链路差异：CLI 走 `https://aicoding.aideb.me/v1`，该地址可达；插件还需要 `chatgpt.com` / `ab.chatgpt.com` 的官方账户链路，cpu1 直连 `chatgpt.com:443` 超时。故障修复需先重载 Remote-SSH/窗口使新设置生效，然后决定给 cpu1 提供可达 ChatGPT 官方域名的代理或继续使用 gateway CLI；不能把 gateway 地址填入插件的 ChatGPT 登录链路。
+- 验证证据：`~/.vscode-server/data/logs/20260818T092800/exthost1/openai.chatgpt/Codex.log` 显示新 app-server 仍收到 `127.0.0.1:7897`，同时 `chatgpt.com`/`ab.chatgpt.com` 请求 `fetch failed`；Extension Host 环境本身无代理，代理来自扩展读取的 VS Code 应用级 `http.proxy`。官方 Codex app-server 文档（Context7 `/openai/codex`）说明 VS Code 扩展与 CLI 共享 `~/.codex/config.toml`/`auth.json`，但插件远端目录/账户请求仍受 ChatGPT auth 与网络约束。
 
 ## 当前主线
 
@@ -18,6 +132,91 @@
   - 把 dataset 收成最小 audio-target contract，只保留“录音和目标句是否对上”的稳定判断
 
 ## 最新收口
+
+0. 2026-08-17 已完成燃言硬件产品最终两版对外文件
+   - 首家供应商版：`燃言多模态AI无障碍沟通机_产品功能需求文档_首家供应商修订版_2026-08-17.docx`；保留原供应商熟悉的七章骨架、黑白标题与网格表，但正文不含原稿对照、研究过程或角色阅读分工
+   - 通用供应商版：`燃言多模态AI无障碍沟通机_产品方案_通用供应商版_2026-08-17.docx`；独立说明产品、全系统功能、P0/G1—G7、G1 工程输入、验证量产、质量合规、报价交付和供应商回复
+   - 两份正文品牌仅为“燃言”，无 VoxFlame/心声/MindVoice、参考资料章节、图标、emoji、装饰图或内嵌媒体；均为 8 页 A4，关键表格逐页检查无裁切
+   - 内部参数事实源为 `research/product-engineering/evidence/ranyan-hardware-product-2026-08-17/`：原厂器件事实、候选平台、采购/测试目标和未知逐项分开；ESP32-S3、TAS2563、QCM6490、RK3566、RK3588 资料及 ASHA/FDA/NIST/EU/W3C 方法材料已集中留档，获取失败不冒充已读
+   - 旧硬件路线 Markdown、旧供应商 Markdown、两份旧生成器和旧证据目录已清理；原供应商 Word 保留为格式基准。下一步先冻结 P0 真实任务 A/B，再向至少两家供应商发 G1 同口径 RFI/RFQ，不立即冻结 BOM 或开模
+
+0. 2026-08-16 已按第一性原理收口沟通、记忆、练习与健康筛查，重点完成沟通/记忆去重
+   - 用户唯一目标是“把话表达出去”；Web 只保留 `/communicate`，已物理删除 `/chat`、`/communicate/live` 和固定六场景选择组件，不保留兼容跳转。
+   - `/communicate` 默认是快速表达：匿名用户无需登录即可使用通用短语和手动输入，个人短语登录后异步加载；表达直接走浏览器本机朗读，不连接 LiveKit、不调用 agent、不上传声音，个人短语使用次数后台记录，不让网络请求阻塞代播。
+   - 用户明确选择“日常沟通”后，才要求登录并动态加载、挂载 `ChatInterface` 和 LiveKit agent；首屏只保留开始沟通、麦克风和核心输出，已移除固定场景大卡、短语抽屉、连接诊断和手动资料勾选。按需拆包后 `/communicate` First Load JS 从约 355 kB 降到 209 kB。
+   - 记忆页成为画像、场景模板、热词、策略、自定义材料和个人短语的唯一维护面；日常沟通按 workspace `default_selected` 自动带入已启用模板与当前材料，不让用户重复装配。
+   - 练习仍只有 `20 词能力筛查 / 训练与数据录入`；健康筛查报告仍只给系统听清、音系、稳定性、节奏、静音、收音和个性化准备度，不自动判医学严重度，不新增自由表达入口。
+   - 产品决策已沉淀到 `research/product-engineering/COMMUNICATION_SURFACE_FIRST_PRINCIPLES_2026-08-16.md` 和 `RF-009`。Web 17 个测试、TypeScript 与 production build 已通过；HTTP / Playwright 验证匿名 `/communicate` 为 200、`/chat` 与 `/communicate/live` 均直接 404、点击日常沟通才进入登录。待真实设备确认有声 TTS，并完成真实账号个人短语、LiveKit 麦克风与 confirmed output smoke。
+
+0. 2026-08-16 已把筛查页从单一机器分数扩展为沟通表现报告，不新增产品任务
+   - 固定 20 词筛查使用字符编辑距离，错字、多字、漏字均计入，并报告易混中文音系、词间稳定性、个人节奏、静音与收音；不再由 ASR 分数自动写入医学轻/中/重。
+   - 自由表达、同场景 A/B、朋友听懂确认和 7/30 天趋势只保留为现有报告流程内的研究候选，未作为已落地功能，也不会新增练习入口。
+   - 研究证据与产品边界已沉淀到 `research/speech-health/VOICE_AND_COMMUNICATION_PERFORMANCE_REPORT_RESEARCH_2026-08-16.md` 和 `RF-008`；新增核验会话 ASR、卒中构音障碍核心结局、个性化字幕真实使用、2026 伙伴训练、自动表达教练综述与 Microsoft Speaker Coach 官方能力。
+   - 尚未验证：真实账号下的 20 词完整录音与报告；未来趋势必须在同人、同任务、同设备下设计，换设备后重建基线。
+
+0. 2026-08-14 已加入国内成果初步审查体系：论文 / 发明专利 / 软件著作权 / 产品
+   - `research/OUTCOME_REVIEW.md` 定义国内优先的权威来源和边界：中国版权保护中心/国家版权局、CNIPA、WIPO PATENTSCOPE、CNKI、万方、NSTL、COPE，以及 PubMed/Crossref 等补充来源
+   - 软件著作权单独检查主体与权属链、源程序/文档版本固化、hash、第三方依赖和开源/模型/数据许可；不把软著当成技术效果或专利权利保护
+   - 国内论文只要求“不是垃圾期刊”不等于放宽审查：至少核验期刊身份/ISSN/出版社/审稿政策、CNKI/万方/NSTL 与 DOI 题录、撤稿/更正、相关工作、数据/方法/统计/伦理和主张边界；拒绝保证录用、代写代投等掠夺性信号
+   - 专利初审必须包含 CNIPA/WIPO/论文/产品现有技术检索、权利要求边界、权属和公开时机；不把自动检索当作正式法律意见
+   - 每个 `research_id` 必须挂 `research/outcome-reviews/<RO>.md` 初步审查报告；报告只输出 `pass_precheck / revise / hold / escalate_professional`，未通过不得发布、申请或扩展产品范围
+   - 已验证：研究 harness、来源 harness 与 AI docs harness 全部通过
+
+0. 2026-08-14 已落地研究—发现—实验—成果—产品—反馈优化 Harness 与发布前权威闸门
+   - `research/RESEARCH_HARNESS.md` 定义统一生命周期：`discovered -> evidence_review -> experiment -> outcome_review -> authority_review -> scholarly/IP 或产品试点 -> adopted/improving/rejected`
+   - 每个机会只有一个 `research_id`，由 `research/PIPELINE.yaml` 串联证据包、实验、论文/专利/开源、场景试点和反馈优化，避免研究、成果和产品各维护一套事实源
+   - `authority_gate` 是发布论文、专利、公开数据/代码、产品默认能力，或扩展到新用户/病因/语言/设备/场景前的硬阻断；至少两个独立权威来源、独立复核、反证、边界、失败条件和回退缺一不可，否则只能 `internal_only` / `hold`
+   - `research/FEEDBACK_REGISTRY.yaml` 将用户、沟通伙伴、临床专家、遥测和失败样本转为可证伪假设、责任 owner、动作、验证和关闭条件；反馈不再直接驱动 prompt、模型或产品改动
+   - 已新增证据包、反馈条目、研究机会、场景试点、学术/IP 模板和 `scripts/check_research_harness.py`
+   - 已验证：`python3 scripts/check_research_harness.py`、`bash scripts/check_research_system.sh`、`bash scripts/check_ai_docs.sh`
+
+0. 2026-08-14 已建立精简的研究来源与专家雷达
+   - `research/SOURCE_REGISTRY.yaml` 现在按五个主题各保留 3 个默认锚点，其他来源只按问题临时发现，不以堆链接代替研究质量
+   - `research/SOURCE_ROUTING.md` 定义来源等级、主题路由、实时搜索/抓取/更新和证据回流规则；社媒、博客和博主只作 radar，重要结论必须回到论文、标准、官方文档、代码或机构页面
+   - `speechhome.com` 已登记为语音/构音领域高相关但 `candidate_unverified` 的 discovery 来源；当前环境 DNS 无法解析，未把它当作已验证权威来源
+   - `research/EXPERT_WATCHLIST.yaml` 收窄为少量可核验英文专家与中文专家按需检索入口，不批量维护未经核验的中外账号名单
+   - `scripts/check_research_sources.py` 已接入研究检查，默认离线验证注册表结构；需要联网时显式运行 `--network`
+
+0. 2026-08-14 Web / Mobile 沟通与练习页面职责已完成产品级拆分
+   - Web：`/communicate` 是唯一沟通 surface，同页按需承接快速表达与日常沟通；`/practice` 只区分筛查与数据录入，`/assessment` 只做 20 词筛查，`/contribute` 只选数据录入主题，`/contribute/topic/[topicId]` 只做录音执行。
+   - `/chat` 与 `/communicate/live` 已在 2026-08-16 物理删除；旧筛查 topic 仍仅做训练路径兼容，不承接新逻辑。
+   - Mobile 保持四个一级 surface，不引入 WebView；练习任务路由只有 `practice_home / assessment / collection`。自定义材料属于 `collection` 内部来源，与公共题库并列，不是第三个产品页面。
+   - Mobile 练习首页只有“20 词能力筛查 / 数据录入”两张主卡；数据录入页内部再选择“公共题库 / 自定义材料”，公共题库主题也在这一层选择。
+   - 现役事实源未改变：沟通继续复用 RTC / LiveKit hooks，筛查与数据录入继续复用正式 catalog、原生 recorder queue、识别反馈和上传回执。
+   - 验证：`frontend npm test`（16 files）、`npx tsc --noEmit`、`npm run build`；Playwright 390×844 首页和未登录 `/communicate / practice / assessment` 鉴权 next；Mobile `npm run check / typecheck / export:android / export:ios`；`bash scripts/check_ai_docs.sh`。
+
+0. 2026-08-14 已统一研究系统并接入 `CLEAR-VOX-MODEL` 子仓库
+   - `references/clear-vox-model` 已作为 Git submodule 固定到 `0997c0dc941ad0cda39e3ab92d5efd783fbfc38f`；上游模型代码、R&D、EXP、harness 与 Git 跟踪资产保持原始事实源
+   - 应用侧研究统一到 `research/` 五主题：`voice-agent / agent-systems / speech-health / product-psychology / product-engineering`；新增 `agent-systems/` 研究通用 Agent 底层机制、工程架构、产品化和场景落地，并要求对语音 Agent 做跨模态对照；`docs/` 不再新增平级研究稿
+   - 新增 `research/APPLICATION_FEEDBACK_REGISTRY.md`，以 `adopt / validate / hold / reject` 管理实验到应用的回流；首批登记已覆盖上游 EXP-16/17A/18D/21 与现有 memory、Voiceitt、康复研究
+   - 两份分散的 Faster-Whisper / EverOS memory 摘要已合并为一份上下文与记忆综合，旧文件由 Git 历史保留；其余真实研究原文按主题迁移
+   - `docs/README.md` 已清除不存在的历史文档入口，agent/AI 工程规则已同步，`scripts/check_research_system.sh` 已接入 AI docs harness
+   - 主 submodule 的 6 个直接嵌套仓库可按固定 gitlink 使用；上游 `modules/dsr/Qwen3-ASR` gitlink `8ea1249` 已不在配置远程中；`Codec-DSR` 内部的 `Matcha-TTS` gitlink 缺 `.gitmodules` 映射。两项均记录在 `research/UPSTREAM_INTEGRATION_STATUS.md`，未擅自替换 commit 或猜测远程 URL
+
+0. 2026-08-14 已收口 Playwright 临时产物与 Docker 安全清理策略
+   - `.playwright-cli/` 和 `output/playwright/` 已加入 `.gitignore`；浏览器快照、console 记录和临时截图只作为当次验证证据，不再长期进入 Git。重要结论继续写入任务状态和测试回归，而不是依赖易失截图。
+   - 已删除仓库中历史跟踪的 Playwright 快照与截图；这些文件仍可从旧 Git commit 恢复。
+   - 按 `scripts/docker_disk_maintenance.sh status -> prune-safe` 执行定向清理，回收约 `697.7MB`；根盘从 `72%` 降到 `71%`，剩余约 `17GB`。
+   - 运行容器、卷、`latest` 与 `pre-*` 回滚镜像均保留；未满 7 天的 `3.274GB` build cache 未强制删除。后续按月或磁盘超过 `75%` 时运行同一安全脚本，不使用 `docker system prune -af`。
+
+0. 2026-08-13 Web 与 Mobile 的信息架构和响应式交互继续收口
+   - Web 首页、沟通页、训练入口按“入口选择 -> 当前工作台 -> 训练回顾 / 沟通档案”分层；功能没有删除，只把低频说明、报告和匿名活动移出首屏主动作区。
+   - Web 沟通页在从首页带入场景时不再重复渲染场景选择大卡；手机顶栏改为紧凑动作区，返回、短句、连接和账号控件保持可触达，账号入口触控区提升到 44px。
+   - Web 训练首页明确拆成“20 词能力筛查”和“训练与收集”两个主任务；训练主题、自定义材料进入第二层；今日 / 7 天总结和匿名训练活动收进原生可访问的“训练回顾”折叠区。
+   - Web 训练与首页移动布局补齐 `h-dvh`、`text-balance/text-pretty`、焦点环、44px 关键动作、窄屏换行和实体表面约束；去掉训练入口和启动态的背景渐变。
+   - Mobile 档案编辑器去掉不必要的 non-null assertion；材料、画像、短句操作行在窄屏自动换行，避免组合按钮挤压。
+   - 已验证：Web 71 项测试、`npx tsc --noEmit`、Next production build、Playwright 390x844 / 1440x900 首页截图、未登录 `/contribute` 跳转与 console smoke；Mobile check/typecheck。
+   - 当前仍不能宣称 App 100% 替代 Web：必须补 Android/iOS 真机的登录、沟通 RTC、训练 RTC + 原生录音并行、最终转写、上传 / 撤回、TTS / 复制以及档案 CRUD smoke。
+
+0. 2026-08-13 已纠正 Mobile Workbench“只有登录和页面壳、沟通/训练功能近乎为零”的产品与工程偏差
+   - 根因确认：Web 长期承载完整产品逻辑，而 Mobile `0.1.x` 当时明确只是 V1 skeleton；App 虽能建 LiveKit room 和保存本机录音，但没有消费实时文本、confirmed output，也没有正式训练题库、筛查/训练分流和自动收集，因此不能视为 Web 一对一替代
+   - 一对一映射口径收口为“同一业务能力、同一后端事实源、按设备优化交互”，不使用 WebView，也不要求像素级复制桌面布局
+   - Mobile 沟通页已新增：沟通前场景选择、LiveKit user/assistant transcript、常用短句真正发送给 agent、可编辑确认输出、全屏给对方看、原生文本发声、复制；场景继续进入 RTC intent，不在实时工作台里堆主题卡
+   - Mobile 训练页已拆成独立 `20 词能力筛查` 与 `训练收集`；新增 `/api/training/catalog` 直接复用 Web 正式 9 类/9,000+ 句语料，支持每次 120 条分页，录音带 sentence id/category/flow，停止后自动进入现役上传回执链，失败保留本地重试
+   - Web 同步优化：沟通场景上移到首页进入前选择；已有场景进入沟通工作台后不再重复显示大块主题选择；训练首页把筛查从普通主题卡中移出，形成“能力筛查 / 训练与收集”两个清晰任务入口，并移除背景渐变
+   - 防回退：Mobile 静态守卫已要求 `RoomEvent.DataReceived / assistant transcript / expo-speech / expo-clipboard / training catalog / training flow metadata`
+   - 已验证：Web 71 项测试、TypeScript、production build；训练目录 `9` 类、筛查 `20/20`、现代文章分页 `4952 total / 120 page`；Playwright `390x844` 首页场景入口 smoke 与训练鉴权跳转；Mobile check、TypeScript、Android `913 modules / 5MB`、iOS `915 modules / 5MB` export
+   - 尚未完成的 App/Web parity：训练实时识别与评分、20 词整组结果、训练日报/周报、自定义材料切句、上传撤回，以及沟通档案完整编辑；这些完成并通过 Android 真机登录/LiveKit/录音/朗读/复制 smoke 前，App 仍不能宣称完全替代 Web
 
 0. 2026-08-13 Web 与 Mobile 前端用户提示已统一收口为简短产品文案
    - Web 与 Mobile 分别建立受控 `product-message` 转换层，后端、第三方 SDK、实时消息和异常对象的原始 `error / message / reason / code` 不再直接进入用户界面；Mobile 不跨目录导入 Next 模块
@@ -55,23 +254,6 @@
    - `test1@poc.com` 仍长期停用；当前 Auth 仍为公开注册、邮箱自动确认、未观察到 CAPTCHA 开启
    - 报告对外口径为“通报所述越权读取路径已完成技术整改并复测通过”，不声称日志尚不能证明的“绝无数据访问”
    - 后续计划依据现行《网络安全法》第二十三、第二十四、第二十七条，覆盖等保、六个月日志、漏洞闭环、密钥治理、注册安全、WAF/源站、数据分类、供应链和应急演练
-
-0. 2026-08-01 独立手机号注册 / 登录已完成 Web 与 Mobile 部署，真实短信只剩腾讯云签名配置阻塞
-   - Supabase Auth 继续是身份事实源；邮箱和手机号是并列选择，手机号可直接创建独立 phone-only 用户，不要求绑定邮箱账号或共用 UUID
-   - Web 与 Mobile 在注册模式使用 `shouldCreateUser: true`、登录模式使用 `false`；邮箱密码注册 / 登录完整保留
-   - backend 新增 Supabase Send SMS Hook 与腾讯云 SMS adapter：校验 Standard Webhooks 签名、仅接受中国大陆 E.164 号码和 6 位 OTP、同 webhook id 幂等、单号码 60 秒 / 小时 / 日限流
-   - 腾讯云调用固定使用已审核签名、模板与单个 `{1}` OTP 参数；日志不记录 OTP 或完整手机号，只保留掩码号码、provider code 与 RequestId
-   - Web 登录 / 注册页与 Mobile Workbench 登录 / 注册页均提供邮箱、手机两种入口；`/settings/account` 的绑定入口仅作为可选能力保留
-   - Supabase Phone provider 与 HTTPS Send SMS Hook 已开启；backend 为 `PHONE_AUTH_ENABLED=1`、`TENCENT_SMS_DRY_RUN=0`，Web 与 EAS development/preview/production 手机入口均已开启
-   - CAM 最小权限编程访问子用户凭据已保存到 `backend/.env`（文件 `600`）；误建的 CVM 角色不进入轻量应用服务器运行链路
-   - 已提供两个隐藏输入脚本：`scripts/ops/save_tencent_sms_credentials.sh` 与 `scripts/ops/save_supabase_sms_hook_secret.sh`，密钥不进入聊天、命令历史或源码
-   - Supabase 生产 Hook 实际会传入无加号的 `861...` 号码；backend 已兼容 `+861... / 861... / 1...` 并统一规范化为 E.164，相关回归通过
-   - 真实短信请求已到达腾讯云，但返回 `FailedOperation.SignatureIncorrectOrUnapproved`；当前 `TENCENT_SMS_SIGN_NAME` 与原计划的公司全称一致，需从腾讯云“国内短信 -> 签名管理”核对实际签名内容、审核 / 运营商报备状态和应用关联后完成 smoke
-   - 部署后验证：backend/frontend 容器均 healthy；`/`、`/login`、`/api/rtc/health` 均为 `200`；Playwright 已验证登录与注册状态下邮箱 / 手机标签及手机号注册表单
-   - 回滚镜像标签：`voxflame-agent-backend:pre-phone-auth-20260801`、`voxflame-agent-frontend:pre-phone-auth-20260801`
-   - Android `0.1.2`（build 3）EAS preview 已完成：`b47cd371-ef9f-409f-a45d-1e1d180a26dd`；`https://voxember.com/download` 已部署该构建入口
-   - 下一步人工边界：提供腾讯云审核通过的准确“签名内容”；更新后用负责人手机号完成一次真实注册和再次登录，并做 Android 真机 smoke
-   - CAPTCHA 继续等 Web 与 Mobile 都接好 token 后再全局开启，避免提前中断任一现有邮箱登录入口
 
 0. 2026-08-01 Docker 部署与磁盘维护经验已写入工程 harness
    - `scripts/docker-rebuild-core-fast.sh` 新增 `env-backend / backend / frontend / core` 最小影响模式；环境变量更新不再先 `docker compose down`，只 recreate backend
@@ -176,15 +358,9 @@
    - 当前阻塞项：权威 NS 仍是 `eleven.dnspod.net`、`rich.dnspod.net`，公网 A 仍解析到 `111.230.35.89`；CAM 子账号缺腾讯云 Domain 权限，无法代改注册商 NS。需要用户在腾讯云域名控制台把 NS 改为 `ns1.qeodns.com`、`ns2.qeodns.com`
    - NS 生效后再继续：启用 EdgeOne HTTPS 证书，验证 EdgeOne 响应头，定位源站实例 / Lighthouse 防火墙并限制源站直连
 
-0. 2026-06-28 已把 `2307294809@qq.com` 的沟通页与训练 / 评测页 ASR 路由接到 cpu1 本机 HTTP ASR 服务
-   - 账号 userId：`64758dee-5026-4b53-a063-1d02d0834f67`
-   - [livekit_agent/asr_runtime.py](/home/ubuntu/VoxFlame-Agent/livekit_agent/asr_runtime.py) 的 `QWEN_HTTP_ASR_*` 命中范围已从仅 `communication` 放开到 `communication + training`，因此沟通页和训练评测页共用同一条账号级 HTTP ASR 路由
-   - [docker-compose.yml](/home/ubuntu/VoxFlame-Agent/docker-compose.yml) 中 `livekit-agent` 改为 `network_mode: host`，默认 `QWEN_HTTP_ASR_URL=http://127.0.0.1:18000/transcribe`，默认 `QWEN_HTTP_ASR_USER_IDS=64758dee-5026-4b53-a063-1d02d0834f67`
-   - 因为 `environment` 会覆盖 `livekit_agent/.env`，compose 默认白名单也必须保留该 userId；只改 `livekit_agent/.env` 不足以让容器命中账号路由
-   - `backend` 默认 `LIVEKIT_AGENT_HEALTH_URL` 已改为 `http://host.docker.internal:8081/`，以便 backend 仍在 bridge 网络时检查 host-network 的 livekit-agent
-   - 重启后本机 ASR health 一度返回 `{"status":"ok","backend":"transformers"}`，3 秒评估筛查 WAV 单次转写返回 `发扬`，成功样本耗时约 `0.639s` 和 `1.850s`
-   - 但 `127.0.0.1:18000/transcribe` 连续请求测试出现过瞬时 `connection refused`，随后 `/health` 又恢复；这更像 ASR 服务自身的连续请求 / worker 稳定性问题，不是 VoxFlame 路由逻辑问题。HTTP ASR 失败时 livekit_agent 会按已有逻辑回退 DashScope realtime ASR
-   - 已验证：`python3 -m unittest livekit_agent.tests.test_asr_runtime`、`docker compose config | rg -n "QWEN_HTTP_ASR|network_mode|LIVEKIT_AGENT_HEALTH_URL|LIVEKIT_URL"`、本机 `curl /health` 与单条 `/transcribe`
+0. 2026-06-28 的单账号 HTTP ASR 试接已于 2026-08-24 被统一账户网关取代
+   - 旧的应用侧账号白名单和单账号部署方式已删除，不再作为维护或扩容入口。
+   - 现役契约见本文件顶部“个性化 ASR 统一账户网关”；所有已认证账户统一进入 8001，由模型服务决定个性化或公共 fallback。
 
 0. 2026-06-14 已重新拉取 2026-05-24 之后的 OSS 训练数据增量
    - 使用脚本 [download_oss_by_account.ts](/home/ubuntu/VoxFlame-Agent/backend/scripts/download_oss_by_account.ts) 按 `--since 2026-05-24T00:00:00+08:00` 拉取，不覆盖旧目录
@@ -200,7 +376,7 @@
    - 带标点或自然停顿的句子优先在开头 / 标点边界收口，不再为了长度把一句话中间硬断开；只有无标点超长文本才按 20 字左右硬切
    - 前端 [prepared-expression-practice.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/prepared-expression-practice.ts) 继续用 `document_content` 全量生成训练 exercises，保证训练页可练句拼回去等于原材料全文
    - 新增 [prepared-expression.service.test.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/prepared-expression.service.test.ts) 和更新 [prepared-expression-practice.test.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/training/prepared-expression-practice.test.ts) 覆盖全文不丢、无标点长句硬切和 section metadata 保留
-   - 当前运行中的 `livekit-agent` 容器里 `QWEN_HTTP_ASR_URL` 与 `QWEN_HTTP_ASR_USER_IDS` 均为空；`2307294809@qq.com` 对应 userId `64758dee-5026-4b53-a063-1d02d0834f67` 的私有 HTTP ASR 云部署路由当前没有启用
+   - 当时的单账号私有 ASR 部署状态已失效；现役统一账户网关状态见本文件顶部。
    - 已验证：
    - `cd frontend && npm run build`
    - `cd frontend && node --import ./test/register-runtime-test-hooks.mjs --experimental-strip-types -e "import('./src/lib/training/prepared-expression-practice.test.ts').catch((error) => { console.error(error); process.exit(1); })"`
@@ -267,7 +443,7 @@
 
 0. 2026-05-26 已按当前代码现状重写产品 PRD 和分病因疗法映射文档
    - [产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 已删掉已完成历史计划，改成当前代码事实 + 下一步执行计划
-   - [分病因疗法锚点文档](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md) 已删掉大而全病因清单，保留正式疗法 / 理论锚点、专家边界和产品化顺序
+   - [分病因疗法锚点文档](/home/ubuntu/VoxFlame-Agent/research/speech-health/VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md) 已删掉大而全病因清单，保留正式疗法 / 理论锚点、专家边界和产品化顺序
    - 当前代码深度盘点结论：
    - 沟通页已有 LiveKit 主链、表达工具箱、starter kit、workspace loadout、字幕辅助和麦克风输入反馈
    - 训练页已拆为 `/contribute` 主题选择和 `/contribute/topic/[topicId]` 录音训练，支持评估筛查、自定义材料切句、上传 metadata、病因标签和质量信息
@@ -381,7 +557,7 @@
    - `python3 -m unittest livekit_agent.tests.test_data_contract livekit_agent.tests.test_asr_runtime`
 
 0. 2026-05-16 已新增 restsend 作者合作价值与硬件音频桥研究文档
-   - 新增 [restsend Rust 通信栈与硬件音频桥研究（2026-05-16）](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_RESTSEND_RUST_STACK_AND_HARDWARE_AUDIO_BRIDGE_RESEARCH_2026-05-16.md)
+   - 新增 [restsend Rust 通信栈与硬件音频桥研究（2026-05-16）](/home/ubuntu/VoxFlame-Agent/research/speech-health/VOXFLAME_RESTSEND_RUST_STACK_AND_HARDWARE_AUDIO_BRIDGE_RESEARCH_2026-05-16.md)
    - 文档基于 Context7 和 GitHub 公开资料分析 `rustpbx / rsipstack / rustrtc / audio-codec`：这位作者更像 VoxFlame 未来 `SIP / PBX / RTP / WebRTC / audio codec` 通信网关层合作者，而不是第一版 ESP32-S3 固件外包
    - 核心判断：restsend 栈最适合 P2/P3 的电话 / 医院分机 / 远程随访 / SIP trunk / WebRTC-SIP bridge / 音频转码 / 通话录音接入；当前 P0/P1 硬件仍应以 Mobile Workbench + 现成麦克风/音箱 + ESP32-S3 音频外设为主
    - 硬件形态判断收口为 `耳挂式近口麦克风 + 挂脖 / 胸前扬声器盒 + 手机 App brain`；胸针更适合按钮/状态/扬声器，不适合作主麦；眼镜是高预算后期路线
@@ -389,7 +565,7 @@
    - 已同步 [docs/README.md](/home/ubuntu/VoxFlame-Agent/docs/README.md)
 
 0. 2026-05-15 已新增 Voiceitt 功能设置深度分析文档
-   - 新增 [Voiceitt 功能设置深度分析与 VoxFlame 启发（2026-05-15）](/home/ubuntu/VoxFlame-Agent/docs/VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
+   - 新增 [Voiceitt 功能设置深度分析与 VoxFlame 启发（2026-05-15）](/home/ubuntu/VoxFlame-Agent/research/product-psychology/VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
    - 文档拆解 Voiceitt 的 `Record / Speak / Dictate / Integrations` 四个功能层，以及 voice output、silence timeout、playback speed、preferred microphone、record validation、profanity、flip text、highlight words、streaming、shortcut phrases、personal vocabulary、voice commands、notes/history、account deletion 等设置项
    - 核心判断：Voiceitt 本质是 personalized speech access layer，不是单个 ASR 页面；VoxFlame 应吸收“设置影响真实链路、三种输出面分开、个人语音 profile 是中心资产、shortcut phrases 和 listener-facing UI 高价值”的原则
    - 已明确不应照搬：模式命名、过早做 Chrome/会议插件、把 voice commands 当默认交互、把训练 level 做成纯数量 gamification
@@ -404,7 +580,7 @@
    - 已同步 [docs/README.md](/home/ubuntu/VoxFlame-Agent/docs/README.md)
 
 0. 2026-05-15 已新增分病因言语康复与沟通产品化深度文档
-   - 新增 [分病因言语康复与沟通产品化深度文档（2026-05-15）](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
+   - 新增 [分病因言语康复与沟通产品化深度文档（2026-05-15）](/home/ubuntu/VoxFlame-Agent/research/speech-health/VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
    - 以 ReTalk / 复言的中风康复产品化样板为参照，拆出 `专家评估 -> 软件高频训练 -> AI 分析 -> 专家复核 -> 专家知识自动化` 的工作流，而不是照搬单一中风训练菜单
    - 文档逐个覆盖中风 / 神经损伤、脑外伤、脑瘫、唐氏综合征、多发性硬化、肌萎缩侧索硬化 / 运动神经元病、帕金森病、孤独症谱系障碍、听力损失
    - 每个病因都给出核心机制、成熟疗法 / 医院常用训练原则、VoxFlame 沟通功能、康复练习功能、AI 接轨方式和专家边界
@@ -451,7 +627,7 @@
    - 已沉淀 `VoxFlame Expert Standard v0.1`：覆盖证据等级 L0-L5、用户反馈等级 F0-F4、prompt registry、沟通技巧 registry、训练语料、memory schema、专家协作、材料下载与准入门槛
    - 已写清哪些内容必须专家审核：临床 / 康复 / 构音障碍评估口径、训练语料、评测维度、长期记忆解释、对外医学表达和硬件安全 / 人因设计
    - 已把用户反馈闭环拆成可落地交付物：`feedback_registry`、创始人自我观察模板、目标用户访谈模板、沟通伙伴反馈模板、每周反馈 triage、ship decision log
-   - 已更新 [App / Mobile Workbench 机会文档](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)，加入“标准 / 技术 / 用户反馈闭环”章节，并明确每个 surface 的最小反馈信号
+   - 已更新 [App / Mobile Workbench 机会文档](/home/ubuntu/VoxFlame-Agent/research/product-engineering/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)，加入“标准 / 技术 / 用户反馈闭环”章节，并明确每个 surface 的最小反馈信号
    - 已更新 [README](/home/ubuntu/VoxFlame-Agent/README.md) 与 [docs/README](/home/ubuntu/VoxFlame-Agent/docs/README.md)，把专家标准文档设为当前继续开发的主入口之一
 
 0. 2026-05-10 已把硬件桥接路线改成“发声 + 记录”双主线
@@ -587,7 +763,7 @@
    - 只做了只读账户查询和 OSS 本地同步；未删除账户、未删除 OSS 对象、未改数据库
 
 0. 2026-05-04 已确认可以进入 App / Mobile Workbench Phase 0
-   - 新增并更新 [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+   - 新增并更新 [VoxFlame App / Mobile Workbench Best Practices And Opportunity（2026-05-04）](/home/ubuntu/VoxFlame-Agent/research/product-engineering/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
    - 结论：
    - 当前 Web/PWA 已基本具备稳定演示、录音补传和 workspace contract 基础，可以开始完整移动端工作台研发
    - “一步到位”指产品信息架构、owner、contract 和技术路线一步到位；工程交付仍按可验证切片推进
@@ -696,7 +872,7 @@
    - upload receipt / retry 去重接入
 
 0. 2026-04-29 已新增“从需求到应用架构”的 full-stack 学习指南
-   - 新增 [VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
+   - 新增 [VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md](/home/ubuntu/VoxFlame-Agent/research/product-engineering/VOXFLAME_FULLSTACK_ARCHITECTURE_LEARNING_GUIDE_2026-04-29.md)
    - 文档把新需求拆解固定成：
    - `真实场景 -> surface -> 状态生命周期 -> owner -> contract -> flow -> failure -> verification`
    - 结合当前 VoxFlame 主链说明：

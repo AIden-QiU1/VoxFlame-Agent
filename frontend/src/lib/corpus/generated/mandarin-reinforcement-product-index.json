@@ -1,0 +1,5495 @@
+{
+  "kind": "voxflame_mandarin_reinforcement_product_index",
+  "generated_at": "2026-08-24T03:50:10.473Z",
+  "source_kind": "voxflame_mandarin_below_minimum_reinforcement_plan",
+  "policy": {
+    "active_safe_prompts_only": true,
+    "disputed_targets_are_excluded": true,
+    "planned_slots_are_not_completed_recordings": true
+  },
+  "summary": {
+    "selected_prompts": 835,
+    "planned_recording_slots": 2998
+  },
+  "items": {
+    "会议与协作_source_0174": {
+      "low_frequency_targets": [
+        "kan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0243": {
+      "low_frequency_targets": [
+        "kui4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0246": {
+      "low_frequency_targets": [
+        "nai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0278": {
+      "low_frequency_targets": [
+        "kui4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0329": {
+      "low_frequency_targets": [
+        "pian2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0354": {
+      "low_frequency_targets": [
+        "zeng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0397": {
+      "low_frequency_targets": [
+        "lin4",
+        "zu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0448": {
+      "low_frequency_targets": [
+        "kun4",
+        "tuo3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0456": {
+      "low_frequency_targets": [
+        "bang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0499": {
+      "low_frequency_targets": [
+        "yang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0504": {
+      "low_frequency_targets": [
+        "shua1",
+        "tiao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0526": {
+      "low_frequency_targets": [
+        "jun4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0551": {
+      "low_frequency_targets": [
+        "miao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0564": {
+      "low_frequency_targets": [
+        "bi1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0566": {
+      "low_frequency_targets": [
+        "tou1",
+        "wo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0567": {
+      "low_frequency_targets": [
+        "lia3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0568": {
+      "low_frequency_targets": [
+        "sha2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0583": {
+      "low_frequency_targets": [
+        "fen3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0590": {
+      "low_frequency_targets": [
+        "chun1",
+        "qian3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0592": {
+      "low_frequency_targets": [
+        "kan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0595": {
+      "low_frequency_targets": [
+        "bin1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0606": {
+      "low_frequency_targets": [
+        "pi4",
+        "yo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0614": {
+      "low_frequency_targets": [
+        "rao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0615": {
+      "low_frequency_targets": [
+        "pai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0628": {
+      "low_frequency_targets": [
+        "mian2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0629": {
+      "low_frequency_targets": [
+        "shang3",
+        "zan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0633": {
+      "low_frequency_targets": [
+        "deng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0639": {
+      "low_frequency_targets": [
+        "ni4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0642": {
+      "low_frequency_targets": [
+        "feng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0659": {
+      "low_frequency_targets": [
+        "bi1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0682": {
+      "low_frequency_targets": [
+        "dang3",
+        "gan4",
+        "san4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0686": {
+      "low_frequency_targets": [
+        "tuo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0690": {
+      "low_frequency_targets": [
+        "mao1",
+        "xiong2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0694": {
+      "low_frequency_targets": [
+        "sai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0732": {
+      "low_frequency_targets": [
+        "cao1",
+        "tiao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0759": {
+      "low_frequency_targets": [
+        "cui4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0761": {
+      "low_frequency_targets": [
+        "chai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0764": {
+      "low_frequency_targets": [
+        "gang4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0793": {
+      "low_frequency_targets": [
+        "nai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0801": {
+      "low_frequency_targets": [
+        "ga4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0811": {
+      "low_frequency_targets": [
+        "niu3",
+        "wa3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0818": {
+      "low_frequency_targets": [
+        "qu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0819": {
+      "low_frequency_targets": [
+        "cou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0837": {
+      "low_frequency_targets": [
+        "ma4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0874": {
+      "low_frequency_targets": [
+        "ka1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0887": {
+      "low_frequency_targets": [
+        "kun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0898": {
+      "low_frequency_targets": [
+        "sa4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "看病与求助_curated_001": {
+      "low_frequency_targets": [
+        "chuan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "看病与求助_curated_014": {
+      "low_frequency_targets": [
+        "kun4",
+        "tun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "看病与求助_curated_031": {
+      "low_frequency_targets": [
+        "chou1",
+        "xue4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "看病与求助_curated_043": {
+      "low_frequency_targets": [
+        "min3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "看病与求助_curated_049": {
+      "low_frequency_targets": [
+        "niao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "看病与求助_curated_073": {
+      "low_frequency_targets": [
+        "pan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "看病与求助_curated_074": {
+      "low_frequency_targets": [
+        "min3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "看病与求助_curated_080": {
+      "low_frequency_targets": [
+        "tun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "人群与角色_curated_036": {
+      "low_frequency_targets": [
+        "liao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "人群与角色_curated_046": {
+      "low_frequency_targets": [
+        "rao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "人群与角色_curated_084": {
+      "low_frequency_targets": [
+        "lang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "人群与角色_curated_101": {
+      "low_frequency_targets": [
+        "chuang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "日常与出行_curated_036": {
+      "low_frequency_targets": [
+        "la4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "日常与出行_curated_064": {
+      "low_frequency_targets": [
+        "lou2",
+        "ti1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "设备与数字_curated_029": {
+      "low_frequency_targets": [
+        "nao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "设备与数字_curated_055": {
+      "low_frequency_targets": [
+        "lang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "设备与数字_curated_062": {
+      "low_frequency_targets": [
+        "tie1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "设备与数字_curated_068": {
+      "low_frequency_targets": [
+        "shua1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "设备与数字_curated_072": {
+      "low_frequency_targets": [
+        "sou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "设备与数字_curated_110": {
+      "low_frequency_targets": [
+        "kan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "设备与数字_curated_169": {
+      "low_frequency_targets": [
+        "chuang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0015": {
+      "low_frequency_targets": [
+        "cun4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0028": {
+      "low_frequency_targets": [
+        "dui1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0041": {
+      "low_frequency_targets": [
+        "leng2",
+        "zhui1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0044": {
+      "low_frequency_targets": [
+        "qiong2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0049": {
+      "low_frequency_targets": [
+        "cu1",
+        "ya3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0060": {
+      "low_frequency_targets": [
+        "yun3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0062": {
+      "low_frequency_targets": [
+        "chui2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0067": {
+      "low_frequency_targets": [
+        "man2",
+        "zhen3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0075": {
+      "low_frequency_targets": [
+        "diao1",
+        "zao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0076": {
+      "low_frequency_targets": [
+        "su2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0079": {
+      "low_frequency_targets": [
+        "cu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0088": {
+      "low_frequency_targets": [
+        "kuang2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0089": {
+      "low_frequency_targets": [
+        "cou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0095": {
+      "low_frequency_targets": [
+        "chou3",
+        "guai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0097": {
+      "low_frequency_targets": [
+        "lu3",
+        "nuo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0107": {
+      "low_frequency_targets": [
+        "gua1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0124": {
+      "low_frequency_targets": [
+        "peng3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0133": {
+      "low_frequency_targets": [
+        "shuang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0146": {
+      "low_frequency_targets": [
+        "en1",
+        "jia3",
+        "nong4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0174": {
+      "low_frequency_targets": [
+        "gou3",
+        "pu1",
+        "zui3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0178": {
+      "low_frequency_targets": [
+        "pu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0191": {
+      "low_frequency_targets": [
+        "she3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0195": {
+      "low_frequency_targets": [
+        "ning4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0196": {
+      "low_frequency_targets": [
+        "pen1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0236": {
+      "low_frequency_targets": [
+        "tou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0244": {
+      "low_frequency_targets": [
+        "pa2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0246": {
+      "low_frequency_targets": [
+        "cang1",
+        "tang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0261": {
+      "low_frequency_targets": [
+        "zha3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0262": {
+      "low_frequency_targets": [
+        "qiu1",
+        "tui3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0271": {
+      "low_frequency_targets": [
+        "cao3",
+        "ti1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0275": {
+      "low_frequency_targets": [
+        "qia4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0279": {
+      "low_frequency_targets": [
+        "chai1",
+        "ti4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0285": {
+      "low_frequency_targets": [
+        "pa2",
+        "qie3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0302": {
+      "low_frequency_targets": [
+        "weng1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0307": {
+      "low_frequency_targets": [
+        "mian2",
+        "sha1",
+        "ta4",
+        "tan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0319": {
+      "low_frequency_targets": [
+        "bian3",
+        "huang4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0339": {
+      "low_frequency_targets": [
+        "mou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0345": {
+      "low_frequency_targets": [
+        "weng1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0348": {
+      "low_frequency_targets": [
+        "bian3",
+        "huang4",
+        "tiao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0367": {
+      "low_frequency_targets": [
+        "liu3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0384": {
+      "low_frequency_targets": [
+        "mei4",
+        "zeng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0398": {
+      "low_frequency_targets": [
+        "pang2",
+        "po1",
+        "yao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0403": {
+      "low_frequency_targets": [
+        "cui4",
+        "lia3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0416": {
+      "low_frequency_targets": [
+        "peng3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0417": {
+      "low_frequency_targets": [
+        "ca1",
+        "deng4",
+        "pi2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0424": {
+      "low_frequency_targets": [
+        "weng1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0432": {
+      "low_frequency_targets": [
+        "huang4",
+        "yao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0433": {
+      "low_frequency_targets": [
+        "yao2",
+        "zhui4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0446": {
+      "low_frequency_targets": [
+        "tui3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0449": {
+      "low_frequency_targets": [
+        "po2",
+        "suo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0451": {
+      "low_frequency_targets": [
+        "chou3",
+        "guai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0465": {
+      "low_frequency_targets": [
+        "bao2",
+        "mie4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0481": {
+      "low_frequency_targets": [
+        "quan1",
+        "yun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0513": {
+      "low_frequency_targets": [
+        "chen4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0540": {
+      "low_frequency_targets": [
+        "ba2",
+        "ting3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0542": {
+      "low_frequency_targets": [
+        "lan3",
+        "su2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0545": {
+      "low_frequency_targets": [
+        "lu3",
+        "mao4",
+        "nuo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0549": {
+      "low_frequency_targets": [
+        "bang3",
+        "chi4",
+        "gou1",
+        "kong3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0553": {
+      "low_frequency_targets": [
+        "beng1",
+        "pu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0554": {
+      "low_frequency_targets": [
+        "diao1",
+        "die2",
+        "zha1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0559": {
+      "low_frequency_targets": [
+        "qiao2",
+        "wan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0572": {
+      "low_frequency_targets": [
+        "cao3",
+        "ku1",
+        "pu1",
+        "tong4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0595": {
+      "low_frequency_targets": [
+        "shan3",
+        "shuo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0598": {
+      "low_frequency_targets": [
+        "tiao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0599": {
+      "low_frequency_targets": [
+        "pu4",
+        "shai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0600": {
+      "low_frequency_targets": [
+        "kua4",
+        "qiao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0602": {
+      "low_frequency_targets": [
+        "pen2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0621": {
+      "low_frequency_targets": [
+        "chuan4",
+        "qiao2",
+        "yin4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0627": {
+      "low_frequency_targets": [
+        "huai2",
+        "hun2",
+        "qiao2",
+        "xiong1",
+        "xiong2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0642": {
+      "low_frequency_targets": [
+        "chuan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0644": {
+      "low_frequency_targets": [
+        "ai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0663": {
+      "low_frequency_targets": [
+        "zhui4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0667": {
+      "low_frequency_targets": [
+        "chuang2",
+        "keng1",
+        "wa1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0668": {
+      "low_frequency_targets": [
+        "fu3",
+        "mo1",
+        "sha1",
+        "tan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0672": {
+      "low_frequency_targets": [
+        "keng1",
+        "shua1",
+        "wa1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0673": {
+      "low_frequency_targets": [
+        "gua4",
+        "xuan2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0677": {
+      "low_frequency_targets": [
+        "chuang3",
+        "qiao2",
+        "xiong2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0689": {
+      "low_frequency_targets": [
+        "fu1",
+        "niu3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0703": {
+      "low_frequency_targets": [
+        "gao3",
+        "tiao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0721": {
+      "low_frequency_targets": [
+        "pian2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0727": {
+      "low_frequency_targets": [
+        "dai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0733": {
+      "low_frequency_targets": [
+        "nian3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0737": {
+      "low_frequency_targets": [
+        "lin3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0742": {
+      "low_frequency_targets": [
+        "ci2",
+        "pu2",
+        "sa4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0747": {
+      "low_frequency_targets": [
+        "guai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0748": {
+      "low_frequency_targets": [
+        "kua4",
+        "shuai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0753": {
+      "low_frequency_targets": [
+        "ma2",
+        "mao2",
+        "rou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0756": {
+      "low_frequency_targets": [
+        "run4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0763": {
+      "low_frequency_targets": [
+        "run4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0764": {
+      "low_frequency_targets": [
+        "bian3",
+        "zhe2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0767": {
+      "low_frequency_targets": [
+        "sao3",
+        "zhou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0768": {
+      "low_frequency_targets": [
+        "lin4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0772": {
+      "low_frequency_targets": [
+        "can4",
+        "lan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0775": {
+      "low_frequency_targets": [
+        "peng3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0778": {
+      "low_frequency_targets": [
+        "pu4",
+        "sa1",
+        "xuan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0779": {
+      "low_frequency_targets": [
+        "hou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0780": {
+      "low_frequency_targets": [
+        "ang2",
+        "ting3",
+        "zhu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0785": {
+      "low_frequency_targets": [
+        "ku1",
+        "zao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0800": {
+      "low_frequency_targets": [
+        "duo3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0807": {
+      "low_frequency_targets": [
+        "ben1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0817": {
+      "low_frequency_targets": [
+        "feng2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0818": {
+      "low_frequency_targets": [
+        "dun1",
+        "ku1",
+        "zhu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0823": {
+      "low_frequency_targets": [
+        "niang2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0829": {
+      "low_frequency_targets": [
+        "cui4",
+        "kuan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0830": {
+      "low_frequency_targets": [
+        "du3",
+        "niao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0842": {
+      "low_frequency_targets": [
+        "can2",
+        "juan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0852": {
+      "low_frequency_targets": [
+        "feng4",
+        "mao2",
+        "niao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0857": {
+      "low_frequency_targets": [
+        "sao3",
+        "zhou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0860": {
+      "low_frequency_targets": [
+        "she3",
+        "zun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0861": {
+      "low_frequency_targets": [
+        "duo3",
+        "nen4",
+        "zhui4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0873": {
+      "low_frequency_targets": [
+        "pin4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0932": {
+      "low_frequency_targets": [
+        "mo3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0945": {
+      "low_frequency_targets": [
+        "zhuo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_0982": {
+      "low_frequency_targets": [
+        "nai3",
+        "ye2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1001": {
+      "low_frequency_targets": [
+        "chong3",
+        "fu3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1077": {
+      "low_frequency_targets": [
+        "cha1",
+        "tiao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1094": {
+      "low_frequency_targets": [
+        "pa1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1112": {
+      "low_frequency_targets": [
+        "liao4",
+        "tie1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1116": {
+      "low_frequency_targets": [
+        "bi2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1123": {
+      "low_frequency_targets": [
+        "lao2",
+        "sao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1132": {
+      "low_frequency_targets": [
+        "gan4",
+        "mai2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1133": {
+      "low_frequency_targets": [
+        "shuang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1135": {
+      "low_frequency_targets": [
+        "nao3",
+        "re3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1148": {
+      "low_frequency_targets": [
+        "lai4",
+        "mou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1184": {
+      "low_frequency_targets": [
+        "bing3",
+        "tu4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1194": {
+      "low_frequency_targets": [
+        "lu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1203": {
+      "low_frequency_targets": [
+        "fen2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1265": {
+      "low_frequency_targets": [
+        "zong4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1281": {
+      "low_frequency_targets": [
+        "pan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1286": {
+      "low_frequency_targets": [
+        "miu4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1304": {
+      "low_frequency_targets": [
+        "miao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1321": {
+      "low_frequency_targets": [
+        "fen2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1358": {
+      "low_frequency_targets": [
+        "ni1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1360": {
+      "low_frequency_targets": [
+        "fa4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1398": {
+      "low_frequency_targets": [
+        "pao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1421": {
+      "low_frequency_targets": [
+        "ren3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1440": {
+      "low_frequency_targets": [
+        "kan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1483": {
+      "low_frequency_targets": [
+        "cai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1553": {
+      "low_frequency_targets": [
+        "tang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1555": {
+      "low_frequency_targets": [
+        "zuan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1561": {
+      "low_frequency_targets": [
+        "lu1",
+        "zhu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1568": {
+      "low_frequency_targets": [
+        "kuang2",
+        "mian3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1584": {
+      "low_frequency_targets": [
+        "ci2",
+        "rou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1586": {
+      "low_frequency_targets": [
+        "pao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1587": {
+      "low_frequency_targets": [
+        "ning4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1620": {
+      "low_frequency_targets": [
+        "lun2",
+        "niu2",
+        "quan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1626": {
+      "low_frequency_targets": [
+        "kua1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1631": {
+      "low_frequency_targets": [
+        "pao4",
+        "qiang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1638": {
+      "low_frequency_targets": [
+        "mai2",
+        "sheng3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1649": {
+      "low_frequency_targets": [
+        "nao4",
+        "tu4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1669": {
+      "low_frequency_targets": [
+        "chen3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1677": {
+      "low_frequency_targets": [
+        "beng2",
+        "e4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1679": {
+      "low_frequency_targets": [
+        "ai3",
+        "qiang1",
+        "qiang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1682": {
+      "low_frequency_targets": [
+        "juan4",
+        "mo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1692": {
+      "low_frequency_targets": [
+        "ru3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1712": {
+      "low_frequency_targets": [
+        "can2",
+        "cui1",
+        "nao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1714": {
+      "low_frequency_targets": [
+        "pang4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1715": {
+      "low_frequency_targets": [
+        "cao1",
+        "hui3",
+        "mie4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1784": {
+      "low_frequency_targets": [
+        "pa2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1787": {
+      "low_frequency_targets": [
+        "za3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1800": {
+      "low_frequency_targets": [
+        "nu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1815": {
+      "low_frequency_targets": [
+        "pen1",
+        "ti4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1839": {
+      "low_frequency_targets": [
+        "za3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1893": {
+      "low_frequency_targets": [
+        "kuang2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1917": {
+      "low_frequency_targets": [
+        "ai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1958": {
+      "low_frequency_targets": [
+        "zang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_1963": {
+      "low_frequency_targets": [
+        "kui1",
+        "sun3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2004": {
+      "low_frequency_targets": [
+        "tai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2027": {
+      "low_frequency_targets": [
+        "ao2",
+        "xiang2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2085": {
+      "low_frequency_targets": [
+        "kou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2093": {
+      "low_frequency_targets": [
+        "suan1",
+        "ting3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2118": {
+      "low_frequency_targets": [
+        "qiao1",
+        "zhuo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2127": {
+      "low_frequency_targets": [
+        "ai1",
+        "chui1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2141": {
+      "low_frequency_targets": [
+        "kou4",
+        "zhe2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2160": {
+      "low_frequency_targets": [
+        "ren3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2165": {
+      "low_frequency_targets": [
+        "che4",
+        "dian1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2166": {
+      "low_frequency_targets": [
+        "bo0"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2192": {
+      "low_frequency_targets": [
+        "diu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2225": {
+      "low_frequency_targets": [
+        "peng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2236": {
+      "low_frequency_targets": [
+        "hen2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2278": {
+      "low_frequency_targets": [
+        "kua4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2307": {
+      "low_frequency_targets": [
+        "huai4",
+        "man2",
+        "shuai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2340": {
+      "low_frequency_targets": [
+        "cai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2361": {
+      "low_frequency_targets": [
+        "tuo2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2454": {
+      "low_frequency_targets": [
+        "bo0"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2460": {
+      "low_frequency_targets": [
+        "da1",
+        "mei4",
+        "meng2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2519": {
+      "low_frequency_targets": [
+        "ga4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2522": {
+      "low_frequency_targets": [
+        "chuang2",
+        "tang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2523": {
+      "low_frequency_targets": [
+        "po2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2541": {
+      "low_frequency_targets": [
+        "fa4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2544": {
+      "low_frequency_targets": [
+        "feng3",
+        "xian2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2551": {
+      "low_frequency_targets": [
+        "ao2",
+        "bai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2566": {
+      "low_frequency_targets": [
+        "bie1",
+        "gui3",
+        "sha2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2587": {
+      "low_frequency_targets": [
+        "lang4",
+        "lia3",
+        "zhu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2603": {
+      "low_frequency_targets": [
+        "gui3",
+        "zuan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2642": {
+      "low_frequency_targets": [
+        "sheng2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2657": {
+      "low_frequency_targets": [
+        "zuan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2759": {
+      "low_frequency_targets": [
+        "kan1",
+        "zhou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2783": {
+      "low_frequency_targets": [
+        "cai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2867": {
+      "low_frequency_targets": [
+        "lao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2879": {
+      "low_frequency_targets": [
+        "huan1",
+        "kuang2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2934": {
+      "low_frequency_targets": [
+        "zhai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2938": {
+      "low_frequency_targets": [
+        "feng2",
+        "kai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2952": {
+      "low_frequency_targets": [
+        "qu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2956": {
+      "low_frequency_targets": [
+        "qiao1",
+        "ye2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2966": {
+      "low_frequency_targets": [
+        "zhai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2967": {
+      "low_frequency_targets": [
+        "long3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_2969": {
+      "low_frequency_targets": [
+        "chong3",
+        "zun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3004": {
+      "low_frequency_targets": [
+        "zhai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3033": {
+      "low_frequency_targets": [
+        "long2",
+        "po1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3056": {
+      "low_frequency_targets": [
+        "za1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3060": {
+      "low_frequency_targets": [
+        "xu0"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3062": {
+      "low_frequency_targets": [
+        "gang3",
+        "kuan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3089": {
+      "low_frequency_targets": [
+        "geng3",
+        "ya3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3091": {
+      "low_frequency_targets": [
+        "juan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3103": {
+      "low_frequency_targets": [
+        "yao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3110": {
+      "low_frequency_targets": [
+        "pin2",
+        "zai3",
+        "zao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3119": {
+      "low_frequency_targets": [
+        "gou1",
+        "lu2",
+        "qiao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3130": {
+      "low_frequency_targets": [
+        "ba2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3140": {
+      "low_frequency_targets": [
+        "die2",
+        "juan4",
+        "zhe2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3158": {
+      "low_frequency_targets": [
+        "chao3",
+        "ci2",
+        "du1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3187": {
+      "low_frequency_targets": [
+        "hen4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3229": {
+      "low_frequency_targets": [
+        "chan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3230": {
+      "low_frequency_targets": [
+        "miao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3234": {
+      "low_frequency_targets": [
+        "huang3",
+        "pin4",
+        "sa1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3330": {
+      "low_frequency_targets": [
+        "ben1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3356": {
+      "low_frequency_targets": [
+        "e3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3386": {
+      "low_frequency_targets": [
+        "mao1",
+        "pang4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3448": {
+      "low_frequency_targets": [
+        "geng3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3451": {
+      "low_frequency_targets": [
+        "shai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3467": {
+      "low_frequency_targets": [
+        "zang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3476": {
+      "low_frequency_targets": [
+        "shuang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3482": {
+      "low_frequency_targets": [
+        "sa3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3503": {
+      "low_frequency_targets": [
+        "hun2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3511": {
+      "low_frequency_targets": [
+        "shua3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3516": {
+      "low_frequency_targets": [
+        "hen4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3537": {
+      "low_frequency_targets": [
+        "fa2",
+        "que1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3545": {
+      "low_frequency_targets": [
+        "dian1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3581": {
+      "low_frequency_targets": [
+        "pou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3595": {
+      "low_frequency_targets": [
+        "ai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3596": {
+      "low_frequency_targets": [
+        "hun4",
+        "luan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3610": {
+      "low_frequency_targets": [
+        "she2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3615": {
+      "low_frequency_targets": [
+        "niu1",
+        "shuang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3616": {
+      "low_frequency_targets": [
+        "gun3",
+        "lang2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3659": {
+      "low_frequency_targets": [
+        "niang2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3674": {
+      "low_frequency_targets": [
+        "da0",
+        "gou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3687": {
+      "low_frequency_targets": [
+        "chan2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3702": {
+      "low_frequency_targets": [
+        "da0",
+        "liu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3732": {
+      "low_frequency_targets": [
+        "diao1",
+        "kui4",
+        "nan4",
+        "zeng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3742": {
+      "low_frequency_targets": [
+        "hui3",
+        "mie4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3744": {
+      "low_frequency_targets": [
+        "kui1",
+        "sun3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3748": {
+      "low_frequency_targets": [
+        "she1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3751": {
+      "low_frequency_targets": [
+        "han3",
+        "nao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3780": {
+      "low_frequency_targets": [
+        "sa3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3795": {
+      "low_frequency_targets": [
+        "hun4",
+        "luan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3804": {
+      "low_frequency_targets": [
+        "tuo2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3814": {
+      "low_frequency_targets": [
+        "gang3",
+        "ou3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3816": {
+      "low_frequency_targets": [
+        "chen4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3921": {
+      "low_frequency_targets": [
+        "ben1",
+        "she1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3957": {
+      "low_frequency_targets": [
+        "chou3",
+        "lou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3970": {
+      "low_frequency_targets": [
+        "dun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3972": {
+      "low_frequency_targets": [
+        "dai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3983": {
+      "low_frequency_targets": [
+        "he4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_3994": {
+      "low_frequency_targets": [
+        "dang3",
+        "ma2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4007": {
+      "low_frequency_targets": [
+        "huan3",
+        "lao2",
+        "pi2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4042": {
+      "low_frequency_targets": [
+        "dian1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4044": {
+      "low_frequency_targets": [
+        "chang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4123": {
+      "low_frequency_targets": [
+        "fei2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4137": {
+      "low_frequency_targets": [
+        "lao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4140": {
+      "low_frequency_targets": [
+        "chi3",
+        "she1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4151": {
+      "low_frequency_targets": [
+        "ka1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4153": {
+      "low_frequency_targets": [
+        "pi3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4164": {
+      "low_frequency_targets": [
+        "diu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4230": {
+      "low_frequency_targets": [
+        "huan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4247": {
+      "low_frequency_targets": [
+        "feng2",
+        "qia4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4249": {
+      "low_frequency_targets": [
+        "chai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4257": {
+      "low_frequency_targets": [
+        "sang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4297": {
+      "low_frequency_targets": [
+        "hang4",
+        "xia2",
+        "yong1",
+        "zhai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4314": {
+      "low_frequency_targets": [
+        "pan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4388": {
+      "low_frequency_targets": [
+        "nan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4397": {
+      "low_frequency_targets": [
+        "du3",
+        "rang3",
+        "yong1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4430": {
+      "low_frequency_targets": [
+        "gua1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4434": {
+      "low_frequency_targets": [
+        "lao2",
+        "ta4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4466": {
+      "low_frequency_targets": [
+        "beng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4472": {
+      "low_frequency_targets": [
+        "pin1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4482": {
+      "low_frequency_targets": [
+        "jiong3",
+        "zu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4504": {
+      "low_frequency_targets": [
+        "lü2",
+        "shuai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4523": {
+      "low_frequency_targets": [
+        "lu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4557": {
+      "low_frequency_targets": [
+        "nan4",
+        "zhu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4606": {
+      "low_frequency_targets": [
+        "fa4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4622": {
+      "low_frequency_targets": [
+        "pu2",
+        "tao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4644": {
+      "low_frequency_targets": [
+        "geng3",
+        "juan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4646": {
+      "low_frequency_targets": [
+        "chang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4650": {
+      "low_frequency_targets": [
+        "cai4",
+        "pu4",
+        "shai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4651": {
+      "low_frequency_targets": [
+        "lan3",
+        "pao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4652": {
+      "low_frequency_targets": [
+        "qiang4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4664": {
+      "low_frequency_targets": [
+        "ca1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4690": {
+      "low_frequency_targets": [
+        "kan3",
+        "sun3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4730": {
+      "low_frequency_targets": [
+        "ha1",
+        "hong1",
+        "xue4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4757": {
+      "low_frequency_targets": [
+        "kai3",
+        "wan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4759": {
+      "low_frequency_targets": [
+        "duo2",
+        "ning2",
+        "qing4",
+        "tao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4766": {
+      "low_frequency_targets": [
+        "cao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4799": {
+      "low_frequency_targets": [
+        "bing3",
+        "meng2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4872": {
+      "low_frequency_targets": [
+        "zan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4911": {
+      "low_frequency_targets": [
+        "pang4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4946": {
+      "low_frequency_targets": [
+        "pao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4962": {
+      "low_frequency_targets": [
+        "ken3",
+        "zhan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4986": {
+      "low_frequency_targets": [
+        "ou1",
+        "sai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4988": {
+      "low_frequency_targets": [
+        "yun3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "现代文章朗读_source_4998": {
+      "low_frequency_targets": [
+        "dan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0037": {
+      "low_frequency_targets": [
+        "ma4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0071": {
+      "low_frequency_targets": [
+        "sa3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0080": {
+      "low_frequency_targets": [
+        "mo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0086": {
+      "low_frequency_targets": [
+        "chuo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0087": {
+      "low_frequency_targets": [
+        "ke2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0107": {
+      "low_frequency_targets": [
+        "shua3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0109": {
+      "low_frequency_targets": [
+        "a1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0111": {
+      "low_frequency_targets": [
+        "chao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0133": {
+      "low_frequency_targets": [
+        "hun4",
+        "luan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0140": {
+      "low_frequency_targets": [
+        "cong1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0162": {
+      "low_frequency_targets": [
+        "bing1",
+        "run4",
+        "wang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0183": {
+      "low_frequency_targets": [
+        "he1",
+        "nai3",
+        "niu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0199": {
+      "low_frequency_targets": [
+        "guo1",
+        "pan1",
+        "xia2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0205": {
+      "low_frequency_targets": [
+        "ti1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0216": {
+      "low_frequency_targets": [
+        "she2",
+        "zuo2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0233": {
+      "low_frequency_targets": [
+        "pao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0250": {
+      "low_frequency_targets": [
+        "chou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0255": {
+      "low_frequency_targets": [
+        "lai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0257": {
+      "low_frequency_targets": [
+        "lou4",
+        "suo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0258": {
+      "low_frequency_targets": [
+        "po2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0266": {
+      "low_frequency_targets": [
+        "chuan1",
+        "lei2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0277": {
+      "low_frequency_targets": [
+        "hong1",
+        "xuan1",
+        "zha4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0280": {
+      "low_frequency_targets": [
+        "bie1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0290": {
+      "low_frequency_targets": [
+        "bu3",
+        "zhuo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0299": {
+      "low_frequency_targets": [
+        "bi2",
+        "bing1",
+        "za2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0300": {
+      "low_frequency_targets": [
+        "chun1",
+        "min3",
+        "mou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0305": {
+      "low_frequency_targets": [
+        "fen2",
+        "ru3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0308": {
+      "low_frequency_targets": [
+        "chan4",
+        "dou3",
+        "tan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0309": {
+      "low_frequency_targets": [
+        "kong3",
+        "lian3",
+        "nu4",
+        "xue4",
+        "za1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0319": {
+      "low_frequency_targets": [
+        "ca1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0323": {
+      "low_frequency_targets": [
+        "bin4",
+        "teng2",
+        "tong4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0333": {
+      "low_frequency_targets": [
+        "pi4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0346": {
+      "low_frequency_targets": [
+        "ren3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0355": {
+      "low_frequency_targets": [
+        "ta3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0365": {
+      "low_frequency_targets": [
+        "nao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0390": {
+      "low_frequency_targets": [
+        "bao2",
+        "piao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0396": {
+      "low_frequency_targets": [
+        "gua4",
+        "xuan2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0397": {
+      "low_frequency_targets": [
+        "dang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0399": {
+      "low_frequency_targets": [
+        "chao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0401": {
+      "low_frequency_targets": [
+        "bang4",
+        "rou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0408": {
+      "low_frequency_targets": [
+        "hou2",
+        "long2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0412": {
+      "low_frequency_targets": [
+        "huang3",
+        "sa1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0436": {
+      "low_frequency_targets": [
+        "ou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0440": {
+      "low_frequency_targets": [
+        "zuo3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0449": {
+      "low_frequency_targets": [
+        "pai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0454": {
+      "low_frequency_targets": [
+        "rou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0474": {
+      "low_frequency_targets": [
+        "she1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0495": {
+      "low_frequency_targets": [
+        "niao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0502": {
+      "low_frequency_targets": [
+        "ni1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0509": {
+      "low_frequency_targets": [
+        "tai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0571": {
+      "low_frequency_targets": [
+        "ding1",
+        "miao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0580": {
+      "low_frequency_targets": [
+        "ma4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0592": {
+      "low_frequency_targets": [
+        "tuo3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0601": {
+      "low_frequency_targets": [
+        "chou1",
+        "yan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0612": {
+      "low_frequency_targets": [
+        "mao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0625": {
+      "low_frequency_targets": [
+        "kui1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0633": {
+      "low_frequency_targets": [
+        "dang3",
+        "zhe1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0641": {
+      "low_frequency_targets": [
+        "zhe1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0657": {
+      "low_frequency_targets": [
+        "pen1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0660": {
+      "low_frequency_targets": [
+        "chi4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0664": {
+      "low_frequency_targets": [
+        "fu1",
+        "ru3",
+        "teng2",
+        "tong4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0669": {
+      "low_frequency_targets": [
+        "tang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0681": {
+      "low_frequency_targets": [
+        "guo1",
+        "tao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0686": {
+      "low_frequency_targets": [
+        "sai1",
+        "tan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0693": {
+      "low_frequency_targets": [
+        "chuan4",
+        "quan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0698": {
+      "low_frequency_targets": [
+        "pian2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0709": {
+      "low_frequency_targets": [
+        "cai4",
+        "tui3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0726": {
+      "low_frequency_targets": [
+        "lan3",
+        "pian1",
+        "pou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0745": {
+      "low_frequency_targets": [
+        "wa2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0746": {
+      "low_frequency_targets": [
+        "bang3",
+        "fu3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0748": {
+      "low_frequency_targets": [
+        "dun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0749": {
+      "low_frequency_targets": [
+        "bo0",
+        "hao2",
+        "kua1",
+        "yao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0750": {
+      "low_frequency_targets": [
+        "huang1",
+        "zhen3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0767": {
+      "low_frequency_targets": [
+        "san4",
+        "xiu4",
+        "yo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0768": {
+      "low_frequency_targets": [
+        "ma4",
+        "zhou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0779": {
+      "low_frequency_targets": [
+        "geng1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0780": {
+      "low_frequency_targets": [
+        "rou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0787": {
+      "low_frequency_targets": [
+        "suan1",
+        "teng2",
+        "tong4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0793": {
+      "low_frequency_targets": [
+        "geng1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0798": {
+      "low_frequency_targets": [
+        "ke2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0806": {
+      "low_frequency_targets": [
+        "bian3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0815": {
+      "low_frequency_targets": [
+        "bie1",
+        "nu4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0828": {
+      "low_frequency_targets": [
+        "kang2",
+        "lou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0840": {
+      "low_frequency_targets": [
+        "sha2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0841": {
+      "low_frequency_targets": [
+        "ceng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0850": {
+      "low_frequency_targets": [
+        "bao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0861": {
+      "low_frequency_targets": [
+        "ba2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0865": {
+      "low_frequency_targets": [
+        "ou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0897": {
+      "low_frequency_targets": [
+        "hu3",
+        "lang2",
+        "tun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0905": {
+      "low_frequency_targets": [
+        "da1",
+        "niu2",
+        "shuai4",
+        "zai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0909": {
+      "low_frequency_targets": [
+        "zang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0944": {
+      "low_frequency_targets": [
+        "lu3",
+        "zuo2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0945": {
+      "low_frequency_targets": [
+        "sou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0949": {
+      "low_frequency_targets": [
+        "gua1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0950": {
+      "low_frequency_targets": [
+        "chou4",
+        "kui2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0952": {
+      "low_frequency_targets": [
+        "long3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0958": {
+      "low_frequency_targets": [
+        "cu4",
+        "po1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0960": {
+      "low_frequency_targets": [
+        "meng3",
+        "xiong1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0968": {
+      "low_frequency_targets": [
+        "keng1",
+        "wa1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0976": {
+      "low_frequency_targets": [
+        "bi2",
+        "pian1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0980": {
+      "low_frequency_targets": [
+        "cha4",
+        "lu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0987": {
+      "low_frequency_targets": [
+        "huang4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_0994": {
+      "low_frequency_targets": [
+        "nong4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1011": {
+      "low_frequency_targets": [
+        "chun2",
+        "kong3",
+        "nu4",
+        "za2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1013": {
+      "low_frequency_targets": [
+        "chui2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1017": {
+      "low_frequency_targets": [
+        "pin1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1026": {
+      "low_frequency_targets": [
+        "han4",
+        "zang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1033": {
+      "low_frequency_targets": [
+        "duo2",
+        "lei3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1046": {
+      "low_frequency_targets": [
+        "bai1",
+        "ke2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1073": {
+      "low_frequency_targets": [
+        "deng4",
+        "gui3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1116": {
+      "low_frequency_targets": [
+        "dun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1122": {
+      "low_frequency_targets": [
+        "huai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1133": {
+      "low_frequency_targets": [
+        "jiong3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1140": {
+      "low_frequency_targets": [
+        "ai3",
+        "bi1",
+        "qiang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1169": {
+      "low_frequency_targets": [
+        "zhai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1172": {
+      "low_frequency_targets": [
+        "chang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1178": {
+      "low_frequency_targets": [
+        "can2",
+        "chui2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1188": {
+      "low_frequency_targets": [
+        "huang1",
+        "yan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1192": {
+      "low_frequency_targets": [
+        "cai4",
+        "dao1",
+        "shang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1193": {
+      "low_frequency_targets": [
+        "wo1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1234": {
+      "low_frequency_targets": [
+        "fa4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1250": {
+      "low_frequency_targets": [
+        "ren3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1253": {
+      "low_frequency_targets": [
+        "diu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1267": {
+      "low_frequency_targets": [
+        "suan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1269": {
+      "low_frequency_targets": [
+        "cui1",
+        "hui3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1271": {
+      "low_frequency_targets": [
+        "nan4",
+        "zai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1276": {
+      "low_frequency_targets": [
+        "sou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1278": {
+      "low_frequency_targets": [
+        "zha4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1290": {
+      "low_frequency_targets": [
+        "qian3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1343": {
+      "low_frequency_targets": [
+        "e4",
+        "hou2",
+        "yan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1344": {
+      "low_frequency_targets": [
+        "beng1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1351": {
+      "low_frequency_targets": [
+        "dun3",
+        "yong1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1382": {
+      "low_frequency_targets": [
+        "qing4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1384": {
+      "low_frequency_targets": [
+        "niu3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1406": {
+      "low_frequency_targets": [
+        "zai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1409": {
+      "low_frequency_targets": [
+        "tui2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1410": {
+      "low_frequency_targets": [
+        "po2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1412": {
+      "low_frequency_targets": [
+        "huo1",
+        "lang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1433": {
+      "low_frequency_targets": [
+        "die2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1449": {
+      "low_frequency_targets": [
+        "ang2",
+        "yong1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1454": {
+      "low_frequency_targets": [
+        "cang2",
+        "chou2",
+        "hen4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1513": {
+      "low_frequency_targets": [
+        "dao1",
+        "peng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1539": {
+      "low_frequency_targets": [
+        "du3",
+        "zao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1554": {
+      "low_frequency_targets": [
+        "ou3",
+        "shuai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1559": {
+      "low_frequency_targets": [
+        "bu3",
+        "tie1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1562": {
+      "low_frequency_targets": [
+        "wa3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1566": {
+      "low_frequency_targets": [
+        "juan1",
+        "zeng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1580": {
+      "low_frequency_targets": [
+        "chi4",
+        "tong4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1589": {
+      "low_frequency_targets": [
+        "long3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1609": {
+      "low_frequency_targets": [
+        "zhui4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1610": {
+      "low_frequency_targets": [
+        "e2",
+        "zhai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1619": {
+      "low_frequency_targets": [
+        "chou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1622": {
+      "low_frequency_targets": [
+        "tiao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1643": {
+      "low_frequency_targets": [
+        "wang1",
+        "zhao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1658": {
+      "low_frequency_targets": [
+        "ning4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1677": {
+      "low_frequency_targets": [
+        "ai2",
+        "rou4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1681": {
+      "low_frequency_targets": [
+        "geng1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1683": {
+      "low_frequency_targets": [
+        "pao1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1723": {
+      "low_frequency_targets": [
+        "tiao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1732": {
+      "low_frequency_targets": [
+        "qu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1757": {
+      "low_frequency_targets": [
+        "mi3",
+        "pi4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1761": {
+      "low_frequency_targets": [
+        "cao1",
+        "jia3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1769": {
+      "low_frequency_targets": [
+        "gan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1777": {
+      "low_frequency_targets": [
+        "ka1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1788": {
+      "low_frequency_targets": [
+        "zhan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1810": {
+      "low_frequency_targets": [
+        "wa3",
+        "wo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1815": {
+      "low_frequency_targets": [
+        "ti1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1817": {
+      "low_frequency_targets": [
+        "guo1",
+        "qiu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1821": {
+      "low_frequency_targets": [
+        "qiao1",
+        "sun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1830": {
+      "low_frequency_targets": [
+        "han4",
+        "lin4",
+        "zu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1851": {
+      "low_frequency_targets": [
+        "chuang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1864": {
+      "low_frequency_targets": [
+        "a1",
+        "han3",
+        "mian3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1867": {
+      "low_frequency_targets": [
+        "bu3",
+        "nuo2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1869": {
+      "low_frequency_targets": [
+        "chuan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1888": {
+      "low_frequency_targets": [
+        "pai4",
+        "zan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1903": {
+      "low_frequency_targets": [
+        "chang4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1904": {
+      "low_frequency_targets": [
+        "an3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1910": {
+      "low_frequency_targets": [
+        "lou4",
+        "zui3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1912": {
+      "low_frequency_targets": [
+        "dui1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1917": {
+      "low_frequency_targets": [
+        "qia4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1923": {
+      "low_frequency_targets": [
+        "en1",
+        "jun4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1925": {
+      "low_frequency_targets": [
+        "he1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1928": {
+      "low_frequency_targets": [
+        "pi2",
+        "ta3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1931": {
+      "low_frequency_targets": [
+        "ni4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1933": {
+      "low_frequency_targets": [
+        "feng4",
+        "kai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1946": {
+      "low_frequency_targets": [
+        "fa2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1961": {
+      "low_frequency_targets": [
+        "xu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1962": {
+      "low_frequency_targets": [
+        "kua1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1963": {
+      "low_frequency_targets": [
+        "geng3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1974": {
+      "low_frequency_targets": [
+        "ye2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1975": {
+      "low_frequency_targets": [
+        "chun2",
+        "zui3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_1993": {
+      "low_frequency_targets": [
+        "niang2",
+        "pian1",
+        "qiao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2001": {
+      "low_frequency_targets": [
+        "yun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2008": {
+      "low_frequency_targets": [
+        "rao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2028": {
+      "low_frequency_targets": [
+        "gua1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2037": {
+      "low_frequency_targets": [
+        "mi1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2050": {
+      "low_frequency_targets": [
+        "mie4",
+        "sa4",
+        "sen1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2051": {
+      "low_frequency_targets": [
+        "ding1",
+        "lei3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2064": {
+      "low_frequency_targets": [
+        "wan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2068": {
+      "low_frequency_targets": [
+        "xue1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2071": {
+      "low_frequency_targets": [
+        "pao4",
+        "yong1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2075": {
+      "low_frequency_targets": [
+        "dao1",
+        "liao4",
+        "qiao2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2081": {
+      "low_frequency_targets": [
+        "pi3",
+        "zhai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2082": {
+      "low_frequency_targets": [
+        "hun1",
+        "lei2",
+        "nuo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2087": {
+      "low_frequency_targets": [
+        "yao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2108": {
+      "low_frequency_targets": [
+        "ou3",
+        "peng3",
+        "zhui1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2119": {
+      "low_frequency_targets": [
+        "man2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2127": {
+      "low_frequency_targets": [
+        "chi3",
+        "cun4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2132": {
+      "low_frequency_targets": [
+        "ni1",
+        "tiao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2136": {
+      "low_frequency_targets": [
+        "xiang2",
+        "xu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2140": {
+      "low_frequency_targets": [
+        "qian3",
+        "yang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2149": {
+      "low_frequency_targets": [
+        "bang4",
+        "bing3",
+        "su1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2160": {
+      "low_frequency_targets": [
+        "fei2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2161": {
+      "low_frequency_targets": [
+        "ha1",
+        "ni1",
+        "qian4",
+        "shuo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2206": {
+      "low_frequency_targets": [
+        "dui1",
+        "zha1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2220": {
+      "low_frequency_targets": [
+        "bei1",
+        "cong1",
+        "lian3",
+        "tong4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2223": {
+      "low_frequency_targets": [
+        "po1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2235": {
+      "low_frequency_targets": [
+        "luan4",
+        "rao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2238": {
+      "low_frequency_targets": [
+        "pang1",
+        "ping1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2267": {
+      "low_frequency_targets": [
+        "pin1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2277": {
+      "low_frequency_targets": [
+        "can4",
+        "lan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2306": {
+      "low_frequency_targets": [
+        "pi3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2316": {
+      "low_frequency_targets": [
+        "tuo4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2343": {
+      "low_frequency_targets": [
+        "can4",
+        "cui3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2346": {
+      "low_frequency_targets": [
+        "chou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2361": {
+      "low_frequency_targets": [
+        "du1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2386": {
+      "low_frequency_targets": [
+        "sha1",
+        "su2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2417": {
+      "low_frequency_targets": [
+        "ping1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2420": {
+      "low_frequency_targets": [
+        "pa2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2466": {
+      "low_frequency_targets": [
+        "pang2",
+        "sha4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2490": {
+      "low_frequency_targets": [
+        "dui1",
+        "zha1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2497": {
+      "low_frequency_targets": [
+        "liu3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2504": {
+      "low_frequency_targets": [
+        "huan3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2505": {
+      "low_frequency_targets": [
+        "miao3",
+        "niao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2538": {
+      "low_frequency_targets": [
+        "ni4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2540": {
+      "low_frequency_targets": [
+        "guai3",
+        "lai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2545": {
+      "low_frequency_targets": [
+        "tou1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2555": {
+      "low_frequency_targets": [
+        "meng3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2575": {
+      "low_frequency_targets": [
+        "kun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2585": {
+      "low_frequency_targets": [
+        "cui1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2592": {
+      "low_frequency_targets": [
+        "pan1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2598": {
+      "low_frequency_targets": [
+        "ta4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2600": {
+      "low_frequency_targets": [
+        "can4",
+        "lan4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2605": {
+      "low_frequency_targets": [
+        "yun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2637": {
+      "low_frequency_targets": [
+        "rang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2641": {
+      "low_frequency_targets": [
+        "ka1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2643": {
+      "low_frequency_targets": [
+        "ye1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2657": {
+      "low_frequency_targets": [
+        "cang1",
+        "sang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2660": {
+      "low_frequency_targets": [
+        "shang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2683": {
+      "low_frequency_targets": [
+        "chuang3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2695": {
+      "low_frequency_targets": [
+        "heng2",
+        "kang4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2698": {
+      "low_frequency_targets": [
+        "che4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2702": {
+      "low_frequency_targets": [
+        "da0",
+        "liu1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2721": {
+      "low_frequency_targets": [
+        "huai2",
+        "niao3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2722": {
+      "low_frequency_targets": [
+        "tun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2741": {
+      "low_frequency_targets": [
+        "chan4",
+        "dou3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2750": {
+      "low_frequency_targets": [
+        "cong1",
+        "la4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2756": {
+      "low_frequency_targets": [
+        "kua4",
+        "tiao4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2770": {
+      "low_frequency_targets": [
+        "lei2",
+        "ta3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2771": {
+      "low_frequency_targets": [
+        "qu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2777": {
+      "low_frequency_targets": [
+        "beng1",
+        "shang0"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2798": {
+      "low_frequency_targets": [
+        "zhai1",
+        "zhe2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2810": {
+      "low_frequency_targets": [
+        "yun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2812": {
+      "low_frequency_targets": [
+        "gou3",
+        "nian3",
+        "tu4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2813": {
+      "low_frequency_targets": [
+        "dai1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2824": {
+      "low_frequency_targets": [
+        "he4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2839": {
+      "low_frequency_targets": [
+        "mu2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2855": {
+      "low_frequency_targets": [
+        "deng4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2865": {
+      "low_frequency_targets": [
+        "guang4",
+        "xian2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2895": {
+      "low_frequency_targets": [
+        "hu3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2904": {
+      "low_frequency_targets": [
+        "chou2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2910": {
+      "low_frequency_targets": [
+        "kai3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2921": {
+      "low_frequency_targets": [
+        "kun1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2922": {
+      "low_frequency_targets": [
+        "wang1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2945": {
+      "low_frequency_targets": [
+        "huai4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2946": {
+      "low_frequency_targets": [
+        "niang2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2950": {
+      "low_frequency_targets": [
+        "duo3",
+        "yun2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2961": {
+      "low_frequency_targets": [
+        "gun3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2975": {
+      "low_frequency_targets": [
+        "gun3"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2977": {
+      "low_frequency_targets": [
+        "wa0",
+        "wa2"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2981": {
+      "low_frequency_targets": [
+        "heng1"
+      ],
+      "planned_recording_slots": 4
+    },
+    "音系强化_source_2991": {
+      "low_frequency_targets": [
+        "ben4"
+      ],
+      "planned_recording_slots": 4
+    },
+    "会议与协作_source_0450": {
+      "low_frequency_targets": [
+        "lüe4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "会议与协作_source_0513": {
+      "low_frequency_targets": [
+        "yang1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "会议与协作_source_0653": {
+      "low_frequency_targets": [
+        "miao4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "会议与协作_source_0797": {
+      "low_frequency_targets": [
+        "fen3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "会议与协作_source_0815": {
+      "low_frequency_targets": [
+        "bang4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "会议与协作_source_0831": {
+      "low_frequency_targets": [
+        "kui4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "设备与数字_curated_086": {
+      "low_frequency_targets": [
+        "miao2",
+        "sao3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0035": {
+      "low_frequency_targets": [
+        "shai4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0072": {
+      "low_frequency_targets": [
+        "chui2",
+        "sha1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0123": {
+      "low_frequency_targets": [
+        "gan4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0333": {
+      "low_frequency_targets": [
+        "cun4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0381": {
+      "low_frequency_targets": [
+        "ai3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0406": {
+      "low_frequency_targets": [
+        "zhui1",
+        "zhuo1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0413": {
+      "low_frequency_targets": [
+        "tou1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0550": {
+      "low_frequency_targets": [
+        "lu3",
+        "nuo4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0578": {
+      "low_frequency_targets": [
+        "qian3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0615": {
+      "low_frequency_targets": [
+        "chuan4",
+        "zhu1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0637": {
+      "low_frequency_targets": [
+        "bao2"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0761": {
+      "low_frequency_targets": [
+        "shang3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0771": {
+      "low_frequency_targets": [
+        "miao2",
+        "zou4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_0851": {
+      "low_frequency_targets": [
+        "chui1",
+        "meng3",
+        "shang0"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_1053": {
+      "low_frequency_targets": [
+        "en1",
+        "jun4",
+        "xiong1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_1127": {
+      "low_frequency_targets": [
+        "bi2"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_1346": {
+      "low_frequency_targets": [
+        "mao1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_1437": {
+      "low_frequency_targets": [
+        "feng4",
+        "tou4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_1446": {
+      "low_frequency_targets": [
+        "dai1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_1473": {
+      "low_frequency_targets": [
+        "tu4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_1519": {
+      "low_frequency_targets": [
+        "chi3",
+        "cun4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_1651": {
+      "low_frequency_targets": [
+        "gui3",
+        "la4",
+        "yin4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_2190": {
+      "low_frequency_targets": [
+        "chou1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_2204": {
+      "low_frequency_targets": [
+        "da1",
+        "meng2"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_2394": {
+      "low_frequency_targets": [
+        "pin1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_2490": {
+      "low_frequency_targets": [
+        "han4",
+        "rou2"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_2751": {
+      "low_frequency_targets": [
+        "qiang3",
+        "zan4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_2960": {
+      "low_frequency_targets": [
+        "chai1",
+        "zhu1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_3141": {
+      "low_frequency_targets": [
+        "la4",
+        "piao1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_3316": {
+      "low_frequency_targets": [
+        "lia3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_3324": {
+      "low_frequency_targets": [
+        "diu1",
+        "yong1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_3506": {
+      "low_frequency_targets": [
+        "cui4",
+        "nao3",
+        "sun1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_3543": {
+      "low_frequency_targets": [
+        "meng3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_3576": {
+      "low_frequency_targets": [
+        "ao2",
+        "xuan1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_3589": {
+      "low_frequency_targets": [
+        "bei1",
+        "shan3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_4082": {
+      "low_frequency_targets": [
+        "bei1",
+        "lian3",
+        "qian4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_4292": {
+      "low_frequency_targets": [
+        "cha1",
+        "suo1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_4479": {
+      "low_frequency_targets": [
+        "hou2"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_4519": {
+      "low_frequency_targets": [
+        "mi3",
+        "tiao3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_4807": {
+      "low_frequency_targets": [
+        "hen4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "现代文章朗读_source_4825": {
+      "low_frequency_targets": [
+        "guo1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_0618": {
+      "low_frequency_targets": [
+        "zha4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_1004": {
+      "low_frequency_targets": [
+        "qiao3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_1306": {
+      "low_frequency_targets": [
+        "mai2"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_1722": {
+      "low_frequency_targets": [
+        "tan1",
+        "zhai4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_1803": {
+      "low_frequency_targets": [
+        "chi4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_2101": {
+      "low_frequency_targets": [
+        "fa2",
+        "qin2"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_2381": {
+      "low_frequency_targets": [
+        "xu2"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_2481": {
+      "low_frequency_targets": [
+        "sheng3"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_2615": {
+      "low_frequency_targets": [
+        "bei1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_2734": {
+      "low_frequency_targets": [
+        "huang1"
+      ],
+      "planned_recording_slots": 3
+    },
+    "音系强化_source_2844": {
+      "low_frequency_targets": [
+        "jun4"
+      ],
+      "planned_recording_slots": 3
+    },
+    "会议与协作_source_0427": {
+      "low_frequency_targets": [
+        "bin1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "会议与协作_source_0656": {
+      "low_frequency_targets": [
+        "pan4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "会议与协作_source_0783": {
+      "low_frequency_targets": [
+        "gao3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "设备与数字_curated_163": {
+      "low_frequency_targets": [
+        "lang3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0068": {
+      "low_frequency_targets": [
+        "rang3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0237": {
+      "low_frequency_targets": [
+        "pian2"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0278": {
+      "low_frequency_targets": [
+        "chou3",
+        "han4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0308": {
+      "low_frequency_targets": [
+        "dao1",
+        "shan3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0401": {
+      "low_frequency_targets": [
+        "du3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0473": {
+      "low_frequency_targets": [
+        "lai4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0533": {
+      "low_frequency_targets": [
+        "bai4",
+        "dou4",
+        "lun2"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0576": {
+      "low_frequency_targets": [
+        "wan1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0587": {
+      "low_frequency_targets": [
+        "shan3",
+        "xia2",
+        "zhao1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0648": {
+      "low_frequency_targets": [
+        "rou4",
+        "xue4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0744": {
+      "low_frequency_targets": [
+        "juan1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_0919": {
+      "low_frequency_targets": [
+        "rao3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_1067": {
+      "low_frequency_targets": [
+        "qiu1",
+        "zhao1",
+        "zu1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_1362": {
+      "low_frequency_targets": [
+        "ta3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_1556": {
+      "low_frequency_targets": [
+        "bin1",
+        "sun1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_1589": {
+      "low_frequency_targets": [
+        "chou4",
+        "lian3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_2010": {
+      "low_frequency_targets": [
+        "hun4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_2013": {
+      "low_frequency_targets": [
+        "ai1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_2145": {
+      "low_frequency_targets": [
+        "chun2",
+        "dou4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_2209": {
+      "low_frequency_targets": [
+        "kui1",
+        "qian4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_2314": {
+      "low_frequency_targets": [
+        "hu3",
+        "ya3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_3249": {
+      "low_frequency_targets": [
+        "bie1",
+        "si3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_3735": {
+      "low_frequency_targets": [
+        "hu3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_3992": {
+      "low_frequency_targets": [
+        "kang4",
+        "zai1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_4054": {
+      "low_frequency_targets": [
+        "zha1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_4237": {
+      "low_frequency_targets": [
+        "cang1",
+        "chuang2",
+        "pu4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_4407": {
+      "low_frequency_targets": [
+        "huang1",
+        "tao2"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_4548": {
+      "low_frequency_targets": [
+        "cu4",
+        "du1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_4614": {
+      "low_frequency_targets": [
+        "pan4",
+        "zao1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "现代文章朗读_source_4775": {
+      "low_frequency_targets": [
+        "sun1",
+        "zha4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0125": {
+      "low_frequency_targets": [
+        "ke2"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0161": {
+      "low_frequency_targets": [
+        "he1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0217": {
+      "low_frequency_targets": [
+        "huang3",
+        "sa1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0377": {
+      "low_frequency_targets": [
+        "chou4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0381": {
+      "low_frequency_targets": [
+        "zhao1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0493": {
+      "low_frequency_targets": [
+        "lan3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0496": {
+      "low_frequency_targets": [
+        "huai4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0508": {
+      "low_frequency_targets": [
+        "zai3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0720": {
+      "low_frequency_targets": [
+        "die2",
+        "zhe2"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0826": {
+      "low_frequency_targets": [
+        "min3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0879": {
+      "low_frequency_targets": [
+        "nong4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_0975": {
+      "low_frequency_targets": [
+        "bang3",
+        "cha4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1032": {
+      "low_frequency_targets": [
+        "chou4",
+        "e4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1240": {
+      "low_frequency_targets": [
+        "bi1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1308": {
+      "low_frequency_targets": [
+        "lei3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1309": {
+      "low_frequency_targets": [
+        "pai4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1332": {
+      "low_frequency_targets": [
+        "miao3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1460": {
+      "low_frequency_targets": [
+        "diao1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1535": {
+      "low_frequency_targets": [
+        "han3",
+        "kang4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1633": {
+      "low_frequency_targets": [
+        "can2",
+        "yin4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1679": {
+      "low_frequency_targets": [
+        "bu3",
+        "tie1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1768": {
+      "low_frequency_targets": [
+        "mao2"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_1825": {
+      "low_frequency_targets": [
+        "qing4",
+        "qiu1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_2010": {
+      "low_frequency_targets": [
+        "cang1",
+        "cang2",
+        "sen1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_2054": {
+      "low_frequency_targets": [
+        "fa2"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_2084": {
+      "low_frequency_targets": [
+        "juan4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_2156": {
+      "low_frequency_targets": [
+        "ding1",
+        "lei3"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_2165": {
+      "low_frequency_targets": [
+        "zou4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_2333": {
+      "low_frequency_targets": [
+        "fu1"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_2688": {
+      "low_frequency_targets": [
+        "lou4"
+      ],
+      "planned_recording_slots": 2
+    },
+    "音系强化_source_2930": {
+      "low_frequency_targets": [
+        "xuan2"
+      ],
+      "planned_recording_slots": 2
+    },
+    "会议与协作_source_0129": {
+      "low_frequency_targets": [
+        "pang2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "会议与协作_source_0227": {
+      "low_frequency_targets": [
+        "bai4"
+      ],
+      "planned_recording_slots": 1
+    },
+    "会议与协作_source_0367": {
+      "low_frequency_targets": [
+        "hun1",
+        "qing4"
+      ],
+      "planned_recording_slots": 1
+    },
+    "会议与协作_source_0519": {
+      "low_frequency_targets": [
+        "heng2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "会议与协作_source_0677": {
+      "low_frequency_targets": [
+        "han3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "会议与协作_source_0739": {
+      "low_frequency_targets": [
+        "sun3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "看病与求助_curated_016": {
+      "low_frequency_targets": [
+        "gua4",
+        "zhen3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "看病与求助_curated_066": {
+      "low_frequency_targets": [
+        "teng2",
+        "tong4"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_0167": {
+      "low_frequency_targets": [
+        "huai2",
+        "mian3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_0409": {
+      "low_frequency_targets": [
+        "cang2",
+        "juan4"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_0496": {
+      "low_frequency_targets": [
+        "huai2",
+        "yin4"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_0786": {
+      "low_frequency_targets": [
+        "ao2",
+        "piao1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_0796": {
+      "low_frequency_targets": [
+        "niu3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_1296": {
+      "low_frequency_targets": [
+        "bie1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_2182": {
+      "low_frequency_targets": [
+        "kan3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_2218": {
+      "low_frequency_targets": [
+        "ye2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_2675": {
+      "low_frequency_targets": [
+        "liu3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_3144": {
+      "low_frequency_targets": [
+        "e2",
+        "gao3",
+        "zao1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_3167": {
+      "low_frequency_targets": [
+        "su1",
+        "xu2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_3754": {
+      "low_frequency_targets": [
+        "mo1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_3787": {
+      "low_frequency_targets": [
+        "chun2",
+        "tao2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_4465": {
+      "low_frequency_targets": [
+        "xu2",
+        "xuan1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_4629": {
+      "low_frequency_targets": [
+        "chuang1",
+        "tiao4"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_4638": {
+      "low_frequency_targets": [
+        "chuan1",
+        "hun1",
+        "zuo3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "现代文章朗读_source_4989": {
+      "low_frequency_targets": [
+        "fa2",
+        "que1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_0085": {
+      "low_frequency_targets": [
+        "zui3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_0105": {
+      "low_frequency_targets": [
+        "ting3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_0179": {
+      "low_frequency_targets": [
+        "nai4"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_0342": {
+      "low_frequency_targets": [
+        "fen3",
+        "nai3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_0369": {
+      "low_frequency_targets": [
+        "nong4",
+        "qin2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_0552": {
+      "low_frequency_targets": [
+        "qiang3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_0711": {
+      "low_frequency_targets": [
+        "sai1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1023": {
+      "low_frequency_targets": [
+        "duo2",
+        "lei3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1411": {
+      "low_frequency_targets": [
+        "ou1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1415": {
+      "low_frequency_targets": [
+        "en1",
+        "lan4"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1537": {
+      "low_frequency_targets": [
+        "liao4"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1575": {
+      "low_frequency_targets": [
+        "a1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1594": {
+      "low_frequency_targets": [
+        "heng2",
+        "meng2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1666": {
+      "low_frequency_targets": [
+        "cu4",
+        "cui1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1700": {
+      "low_frequency_targets": [
+        "kui1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1743": {
+      "low_frequency_targets": [
+        "da1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1820": {
+      "low_frequency_targets": [
+        "kun1",
+        "lun2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_1930": {
+      "low_frequency_targets": [
+        "huang3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_2113": {
+      "low_frequency_targets": [
+        "lei2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_2464": {
+      "low_frequency_targets": [
+        "chao3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_2516": {
+      "low_frequency_targets": [
+        "kuan1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_2563": {
+      "low_frequency_targets": [
+        "hun1",
+        "xu2"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_2703": {
+      "low_frequency_targets": [
+        "pin2",
+        "zai1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_2837": {
+      "low_frequency_targets": [
+        "ou3"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_2883": {
+      "low_frequency_targets": [
+        "geng1"
+      ],
+      "planned_recording_slots": 1
+    },
+    "音系强化_source_2962": {
+      "low_frequency_targets": [
+        "hui3"
+      ],
+      "planned_recording_slots": 1
+    }
+  }
+}

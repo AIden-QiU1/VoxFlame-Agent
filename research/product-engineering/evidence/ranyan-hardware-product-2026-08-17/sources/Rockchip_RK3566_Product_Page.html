@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html>
+  	<head>
+        <title>Rockchip-瑞芯微电子股份有限公司</title>
+    	<meta charset="utf-8">
+    	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+    	<meta name="description" content="瑞芯微专注于移动互联网、数字多媒体芯片设计，是专业的个人移动信息终端SOC解决方案供应商。瑞芯微在移动互联网领域有多个较完整的自主创新的知识产权群，为中国电子业发展做出积极努力。目前产品涵盖Android平板电脑、Android电视机顶盒（智能电视）、电子书、WIFI/蓝牙音频解决方案等">
+        <meta name="keywords" content="数字多媒体芯片设计,个人移动信息终端SOC解决方案,移动互联网,移动互联芯片解决方案" />
+        <meta http-equiv="Cache" content="no-cache">
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta http-equiv="Pragma" content="no-cache" />
+        <meta http-equiv="Expires" content="0" />
+    	<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1.0,minimum-scale=1,user-scalable=no">
+    	<!-- Bootstrap -->
+		<link rel="stylesheet" href="/templets/new_2014_9/css/bootstrap-3.2.0.min.css">  
+     	<!-- 禁用响应式 -->
+     	<link href="/templets/new_2014_9/css/non-responsive_1.3.css?ver=1.0.0" rel="stylesheet" type="text/css">
+      	<link href="/templets/new_2014_9/css/style_1.3.css?ver=1.0.2" rel="stylesheet" type="text/css">
+          <script src="/js/jquery-2.0.min.js"></script>
+    	<!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    	<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    	<!--[if lt IE 9]>
+        	<script src="http://cdn.bootcss.com/html5shiv/3.7.0/html5shiv.min.js"></script>
+        	<script src="http://cdn.bootcss.com/respond.js/1.3.0/respond.min.js"></script>
+    	<![endif]-->
+    	<!-- 最新的 Bootstrap 核心 JavaScript 文件 -->
+        <script src="/templets/new_2014_9/js/bootstrap-3.2.0.min.js?ver1.7.1"></script>
+        <!-- 引入移动端JS -->
+		<script src="/templets/new_2014_9/js/match_mobile.js?ver1.7.3"></script>
+		<script>
+			$($('.navbar-nav li').first()).remove();
+			$(document).on('scroll',setPosition)
+			$(window).on('resize',setPosition)
+			window.myScrollLeft=0;
+    		function setPosition(){
+					var scroll_Left = document.body.scrollLeft||document.documentElement.scrollLeft;
+					if (window.myScrollLeft==scroll_Left) {
+						return;
+					}
+					window.myScrollLeft=scroll_Left;
+					$(".navbar-fixed-top").css('left',0-scroll_Left );
+			}
+		</script>
+  	</head>
+  	<body data-spy="scroll" data-target=".nav-home">
+       	<!-- Fixed navbar -->
+	<div class="navbar navbar-default navbar-fixed-top" role="navigation">
+		<div class="container">
+			<div class="navbar-header">
+				<button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+				<span class="sr-only">Toggle navigation</span>
+				<span class="icon-bar"></span>
+				<span class="icon-bar"></span>
+				<span class="icon-bar"></span>
+				</button>
+				<a href='/a/en/index.html'><img class="navbarImg" src="/templets/new_2014_9/images/en/logo.png"></a>
+			</div>
+			<div class="navbar-collapse collapse">
+				<div class="navsubmenu">
+		          	<span>Stock Code:&nbsp;&nbsp;603893</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+		          	<a href="https://www.rock-chips.com" title="中文" id="lang_gb2312" class="en">中文</a>/<span href="/a/en/index.html" title="EN" class="selected">EN</span>
+		        </div>
+				<ul class="nav navbar-nav EnMenu">
+					<li class="nav-mid-line"></li><li><a class="addPadding active" href="/a/en/products/index.html">Products</a></li>
+					<li class="nav-mid-line"></li><li><a class="addPadding" href='/a/en/Solutions/index.html'>Solutions</a></li>
+					
+					<li class="nav-mid-line"></li><li><a class="addPadding" href='/a/en/News/index.html'>News</a></li>
+					
+					<li class="nav-mid-line"></li><li><a class="addPadding" href='https:\/\/hr.rock-chips.com/social-recruitment'>Careers</a></li>
+					
+					<li class="nav-mid-line"></li><li><a class="addPadding" href='/a/en/contact/index.html'>Contact</a></li>
+					
+					<li class="nav-mid-line"></li><li><a class="addPadding" href='/a/en/About_Rockchip/index.html'>About</a></li>
+					
+					<li class="nav-mid-line"></li><li><a class="addPadding" href='http://opensource.rock-chips.com'>Wiki</a></li>
+					
+					<li class="nav-mid-line"></li><li><a class="addPadding" href='/a/en/psirt/index.html'>PSIRT</a></li>
+					
+					<li class="nav-mid-line"></li><li><a class="addPadding" href='/a/en/download/index.html'>Support Documents</a></li>
+					
+					<!--
+					<li class="language languageLineH">
+						<a href="https://www.rock-chips.com" title="中文" id="lang_gb2312" class="en">中文</a>/<span href="/a/en/index.html" title="EN" class="selected">EN</span>
+					</li>
+					-->
+				</ul>
+			</div><!--/.nav-collapse -->
+		</div>
+	</div>
+
+	<div class="navbar-mobile">
+		<div class="non_list">
+		  <div class="container">
+			  <a class="logo_img" href='/a/en/index.html'>
+				<img src="/templets/new_2014_9/images/mobile-img/m-logo.png" alt="">
+			  </a>
+			  <div class="show" href="javascript:;"  onclick="showList()">
+				<img src="/templets/new_2014_9/images/mobile-img/nav_list.png" alt="">
+			  </div>
+			  <div class="lang">
+				<!-- 模板 -->
+				<a href="https://www.rock-chips.com" title="中文" id="lang_gb2312" class="en">中文</a>/<span href="/a/en/index.html" title="EN" class="selected">EN</span>
+			  </div>
+			  <div class="navsubmenu">
+		          <span>Stock Code:&nbsp;&nbsp;603893</span>
+		      </div>
+		  </div>
+		</div>
+		<div class="show_list" >
+		  <div class="list_head">
+			<div class="container">
+			  <div class="close_list" onclick="hideList()">
+				<img src="/templets/new_2014_9/images/mobile-img/close-list.png"></img>
+			  </div>
+			</div>
+		  </div>
+		  <div class="list_content">
+			<ul>
+				<!-- 模板 -->
+			  <li><a href="/a/en/products/index.html" class="active"><div class="container"> Products<div class="arr"></div></div></a></li>
+			  <li><a href='/a/en/Solutions/index.html'><div class="container">Solutions<div class="arr"></div></div></a></li> 
+			  <li><a href='/a/en/News/index.html'><div class="container">News<div class="arr"></div></div></a></li> 
+			  <li><a href='https:\/\/hr.rock-chips.com/social-recruitment'><div class="container">Careers<div class="arr"></div></div></a></li> 
+			  <li><a href='/a/en/contact/index.html'><div class="container">Contact<div class="arr"></div></div></a></li> 
+			  <li><a href='/a/en/About_Rockchip/index.html'><div class="container">About<div class="arr"></div></div></a></li> 
+			  <li><a href='http://opensource.rock-chips.com'><div class="container">Wiki<div class="arr"></div></div></a></li> 
+			  <li><a href='/a/en/psirt/index.html'><div class="container">PSIRT<div class="arr"></div></div></a></li> 
+			  <li><a href='/a/en/download/index.html'><div class="container">Support Documents<div class="arr"></div></div></a></li> 
+			</ul>
+		  </div>
+		</div>
+	  </div>
+	<!--end nav -->	
+
+<div id="main_0" role="main">
+
+		<script>
+        $(document).ready(function(){ 
+            var k = 1;
+            $('.info_top span').each(function(){
+               var len =  $(".info_top span:not('.gan')").get().length;
+               var sellen =  $('.info_top span.sel').get().length;
+               if(k < len){
+                  $(this).after("<span class='gan'>&nbsp;&nbsp;/&nbsp;&nbsp;</span>"); 
+               }
+               if(sellen > 1){
+                  if(k == 1){
+                    $(this).removeClass("sel");
+                  }
+               }
+               k++;
+            });
+
+            //var first = $('.info_top span').first();
+
+            //if($(first).attr('class') != 'sel'){
+            //   if (!window.mflag) {
+            //      $('html,body').animate({scrollTop: 600}, 200);
+            //   } 
+               
+               
+            //}
+
+        });
+        window.onload=function(){
+			$(window).scroll(function() {
+				const max = $('html').height() - $(window).height()
+				if(max <= $(document).scrollTop()) {
+					$('html,body').stop()
+				}
+			})
+			if (!window.mflag) {
+				$('html,body').animate({scrollTop: 600}, 200);
+			} else{
+				$('html,body').stop().animate({scrollTop: $(".info_top").offset().top}, 200).stop();
+			} 
+        }
+        </script>
+         
+<link href="/templets/new_2014_9/css/info.css?ver=1.8.0" rel="stylesheet" type="text/css">
+<style>
+.sub_content .info_showcontent{ padding-top: 40px; }
+.aboutproduct tbody td{padding: 8px 15px;}
+.info_showcontent .pro_pic{ width:340px; height:300px; float:right; text-align:center; overflow:hidden; margin: 20px 0 0 0;}
+.info_showcontent .pro_pic p{ color:#e78b00; font-size:22px; margin-top:25px; font-weight:bold; text-align:center; }
+.info_showcontent .pro_pic img{ max-width:340px; max-height:275px;}
+.info_showcontent .pro_ys{ height:auto; overflow:hidden; float:left; margin:20px 0 15px 15px;}
+.info_showcontent .pro_ys p{font-size:36px; font-family: auto; font-weight:bold; color:#e78b00;padding:0 0 0 20px;}
+.info_showcontent .pro_ys p.yyfx{color: #6d6d6d;font-size: 18px;margin-top: 20px;font-family: auto;}
+.info_showcontent .pro_ys p.zytx{color: #6d6d6d;font-size: 18px;margin-top: 22px;font-family: auto;}
+.info_showcontent .pro_ys ul{ margin:5px; padding:0 0 0 20px; width:550px;}
+.info_showcontent .pro_ys ul li { list-style:none; margin:15px 0; padding-left:25px;line-height:17px; vertical-align:middle; background:url(/templets/new_2014_9/images/dot.png) left 4px no-repeat; font-size:16px; color:#6d6d6d;}
+.main_body{ min-height:250px;}
+.aboutproduct_top{ height:31px; background-color:#0649B1; background-position:right; line-height:31px; vertical-align:middle; padding-left:25px; letter-spacing:3px; text-transform: uppercase; background-repeat:no-repeat; font-size:16px; font-weight:bold; color:#fff; background-image:url(/templets/default/images/table_bg.png);}
+.showdateiled{ padding:10px;}
+.showdateiled img{ max-width:739px;}
+.aboutproduct tbody td{ padding:15px; background:#fff;}
+.aboutproduct .xl65{ background:#EEF3F9; color:#073475; font-weight:bold; text-align:center; font-size:14px;}
+.aboutproduct .xl67{ background:#EEF3F9; color:#073475; font-weight:bold; text-align:center; font-size:14px;}
+.aboutproduct .xl66{ padding-left:30px;}
+.aboutproduct .multi_table{table-layout: fixed}
+.aboutproduct .multi_table td{text-align: center;line-height: 1.1}
+.aboutproduct .xl70{background:#EEF3F9; color:#073475; font-weight:bold; text-align:center; font-size:14px;width: 28%;}
+.aboutproduct .xl71{font-size:14px;width: 28%;}
+#proapply{height: 0;overflow: hidden;}
+#product
+{
+  cursor: pointer;
+}
+
+/* 产品内页 */
+/* @media screen and (max-device-width:1024px){ */
+    .is_mobile .sub_content .info_showcontent{ padding-top: 0.1rem; }
+    .is_mobile .aboutproduct tbody td{padding: 0.12rem 0.2rem;}
+    .is_mobile #proinfo{padding-top: 0.3rem}
+    .is_mobile #proapply{height: 0;overflow: hidden;}
+    .is_mobile .sub_content .info_showcontent{padding: 0.28rem;}
+    .is_mobile .info_showcontent .pro_pic{width:2.6rem;height: 3.2rem;margin: 0;}
+    .is_mobile .info_showcontent .pro_pic img{width: 2.1rem;max-height: 3.2rem;}
+    .is_mobile .container .info_showcontent .pro_ys{width: 5.3rem;margin: 0 0 0.2rem 0.2rem;height: auto;}
+    .is_mobile .info_showcontent .pro_ys p{font-size:0.44rem;line-height: 0.5rem;padding: 0 0 0 0.2rem;margin: 0;}
+    .is_mobile .info_showcontent .pro_ys ul{margin: 0;padding: 0;width: 100%;}
+    .is_mobile .container .info_showcontent .pro_ys ul li{margin: 0;height: auto;line-height:0.44rem; font-size: 0.28rem;padding-left: 0.2rem;background-size: 0.1rem;background-position: left 0.17rem}
+
+    .is_mobile .aboutproduct_top{height: 0.6rem;font-size: 0.33rem;padding-left:0.2rem; }
+    .is_mobile .aboutproduct tbody td{padding: 0.2rem;font-size: 0.28rem!important;}
+    .is_mobile .aboutproduct .xl66{padding-left: 0.3rem;}
+    .is_mobile .aboutproduct .xl65,.is_mobile .aboutproduct .xl67{width: 2rem;}
+
+    .is_mobile #apply{background-size: 100%!important; font-size: 0.33rem!important;width: 3rem!important;height: 0.8rem!important;line-height: 0.8rem!important;margin: 0!important}
+    .is_mobile img.lk{width: 3rem!important;max-width: none!important;height: 0.8rem!important;}
+/* } */
+
+</style>
+<script type="text/javascript">
+    $(function () {
+        var proname = $('.pro_ys p').text();
+        $.get('/plus/visit.php?type=1&lang=en&title='+proname, function(){});
+        $(".list_content li").eq(0).addClass("on");
+        $(function () {
+            $("#product").click(function () {
+                if (!window.mflag) {
+                    $('html,body').animate({
+                        scrollTop: 600
+                    }, 200);
+                } else {
+                    $('html,body').animate({
+                        scrollTop: window.rem2px(5.9)
+                    }, 200);
+                }
+            });
+        });
+
+        var applyobj = $('#apply').get();
+        var lan = $("#lang").val();
+        if (applyobj.length >= 1) {
+            var thumb = $('#bigpicimg').attr('src');
+            thumb = "https://www.rock-chips.com" + thumb;
+            $("#proapply").html('<iframe name="table" src="https://ai.rock-chips.com/index.php?r=index/product&product=' +
+            // $("#proapply").html('<iframe name="table" src="http://10.10.10.12:8555/index.php?r=index/product&product=' +
+
+                proname +
+                '&lan=' + lan + '&thumb=' + encodeURI(thumb) +
+                '" width="100%" height="1300" style="border:0;"></iframe>'
+            );
+        }
+    });
+
+    function apply() {
+        $('#proinfo').hide();
+        // $('#proapply').show();
+        $('#proapply').css("height","auto")
+        // $('html, body').animate({scrollTop:700}, 'slow');
+        if (!window.mflag) {
+            $('html,body').animate({
+                scrollTop: 600
+            }, 200);
+        } else {
+            $('html,body').animate({
+                scrollTop: window.rem2px(5.9)
+            }, 200);
+        }
+    }
+</script>
+<input type="hidden" id="lang" value="en">
+<div id="main" role="main">
+    <!-- Section #1 / Intro -->
+    <div class="bg_colour">
+        <div id="product" class="story"></div>
+        <div class="info_top">
+            <span class="sel"><a href='/a/en/products/index.html'>All</a></span>
+            <span class="sel"><a href="/a/en/products/RK35_Series/index.html">RK35 Series</a></span>
+            <span><a href='/a/en/products/RK33_Series/index.html'>RK33 Series</a></span>
+            
+            <span><a href='/a/en/products/RK32_Series/index.html'>RK32 Series</a></span>
+            
+            <span><a href='/a/en/products/RK31_Series/index.html'>RK31 Series</a></span>
+            
+            <span><a href='/a/en/products/RK30_Series/index.html'>RK30 Series</a></span>
+            
+            <span><a href='/a/en/products/RK18_Series/index.html'>RK18 Series</a></span>
+            
+            <span><a href='/a/en/products/RK_Nano_Series/index.html'>RK2 Series</a></span>
+            
+            <span><a href='/a/en/products/rkpower/index.html'>RK Power Series</a></span>
+            
+            <span><a href='/a/en/products/RV11_Series/index.html'>RV11 Series</a></span>
+            
+            <span><a href='/a/en/products/Rockchip_Module/index.html'>Rockchip Module</a></span>
+            
+            <span><a href='/a/en/products/RK6_Series/index.html'>RK6 Series</a></span>
+            
+        </div>
+        <div class="container sub sub_content">
+            <div class="info_showcontent">
+                <div id="proinfo">
+                    <div class="clearfix">
+                        <div class="pro_pic">
+                            
+                            <img src="/uploads/allimg/251208/1-25120QAS20.png" id="bigpicimg" />
+                            
+                        </div>
+                        <div class="pro_ys">
+                            <p>RK3566</p>
+                            
+                            <p class="zytx">Key features</p>
+							<ul>
+    <li class="youshi_1">Quad-core Cortex-A55</li>
+    <li class="youshi_2">Mali-G52 GPU</li>
+    <li class="youshi_2">1TOPS NPU</li>
+    <li class="youshi_3">LPDDR4/LPDDR4X/DDR4/DDR3/DDR3L/LPDDR3</li>
+    <li class="youshi_4">4KP60 H.265/H.264/VP9 video decoder</li>
+    <li class="youshi_4">1080P60 H.264/H.265 video encoder</li>
+    <li class="youshi_4">8M ISP</li>
+    <li class="youshi_4">Single Display, LVDS/MIPI-DSI/RGB/eDp/HDMI2.0/EBC</li>
+    <li class="youshi_4">1x8ch I2S/TDM, 1x8ch PDM, 2x2ch I2S</li>
+</ul>
+                        </div>
+                    </div>
+                    <div class="showinfo">
+                        <div class="aboutproduct">
+                            <table border="0" cellpadding="0" cellspacing="1" style="background:#E4E5E8" width="100%">
+    <thead>
+        <tr>
+            <td class="aboutproduct_top" colspan="2">SPECIFICATIONS</td>
+        </tr>
+    </thead>
+    <tbody>
+        <tr style="padding:20px;" valign="middle">
+            <td rowspan="1" class="xl65">CPU</td>
+            <td class="xl66">&bull;&nbsp;Quad-Core ARM Cortex-A55</td>
+        </tr>
+        <tr style="padding:20px;" valign="middle">
+            <td rowspan="3" class="xl65">GPU</td>
+            <td class="xl66">&bull; ARM G52 2EE</td>
+        </tr>
+        <tr>
+            <td class="xl66">&bull; Support OpenGL ES 1.1/2.0/3.2，OpenCL 2.0，Vulkan 1.1</td>
+        </tr>
+        <tr>
+            <td class="xl66">&bull; High performance dedicated 2D processor</td>
+        </tr>
+        <tr style="padding:20px;" valign="middle">
+            <td rowspan="1" class="xl67" width="152">Display</td>
+            <td class="xl66">&bull;  Support eDp/HDMI/MIPI/LVDS/EBC</td>
+        </tr>
+        <tr style="padding:20px;" valign="middle">
+            <td rowspan="3" class="xl65" style="height:30.0pt">Multi-Media</td>
+            <td class="xl66">&bull; Support 4K 60fps H.265/H.264/VP9 decoder</td>
+        </tr>
+        <tr>
+            <td class="xl66">&bull;  Support 1080P 60fps H.265/H.264 encoder</td>
+        </tr>
+        <tr>
+            <td class="xl66">&bull;  Support 8M ISP</td>
+        </tr>
+        <tr style="padding:20px;" valign="middle">
+            <td rowspan="1" class="xl65" style="height:30.0pt">NPU</td>
+            <td class="xl66">&bull; Support 1T</td>
+        </tr>
+    </tbody>
+</table>
+<div class="clearfix">&nbsp;</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- <div id="proapply" style="display:none;"> -->
+                <div id="proapply">
+                </div>
+            </div>
+        </div>
+    </div>
+</div> <!-- // End of #main -->
+    	<div id="footer">
+		<p class="text-center">
+			<p style="text-align: center;">Rockchip Electronics Co., Ltd.&nbsp;All rights reserved<br />
+<a href="https://beian.miit.gov.cn/" target="_blank" style="color:#6e7a84;">闽ICP备19006074号-1</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a target="_blank" href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=35010202001061" style="color:#6e7a84;"><img src="http://file.rock-chips.com/public/ba.png" style="" alt="" />闽公网安备 35010202001061号</a></p>
+		</p>
+	</div>
+</div> <!-- // End of #main -->
+    
+<script>
+        $(document).ready(function() {
+        $('.nav-home a[href*=#]').click(function() {
+            if (location.pathname.replace(/^\//, '') == this.pathname.replace(/^\//, '') && location.hostname == this.hostname) {
+                var $target = $(this.hash);
+                $target = $target.length && $target || $('[name=' + this.hash.slice(1) + ']');
+                if ($target.length) {
+                    var targetOffset = $target.offset().top;
+                    $('html,body').animate({
+                        scrollTop: targetOffset
+                    },
+                    500);
+                    return false;
+                }
+            }
+        });
+    });
+    
+        //监听滚动条滚动事件
+            //$(window).scroll(function () {
+                //$(window).scrollTop()这个方法是当前滚动条滚动的距离
+                //$(window).height()获取当前窗体的高度
+                //$(document).height()获取当前文档的高度
+               //if($(window).scrollTop()>=0&& $(window).scrollTop()<=800){
+                   //回到top时
+                   //navbarBig();
+    
+               //}else{
+    
+                   //navbarSmall();
+    
+               //}
+    
+            //});
+            //监听鼠标移入a标签事件
+            //$(".navbar-nav").hover(function(){
+            //    if($(window).scrollTop()>800){
+            //        navbarBig();
+            //    }else{
+    
+            //    }
+    
+            //},function(){
+            //    if($(window).scrollTop()>800){
+            //        navbarSmall();
+            //    }else{
+    
+            //    }
+    
+    
+            //});
+    
+            function navbarBig(){
+                $(".navbar-fixed-top").height(90);
+                $(".navbar-nav").find("a").addClass("addPadding");
+                $(".navbar-nav").find("a").removeClass("addPaddingLR");
+    
+                $(".navbar-nav").find(".language").addClass("languageLineH");
+                $(".navbar-nav").find(".language").removeClass("languageLineHChange");
+    
+                $(".en").removeClass("addPadding");
+                $(".en").removeClass("addPaddingLR");
+    
+                $(".navbarImg").attr("src","/templets/new_2014_9/images/en/logo.png");
+            }
+    
+            function navbarSmall(){
+                $(".navbar-fixed-top").height(45);
+                $(".navbar-nav").find("a").removeClass("addPadding");
+                $(".navbar-nav").find("a").addClass("addPaddingLR");
+                //中文字样
+                $(".navbar-nav").find(".language").addClass("languageLineHChange");
+                $(".navbar-nav").find(".language").removeClass("languageLineH");
+    
+                // $(".navbarImg").height(45);
+                $(".navbarImg").attr("src","/templets/new_2014_9/images/en/logo_003.png");
+    
+                $(".en").removeClass("addPadding");
+                $(".en").removeClass("addPaddingLR");
+            }
+    
+    
+    $(function () {
+      $('[data-toggle="tooltip"]').tooltip()
+    })
+        </script>
+<div class="delete_next"></div>
+</body>
+
+</html>	

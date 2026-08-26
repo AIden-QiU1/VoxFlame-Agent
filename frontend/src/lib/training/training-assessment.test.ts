@@ -9,14 +9,14 @@ test('summarizeAssessmentAttempts calculates character accuracy across completed
       targetText: '爸爸',
       heardText: '爸爸',
       normalizedTarget: '爸爸',
-      missingChars: [],
+      normalizedHeard: '爸爸',
     },
     {
       exerciseId: 'b',
       targetText: '刷牙',
       heardText: '刷',
       normalizedTarget: '刷牙',
-      missingChars: ['牙'],
+      normalizedHeard: '刷',
     },
   ], 2)
 
@@ -24,7 +24,7 @@ test('summarizeAssessmentAttempts calculates character accuracy across completed
   assert.equal(summary.matchedChars, 3)
   assert.equal(summary.totalChars, 4)
   assert.equal(summary.accuracyRatio, 0.75)
-  assert.equal(summary.severityLabel, '轻度')
+  assert.equal(summary.severityLabel, '低支持需求')
   assert.equal(summary.weakestExercises[0]?.targetText, '刷牙')
 })
 
@@ -35,7 +35,7 @@ test('summarizeAssessmentAttempts keeps incomplete screening results provisional
       targetText: '医生',
       heardText: '',
       normalizedTarget: '医生',
-      missingChars: ['医', '生'],
+      normalizedHeard: '',
     },
   ], 20)
 
@@ -44,5 +44,29 @@ test('summarizeAssessmentAttempts keeps incomplete screening results provisional
   assert.equal(summary.isComplete, false)
   assert.equal(summary.severityBand, 'insufficient')
   assert.equal(summary.severityLabel, '评估中')
-  assert.match(summary.severitySummary, /不生成轻、中、重等级/)
+  assert.match(summary.severitySummary, /不生成训练支持级别/)
+})
+
+test('summarizeAssessmentAttempts penalizes substitutions and extra characters', () => {
+  const summary = summarizeAssessmentAttempts([
+    {
+      exerciseId: 'substitution',
+      targetText: '医生',
+      heardText: '衣生',
+      normalizedTarget: '医生',
+      normalizedHeard: '衣生',
+    },
+    {
+      exerciseId: 'insertion',
+      targetText: '爸爸',
+      heardText: '爸爸好',
+      normalizedTarget: '爸爸',
+      normalizedHeard: '爸爸好',
+    },
+  ], 2)
+
+  assert.equal(summary.matchedChars, 2)
+  assert.equal(summary.totalChars, 4)
+  assert.equal(summary.accuracyRatio, 0.5)
+  assert.equal(summary.severityLabel, '低支持需求')
 })

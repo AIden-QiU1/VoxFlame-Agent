@@ -1,0 +1,12 @@
+{
+  "valid": true,
+  "errors": [],
+  "summary": {
+    "items": 263,
+    "unique_ids": 263,
+    "approved_items": 0,
+    "production_export_items": 0,
+    "pending_or_rejected_items": 263,
+    "declared_targets": 88
+  }
+}

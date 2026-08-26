@@ -1,0 +1,37 @@
+{
+  "kind": "voxflame_mandarin_open_research_recording_candidates",
+  "source": {
+    "repository": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci",
+    "url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci",
+    "source_type": "open_research_corpus",
+    "license": "MIT",
+    "readme_sha256": "2438b1a0b9d8bceed48a02add80c6739e75bc2ea98a82cb032583997f7fbe849",
+    "corpus_file": "corpus_sentences.csv",
+    "corpus_file_sha256": "6acb1e6584d3b9f1b8b7120a9a7ca9a54584450975b0dbe83204662f0086965c",
+    "repository_claimed_sentence_count": 195,
+    "repository_claimed_untoned_syllable_coverage": 387
+  },
+  "policy": {
+    "not_a_textbook_source": true,
+    "machine_gate_only_for_recording_visibility": true,
+    "not_training_import": true,
+    "asr_or_human_spoken_text_not_required": true,
+    "excluded_high_burden_or_criminal_anchor": true
+  },
+  "items": [
+    {"source_row_number": 6, "text": "我赶紧撑开雨伞。", "coverage_targets": ["san3"], "source_sentence_pinyin": "wo3 gan3 jin3 cheng1 kai1 yu3 san3"},
+    {"source_row_number": 15, "text": "里面住着一位慈祥的老僧。", "coverage_targets": ["seng1"], "source_sentence_pinyin": "li3 mian4 zhu4 zhe0 yi1 wei4 ci2 xiang2 de0 lao3 seng1"},
+    {"source_row_number": 18, "text": "听说这条江里曾经生活着珍贵的白鳍豚。", "coverage_targets": ["tun2"], "source_sentence_pinyin": "ting1 shuo1 zhe4 tiao2 jiang1 li3 ceng2 jing1 sheng1 huo2 zhe0 zhen1 gui4 de0 bai2 qi2 tun2"},
+    {"source_row_number": 61, "text": "工人用电钻在墙上钻孔，安装电线。", "coverage_targets": ["zuan1"], "source_sentence_pinyin": "gong1 ren2 yong4 dian4 zuan4 zai4 qiang2 shang4 zuan1 kong3 an1 zhuang1 dian4 xian4"},
+    {"source_row_number": 84, "text": "柴堆旁的仓库里还藏着粮食。", "coverage_targets": ["chai2"], "source_sentence_pinyin": "chai2 dui1 pang2 de0 cang1 ku4 li3 hai2 cang2 zhe0 liang2 shi2"},
+    {"source_row_number": 106, "text": "说这趟航班准点起航。", "coverage_targets": ["tang4"], "source_sentence_pinyin": "shuo1 zhe4 tang4 hang2 ban1 zhun3 dian3 qi3 hang2"},
+    {"source_row_number": 125, "text": "卵石铺满了河岸。", "coverage_targets": ["luan3"], "source_sentence_pinyin": "luan3 shi2 pu4 man3 le0 he2 an4"},
+    {"source_row_number": 132, "text": "他背着鼓鼓的行囊。", "coverage_targets": ["nang2"], "source_sentence_pinyin": "ta1 bei4 zhe0 gu3 gu3 de0 xing2 nang2"},
+    {"source_row_number": 137, "text": "他小心捏起碎片。", "coverage_targets": ["nie1"], "source_sentence_pinyin": "ta1 xiao3 xin1 nie1 qi3 sui4 pian4"},
+    {"source_row_number": 138, "text": "聂师傅在旁边耐心指点。", "coverage_targets": ["nie4"], "source_sentence_pinyin": "nie4 shi1 fu0 zai4 pang2 bian1 nai4 xin1 zhi3 dian3"},
+    {"source_row_number": 148, "text": "婆婆拿抹布把它擦干。", "coverage_targets": ["po0"], "source_sentence_pinyin": "po2 po0 na2 ma1 bu4 ba3 ta1 ca1 gan1"},
+    {"source_row_number": 159, "text": "桑树下，她扯着嗓子。", "coverage_targets": ["che3", "sang3"], "source_sentence_pinyin": "sang1 shu4 xia4 ta1 che3 zhe0 sang3 zi0"},
+    {"source_row_number": 161, "text": "他拿起扫帚扫地。", "coverage_targets": ["sao4"], "source_sentence_pinyin": "ta1 na2 qi3 sao4 zhou0 sao3 di4"},
+    {"source_row_number": 172, "text": "又把西藏带回的挂毯抖了抖。", "coverage_targets": ["zang4"], "source_sentence_pinyin": "you4 ba3 xi1 zang4 dai4 hui2 de0 gua4 tan3 dou3 le0 dou3"}
+  ]
+}

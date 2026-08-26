@@ -1,4 +1,8 @@
 import GENERATED_REAL_CORPUS from '../generated/mandarin-training-real.json'
+import APPROVED_CORE_GAP_CORPUS from '../generated/mandarin-approved-core-gap-corpus.json'
+import RECORDING_CORE_GAP_CORPUS from '../generated/mandarin-recording-core-gap-corpus.json'
+import RECORDING_REINFORCEMENT_CORPUS from '../generated/mandarin-recording-reinforcement-corpus.json'
+import RECORDING_OPEN_RESEARCH_CORPUS from '../generated/mandarin-recording-open-research-corpus.json'
 import { ASSESSMENT_SCREENING_EXERCISES } from './assessment-screening'
 import { CURATED_TOPIC_EXERCISES } from './curated-topics'
 import {
@@ -23,6 +27,18 @@ interface GeneratedTrainingCorpus {
 }
 
 const REAL_CORPUS = GENERATED_REAL_CORPUS as GeneratedTrainingCorpus
+const APPROVED_CORE_GAP_EXERCISES = (APPROVED_CORE_GAP_CORPUS as {
+  items: MandarinTrainingExercise[]
+}).items
+const RECORDING_CORE_GAP_EXERCISES = (RECORDING_CORE_GAP_CORPUS as {
+  items: MandarinTrainingExercise[]
+}).items
+const RECORDING_REINFORCEMENT_EXERCISES = (RECORDING_REINFORCEMENT_CORPUS as {
+  items: MandarinTrainingExercise[]
+}).items
+const RECORDING_OPEN_RESEARCH_EXERCISES = (RECORDING_OPEN_RESEARCH_CORPUS as {
+  items: MandarinTrainingExercise[]
+}).items
 
 export type {
   MandarinTrainingCategory,
@@ -65,10 +81,13 @@ const CATEGORY_EXERCISE_MAP = MANDARIN_TRAINING_CATEGORIES.reduce(
       return accumulator
     }
 
+    const approvedGapExercises = category === '音系强化'
+      ? [...RECORDING_CORE_GAP_EXERCISES, ...RECORDING_REINFORCEMENT_EXERCISES, ...RECORDING_OPEN_RESEARCH_EXERCISES, ...APPROVED_CORE_GAP_EXERCISES]
+      : []
     accumulator[category] = mergeExercises(
       category,
-      CURATED_TOPIC_EXERCISES[category] ?? [],
-      generated,
+      approvedGapExercises,
+      [...(CURATED_TOPIC_EXERCISES[category] ?? []), ...generated],
     ).filter((exercise) => {
       if (accumulator.__seenTexts.has(exercise.text)) {
         return false

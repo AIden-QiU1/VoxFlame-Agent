@@ -115,7 +115,6 @@ export interface LiveKitTransportRuntime {
   participantAttributes: Record<string, string>
   agentDispatch: {
     agentName: string
-    metadata: string
   } | null
 }
 
@@ -130,6 +129,7 @@ export interface StartRtcSessionInput {
   intent?: RtcSessionIntentInput
   userUid?: number
   authenticatedUserId?: string | null
+  asrAccountId?: string | null
   botUid?: number
   timeoutSeconds?: number
   properties?: RtcPropertyOverrides
@@ -306,6 +306,7 @@ export class RtcOrchestrationService {
       apiSecret: process.env.LIVEKIT_API_SECRET!.trim(),
       agentName: liveKitStatus.agentName,
       authenticatedUserId: input.authenticatedUserId,
+      asrAccountId: input.asrAccountId,
       preparationContext,
     })
 
@@ -332,7 +333,9 @@ export class RtcOrchestrationService {
         participantToken: liveKitSession.participantToken,
         participantMetadata: liveKitSession.participantMetadata,
         participantAttributes: liveKitSession.participantAttributes,
-        agentDispatch: liveKitSession.agentDispatch,
+        agentDispatch: liveKitSession.agentDispatch
+          ? { agentName: liveKitSession.agentDispatch.agentName }
+          : null,
       },
       intent,
       readiness,

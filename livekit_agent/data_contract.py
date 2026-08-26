@@ -148,6 +148,7 @@ def build_user_transcript_output(
     is_final: bool,
     source: str = "dashscope_realtime_asr",
     client_capture_id: str | None = None,
+    asr_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "type": "transcript",
@@ -165,6 +166,11 @@ def build_user_transcript_output(
         normalized_capture_id = client_capture_id.strip()
         payload["client_capture_id"] = normalized_capture_id
         payload["metadata"]["client_capture_id"] = normalized_capture_id
+
+    if asr_metadata:
+        for key in ("model_version", "personalized", "fallback"):
+            if key in asr_metadata:
+                payload["metadata"][key] = asr_metadata[key]
 
     return payload
 

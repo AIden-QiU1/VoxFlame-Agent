@@ -1,0 +1,57 @@
+research_id: RO-000
+status: template
+evidence_class: discovery_only
+claim: TEMPLATE - replace before use
+sources:
+  - source_id: TBD
+    url: TBD
+    evidence_level: primary|professional|radar
+    accessed_at: TBD
+    published_or_version: TBD
+    supports: TBD
+    limitations: TBD
+independent_review:
+  required: true
+  reviewer: TBD
+  relationship_to_author: TBD
+  completed_at: TBD
+  result: pending
+authority_gate:
+  status: pending
+  release_or_expansion: internal_only
+  claim_scope: TBD
+  authority_sources:
+    - source_id: TBD
+      url: TBD
+      tier: primary|professional
+      independence_basis: TBD
+      supports: TBD
+      limitations: TBD
+  independent_review:
+    reviewer: TBD
+    institution_or_scope: TBD
+    conflict_of_interest: TBD
+    result: pending
+    reviewed_at: TBD
+  counterevidence_recorded: false
+  population_device_scenario_bounds_recorded: false
+  failure_conditions: TBD
+  rollback_or_withdrawal: TBD
+  recheck_date: TBD
+reproducibility:
+  code_or_protocol: TBD
+  data_version_and_license: TBD
+  commit_or_release: TBD
+  run_command: TBD
+  seed_or_determinism: TBD
+  raw_artifacts: TBD
+uncertainty_and_counterevidence:
+  uncertainty: TBD
+  counterevidence: TBD
+  out_of_scope: TBD
+outcome_gates:
+  scholarly: pending
+  patent: pending
+  software_copyright: pending
+  product: pending
+review_report: research/outcome-reviews/RO-000.md

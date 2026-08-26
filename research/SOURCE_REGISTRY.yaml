@@ -1,0 +1,170 @@
+version: 2
+updated_at: 2026-08-14
+purpose: >-
+  精简来源白名单。默认只抓这些锚点；其他网站、论文、社媒账号按问题临时发现，
+  通过核验后再加入，不把来源数量当作研究质量。
+evidence_levels:
+  primary: 官方标准/文档、政府机构、原始论文或官方实现
+  professional: 专业学会、大学/医院、专业数据库
+  radar: 学者/专家/行业作者的公开主页或社媒，只用于发现和观点跟踪
+rules:
+  - 每个主题默认 3 个锚点：规范/专业事实、技术或论文、真实场景/产品对照
+  - 搜索结果、社媒、博客不能单独支撑医疗、安全、部署或用户承诺
+  - 重要观点必须回溯原论文、标准、官方文档、代码或机构页面
+  - 抓取前检查 robots.txt、许可和服务条款；保存 URL、时间、状态和 content_hash
+  - 内容发生变化进入待审队列，不自动改写研究结论或运行时配置
+topics:
+  voice-agent:
+    goal: 实时语音 Agent 的延迟、打断、音频传输和运行时可靠性
+    anchors:
+      - id: livekit-agents
+        url: https://docs.livekit.io/agents/
+        tier: primary
+        use: 当前 LiveKit Agents API、session、tools 和部署契约
+      - id: webrtc-standard
+        url: https://www.w3.org/TR/webrtc/
+        tier: primary
+        use: 浏览器媒体、权限和实时传输标准
+      - id: pubmed-speech-agent
+        url: https://pubmed.ncbi.nlm.nih.gov/?term=voice+agent+speech+recognition+turn-taking
+        tier: primary
+        use: 语音识别、轮次、可打断性和辅助沟通的最新论文发现
+    radar:
+      - id: alan-black
+        url: https://www.cs.cmu.edu/~awb/
+        use: TTS/语音合成研究线索；具体结论回溯论文
+  agent-systems:
+    goal: 通用 Agent 机制、评估、安全和产品化
+    anchors:
+      - id: nist-ai-rmf
+        url: https://www.nist.gov/itl/ai-risk-management-framework
+        tier: primary
+        use: 风险、治理、评估和部署控制
+      - id: w3c-coga
+        url: https://www.w3.org/WAI/standards-guidelines/coga/
+        tier: primary
+        use: 可理解交互、认知无障碍和错误恢复
+      - id: anthropic-effective-agents
+        url: https://www.anthropic.com/research/building-effective-agents
+        tier: professional
+        use: Agent workflow 模式与工程取舍；不单独支撑安全结论
+    radar:
+      - id: lilian-weng
+        url: https://lilianweng.github.io/
+        use: Agent/规划/模型机制综述；具体结论回溯原论文
+      - id: simon-willison
+        url: https://simonwillison.net/
+        use: LLM 应用工程和新工具实时雷达；具体结论回溯官方实现
+  speech-health:
+    goal: 构音障碍、语音可及性、康复和医疗边界
+    anchors:
+      - id: nidcd
+        url: https://www.nidcd.nih.gov/
+        tier: primary
+        use: 政府语音/听力/沟通健康信息
+      - id: asha
+        url: https://www.asha.org/
+        tier: professional
+        use: 言语语言病理专业实践和术语
+      - id: pubmed
+        url: https://pubmed.ncbi.nlm.nih.gov/
+        tier: primary
+        use: 同行评审论文和临床证据
+    discovery:
+      - id: speechhome
+        url: https://speechhome.com/
+        tier: radar
+        status: candidate_unverified
+        use: 构音/语音领域术语、实践材料和新线索
+        note: 先核验可访问性、作者/编辑资质、引用链、更新时间和许可；不能单独支撑医疗结论
+  product-psychology:
+    goal: 信任、羞耻/疲劳、坚持使用、沟通伙伴和无障碍体验
+    anchors:
+      - id: w3c-coga
+        url: https://www.w3.org/WAI/standards-guidelines/coga/
+        tier: primary
+        use: 可理解性、认知负担和错误恢复
+      - id: who-icf
+        url: https://www.who.int/standards/classifications/international-classification-of-functioning-disability-and-health
+        tier: primary
+        use: 参与、功能和生活场景，而非只看模型分数
+      - id: asha
+        url: https://www.asha.org/
+        tier: professional
+        use: supported conversation、沟通伙伴和语音可及性背景
+    discovery:
+      - id: nngroup
+        url: https://www.nngroup.com/articles/
+        tier: professional
+        use: 可用性和交互研究线索；具体结论优先回溯原研究
+  product-engineering:
+    goal: 架构、安全、可靠性、可观测性、移动端和部署
+    anchors:
+      - id: owasp-llm
+        url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+        tier: professional
+        use: LLM 应用威胁和安全控制
+      - id: nist-ai-rmf
+        url: https://www.nist.gov/itl/ai-risk-management-framework
+        tier: primary
+        use: AI 系统风险、测量和治理
+      - id: w3c-webauthn
+        url: https://www.w3.org/TR/webauthn-3/
+        tier: primary
+        use: Web 身份认证和凭据安全契约
+    radar:
+      - id: martin-fowler
+        url: https://martinfowler.com/
+        use: 架构、重构和持续交付实践；具体安全结论回溯标准
+outcome_review_sources:
+  software_copyright_cn:
+    - id: china-copyright-protection-center
+      url: https://www.ccopyright.com.cn/
+      tier: primary
+      access_mode: public_web_manual_check
+      use: 国内软件著作权登记主体、流程和材料核验入口
+      limitation: 不承诺自动预审或授权概率；正式登记以主管机构为准
+    - id: national-copyright-administration
+      url: https://www.ncac.gov.cn/
+      tier: primary
+      access_mode: public_web_manual_check
+      use: 国家版权规则、政策和公开通知
+      limitation: 具体材料要求以最新官方办事指南为准
+  patent_cn:
+    - id: cnipa
+      url: https://www.cnipa.gov.cn/
+      tier: primary
+      access_mode: public_web_manual_check
+      use: 国内专利审查指南、政策和官方入口
+      limitation: 检索/初审建议不等于授权决定或法律意见
+    - id: wipo-patentscope
+      url: https://patentscope.wipo.int/
+      tier: primary
+      access_mode: public_search_manual_or_account_limited
+      use: 国际专利公开文本和现有技术补充检索
+      limitation: 不替代 CNIPA 检索和专利代理师意见
+  paper_cn:
+    - id: cnki
+      url: https://www.cnki.net/
+      tier: professional
+      access_mode: subscription_or_manual
+      use: 中文论文题录、期刊和相关工作核验
+      limitation: 收录不等于论文质量；需交叉核验
+    - id: wanfang
+      url: https://www.wanfangdata.com.cn/
+      tier: professional
+      access_mode: subscription_or_manual
+      use: 中文论文、学位论文和期刊元数据交叉核验
+      limitation: 数据覆盖和访问权限可能变化
+    - id: nstl
+      url: https://www.nstl.gov.cn/
+      tier: professional
+      access_mode: public_web_manual_check
+      use: 国家科技图书文献中心的科技文献发现与核验
+      limitation: 不替代全文和同行评审
+    - id: cope
+      url: https://publicationethics.org/
+      tier: professional
+      access_mode: public_web_manual_check
+      use: 期刊出版伦理、撤稿和掠夺性出版风险判断
+      limitation: 不是中国期刊的官方批准名单

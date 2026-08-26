@@ -8,14 +8,14 @@ const QUICK_START = [
     step: '01',
     title: '先选病种',
     body: '进评估主题区前，先把疾病种类选好。只需要做一次。',
-    href: '/contribute/topic/assessment-screening',
+    href: '/assessment',
     action: '去评估区',
   },
   {
     step: '02',
     title: '先做评估',
     body: '按顺序录完筛查词，再看字准率和初步等级。',
-    href: '/contribute/topic/assessment-screening',
+    href: '/assessment',
     action: '开始筛查',
   },
   {
@@ -38,7 +38,7 @@ const PAGE_GUIDE = [
   {
     title: '评估主题区',
     body: '用来选病种、看初步严重程度。',
-    href: '/contribute/topic/assessment-screening',
+    href: '/assessment',
   },
   {
     title: '训练页',

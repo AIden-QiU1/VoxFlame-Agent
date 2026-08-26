@@ -1,0 +1,264 @@
+batch	id	coverage_targets	type	text	source	reading_evidence	linguistic	naturalness	user_burden	safety	license	product	review_notes	reviewed_by	reviewed_at
+1	sentence-authored-ang1-001	ang1	short_sentence	这块抹布有点肮脏	VoxFlame authored candidate	肮脏 [ang1 zang1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-ang1-002	ang1	short_sentence	请换掉这条肮脏毛巾	VoxFlame authored candidate	肮脏 [ang1 zang1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-ang1-肮脏	ang1	word	肮脏	CC-CEDICT	肮脏 [ang1 zang1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-ang4-001	ang4	short_sentence	春天的公园绿意盎然	VoxFlame authored candidate	盎然 [ang4 ran2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-ang4-002	ang4	short_sentence	院子里一片生机盎然	VoxFlame authored candidate	盎然 [ang4 ran2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-ang4-盎司	ang4	word	盎司	CC-CEDICT	盎司 [ang4 si1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-13972589	ao1	short_sentence	月球的表面凹凸不平。	Tatoeba	凹凸 [ao1 tu1] (CC-CEDICT whole-word reading) | 凹凸不平 [ao1 tu1 bu4 ping2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-ao1-001	ao1	short_sentence	这块地面凹凸不平	VoxFlame authored candidate	凹凸不平 [ao1 tu1 bu4 ping2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-ao1-凹凸	ao1	word	凹凸	CC-CEDICT	凹凸 [ao1 tu1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-353692	bei0 jia2	short_sentence	她的胳臂下面夹着一本书。	Tatoeba	胳臂 [ge1 bei5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-bei0-001	bei0	short_sentence	我的胳臂有点酸	VoxFlame authored candidate	胳臂 [ge1 bei5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-bei0-胳臂	bei0	word	胳臂	CC-CEDICT	胳臂 [ge1 bei5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-bo3-001	bo3	short_sentence	这段路有些颠簸	VoxFlame authored candidate	颠簸 [dian1 bo3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-bo3-002	bo3	short_sentence	山路上有些颠簸	VoxFlame authored candidate	颠簸 [dian1 bo3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-bo3-颠簸	bo3	word	颠簸	CC-CEDICT	颠簸 [dian1 bo3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-9049749	bo4	short_sentence	这个漱口水的薄荷味太重了。	Tatoeba	薄荷 [bo4 he5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-bo4-001	bo4	short_sentence	我想要一杯薄荷茶	VoxFlame authored candidate	薄荷 [bo4 he5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-bo4-薄荷	bo4	word	薄荷	CC-CEDICT	薄荷 [bo4 he5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-can3-001	can3	short_sentence	这场比赛最终惨败	VoxFlame authored candidate	惨败 [can3 bai4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-can3-002	can3	short_sentence	今天的生意有些惨淡	VoxFlame authored candidate	惨淡 [can3 dan4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-can3-惨淡	can3	word	惨淡	CC-CEDICT	惨淡 [can3 dan4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-676993	chai2	short_sentence	您有火柴吗?	Tatoeba	火柴 [huo3 chai2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-chai2-001	chai2	short_sentence	抽屉里还有一盒火柴	VoxFlame authored candidate	火柴 [huo3 chai2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-chai2-火柴	chai2	word	火柴	CC-CEDICT	火柴 [huo3 chai2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-che3-001	che3	short_sentence	这件事牵扯多个环节	VoxFlame authored candidate	牵扯 [qian1 che3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-che3-002	che3	short_sentence	这个问题牵扯很多部门	VoxFlame authored candidate	牵扯 [qian1 che3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-che3-牵扯	che3	word	牵扯	CC-CEDICT	牵扯 [qian1 che3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-cheng3-001	cheng3	short_sentence	这个企图最终没有得逞	VoxFlame authored candidate	得逞 [de2 cheng3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	sentence-authored-cheng3-002	cheng3	short_sentence	他们的计划未能得逞	VoxFlame authored candidate	得逞 [de2 cheng3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+1	word-cheng3-得逞	cheng3	word	得逞	CC-CEDICT	得逞 [de2 cheng3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-chong4-001	chong4	short_sentence	年轻人很有冲劲	VoxFlame authored candidate	冲劲 [chong4 jin4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-chong4-002	chong4	short_sentence	这个团队很有冲劲	VoxFlame authored candidate	冲劲 [chong4 jin4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-chong4-冲劲	chong4	word	冲劲	CC-CEDICT	冲劲 [chong4 jin4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-chuo1-001	chuo1	short_sentence	请别戳破气球	VoxFlame authored candidate	戳破 [chuo1 po4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-chuo1-002	chuo1	short_sentence	铅笔戳破了纸张	VoxFlame authored candidate	戳破 [chuo1 po4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-chuo1-戳破	chuo1	word	戳破	CC-CEDICT	戳破 [chuo1 po4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-2440699	ci1	short_sentence	他的演技绝对有瑕疵。	Tatoeba	瑕疵 [xia2 ci1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-ci1-001	ci1	short_sentence	这件产品还有瑕疵	VoxFlame authored candidate	瑕疵 [xia2 ci1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-ci1-瑕疵	ci1	word	瑕疵	CC-CEDICT	瑕疵 [xia2 ci1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-cuan4-001	cuan4	short_sentence	请勿篡改原始记录	VoxFlame authored candidate	篡改 [cuan4 gai3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-cuan4-002	cuan4	short_sentence	这份文件禁止篡改	VoxFlame authored candidate	篡改 [cuan4 gai3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-cuan4-篡改	cuan4	word	篡改	CC-CEDICT	篡改 [cuan4 gai3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-cuo1-001	cuo1	short_sentence	大家一起切磋技艺	VoxFlame authored candidate	切磋 [qie1 cuo1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-cuo1-002	cuo1	short_sentence	同学们课后切磋球技	VoxFlame authored candidate	切磋 [qie1 cuo1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-cuo1-切磋	cuo1	word	切磋	CC-CEDICT	切磋 [qie1 cuo1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-dai3-001	dai3	short_sentence	好歹先吃点东西	VoxFlame authored candidate	好歹 [hao3 dai3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-dai3-002	dai3	short_sentence	我们好歹赶上了车	VoxFlame authored candidate	好歹 [hao3 dai3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-dai3-好歹	dai3	word	好歹	CC-CEDICT	好歹 [hao3 dai3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-duo4-001	duo4	short_sentence	船长正在掌舵	VoxFlame authored candidate	掌舵 [zhang3 duo4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-duo4-002	duo4	short_sentence	今天由他负责掌舵	VoxFlame authored candidate	掌舵 [zhang3 duo4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-duo4-掌舵	duo4	word	掌舵	CC-CEDICT	掌舵 [zhang3 duo4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-e1-001	e1	short_sentence	这盒阿胶已经开封	VoxFlame authored candidate	阿胶 [e1 jiao1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-e1-002	e1	short_sentence	阿胶需要密封保存	VoxFlame authored candidate	阿胶 [e1 jiao1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-e1-阿胶	e1	word	阿胶	CC-CEDICT	阿胶 [e1 jiao1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-fei3-001	fei3	short_sentence	这台设备价格不菲	VoxFlame authored candidate	不菲 [bu4 fei3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-fei3-002	fei3	short_sentence	那枚戒指镶着翡翠	VoxFlame authored candidate	翡翠 [fei3 cui4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-fei3-不菲	fei3	word	不菲	CC-CEDICT	不菲 [bu4 fei3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-ga1-001	ga1	short_sentence	今晚我们吃咖喱饭	VoxFlame authored candidate	咖喱 [ga1 li2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	sentence-authored-ga1-002	ga1	short_sentence	咖喱汤还在加热	VoxFlame authored candidate	咖喱 [ga1 li2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+2	word-ga1-咖喱	ga1	word	咖喱	CC-CEDICT	咖喱 [ga1 li2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-ga2-001	ga2	short_sentence	我买了一盒牛轧糖	VoxFlame authored candidate	牛轧糖 [niu2 ga2 tang2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-ga2-002	ga2	short_sentence	这块牛轧糖有点硬	VoxFlame authored candidate	牛轧糖 [niu2 ga2 tang2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	word-ga2-牛轧糖	ga2	word	牛轧糖	CC-CEDICT	牛轧糖 [niu2 ga2 tang2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-gong3-001	gong3	short_sentence	院子里有一座拱门	VoxFlame authored candidate	拱门 [gong3 men2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-gong3-002	gong3	short_sentence	我们从石拱门下经过	VoxFlame authored candidate	拱门 [gong3 men2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	word-gong3-巩固	gong3	word	巩固	CC-CEDICT	巩固 [gong3 gu4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-380719	gua3	short_sentence	他观察入微,但沉默寡言。	Tatoeba	寡言 [gua3 yan2] (CC-CEDICT whole-word reading) | 沉默寡言 [chen2 mo4 gua3 yan2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+3	sentence-6111937	gua3	short_sentence	林肯本人是沉默寡言的。	Tatoeba	寡言 [gua3 yan2] (CC-CEDICT whole-word reading) | 沉默寡言 [chen2 mo4 gua3 yan2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+3	word-gua3-寡言	gua3	word	寡言	CC-CEDICT	寡言 [gua3 yan2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-1584111	gun4	short_sentence	两个棍棒相互摩擦能起火。	Tatoeba	棍棒 [gun4 bang4] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+3	sentence-2250635	gun4	short_sentence	曲棍球在中国不是很流行。	Tatoeba	曲棍 [qu1 gun4] (CC-CEDICT whole-word reading) | 曲棍球 [qu1 gun4 qiu2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+3	word-gun4-棍子	gun4	word	棍子	CC-CEDICT	棍子 [gun4 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-ha2-001	ha2	short_sentence	池塘边蹲着一只蛤蟆	VoxFlame authored candidate	蛤蟆 [ha2 ma5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-ha2-002	ha2	short_sentence	雨后蛤蟆叫得很响	VoxFlame authored candidate	蛤蟆 [ha2 ma5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	word-ha2-癞蛤蟆	ha2	word	癞蛤蟆	CC-CEDICT	癞蛤蟆 [lai4 ha2 ma5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-3338901	han1	short_sentence	他的鼾声吵得我不能入睡。	Tatoeba	鼾声 [han1 sheng1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-han1-001	han1	short_sentence	他的鼾声有点响	VoxFlame authored candidate	鼾声 [han1 sheng1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	word-han1-打鼾	han1	word	打鼾	CC-CEDICT	打鼾 [da3 han1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-1505020	hao1	short_sentence	我得好好儿地学习	Tatoeba	好好儿 [hao3 hao1 r5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-hao1-001	hao1	short_sentence	你在家好好儿休息	VoxFlame authored candidate	好好儿 [hao3 hao1 r5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	word-hao1-好好儿	hao1	word	好好儿	CC-CEDICT	好好儿 [hao3 hao1 r5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-hong3-001	hong3	short_sentence	家人正在耐心哄劝他	VoxFlame authored candidate	哄劝 [hong3 quan4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-hong3-002	hong3	short_sentence	老师轻声哄劝孩子	VoxFlame authored candidate	哄劝 [hong3 quan4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	word-hong3-哄劝	hong3	word	哄劝	CC-CEDICT	哄劝 [hong3 quan4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-hong4-001	hong4	short_sentence	他们别再起哄了	VoxFlame authored candidate	起哄 [qi3 hong4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-hong4-002	hong4	short_sentence	观众席上有人起哄	VoxFlame authored candidate	起哄 [qi3 hong4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	word-hong4-起哄	hong4	word	起哄	CC-CEDICT	起哄 [qi3 hong4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-hou3-001	hou3	short_sentence	远处传来一阵吼声	VoxFlame authored candidate	吼声 [hou3 sheng1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	sentence-authored-hou3-002	hou3	short_sentence	走廊里突然传来吼声	VoxFlame authored candidate	吼声 [hou3 sheng1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+3	word-hou3-吼声	hou3	word	吼声	CC-CEDICT	吼声 [hou3 sheng1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-343998	jia2	short_sentence	她的脸颊冷得像冰一样。	Tatoeba	脸颊 [lian3 jia2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+4	word-jia2-脸颊	jia2	word	脸颊	CC-CEDICT	脸颊 [lian3 jia2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-10280146	kua3	short_sentence	我们到家的时候都累垮了。	Tatoeba	累垮 [lei4 kua3] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-kua3-001	kua3	short_sentence	大雨冲垮了旧木桥	VoxFlame authored candidate	冲垮 [chong1 kua3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	word-kua3-冲垮	kua3	word	冲垮	CC-CEDICT	冲垮 [chong1 kua3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-kui3-001	kui3	short_sentence	孩子在看傀儡戏	VoxFlame authored candidate	傀儡 [kui3 lei3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-kui3-002	kui3	short_sentence	台上摆着一个傀儡	VoxFlame authored candidate	傀儡 [kui3 lei3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	word-kui3-傀儡	kui3	word	傀儡	CC-CEDICT	傀儡 [kui3 lei3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-kun3-001	kun3	short_sentence	请把纸箱捆绑牢固	VoxFlame authored candidate	捆绑 [kun3 bang3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-kun3-002	kun3	short_sentence	这些电线需要捆绑整理	VoxFlame authored candidate	捆绑 [kun3 bang3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	word-kun3-捆绑	kun3	word	捆绑	CC-CEDICT	捆绑 [kun3 bang3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-la3-001	la3	short_sentence	请把喇叭声音调低	VoxFlame authored candidate	喇叭 [la3 ba5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-la3-002	la3	short_sentence	门口传来喇叭声	VoxFlame authored candidate	喇叭 [la3 ba5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	word-la3-喇叭	la3	word	喇叭	CC-CEDICT	喇叭 [la3 ba5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-346835	lao4	short_sentence	比起奶酪,我更喜欢黄油。	Tatoeba	奶酪 [nai3 lao4] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+4	sentence-414151	lao4	short_sentence	想吃一点巧克力奶酪吗?	Tatoeba	奶酪 [nai3 lao4] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+4	word-lao4-奶酪	lao4	word	奶酪	CC-CEDICT	奶酪 [nai3 lao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-lei1-001	lei1	short_sentence	请把绳子勒紧一点	VoxFlame authored candidate	勒紧 [lei1 jin3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-lei1-002	lei1	short_sentence	把袋口勒紧一点	VoxFlame authored candidate	勒紧 [lei1 jin3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	word-lei1-勒紧	lei1	word	勒紧	CC-CEDICT	勒紧 [lei1 jin3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-lin1-001	lin1	short_sentence	请把袋子拎起来	VoxFlame authored candidate	拎起 [lin1 qi3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-lin1-002	lin1	short_sentence	把书包轻轻拎起	VoxFlame authored candidate	拎起 [lin1 qi3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	word-lin1-拎起	lin1	word	拎起	CC-CEDICT	拎起 [lin1 qi3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-1102436	lu0	short_sentence	老婆打呼噜,我该怎么办?	Tatoeba	打呼噜 [da3 hu1 lu5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+4	sentence-6940192	lu0	short_sentence	西葫芦是绿色的。	Tatoeba	葫芦 [hu2 lu5] (CC-CEDICT whole-word reading) | 西葫芦 [xi1 hu2 lu5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+4	word-lu0-葫芦	lu0	word	葫芦	CC-CEDICT	葫芦 [hu2 lu5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-luan3-001	luan3	short_sentence	院子里铺着鹅卵石	VoxFlame authored candidate	鹅卵石 [e2 luan3 shi2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-luan3-002	luan3	short_sentence	我捡起一块鹅卵石	VoxFlame authored candidate	鹅卵石 [e2 luan3 shi2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	word-luan3-鹅卵石	luan3	word	鹅卵石	CC-CEDICT	鹅卵石 [e2 luan3 shi2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+4	sentence-authored-luo1-001	luo1	short_sentence	请别反复啰嗦	VoxFlame authored candidate	啰嗦 [luo1 suo5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-luo1-002	luo1	short_sentence	这段说明太啰嗦	VoxFlame authored candidate	啰嗦 [luo1 suo5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	word-luo1-啰唆	luo1	word	啰唆	CC-CEDICT	啰唆 [luo1 suo5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-2757108	luo3	short_sentence	那颗星星可以用裸眼看到。	Tatoeba	裸眼 [luo3 yan3] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-luo3-001	luo3	short_sentence	这幅画用裸眼就能看清	VoxFlame authored candidate	裸眼 [luo3 yan3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	word-luo3-裸眼	luo3	word	裸眼	CC-CEDICT	裸眼 [luo3 yan3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-mang3-001	mang3	short_sentence	请别做出鲁莽决定	VoxFlame authored candidate	鲁莽 [lu3 mang3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-mang3-002	mang3	short_sentence	动物园里有一条蟒蛇	VoxFlame authored candidate	蟒蛇 [mang3 she2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	word-mang3-蟒蛇	mang3	word	蟒蛇	CC-CEDICT	蟒蛇 [mang3 she2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-men4-001	men4	short_sentence	房间里的空气有些沉闷	VoxFlame authored candidate	沉闷 [chen2 men4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-men4-002	men4	short_sentence	今天的天气有点沉闷	VoxFlame authored candidate	沉闷 [chen2 men4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	word-men4-沉闷	men4	word	沉闷	CC-CEDICT	沉闷 [chen2 men4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-347415	nei3	short_sentence	别气馁,继续写作吧。	Tatoeba	气馁 [qi4 nei3] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-nei3-001	nei3	short_sentence	遇到困难不要气馁	VoxFlame authored candidate	气馁 [qi4 nei3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	word-nei3-气馁	nei3	word	气馁	CC-CEDICT	气馁 [qi4 nei3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-niang4-001	niang4	short_sentence	这个计划仍在酝酿	VoxFlame authored candidate	酝酿 [yun4 niang4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-niang4-002	niang4	short_sentence	团队正在酝酿新方案	VoxFlame authored candidate	酝酿 [yun4 niang4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	word-niang4-酝酿	niang4	word	酝酿	CC-CEDICT	酝酿 [yun4 niang4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-nie1-001	nie1	short_sentence	两块黏土可以捏合	VoxFlame authored candidate	捏合 [nie1 he2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-nie1-002	nie1	short_sentence	请把两块黏土捏合	VoxFlame authored candidate	捏合 [nie1 he2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	word-nie1-捏合	nie1	word	捏合	CC-CEDICT	捏合 [nie1 he2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-nie4-001	nie4	short_sentence	桌上放着一把镊子	VoxFlame authored candidate	镊子 [nie4 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-nie4-002	nie4	short_sentence	请用镊子夹住棉球	VoxFlame authored candidate	镊子 [nie4 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	word-nie4-镊子	nie4	word	镊子	CC-CEDICT	镊子 [nie4 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-345277	peng1	short_sentence	这些苹果宜于烹饪。	Tatoeba	烹饪 [peng1 ren4] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+5	sentence-433470	peng1	short_sentence	她打算去烹饪学校上几堂课。	Tatoeba	烹饪 [peng1 ren4] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+5	word-peng1-烹饪	peng1	word	烹饪	CC-CEDICT	烹饪 [peng1 ren4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-piao3-001	piao3	short_sentence	这块白布需要漂白	VoxFlame authored candidate	漂白 [piao3 bai2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-piao3-002	piao3	short_sentence	漂白剂放在柜子里	VoxFlame authored candidate	漂白剂 [piao3 bai2 ji4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	word-piao3-漂白	piao3	word	漂白	CC-CEDICT	漂白 [piao3 bai2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+5	sentence-authored-pie1-001	pie1	short_sentence	我刚才瞥见了他	VoxFlame authored candidate	瞥见 [pie1 jian4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-pie1-002	pie1	short_sentence	我在人群中瞥见朋友	VoxFlame authored candidate	瞥见 [pie1 jian4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	word-pie1-瞥见	pie1	word	瞥见	CC-CEDICT	瞥见 [pie1 jian4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-4117357	pie3	short_sentence	我是右撇子。	Tatoeba	右撇子 [you4 pie3 zi5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+6	sentence-832799	pie3	short_sentence	我是左撇子。	Tatoeba	左撇子 [zuo3 pie3 zi5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+6	word-pie3-左撇子	pie3	word	左撇子	CC-CEDICT	左撇子 [zuo3 pie3 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-po0-001	po0	short_sentence	婆婆正在阳台浇花	VoxFlame authored candidate	婆婆 [po2 po5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-po0-002	po0	short_sentence	她陪婆婆去散步	VoxFlame authored candidate	婆婆 [po2 po5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	word-po0-婆婆	po0	word	婆婆	CC-CEDICT	婆婆 [po2 po5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-qiao4-001	qiao4	short_sentence	这段山坡十分陡峭	VoxFlame authored candidate	陡峭 [dou3 qiao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-qiao4-002	qiao4	short_sentence	前方山路有些陡峭	VoxFlame authored candidate	陡峭 [dou3 qiao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	word-qiao4-陡峭	qiao4	word	陡峭	CC-CEDICT	陡峭 [dou3 qiao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-333374	qie2	short_sentence	番茄容易遭受很多病害。	Tatoeba	番茄 [fan1 qie2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+6	sentence-358981	qie2	short_sentence	严格地讲,番茄是水果。	Tatoeba	番茄 [fan1 qie2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+6	word-qie2-番茄	qie2	word	番茄	CC-CEDICT	番茄 [fan1 qie2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-qin3-001	qin3	short_sentence	寝室晚上准时熄灯	VoxFlame authored candidate	寝室 [qin3 shi4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-qin3-002	qin3	short_sentence	请保持寝室安静	VoxFlame authored candidate	寝室 [qin3 shi4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	word-qin3-寝室	qin3	word	寝室	CC-CEDICT	寝室 [qin3 shi4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-qiu3-001	qiu3	short_sentence	这件事让我出糗了	VoxFlame authored candidate	出糗 [chu1 qiu3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-qiu3-002	qiu3	short_sentence	偶尔出糗也没关系	VoxFlame authored candidate	出糗 [chu1 qiu3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	word-qiu3-出糗	qiu3	word	出糗	CC-CEDICT	出糗 [chu1 qiu3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-rao2-001	rao2	short_sentence	这里的土地十分富饶	VoxFlame authored candidate	富饶 [fu4 rao2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-rao2-002	rao2	short_sentence	这片平原物产富饶	VoxFlame authored candidate	富饶 [fu4 rao2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	word-rao2-富饶	rao2	word	富饶	CC-CEDICT	富饶 [fu4 rao2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-reng1-001	reng1	short_sentence	请把空瓶扔掉	VoxFlame authored candidate	扔掉 [reng1 diao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-reng1-002	reng1	short_sentence	坏掉的纸盒可以扔掉	VoxFlame authored candidate	扔掉 [reng1 diao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	word-reng1-扔掉	reng1	word	扔掉	CC-CEDICT	扔掉 [reng1 diao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-rong3-001	rong3	short_sentence	这份说明过于冗长	VoxFlame authored candidate	冗长 [rong3 chang2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-rong3-002	rong3	short_sentence	请删去冗长的段落	VoxFlame authored candidate	冗长 [rong3 chang2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	word-rong3-冗长	rong3	word	冗长	CC-CEDICT	冗长 [rong3 chang2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+6	sentence-authored-rui3-001	rui3	short_sentence	请用石蕊试纸检测	VoxFlame authored candidate	石蕊试纸 [shi2 rui3 shi4 zhi3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-authored-rui3-002	rui3	short_sentence	石蕊试纸变成红色	VoxFlame authored candidate	石蕊试纸 [shi2 rui3 shi4 zhi3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	word-rui3-石蕊	rui3	word	石蕊	CC-CEDICT	石蕊 [shi2 rui3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-332742	san3	short_sentence	我错拿了你的雨伞。	Tatoeba	雨伞 [yu3 san3] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	sentence-authored-san3-001	san3	short_sentence	出门记得带上雨伞	VoxFlame authored candidate	雨伞 [yu3 san3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	word-san3-雨伞	san3	word	雨伞	CC-CEDICT	雨伞 [yu3 san3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-335486	sang3	short_sentence	我只是想要听听你的嗓音。	Tatoeba	嗓音 [sang3 yin1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	sentence-336183	sang3	short_sentence	她提高了她的嗓音。	Tatoeba	嗓音 [sang3 yin1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	word-sang3-嗓音	sang3	word	嗓音	CC-CEDICT	嗓音 [sang3 yin1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-346693	sang4	short_sentence	他很沮丧。	Tatoeba	沮丧 [ju3 sang4] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	sentence-464754	sang4	short_sentence	目前,他情绪沮丧。	Tatoeba	沮丧 [ju3 sang4] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	word-sang4-沮丧	sang4	word	沮丧	CC-CEDICT	沮丧 [ju3 sang4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-authored-sao4-001	sao4	short_sentence	请把扫帚放回原处	VoxFlame authored candidate	扫帚 [sao4 zhou5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-authored-sao4-002	sao4	short_sentence	这把扫帚很耐用	VoxFlame authored candidate	扫帚 [sao4 zhou5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	word-sao4-扫帚	sao4	word	扫帚	CC-CEDICT	扫帚 [sao4 zhou5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-10303602	shai1	short_sentence	这是一个筛子。	Tatoeba	筛子 [shai1 zi5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	sentence-authored-shai1-001	shai1	short_sentence	请用筛子过滤细沙	VoxFlame authored candidate	筛子 [shai1 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	word-shai1-筛子	shai1	word	筛子	CC-CEDICT	筛子 [shai1 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-430661	shao2	short_sentence	把勺子给我。	Tatoeba	勺子 [shao2 zi5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	sentence-466234	shao2	short_sentence	少了一把勺子。	Tatoeba	勺子 [shao2 zi5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	word-shao2-勺子	shao2	word	勺子	CC-CEDICT	勺子 [shao2 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-authored-shuai3-001	shuai3	short_sentence	请把伞上的水甩掉	VoxFlame authored candidate	甩掉 [shuai3 diao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-authored-shuai3-002	shuai3	short_sentence	先把鞋上的泥甩掉	VoxFlame authored candidate	甩掉 [shuai3 diao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	word-shuai3-甩掉	shuai3	word	甩掉	CC-CEDICT	甩掉 [shuai3 diao4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-13549567	shuan1	short_sentence	螺栓我找到了,螺帽在哪里?	Tatoeba	螺栓 [luo2 shuan1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	sentence-350674	shuan1	short_sentence	他把门闩上。	Tatoeba	门闩 [men2 shuan1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	word-shuan1-螺栓	shuan1	word	螺栓	CC-CEDICT	螺栓 [luo2 shuan1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-4262102	song3	short_sentence	他耸了耸肩。	Tatoeba	耸肩 [song3 jian1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	sentence-4262103	song3	short_sentence	她耸了耸肩。	Tatoeba	耸肩 [song3 jian1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+7	word-song3-耸肩	song3	word	耸肩	CC-CEDICT	耸肩 [song3 jian1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+7	sentence-796917	sui3	short_sentence	个人自由是民主的精髓。	Tatoeba	精髓 [jing1 sui3] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-sui3-001	sui3	short_sentence	这篇文章抓住了精髓	VoxFlame authored candidate	精髓 [jing1 sui3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	word-sui3-精髓	sui3	word	精髓	CC-CEDICT	精髓 [jing1 sui3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-tang1-001	tang1	short_sentence	请给我一把汤匙	VoxFlame authored candidate	汤匙 [tang1 chi2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-tang1-002	tang1	short_sentence	汤匙放在餐桌上	VoxFlame authored candidate	汤匙 [tang1 chi2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	word-tang1-汤匙	tang1	word	汤匙	CC-CEDICT	汤匙 [tang1 chi2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-tang4-001	tang4	short_sentence	她打算周末去烫发	VoxFlame authored candidate	烫发 [tang4 fa4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-tang4-002	tang4	short_sentence	这家店可以预约烫发	VoxFlame authored candidate	烫发 [tang4 fa4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	word-tang4-烫发	tang4	word	烫发	CC-CEDICT	烫发 [tang4 fa4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-805226	tian3	short_sentence	她给了我一个腼腆的笑容。	Tatoeba	腼腆 [mian3 tian3] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-tian3-001	tian3	short_sentence	他笑起来有些腼腆	VoxFlame authored candidate	腼腆 [mian3 tian3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	word-tian3-腼腆	tian3	word	腼腆	CC-CEDICT	腼腆 [mian3 tian3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-334882	tuan1	short_sentence	这条河水流湍急。	Tatoeba	湍急 [tuan1 ji2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-tuan1-001	tuan1	short_sentence	这里的水流很湍急	VoxFlame authored candidate	湍急 [tuan1 ji2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	word-tuan1-湍急	tuan1	word	湍急	CC-CEDICT	湍急 [tuan1 ji2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-469426	tun2	short_sentence	海豚是十分聪明的动物。	Tatoeba	海豚 [hai3 tun2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+8	sentence-834381	tun2	short_sentence	海豚是哺乳动物。	Tatoeba	海豚 [hai3 tun2] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+8	word-tun2-海豚	tun2	word	海豚	CC-CEDICT	海豚 [hai3 tun2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-476650	wa4	short_sentence	你的袜子上有个大洞。	Tatoeba	袜子 [wa4 zi5] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-wa4-001	wa4	short_sentence	这双袜子已经洗净	VoxFlame authored candidate	袜子 [wa4 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	word-wa4-袜子	wa4	word	袜子	CC-CEDICT	袜子 [wa4 zi5] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-wai1-001	wai1	short_sentence	墙上的画有些歪斜	VoxFlame authored candidate	歪斜 [wai1 xie2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-wai1-002	wai1	short_sentence	这根木杆已经歪斜	VoxFlame authored candidate	歪斜 [wai1 xie2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	word-wai1-歪斜	wai1	word	歪斜	CC-CEDICT	歪斜 [wai1 xie2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-332603	xia1	short_sentence	看见新鲜龙虾,我有了食欲。	Tatoeba	龙虾 [long2 xia1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-xia1-001	xia1	short_sentence	这盘龙虾已经上桌	VoxFlame authored candidate	龙虾 [long2 xia1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	word-xia1-龙虾	xia1	word	龙虾	CC-CEDICT	龙虾 [long2 xia1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-xiao2-001	xiao2	short_sentence	请不要混淆这两个词	VoxFlame authored candidate	混淆 [hun4 xiao2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-xiao2-002	xiao2	short_sentence	请分清容易混淆的词	VoxFlame authored candidate	混淆 [hun4 xiao2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	word-xiao2-混淆	xiao2	word	混淆	CC-CEDICT	混淆 [hun4 xiao2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+8	sentence-authored-xiu3-001	xiu3	short_sentence	这座木桥已经腐朽	VoxFlame authored candidate	腐朽 [fu3 xiu3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-xiu3-002	xiu3	short_sentence	潮湿木板容易腐朽	VoxFlame authored candidate	腐朽 [fu3 xiu3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	word-xiu3-腐朽	xiu3	word	腐朽	CC-CEDICT	腐朽 [fu3 xiu3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-431002	xun1	short_sentence	他的牙齿被烟熏黄了。	Tatoeba	烟熏 [yan1 xun1] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-xun1-001	xun1	short_sentence	这块腊肉经过烟熏	VoxFlame authored candidate	烟熏 [yan1 xun1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	word-xun1-烟熏	xun1	word	烟熏	CC-CEDICT	烟熏 [yan1 xun1] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-yu1-001	yu1	short_sentence	鞋底沾满了淤泥	VoxFlame authored candidate	淤泥 [yu1 ni2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-yu1-002	yu1	short_sentence	雨后路面都是淤泥	VoxFlame authored candidate	淤泥 [yu1 ni2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	word-yu1-淤泥	yu1	word	淤泥	CC-CEDICT	淤泥 [yu1 ni2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-yuan1-001	yuan1	short_sentence	老师的知识十分渊博	VoxFlame authored candidate	渊博 [yuan1 bo2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-yuan1-002	yuan1	short_sentence	他学识渊博又谦和	VoxFlame authored candidate	渊博 [yuan1 bo2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	word-yuan1-渊博	yuan1	word	渊博	CC-CEDICT	渊博 [yuan1 bo2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-zang4-001	zang4	short_sentence	心脏正在规律跳动	VoxFlame authored candidate	心脏 [xin1 zang4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-zang4-002	zang4	short_sentence	适量运动保护心脏	VoxFlame authored candidate	心脏 [xin1 zang4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	word-zang4-心脏	zang4	word	心脏	CC-CEDICT	心脏 [xin1 zang4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-zha2-001	zha2	short_sentence	我点了一份炸鱼	VoxFlame authored candidate	炸鱼 [zha2 yu2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-zha2-002	zha2	short_sentence	炸鱼已经端上桌	VoxFlame authored candidate	炸鱼 [zha2 yu2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	word-zha2-炸鱼	zha2	word	炸鱼	CC-CEDICT	炸鱼 [zha2 yu2] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-875262	zhou3	short_sentence	不要把你的手肘放在桌子上。	Tatoeba	手肘 [shou3 zhou3] (CC-CEDICT whole-word reading)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-zhou3-001	zhou3	short_sentence	我的手肘有点酸	VoxFlame authored candidate	手肘 [shou3 zhou3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	word-zhou3-手肘	zhou3	word	手肘	CC-CEDICT	手肘 [shou3 zhou3] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-zuan1-001	zuan1	short_sentence	小猫钻进了纸箱	VoxFlame authored candidate	钻进 [zuan1 jin4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	sentence-authored-zuan1-002	zuan1	short_sentence	阳光钻进了窗缝	VoxFlame authored candidate	钻进 [zuan1 jin4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			
+9	word-zuan1-钻进	zuan1	word	钻进	CC-CEDICT	钻进 [zuan1 jin4] (CC-CEDICT)	pending	pending	pending	pending	pending	pending			

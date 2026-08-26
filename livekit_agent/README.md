@@ -341,7 +341,7 @@ cd frontend && NEXT_PUBLIC_API_URL=http://127.0.0.1:3201 NEXT_PUBLIC_RTC_EXECUTI
 当前应以这些文档为准：
 
 - [VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
-- [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
+- [VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md](/home/ubuntu/VoxFlame-Agent/research/voice-agent/VOXFLAME_LIVEKIT_MEMORY_BEST_PRACTICES_2026-04-05.md)
 - [.tasks/current.md](/home/ubuntu/VoxFlame-Agent/.tasks/current.md)
 
 ## 下一步重点

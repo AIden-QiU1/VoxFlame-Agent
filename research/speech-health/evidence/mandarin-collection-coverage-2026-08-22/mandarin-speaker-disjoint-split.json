@@ -1,0 +1,109 @@
+{
+  "kind": "voxflame_mandarin_speaker_disjoint_split_evidence",
+  "generated_at": "2026-08-24T05:51:09.054Z",
+  "seed": "voxflame-mandarin-speaker-disjoint-v1",
+  "policy": {
+    "speaker_disjoint": true,
+    "deterministic": true,
+    "selection_uses_model_output_or_cer": false,
+    "user_ids_and_audio_paths_are_not_emitted": true,
+    "quality_anomalies_are_retained_as_strata": true,
+    "collection_eligibility_is_valid_audio_target_consent_upload": true,
+    "model_evaluation_results_not_included": true
+  },
+  "input": {
+    "input_rows": 1421,
+    "deduplicated_rows": 1185,
+    "eligible_rows": 1180,
+    "excluded_rows": 5,
+    "missing_speaker_identity_rows": 0,
+    "speakers": 8,
+    "source_manifest_count": 10,
+    "source_manifest_sha256": "d823cc00eeaa0f169bb83aca51810d9adb8629b56cd2b437d7bffe2add2035e7"
+  },
+  "split_policy": {
+    "speaker_disjoint": "true",
+    "frozen_test_set": "mandarin-app-speaker-disjoint-test-v1",
+    "target_ratios": {
+      "train": 0.6,
+      "validation": 0.2,
+      "test": 0.2
+    }
+  },
+  "split_summary": {
+    "train": {
+      "rows": 555,
+      "speakers": 5,
+      "unique_targets": 495,
+      "quality_statuses": {
+        "long_silence": 126,
+        "suspected_misread": 1,
+        "suspected_omission": 392,
+        "unusable_audio": 35,
+        "valid": 1
+      },
+      "length_buckets": {
+        "1-3_chars": 34,
+        "4-6_chars": 258,
+        "7-10_chars": 263
+      },
+      "categories": {
+        "人群与角色": 25,
+        "日常与出行": 134,
+        "现代文章朗读": 281,
+        "看病与求助": 46,
+        "设备与数字": 35,
+        "评估筛查": 34
+      }
+    },
+    "validation": {
+      "rows": 429,
+      "speakers": 1,
+      "unique_targets": 424,
+      "quality_statuses": {
+        "suspected_misread": 3,
+        "suspected_omission": 412,
+        "unusable_audio": 11,
+        "valid": 3
+      },
+      "length_buckets": {
+        "1-3_chars": 5,
+        "11-18_chars": 95,
+        "19+_chars": 68,
+        "4-6_chars": 131,
+        "7-10_chars": 130
+      },
+      "categories": {
+        "人群与角色": 142,
+        "发音与朗读": 35,
+        "现代文章朗读": 239,
+        "看病与求助": 12,
+        "评估筛查": 1
+      }
+    },
+    "test": {
+      "rows": 196,
+      "speakers": 2,
+      "unique_targets": 139,
+      "quality_statuses": {
+        "long_silence": 4,
+        "suspected_omission": 164,
+        "unusable_audio": 19,
+        "valid": 9
+      },
+      "length_buckets": {
+        "1-3_chars": 44,
+        "4-6_chars": 130,
+        "7-10_chars": 22
+      },
+      "categories": {
+        "人群与角色": 12,
+        "发音与朗读": 90,
+        "日常与出行": 50,
+        "评估筛查": 44
+      }
+    }
+  },
+  "speaker_overlap": [],
+  "evaluation_status": "split_ready_model_results_pending"
+}

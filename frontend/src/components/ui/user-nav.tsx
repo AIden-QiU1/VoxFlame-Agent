@@ -65,7 +65,7 @@ export function UserNav() {
 
     if (!user) {
         return (
-            <Button variant="ghost" asChild className="relative h-8 w-8 rounded-full">
+            <Button variant="ghost" asChild className="relative size-11 rounded-full px-2">
                 <Link href={loginHref}>登录</Link>
             </Button>
         )
@@ -79,8 +79,12 @@ export function UserNav() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
+                <Button
+                    aria-label={`打开账号菜单：${accountIdentifier}`}
+                    variant="ghost"
+                    className="relative size-11 rounded-full p-1.5"
+                >
+                    <Avatar className="size-8">
                         {avatarUrl ? (
                             <AvatarImage src={avatarUrl} alt={accountIdentifier} />
                         ) : null}

@@ -12,12 +12,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { IcpBeianFooter } from '@/components/legal/IcpBeianFooter'
 import { buildLoginPath } from '@/lib/auth/navigation'
-import type { StarterKitScene } from '@/lib/communication/starter-kit'
 import { UserNav } from '@/components/ui/user-nav'
 
 interface HomeDashboardProps {
   isAuthenticated: boolean
-  onStartCommunicate: (sceneId?: StarterKitScene['id']) => void
+  onStartCommunicate: () => void
+  isOpeningCommunicate?: boolean
 }
 
 interface CapabilityCard {
@@ -34,7 +34,7 @@ const CAPABILITY_CARDS: CapabilityCard[] = [
     id: 'communicate',
     title: '现在沟通',
     summary: '把最重要的一句话放在前面，随时停下或重说。',
-    actionLabel: '进入沟通',
+    actionLabel: '直接进入',
     icon: MessageSquareText,
   },
   {
@@ -42,7 +42,7 @@ const CAPABILITY_CARDS: CapabilityCard[] = [
     title: '练一句',
     summary: '用真实会说出口的句子练习，录完马上回听。',
     actionLabel: '开始练习',
-    href: '/contribute',
+    href: '/practice',
     icon: AudioLines,
   },
   {
@@ -70,11 +70,11 @@ function CapabilityCardView({
     : undefined
 
   return (
-    <article className="flex h-full flex-col rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+    <article className="flex h-full flex-col rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex size-11 items-center justify-center rounded-2xl bg-orange-50 text-orange-700">
         <Icon className="size-5" aria-hidden="true" />
       </div>
-      <h2 className="mt-6 text-balance text-2xl font-semibold text-stone-950">{card.title}</h2>
+      <h2 className="mt-5 text-balance text-2xl font-semibold text-stone-950">{card.title}</h2>
       <p className="mt-3 text-pretty text-sm leading-7 text-stone-600">{card.summary}</p>
       <div className="mt-auto pt-7">
         {card.id === 'communicate' ? (
@@ -105,9 +105,10 @@ function CapabilityCardView({
 
 export default function HomeDashboard({
   isAuthenticated,
+  isOpeningCommunicate = false,
   onStartCommunicate,
 }: HomeDashboardProps) {
-  const practiceHref = isAuthenticated ? '/contribute' : buildLoginPath('/contribute')
+  const practiceHref = isAuthenticated ? '/practice' : buildLoginPath('/practice')
 
   return (
     <div className="flex min-h-dvh flex-col overflow-x-hidden bg-[#f5f1ea] text-stone-950">
@@ -124,7 +125,7 @@ export default function HomeDashboard({
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <Button
+              <Button
               asChild
               className="hidden rounded-xl border-stone-300 bg-white px-4 text-sm text-stone-800 hover:bg-stone-50 sm:inline-flex"
               type="button"
@@ -134,10 +135,11 @@ export default function HomeDashboard({
             </Button>
             <Button
               className="hidden rounded-xl bg-stone-950 px-4 text-sm text-white hover:bg-stone-800 md:inline-flex"
-              onClick={() => onStartCommunicate()}
+                onClick={() => onStartCommunicate()}
+                disabled={isOpeningCommunicate}
               type="button"
             >
-              现在沟通
+              {isOpeningCommunicate ? '正在确认登录状态…' : '现在沟通'}
             </Button>
             <UserNav />
           </div>
@@ -145,29 +147,30 @@ export default function HomeDashboard({
       </header>
 
       <main className="flex-1" id="main-content">
-        <section className="px-5 pb-12 pt-14 sm:px-8 sm:pb-16 sm:pt-20">
+        <section className="px-5 pb-10 pt-10 sm:px-8 sm:pb-16 sm:pt-20">
           <div className="mx-auto max-w-7xl">
             <div className="max-w-3xl">
               <p className="text-sm font-semibold text-orange-700">让系统理解你真正想说的话</p>
-              <h1 className="mt-4 text-balance text-4xl font-semibold leading-tight text-stone-950 sm:text-5xl">
+              <h1 className="mt-3 text-balance text-4xl font-semibold leading-tight text-stone-950 sm:mt-4 sm:text-5xl">
                 先把重要的话，说出去。
               </h1>
               <p className="mt-5 max-w-2xl text-pretty text-base leading-8 text-stone-600 sm:text-lg">
                 沟通、练习和准备在同一条路上。你始终可以打断、改写和重新开始。
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-7 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
                 <Button
-                  className="h-12 rounded-xl bg-stone-950 px-6 text-sm font-semibold text-white hover:bg-stone-800"
+                  className="h-12 rounded-xl bg-stone-950 px-4 text-sm font-semibold text-white hover:bg-stone-800 sm:px-6"
                   onClick={() => onStartCommunicate()}
+                  disabled={isOpeningCommunicate}
                   type="button"
                 >
-                  现在开始沟通
+                  {isOpeningCommunicate ? '正在确认登录状态…' : '现在开始沟通'}
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </Button>
                 <Button
                   asChild
-                  className="h-12 rounded-xl border-stone-300 bg-white px-6 text-sm font-semibold text-stone-800 hover:bg-stone-50"
+                  className="h-12 rounded-xl border-stone-300 bg-white px-4 text-sm font-semibold text-stone-800 hover:bg-stone-50 sm:px-6"
                   type="button"
                   variant="outline"
                 >
@@ -176,9 +179,9 @@ export default function HomeDashboard({
               </div>
             </div>
 
-            <div className="mt-12 grid gap-5 lg:grid-cols-3">
+            <div className="mt-9 grid gap-4 sm:mt-12 lg:grid-cols-3 lg:gap-5">
               {CAPABILITY_CARDS.map((card) => (
-                <CapabilityCardView
+                  <CapabilityCardView
                   card={card}
                   isAuthenticated={isAuthenticated}
                   key={card.id}

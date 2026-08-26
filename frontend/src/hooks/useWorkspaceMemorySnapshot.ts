@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { StarterKitScene } from '@/lib/communication/starter-kit'
+import type { CommunicationSceneId } from '@/lib/communication/communication-scene'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
 import { fetchWorkspaceSnapshot } from '@/lib/memory/workspace-client'
 import { reportFrontendDiagnostic, toProductMessage } from '@/lib/ui/product-message'
@@ -9,7 +9,7 @@ import { reportFrontendDiagnostic, toProductMessage } from '@/lib/ui/product-mes
 interface UseWorkspaceMemorySnapshotOptions {
   userId?: string | null
   isAuthenticated?: boolean
-  sceneId?: StarterKitScene['id']
+  sceneId?: CommunicationSceneId
   enabled?: boolean
 }
 
@@ -17,7 +17,7 @@ interface UseWorkspaceMemorySnapshotResult {
   snapshot: WorkspaceMemorySnapshot | null
   isLoading: boolean
   error: string | null
-  refresh: (sceneId?: StarterKitScene['id']) => Promise<WorkspaceMemorySnapshot | null>
+  refresh: (sceneId?: CommunicationSceneId) => Promise<WorkspaceMemorySnapshot | null>
 }
 
 export function useWorkspaceMemorySnapshot({

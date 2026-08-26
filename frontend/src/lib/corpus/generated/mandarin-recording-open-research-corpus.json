@@ -1,0 +1,421 @@
+{
+  "kind": "voxflame_mandarin_recording_open_research_corpus",
+  "generated_at": "2026-08-24T05:05:14.615Z",
+  "generated_from": "mandarin-open-research-recording-candidates.json",
+  "source": {
+    "repository": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci",
+    "url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci",
+    "source_type": "open_research_corpus",
+    "license": "MIT",
+    "readme_sha256": "2438b1a0b9d8bceed48a02add80c6739e75bc2ea98a82cb032583997f7fbe849",
+    "corpus_file": "corpus_sentences.csv",
+    "corpus_file_sha256": "6acb1e6584d3b9f1b8b7120a9a7ca9a54584450975b0dbe83204662f0086965c",
+    "repository_claimed_sentence_count": 195,
+    "repository_claimed_untoned_syllable_coverage": 387
+  },
+  "policy": {
+    "linguistic_coverage_is_the_root_criterion": true,
+    "source_is_open_research_not_textbook": true,
+    "machine_language_and_content_checks_passed": true,
+    "human_spoken_text_is_not_required_before_recording": true,
+    "valid_audio_and_non_empty_target_are_collection_prerequisites": true,
+    "asr_is_hint_only_and_never_an_automatic_rejection_gate": true,
+    "recording_visibility_does_not_equal_model_training_import": true,
+    "existing_prompts_recordings_manifests_and_sources_preserved": true,
+    "excluded_candidates_remain_in_source_evidence": true,
+    "gate_rules": "frontend/scripts/mandarin-recording-corpus-gate-core.mjs"
+  },
+  "summary": {
+    "recording_ready_items": 14,
+    "recording_ready_targets": 15,
+    "short_sentences": 14,
+    "gate_passed_items": 14
+  },
+  "items": [
+    {
+      "id": "coverage-recording-open-research-001",
+      "text": "我赶紧撑开雨伞。",
+      "category": "音系强化",
+      "target": "san3",
+      "coverage_targets": [
+        "san3"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "我赶紧撑开雨伞。",
+      "source_pinyin": "wo3 gan3 jin3 cheng1 kai1 yu3 san3",
+      "source_sentence_pinyin": "wo3 gan3 jin3 cheng1 kai1 yu3 san3",
+      "source_row_number": 6,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "我赶紧撑开雨伞。",
+          "source_pinyin": "wo3 gan3 jin3 cheng1 kai1 yu3 san3",
+          "source": "open research corpus sentence reading evidence",
+          "target": "san3"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-002",
+      "text": "里面住着一位慈祥的老僧。",
+      "category": "音系强化",
+      "target": "seng1",
+      "coverage_targets": [
+        "seng1"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "里面住着一位慈祥的老僧。",
+      "source_pinyin": "li3 mian4 zhu4 zhe0 yi1 wei4 ci2 xiang2 de0 lao3 seng1",
+      "source_sentence_pinyin": "li3 mian4 zhu4 zhe0 yi1 wei4 ci2 xiang2 de0 lao3 seng1",
+      "source_row_number": 15,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "里面住着一位慈祥的老僧。",
+          "source_pinyin": "li3 mian4 zhu4 zhe0 yi1 wei4 ci2 xiang2 de0 lao3 seng1",
+          "source": "open research corpus sentence reading evidence",
+          "target": "seng1"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-003",
+      "text": "听说这条江里曾经生活着珍贵的白鳍豚。",
+      "category": "音系强化",
+      "target": "tun2",
+      "coverage_targets": [
+        "tun2"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "听说这条江里曾经生活着珍贵的白鳍豚。",
+      "source_pinyin": "ting1 shuo1 zhe4 tiao2 jiang1 li3 ceng2 jing1 sheng1 huo2 zhe0 zhen1 gui4 de0 bai2 qi2 tun2",
+      "source_sentence_pinyin": "ting1 shuo1 zhe4 tiao2 jiang1 li3 ceng2 jing1 sheng1 huo2 zhe0 zhen1 gui4 de0 bai2 qi2 tun2",
+      "source_row_number": 18,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "听说这条江里曾经生活着珍贵的白鳍豚。",
+          "source_pinyin": "ting1 shuo1 zhe4 tiao2 jiang1 li3 ceng2 jing1 sheng1 huo2 zhe0 zhen1 gui4 de0 bai2 qi2 tun2",
+          "source": "open research corpus sentence reading evidence",
+          "target": "tun2"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-004",
+      "text": "工人用电钻在墙上钻孔，安装电线。",
+      "category": "音系强化",
+      "target": "zuan1",
+      "coverage_targets": [
+        "zuan1"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "工人用电钻在墙上钻孔，安装电线。",
+      "source_pinyin": "gong1 ren2 yong4 dian4 zuan4 zai4 qiang2 shang4 zuan1 kong3 an1 zhuang1 dian4 xian4",
+      "source_sentence_pinyin": "gong1 ren2 yong4 dian4 zuan4 zai4 qiang2 shang4 zuan1 kong3 an1 zhuang1 dian4 xian4",
+      "source_row_number": 61,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "工人用电钻在墙上钻孔，安装电线。",
+          "source_pinyin": "gong1 ren2 yong4 dian4 zuan4 zai4 qiang2 shang4 zuan1 kong3 an1 zhuang1 dian4 xian4",
+          "source": "open research corpus sentence reading evidence",
+          "target": "zuan1"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-005",
+      "text": "柴堆旁的仓库里还藏着粮食。",
+      "category": "音系强化",
+      "target": "chai2",
+      "coverage_targets": [
+        "chai2"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "柴堆旁的仓库里还藏着粮食。",
+      "source_pinyin": "chai2 dui1 pang2 de0 cang1 ku4 li3 hai2 cang2 zhe0 liang2 shi2",
+      "source_sentence_pinyin": "chai2 dui1 pang2 de0 cang1 ku4 li3 hai2 cang2 zhe0 liang2 shi2",
+      "source_row_number": 84,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "柴堆旁的仓库里还藏着粮食。",
+          "source_pinyin": "chai2 dui1 pang2 de0 cang1 ku4 li3 hai2 cang2 zhe0 liang2 shi2",
+          "source": "open research corpus sentence reading evidence",
+          "target": "chai2"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-006",
+      "text": "说这趟航班准点起航。",
+      "category": "音系强化",
+      "target": "tang4",
+      "coverage_targets": [
+        "tang4"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "说这趟航班准点起航。",
+      "source_pinyin": "shuo1 zhe4 tang4 hang2 ban1 zhun3 dian3 qi3 hang2",
+      "source_sentence_pinyin": "shuo1 zhe4 tang4 hang2 ban1 zhun3 dian3 qi3 hang2",
+      "source_row_number": 106,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "说这趟航班准点起航。",
+          "source_pinyin": "shuo1 zhe4 tang4 hang2 ban1 zhun3 dian3 qi3 hang2",
+          "source": "open research corpus sentence reading evidence",
+          "target": "tang4"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-007",
+      "text": "卵石铺满了河岸。",
+      "category": "音系强化",
+      "target": "luan3",
+      "coverage_targets": [
+        "luan3"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "卵石铺满了河岸。",
+      "source_pinyin": "luan3 shi2 pu4 man3 le0 he2 an4",
+      "source_sentence_pinyin": "luan3 shi2 pu4 man3 le0 he2 an4",
+      "source_row_number": 125,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "卵石铺满了河岸。",
+          "source_pinyin": "luan3 shi2 pu4 man3 le0 he2 an4",
+          "source": "open research corpus sentence reading evidence",
+          "target": "luan3"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-008",
+      "text": "他背着鼓鼓的行囊。",
+      "category": "音系强化",
+      "target": "nang2",
+      "coverage_targets": [
+        "nang2"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "他背着鼓鼓的行囊。",
+      "source_pinyin": "ta1 bei4 zhe0 gu3 gu3 de0 xing2 nang2",
+      "source_sentence_pinyin": "ta1 bei4 zhe0 gu3 gu3 de0 xing2 nang2",
+      "source_row_number": 132,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "他背着鼓鼓的行囊。",
+          "source_pinyin": "ta1 bei4 zhe0 gu3 gu3 de0 xing2 nang2",
+          "source": "open research corpus sentence reading evidence",
+          "target": "nang2"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-009",
+      "text": "他小心捏起碎片。",
+      "category": "音系强化",
+      "target": "nie1",
+      "coverage_targets": [
+        "nie1"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "他小心捏起碎片。",
+      "source_pinyin": "ta1 xiao3 xin1 nie1 qi3 sui4 pian4",
+      "source_sentence_pinyin": "ta1 xiao3 xin1 nie1 qi3 sui4 pian4",
+      "source_row_number": 137,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "他小心捏起碎片。",
+          "source_pinyin": "ta1 xiao3 xin1 nie1 qi3 sui4 pian4",
+          "source": "open research corpus sentence reading evidence",
+          "target": "nie1"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-010",
+      "text": "聂师傅在旁边耐心指点。",
+      "category": "音系强化",
+      "target": "nie4",
+      "coverage_targets": [
+        "nie4"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "聂师傅在旁边耐心指点。",
+      "source_pinyin": "nie4 shi1 fu0 zai4 pang2 bian1 nai4 xin1 zhi3 dian3",
+      "source_sentence_pinyin": "nie4 shi1 fu0 zai4 pang2 bian1 nai4 xin1 zhi3 dian3",
+      "source_row_number": 138,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "聂师傅在旁边耐心指点。",
+          "source_pinyin": "nie4 shi1 fu0 zai4 pang2 bian1 nai4 xin1 zhi3 dian3",
+          "source": "open research corpus sentence reading evidence",
+          "target": "nie4"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-011",
+      "text": "婆婆拿抹布把它擦干。",
+      "category": "音系强化",
+      "target": "po0",
+      "coverage_targets": [
+        "po0"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "婆婆拿抹布把它擦干。",
+      "source_pinyin": "po2 po0 na2 ma1 bu4 ba3 ta1 ca1 gan1",
+      "source_sentence_pinyin": "po2 po0 na2 ma1 bu4 ba3 ta1 ca1 gan1",
+      "source_row_number": 148,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "婆婆拿抹布把它擦干。",
+          "source_pinyin": "po2 po0 na2 ma1 bu4 ba3 ta1 ca1 gan1",
+          "source": "open research corpus sentence reading evidence",
+          "target": "po0"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-012",
+      "text": "桑树下，她扯着嗓子。",
+      "category": "音系强化",
+      "target": "che3",
+      "coverage_targets": [
+        "che3",
+        "sang3"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "桑树下，她扯着嗓子。",
+      "source_pinyin": "sang1 shu4 xia4 ta1 che3 zhe0 sang3 zi0",
+      "source_sentence_pinyin": "sang1 shu4 xia4 ta1 che3 zhe0 sang3 zi0",
+      "source_row_number": 159,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "桑树下，她扯着嗓子。",
+          "source_pinyin": "sang1 shu4 xia4 ta1 che3 zhe0 sang3 zi0",
+          "source": "open research corpus sentence reading evidence",
+          "target": "che3"
+        },
+        {
+          "text": "桑树下，她扯着嗓子。",
+          "source_pinyin": "sang1 shu4 xia4 ta1 che3 zhe0 sang3 zi0",
+          "source": "open research corpus sentence reading evidence",
+          "target": "sang3"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-013",
+      "text": "他拿起扫帚扫地。",
+      "category": "音系强化",
+      "target": "sao4",
+      "coverage_targets": [
+        "sao4"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "他拿起扫帚扫地。",
+      "source_pinyin": "ta1 na2 qi3 sao4 zhou0 sao3 di4",
+      "source_sentence_pinyin": "ta1 na2 qi3 sao4 zhou0 sao3 di4",
+      "source_row_number": 161,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "他拿起扫帚扫地。",
+          "source_pinyin": "ta1 na2 qi3 sao4 zhou0 sao3 di4",
+          "source": "open research corpus sentence reading evidence",
+          "target": "sao4"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    },
+    {
+      "id": "coverage-recording-open-research-014",
+      "text": "又把西藏带回的挂毯抖了抖。",
+      "category": "音系强化",
+      "target": "zang4",
+      "coverage_targets": [
+        "zang4"
+      ],
+      "source": "Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci (MIT open research corpus)",
+      "source_text": "又把西藏带回的挂毯抖了抖。",
+      "source_pinyin": "you4 ba3 xi1 zang4 dai4 hui2 de0 gua4 tan3 dou3 le0 dou3",
+      "source_sentence_pinyin": "you4 ba3 xi1 zang4 dai4 hui2 de0 gua4 tan3 dou3 le0 dou3",
+      "source_row_number": 172,
+      "source_url": "https://github.com/Chen-xi111/Making-Mandarin-Sentences-from-syllables-bci/blob/main/corpus_sentences.csv",
+      "prompt_type": "short_sentence",
+      "target_carriers": [
+        {
+          "text": "又把西藏带回的挂毯抖了抖。",
+          "source_pinyin": "you4 ba3 xi1 zang4 dai4 hui2 de0 gua4 tan3 dou3 le0 dou3",
+          "source": "open research corpus sentence reading evidence",
+          "target": "zang4"
+        }
+      ],
+      "recording_readiness": "ready_for_recording",
+      "language_review": "machine_checked_open_research_candidate",
+      "review_note": "开放研究语料补充；不是教材原文，不代表训练导入批准。只按有效音频、非空 target 和错读/漏读/长空白/不可用音频做后续质检。"
+    }
+  ]
+}

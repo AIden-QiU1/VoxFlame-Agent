@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict'
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+import ts from 'typescript'
+
+const sourcePath = path.resolve('src/training/mobile-training-feedback.ts')
+const source = await readFile(sourcePath, 'utf8')
+const transpiled = ts.transpileModule(source, {
+  compilerOptions: {
+    module: ts.ModuleKind.ES2022,
+    target: ts.ScriptTarget.ES2022,
+  },
+  fileName: sourcePath,
+}).outputText
+const outputDirectory = await mkdtemp(path.join(tmpdir(), 'voxflame-mobile-training-'))
+const outputPath = path.join(outputDirectory, 'mobile-training-feedback.mjs')
+await import('node:fs/promises').then(({ writeFile }) => writeFile(outputPath, transpiled))
+const { analyzeMobileTrainingAttempt, summarizeMobileAssessment } = await import(
+  `${pathToFileURL(outputPath).href}?v=${Date.now()}`
+)
+
+const feedback = analyzeMobileTrainingAttempt(
+  { id: 'custom', text: '请帮我开门', category: '自定义练习' },
+  '请帮我开门',
+)
+assert.equal(feedback.status, 'excellent')
+
+const summary = summarizeMobileAssessment([
+  {
+    exerciseId: 'substitution',
+    targetText: '医生',
+    heardText: '衣生',
+    normalizedTarget: '医生',
+    normalizedHeard: '衣生',
+    missingChars: ['医'],
+    extraChars: ['衣'],
+    durationMs: 2_000,
+  },
+  {
+    exerciseId: 'insertion',
+    targetText: '爸爸',
+    heardText: '爸爸好',
+    normalizedTarget: '爸爸',
+    normalizedHeard: '爸爸好',
+    missingChars: [],
+    extraChars: ['好'],
+    durationMs: 2_000,
+  },
+], 2)
+
+assert.equal(summary.accuracyPercent, 50)
+assert.equal(summary.label, '低支持需求')
+assert.match(summary.summary, /不是医学严重程度/)
+assert.equal(summary.personalizationSeconds, 4)
+assert.ok(summary.patterns.some((pattern) => pattern.label === '“医”'))
+
+console.log('mobile training feedback tests passed')

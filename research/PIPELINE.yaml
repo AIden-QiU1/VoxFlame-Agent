@@ -1,0 +1,58 @@
+version: 1
+updated_at: 2026-08-14
+schema: research-opportunity-v1
+state_machine:
+  terminal: [adopted, hold, rejected]
+  states: [discovered, evidence_review, experiment_ready, experimenting, outcome_review, authority_review, scholarly_ip, software_copyright_review, scenario_pilot, adopted, improving, hold, rejected]
+  transitions:
+    discovered: [evidence_review, hold]
+    evidence_review: [experiment_ready, hold, rejected]
+    experiment_ready: [experimenting, hold]
+    experimenting: [outcome_review, hold]
+    outcome_review: [authority_review, scenario_pilot, experiment_ready, hold, rejected]
+    authority_review: [scholarly_ip, software_copyright_review, scenario_pilot, adopted, hold, rejected]
+    scholarly_ip: [scenario_pilot, adopted, hold]
+    software_copyright_review: [scenario_pilot, adopted, hold]
+    scenario_pilot: [adopted, improving, hold, rejected]
+    adopted: [improving, hold, rejected]
+    improving: [scenario_pilot, adopted, rejected, hold]
+    hold: [discovered, evidence_review, experiment_ready]
+    rejected: []
+required_fields:
+  - research_id
+  - title
+  - topic
+  - state
+  - owner
+  - problem
+  - target_scenario
+  - current_gate
+  - next_action
+  - evidence_package
+  - feedback_refs
+  - release_intents
+  - authority_gate
+  - review_report
+entries:
+  - research_id: RO-000
+    title: TEMPLATE - replace before use
+    topic: agent-systems
+    state: discovered
+    owner: TBD
+    problem: TBD
+    target_scenario: TBD
+    current_gate: source_identity
+    next_action: replace this template entry
+    evidence_package: research/evidence/RO-000.yaml
+    feedback_refs: []
+    release_intents: []
+    authority_gate: research/evidence/RO-000.yaml#authority_gate
+    review_report: research/outcome-reviews/RO-000.md
+    source_refs: []
+    evidence_refs: []
+    experiment_refs: []
+    scholarly_ip_refs: []
+    product_refs: []
+    metrics: []
+    risks: []
+    rollback: TBD

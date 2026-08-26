@@ -36,6 +36,7 @@ const TRUSTED_MESSAGES = new Set<string>([
   '该手机号已绑定其他账号。',
   '网络异常，请检查后重试。',
   '未找到这条录音。',
+  '暂时无法撤回这条录音，请恢复网络后重试。',
 ])
 
 function diagnosticText(error: unknown): string {

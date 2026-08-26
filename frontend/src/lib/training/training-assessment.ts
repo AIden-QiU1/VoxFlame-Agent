@@ -10,7 +10,7 @@ export interface AssessmentAttemptInput {
   targetText: string
   heardText: string
   normalizedTarget: string
-  missingChars: string[]
+  normalizedHeard: string
 }
 
 export interface AssessmentExerciseScore {
@@ -40,9 +40,31 @@ function roundToWholePercent(value: number): number {
   return Math.round(value * 100)
 }
 
+export function calculateCharacterEditDistance(target: string, heard: string): number {
+  const targetChars = Array.from(target)
+  const heardChars = Array.from(heard)
+  let previous = Array.from({ length: heardChars.length + 1 }, (_, index) => index)
+
+  for (let targetIndex = 1; targetIndex <= targetChars.length; targetIndex += 1) {
+    const current = [targetIndex]
+    for (let heardIndex = 1; heardIndex <= heardChars.length; heardIndex += 1) {
+      const substitutionCost = targetChars[targetIndex - 1] === heardChars[heardIndex - 1] ? 0 : 1
+      current[heardIndex] = Math.min(
+        current[heardIndex - 1] + 1,
+        previous[heardIndex] + 1,
+        previous[heardIndex - 1] + substitutionCost,
+      )
+    }
+    previous = current
+  }
+
+  return previous[heardChars.length]
+}
+
 function buildExerciseScore(attempt: AssessmentAttemptInput): AssessmentExerciseScore {
-  const totalChars = attempt.normalizedTarget.length
-  const matchedChars = Math.max(0, totalChars - attempt.missingChars.length)
+  const totalChars = Array.from(attempt.normalizedTarget).length
+  const editDistance = calculateCharacterEditDistance(attempt.normalizedTarget, attempt.normalizedHeard)
+  const matchedChars = Math.max(0, totalChars - editDistance)
   const accuracyRatio = totalChars > 0 ? matchedChars / totalChars : 0
 
   return {
@@ -64,27 +86,27 @@ function resolveSeverityBand(accuracyRatio: number): {
   if (percent < 30) {
     return {
       severityBand: 'severe',
-      severityLabel: '重度',
+      severityLabel: '高支持需求',
     }
   }
 
   if (percent < 50) {
     return {
       severityBand: 'moderate',
-      severityLabel: '中度',
+      severityLabel: '中支持需求',
     }
   }
 
   if (percent < 80) {
     return {
       severityBand: 'mild',
-      severityLabel: '轻度',
+      severityLabel: '低支持需求',
     }
   }
 
   return {
     severityBand: 'observe',
-    severityLabel: '待观察',
+    severityLabel: '继续观察',
   }
 }
 
@@ -113,7 +135,7 @@ export function summarizeAssessmentAttempts(
       accuracyRatio: 0,
       severityBand: 'insufficient',
       severityLabel: '待开始',
-      severitySummary: '先录完几条筛查词，再看字符准确率和初步等级。',
+      severitySummary: '先录完几条筛查词，再看系统听清率和训练支持建议。',
       isComplete: false,
       weakestExercises: [],
     }
@@ -129,7 +151,7 @@ export function summarizeAssessmentAttempts(
       accuracyRatio,
       severityBand: 'insufficient',
       severityLabel: '评估中',
-      severitySummary: `当前已完成 ${completedCount}/${totalExerciseCount} 条，还差 ${remainingCount} 条。整组完成前不生成轻、中、重等级。`,
+      severitySummary: `当前已完成 ${completedCount}/${totalExerciseCount} 条，还差 ${remainingCount} 条。整组完成前不生成训练支持级别。`,
       isComplete: false,
       weakestExercises: exerciseScores
         .slice()
@@ -149,7 +171,7 @@ export function summarizeAssessmentAttempts(
     accuracyRatio,
     severityBand: severity.severityBand,
     severityLabel: severity.severityLabel,
-    severitySummary: `本轮筛查完成后，字符准确率约 ${roundToWholePercent(accuracyRatio)}%，当前落在“${severity.severityLabel}”。这只是训练用分层，不替代医学评估。`,
+    severitySummary: `本轮系统转写字符准确率约 ${roundToWholePercent(accuracyRatio)}%，建议按“${severity.severityLabel}”安排训练辅助。这反映当前系统听清程度，不是医学严重程度。`,
     isComplete,
     weakestExercises: exerciseScores
       .slice()

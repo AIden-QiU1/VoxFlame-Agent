@@ -71,6 +71,20 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 6. 完成后同步更新 `.claude-summary.md` 和 `.tasks/current.md`。
 7. 当某类坑点、命令、验证方式或路由判断连续重复出现时，主动把它吸收到系统文档、脚本或模板里；同时清理已经失效的旧说明。
 
+### Research First Source
+
+- 应用侧研究统一进入 `research/`，按 `voice-agent / agent-systems / speech-health / product-psychology / product-engineering` 五个主题组织；不要再在 `docs/` 新增长期平级研究稿。涉及语音的通用 Agent 研究必须同时补跨模态对照，不得把文本 Agent 结论直接当作语音能力证据。
+- `references/clear-vox-model` 是模型代码和实验记录的上游 submodule；原始实验事实留在上游，应用侧只记录固定 commit、限制、决策状态和验证门槛。
+- 研究结论必须先进入 `research/APPLICATION_FEEDBACK_REGISTRY.md`；`planned / blocked / diagnostic-only` 或低于实验门槛的候选不得直接进入部署。
+- 普通话录音语料遵循 `research/RESEARCH_HARNESS.md` 的可复现证据门：来源、整词/整句读音命中、简体/现代用字、长度/标点/重复、商业/敏感污染和目标映射是机器可验证硬规则；“自然度/产品价值/用户负担”没有量表、评定者一致性和可复现函数时，不得作为录音区硬门。录音区可见不等于训练导入，人工 `spoken_text` 诊断不得阻塞有效音频 + target 的采集统计。
+- 论文、专利、公开数据/代码、产品默认能力或新用户/新场景扩展，发布前必须通过 `research/` 证据包的 `authority_gate`；未通过只能保持 `internal_only` / `hold`，不能把单篇论文、专家观点、内部 demo 或单点反馈当作权威验证。
+- 国内论文、专利、软件著作权和产品都必须有 `outcome-review` 初步审查报告；报告只能给出材料缺口和改进建议，不替代中国版权保护中心/国家版权局、CNIPA、专利代理师、律师或期刊同行评审。
+- 更新 submodule 不等于更新应用模型；仍需显式 owner、最小切片、回退和应用验证。
+- 医疗 / 健康检测研究默认不是诊断或治疗能力，进入用户功能前必须补专家、隐私、合规和目标人群验证。
+- 硬件、辅助器具、医疗相邻产品和重大采购规划默认按 `已知 / 未知 / 假设 / 求证方法` 盘点；供应商稿、竞品功能和 AI 草案先视为待验证假设。先用 COTS/ODM 与真实任务验证，再以用户价值、支付方、完全落地成本、工程、人因/法规四类 Gate 冻结架构、BOM、开模或量产。
+- 硬件规划先维护内部参数与证据事实源，再按受众派生版本：原供应商稿优先保留其熟悉的章节骨架、表格密度和术语入口；只有任务要求纠偏说明时才展示对照。中性供应商征询稿必须独立完整，保留全系统功能、路线状态、工程输入、偏离/验证/交付/报价，但隔离原稿对照、研究过程、内部预算/毛利和签批意见。多角色判断融合成统一方案，不写角色阅读分工；参数逐项区分原厂事实、候选配置、测试目标和未知。商业文档默认无图标、emoji 和装饰图，并做品牌禁词、DOCX 元数据/媒体与 A4/PDF 裁切检查。
+- 下载外部 PDF/规格书必须核验实际文件类型、标题/页数、来源、访问时间和哈希；网页壳、无关文件或不可访问原文要记录失败与替代，不得写成“已读”。
+
 ## Tool And Skill Routing
 
 - 本地代码、配置、文档能回答的问题，先查仓库，再考虑外部工具。
@@ -148,8 +162,12 @@ VoxFlame 是为构音障碍者打造的开源 AI 语音助手。第一原则不�
 - [docs/aiprompts/SKILL_ROUTING_GUIDE.md](docs/aiprompts/SKILL_ROUTING_GUIDE.md)：`gstack / 工程纪律 skill / 设计专项 skill / Context7 / Playwright / Linear` 的默认路由。
 - [docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md](docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md)：迁移 / 统一 / 废弃 / 兼容层任务模板。
 - [docs/README.md](docs/README.md)：文档导航。
+- [research/README.md](research/README.md)：五大主题研究入口、外部实验边界和应用回流流程。
+- [research/agent-systems/README.md](research/agent-systems/README.md)：通用 Agent 机制、工程架构、产品化和场景落地的研究边界与语音对照方法。
+- [research/APPLICATION_FEEDBACK_REGISTRY.md](research/APPLICATION_FEEDBACK_REGISTRY.md)：研究结论影响应用的唯一决策登记。
+- [references/clear-vox-model](references/clear-vox-model)：`CLEAR-VOX-MODEL` 模型代码、实验与 R&D 上游 submodule。
 - [docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md](docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)：当前产品边界与上线后 `App / 硬件 / 自定义语音 agent / 记忆架构` 规划的权威主文档。
-- [docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md](docs/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)：App / Mobile Workbench 技术路线、官方约束、机会点、阶段计划和创始人需要把控的技术方向。
+- [research/product-engineering/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md](research/product-engineering/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)：App / Mobile Workbench 技术路线、官方约束、机会点、阶段计划和创始人需要把控的技术方向。
 - [docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md](docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)：当前 `apps/mobile-workbench` skeleton、四 surface、contract boundary 与下一步实现顺序。
 - [docs/control-plane.md](docs/control-plane.md)：控制面的职责、边界、现有实现映射与后续收口方向。
 - [docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md](docs/VOXFLAME_AGENT_MEMORY_AND_TOOLING_REFERENCE_2026-03-26.md)：吸收 `memory mechanisms / voice-agent-tooling` 后的统一 agent、memory、tooling 参考文档。

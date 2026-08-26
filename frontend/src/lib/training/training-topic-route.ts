@@ -50,6 +50,10 @@ export function isTrainingTopicId(value: string): value is TrainingTopicId {
 }
 
 export function getTrainingTopicHref(topicId: TrainingTopicId): string {
+  if (topicId === 'assessment-screening') {
+    return '/assessment'
+  }
+
   return `/contribute/topic/${topicId}`
 }
 

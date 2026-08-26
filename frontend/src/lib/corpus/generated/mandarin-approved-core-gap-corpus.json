@@ -1,0 +1,16 @@
+{
+  "kind": "voxflame_approved_mandarin_core_gap_corpus",
+  "generated_at": "2026-08-23T03:34:41.279Z",
+  "generated_from": "mandarin-core-gap-phase1-review.json",
+  "policy": {
+    "core_targets_only": true,
+    "all_six_reviews_approved": true,
+    "edge_and_disputed_targets_excluded": true,
+    "existing_prompt_or_recording_removed": false
+  },
+  "summary": {
+    "approved_items": 0,
+    "approved_targets": 0
+  },
+  "items": []
+}
