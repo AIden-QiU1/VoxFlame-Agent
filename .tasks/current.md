@@ -7,7 +7,8 @@
 - 第 1 项已完成：Mobile parity 通过 PR #17 合入 `main`，版本为 `0.1.4`、Android `versionCode=5`、iOS `buildNumber=5`；新版 APK 已构建并发布到 `https://voxember.com/download/android`。GitHub Actions 因账号 billing lock 未启动，按用户授权以完整本地验证替代 CI 后直接合并。
 - 第 2 项已完成代码切片：Mobile 沟通首页明确分成“快速表达 / 语音助手”；未登录用户也能直接进入快速表达，通用短句点击即本机朗读，并支持自定义文字、本机 TTS、复制和全屏给对方看，不创建 RTC、不上传声音。登录后会去重合并 workspace 个人短句；只有主动进入语音助手并开始沟通才建立 RTC，自定义文字可明确发送给 agent。
 - 第 2 项验证通过：`npm run test:communication`、`npm run test:training`、`npm run check`、`npm run typecheck`、Android/iOS production export、`git diff --check`。真实 TTS、剪贴板、LiveKit 文字发送与触控体验留在第 7 项 Android/iPhone 真机全流程统一验收。
-- 下一步严格进入第 3 项：重做手机训练首页，明确展示“马上录、自己的材料、8 个主题”，包括现代文章朗读；第 4–7 项尚未开始。
+- 第 3 项已完成代码切片：手机训练首页改为“马上录 / 自己的材料 / 按主题选择”三层；8 个正式 collection 类别及真实可录句数直接来自 `/training/catalog`，现代文章朗读明确显示“连续朗读”标识。推荐入口直达“日常与出行”；有自有材料时直达逐句录音，无材料时转到“准备”页添加，20 词筛查保留为次级入口。
+- 第 3 项验证通过：Mobile communication/training tests、check、typecheck、Android/iOS production export、`git diff --check`。下一步严格进入第 4 项材料选择、手机文件导入和统一切句；第 5–7 项尚未开始。
 - 已知非阻塞警告：Expo export 继承了当前 shell 的 `NODE_TLS_REJECT_UNAUTHORIZED=0` 并打印 TLS warning；双平台 bundle 均成功。
 
 ## 2026-08-26 Web 训练录音区产品化重构

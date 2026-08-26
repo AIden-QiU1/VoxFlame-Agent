@@ -217,6 +217,7 @@ export default function App() {
     useState<MobileWorkbenchSurfaceId>('communication')
   const [taskRoute, setTaskRoute] = useState<MobileTaskRoute>('communication_home')
   const [showSignedOutQuickExpression, setShowSignedOutQuickExpression] = useState(false)
+  const [collectionEntrySource, setCollectionEntrySource] = useState<MobileCollectionSource>('catalog')
   const [practiceText, setPracticeText] = useState('')
   const [displayPhrase, setDisplayPhrase] = useState('')
   const [confirmedOutput, setConfirmedOutput] = useState('')
@@ -535,11 +536,12 @@ export default function App() {
                     setTaskRoute('assessment')
                   }
                 }}
-                onOpenCollection={() => {
-                  const firstCollection = trainingCatalog.categories.find((category) => category.kind === 'collection')
-                  if (firstCollection) void trainingCatalog.selectCategory(firstCollection.id)
+                onOpenCollection={(categoryId, source = 'catalog') => {
+                  setCollectionEntrySource(source)
+                  if (categoryId) void trainingCatalog.selectCategory(categoryId)
                   setTaskRoute('collection')
                 }}
+                onOpenMaterials={() => changeSurface('memory')}
                 preparedExpression={workspace.snapshot?.prepared_expression ?? null}
               />
             ) : (
@@ -556,6 +558,7 @@ export default function App() {
               ensureTrainingConnection={ensureTrainingConnection}
               trainingConnection={trainingLiveKitRoom}
               flow={taskRoute as 'assessment' | 'collection'}
+              initialCollectionSource={collectionEntrySource}
               onBack={() => setTaskRoute('practice_home')}
             />
             )
@@ -1322,41 +1325,104 @@ function PracticeHomeScreen({
   dailyTarget,
   onOpenAssessment,
   onOpenCollection,
+  onOpenMaterials,
   preparedExpression,
 }: {
   catalog: ReturnType<typeof useMobileTrainingCatalog>
   dailyTarget: number
   onOpenAssessment(): void
-  onOpenCollection(): void
+  onOpenCollection(categoryId?: string, source?: MobileCollectionSource): void
+  onOpenMaterials(): void
   preparedExpression: MobileWorkspaceSnapshotContract['prepared_expression']
 }) {
+  const collectionCategories = catalog.categories.filter((category) => category.kind === 'collection')
+  const recommendedCategory = collectionCategories.find((category) => category.id === '日常与出行')
+    ?? collectionCategories[0]
+  const materialExercises = buildMobilePreparedMaterialExercises(preparedExpression)
+
   return (
     <View style={styles.screen}>
       <View style={styles.heroHeading}>
         <Text style={styles.eyebrow}>练习</Text>
-        <Text style={styles.pageTitle}>今天要了解能力，还是积累表达？</Text>
-        <Text style={styles.pageCopy}>筛查和数据录入会进入不同页面，每次只完成一个任务。</Text>
+        <Text style={styles.pageTitle}>录下你真正会说的话</Text>
+        <Text style={styles.pageCopy}>从一句今天用得上的话开始，也可以用自己的材料或按主题选择。</Text>
       </View>
+
       <Pressable
-        accessibilityHint="进入独立的 20 词筛查页面"
+        accessibilityHint="直接进入日常与出行主题，开始录第一句"
         accessibilityRole="button"
-        onPress={onOpenAssessment}
-        style={({ pressed }) => [styles.taskCard, pressed ? styles.pressed : null]}
+        disabled={!recommendedCategory}
+        onPress={() => onOpenCollection(recommendedCategory?.id)}
+        style={({ pressed }) => [styles.practiceStartCard, pressed ? styles.pressed : null]}
       >
-        <Text style={styles.taskCardEyebrow}>第一次或想重新了解自己</Text>
-        <Text style={styles.taskCardTitle}>20 词能力筛查</Text>
-        <Text style={styles.taskCardCopy}>固定词表，完成整组后显示训练支持建议，不作为医学评估。</Text>
+        <View style={styles.practiceStartHeader}>
+          <Text style={styles.taskCardEyebrow}>马上录</Text>
+          <Text style={styles.practiceCountBadge}>建议 {dailyTarget} 句</Text>
+        </View>
+        <Text style={styles.practiceStartTitle}>先录几句今天用得上的话</Text>
+        <Text style={styles.taskCardCopy}>见面、出门、乘车、点餐和付款。按平时的方式说，不用一次录完。</Text>
+        <Text style={styles.practiceStartAction}>录第一句 ›</Text>
       </Pressable>
+
       <Pressable
-        accessibilityHint="进入数据录入页面后选择公共题库或自定义材料"
+        accessibilityHint={materialExercises.length > 0 ? '继续录自己的材料' : '查看自己的材料录音入口'}
         accessibilityRole="button"
-        onPress={onOpenCollection}
-        style={({ pressed }) => [styles.taskCard, pressed ? styles.pressed : null]}
+        onPress={() => {
+          if (materialExercises.length > 0) {
+            onOpenCollection(undefined, 'prepared_material')
+            return
+          }
+          onOpenMaterials()
+        }}
+        style={({ pressed }) => [styles.ownMaterialCard, pressed ? styles.pressed : null]}
       >
-        <Text style={styles.taskCardEyebrow}>训练与数据录入</Text>
-        <Text style={styles.taskCardTitle}>进入数据录入</Text>
-        <Text style={styles.taskCardCopy}>公共题库和自定义材料都在这里。今天建议 {dailyTarget} 句。</Text>
+        <Text style={styles.taskCardEyebrow}>自己的材料</Text>
+        <Text style={styles.taskCardTitle}>
+          {preparedExpression ? `继续录《${preparedExpression.title}》` : '用自己的内容来录'}
+        </Text>
+        <Text style={styles.taskCardCopy}>
+          {materialExercises.length > 0
+            ? `已经切成 ${materialExercises.length} 句，从上次的位置继续。`
+            : '把工作发言、复诊说明或常用文章放进准备页后，就能逐句录音。'}
+        </Text>
+        <Text style={styles.materialAction}>{materialExercises.length > 0 ? '继续录音 ›' : '查看材料入口 ›'}</Text>
       </Pressable>
+
+      <SectionHeader aside={`${collectionCategories.length} 个主题`} title="按主题选择" />
+      <Text style={styles.sectionSummary}>每个主题都显示当前可录句数，点开后直接进入对应题库。</Text>
+      <View style={styles.practiceTopicList}>
+        {collectionCategories.map((category) => (
+          <Pressable
+            accessibilityHint={`进入${category.label}录音题库`}
+            accessibilityRole="button"
+            key={category.id}
+            onPress={() => onOpenCollection(category.id)}
+            style={({ pressed }) => [
+              styles.practiceTopicRow,
+              category.id === '现代文章朗读' ? styles.practiceTopicRowFeatured : null,
+              pressed ? styles.pressed : null,
+            ]}
+          >
+            <View style={styles.categoryCopy}>
+              <Text style={styles.categoryTitle}>{category.label}</Text>
+              <Text numberOfLines={2} style={styles.mutedText}>{category.description}</Text>
+            </View>
+            <View style={styles.practiceTopicMeta}>
+              {category.id === '现代文章朗读' ? <Text style={styles.readingBadge}>连续朗读</Text> : null}
+              <Text style={styles.categoryCount}>{category.count} 句</Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={styles.assessmentEntry}>
+        <View style={styles.categoryCopy}>
+          <Text style={styles.cardLabel}>想先了解目前表现？</Text>
+          <Text style={styles.categoryTitle}>20 词能力筛查</Text>
+          <Text style={styles.mutedText}>完成整组后只给训练支持建议，不作为医学评估。</Text>
+        </View>
+        <SecondaryButton compact label="开始筛查" onPress={onOpenAssessment} />
+      </View>
       {preparedExpression?.training_reports ? (
         <View style={styles.trainingReportPreview}>
           <View style={styles.sectionIntro}>
@@ -1392,6 +1458,7 @@ function PracticeScreen({
   queue,
   trainingConnection,
   flow,
+  initialCollectionSource,
   onBack,
 }: {
   catalog: ReturnType<typeof useMobileTrainingCatalog>
@@ -1406,6 +1473,7 @@ function PracticeScreen({
   queue: ReturnType<typeof useNativeRecorderQueue>
   trainingConnection: ReturnType<typeof useLiveKitRoomConnection>
   flow: 'assessment' | 'collection'
+  initialCollectionSource: MobileCollectionSource
   onBack(): void
 }) {
   const [selectedExercise, setSelectedExercise] = useState<MobileTrainingExercise | null>(null)
@@ -1415,7 +1483,7 @@ function PracticeScreen({
   const [feedback, setFeedback] = useState<MobileTrainingFeedback | null>(null)
   const [assessmentAttempts, setAssessmentAttempts] = useState<MobileAssessmentAttempt[]>([])
   const [showRecordings, setShowRecordings] = useState(false)
-  const [collectionSource, setCollectionSource] = useState<MobileCollectionSource>('catalog')
+  const [collectionSource, setCollectionSource] = useState<MobileCollectionSource>(initialCollectionSource)
   const [environmentReady, setEnvironmentReady] = useState(false)
   const [distanceReady, setDistanceReady] = useState(false)
   const [consentReady, setConsentReady] = useState(false)
@@ -2664,6 +2732,55 @@ const styles = StyleSheet.create({
   taskCardEyebrow: { color: COLORS.accent, fontSize: 12, fontWeight: '800' },
   taskCardTitle: { color: COLORS.ink, fontSize: 21, fontWeight: '800', lineHeight: 29 },
   taskCardCopy: { color: COLORS.muted, fontSize: 14, lineHeight: 22 },
+  practiceStartCard: {
+    backgroundColor: COLORS.accentSoft,
+    borderColor: '#E7BCA4',
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 10,
+    minHeight: 190,
+    padding: 20,
+  },
+  practiceStartHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  practiceCountBadge: { backgroundColor: COLORS.surface, borderRadius: 999, color: COLORS.muted, fontSize: 12, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 6 },
+  practiceStartTitle: { color: COLORS.ink, fontSize: 25, fontWeight: '800', lineHeight: 34 },
+  practiceStartAction: { color: COLORS.accent, fontSize: 15, fontWeight: '800', marginTop: 'auto' },
+  ownMaterialCard: {
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 9,
+    padding: 18,
+  },
+  materialAction: { color: COLORS.accent, fontSize: 14, fontWeight: '800', marginTop: 4 },
+  practiceTopicList: { gap: 9 },
+  practiceTopicRow: {
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    minHeight: 82,
+    padding: 14,
+  },
+  practiceTopicRowFeatured: { backgroundColor: '#FFF8ED', borderColor: '#EACB98' },
+  practiceTopicMeta: { alignItems: 'flex-end', gap: 6 },
+  readingBadge: { backgroundColor: '#F3E2C5', borderRadius: 999, color: '#7D4B17', fontSize: 10, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 4 },
+  assessmentEntry: {
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceMuted,
+    borderColor: COLORS.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    padding: 16,
+  },
   signedOutQuickCard: {
     backgroundColor: COLORS.accentSoft,
     borderColor: '#E7BCA4',
