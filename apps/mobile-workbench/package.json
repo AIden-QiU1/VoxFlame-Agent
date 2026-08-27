@@ -1,6 +1,6 @@
 {
   "name": "@voxflame/mobile-workbench",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "main": "index.ts",
   "scripts": {
@@ -33,7 +33,8 @@
     "test:memory": "node scripts/test-mobile-memory-editor.mjs",
     "check": "node scripts/check-mobile-workbench.mjs",
     "smoke:real-workspace": "node scripts/smoke-real-workspace.mjs",
-    "smoke:device-env": "node scripts/smoke-device-env.mjs"
+    "smoke:device-env": "node scripts/smoke-device-env.mjs",
+    "validate:device-acceptance": "node scripts/validate-device-acceptance.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "14.0.0",
