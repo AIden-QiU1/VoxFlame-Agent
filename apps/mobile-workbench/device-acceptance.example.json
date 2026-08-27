@@ -2,8 +2,8 @@
   "platform": "android",
   "device_model": "填写真实机型",
   "os_version": "填写系统版本",
-  "app_version": "0.1.5",
-  "build_number": "6",
+  "app_version": "0.1.7",
+  "build_number": "8",
   "tested_at": "2026-08-27T00:00:00+08:00",
   "tester_id": "匿名测试人编号",
   "flows": [

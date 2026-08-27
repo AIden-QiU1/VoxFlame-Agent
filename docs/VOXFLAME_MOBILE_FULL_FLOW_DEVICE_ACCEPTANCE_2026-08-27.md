@@ -1,6 +1,6 @@
 # VoxFlame Mobile 完整替代 Web 真机验收
 
-> 适用版本：`0.1.5 (6)` 起。Android 与 iPhone 必须分别执行；只打开页面、只跑模拟器或只完成 bundle 构建都不算通过。
+> 适用版本：`0.1.7 (8)` 起。Android 与 iPhone 必须分别执行；只打开页面、只跑模拟器或只完成 bundle 构建都不算通过。
 
 ## 自动化门
 
