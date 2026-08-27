@@ -59,6 +59,11 @@ import {
 } from './src/training/mobile-training-feedback'
 import { buildMobilePreparedMaterialExercises } from './src/training/prepared-material-practice'
 import {
+  confirmMobileTrainingAttempt,
+  discardMobileTrainingAttempt,
+  replaceMobileTrainingAttempt,
+} from './src/training/mobile-attempt-confirmation'
+import {
   getMobileCollectionPlanId,
   isMobileCollectionPreflightReady,
   MOBILE_COLLECTION_PLANS,
@@ -106,6 +111,14 @@ type MobileTaskRoute =
   | 'collection'
 
 type MobileCollectionSource = 'catalog' | 'prepared_material'
+
+type MobileAttemptAction = 'idle' | 'analyzing' | 'uploading' | 'discarding' | 'replacing'
+
+interface MobilePendingAttempt {
+  item: MobileWorkbenchRecorderQueueItem
+  feedback: MobileTrainingFeedback
+  assessmentAttempt: MobileAssessmentAttempt | null
+}
 
 const COLORS = {
   background: '#F5F1EA',
@@ -1525,6 +1538,8 @@ function PracticeScreen({
   const [activeCaptureId, setActiveCaptureId] = useState<string | null>(null)
   const activeCaptureIdRef = useRef<string | null>(null)
   const [feedback, setFeedback] = useState<MobileTrainingFeedback | null>(null)
+  const [pendingAttempt, setPendingAttempt] = useState<MobilePendingAttempt | null>(null)
+  const [attemptAction, setAttemptAction] = useState<MobileAttemptAction>('idle')
   const [assessmentAttempts, setAssessmentAttempts] = useState<MobileAssessmentAttempt[]>([])
   const [showRecordings, setShowRecordings] = useState(false)
   const [collectionSource, setCollectionSource] = useState<MobileCollectionSource>(initialCollectionSource)
@@ -1569,6 +1584,7 @@ function PracticeScreen({
     distanceReady,
     understandsConsent: consentReady,
   })
+  const attemptLocked = pendingAttempt !== null || attemptAction !== 'idle'
 
   useEffect(() => {
     setSelectedExercise(visibleExercises[0] ?? null)
@@ -1596,11 +1612,11 @@ function PracticeScreen({
     )
   }
 
-  const startTrainingAttempt = async (): Promise<void> => {
+  const startTrainingAttempt = async (): Promise<boolean> => {
     setFeedback(null)
     if (!collectionPreflightReady) {
       Alert.alert('先完成采集前确认', '请确认环境安静、麦克风位置稳定，并确认本次训练数据授权后再开始。')
-      return
+      return false
     }
     const captureId = `mobile-training-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     activeCaptureIdRef.current = captureId
@@ -1624,17 +1640,19 @@ function PracticeScreen({
     if (!started) {
       activeCaptureIdRef.current = null
       setActiveCaptureId(null)
-      return
+      return false
     }
     void connectionPromise.then(async (connected) => {
       if (!connected || activeCaptureIdRef.current !== captureId) return
       await trainingConnection.startTrainingCapture(captureId, flow === 'assessment')
     })
+    return true
   }
 
   const stopAndAnalyze = async (): Promise<void> => {
     const captureId = activeCaptureId
     if (!captureId) return
+    setAttemptAction('analyzing')
     activeCaptureIdRef.current = null
     setActiveCaptureId(null)
     const connected = trainingConnection.status === 'connected'
@@ -1644,7 +1662,10 @@ function PracticeScreen({
         ? trainingConnection.stopTrainingCapture(captureId)
         : Promise.resolve(false),
     ])
-    if (!item) return
+    if (!item) {
+      setAttemptAction('idle')
+      return
+    }
     const heardText = stopped || connected
       ? await trainingConnection.waitForFinalTranscript(captureId)
       : ''
@@ -1668,10 +1689,8 @@ function PracticeScreen({
         ? { prepared_expression_id: preparedExpression.id }
         : {}),
     })
-    if (enrichedItem) await queue.uploadRecording(enrichedItem.recordingId, enrichedItem)
-    if (flow === 'assessment' && selectedExercise) {
-      setAssessmentAttempts((current) => {
-        const attempt = {
+    const assessmentAttempt = flow === 'assessment' && selectedExercise
+      ? {
           exerciseId: selectedExercise.id,
           targetText: selectedExercise.text,
           heardText,
@@ -1682,9 +1701,13 @@ function PracticeScreen({
           durationMs: item.recording.audio.durationMs,
           qualityDisposition: item.recording.audio.quality?.disposition,
         }
-        return [...current.filter((entry) => entry.exerciseId !== selectedExercise.id), attempt]
-      })
-    }
+      : null
+    setPendingAttempt({
+      item: enrichedItem ?? item,
+      feedback: nextFeedback,
+      assessmentAttempt,
+    })
+    setAttemptAction('idle')
   }
 
   const selectExerciseAt = (index: number): void => {
@@ -1695,10 +1718,66 @@ function PracticeScreen({
     setFeedback(null)
   }
 
+  const confirmPendingAttempt = async (): Promise<void> => {
+    if (!pendingAttempt || attemptAction !== 'idle') return
+    setAttemptAction('uploading')
+    const result = await confirmMobileTrainingAttempt(
+      () => queue.uploadRecording(pendingAttempt.item.recordingId, pendingAttempt.item),
+    )
+    if (result === 'confirmed') {
+      if (pendingAttempt.assessmentAttempt) {
+        const confirmedAttempt = pendingAttempt.assessmentAttempt
+        setAssessmentAttempts((current) => [
+          ...current.filter((entry) => entry.exerciseId !== confirmedAttempt.exerciseId),
+          confirmedAttempt,
+        ])
+      }
+      setPendingAttempt(null)
+      setFeedback(null)
+      if (exerciseIndex < visibleExercises.length - 1) {
+        selectExerciseAt(exerciseIndex + 1)
+      }
+    }
+    setAttemptAction('idle')
+  }
+
+  const discardPendingAttempt = async (): Promise<void> => {
+    if (!pendingAttempt || attemptAction !== 'idle') return
+    setAttemptAction('discarding')
+    const result = await discardMobileTrainingAttempt(
+      () => queue.discard(pendingAttempt.item.recordingId),
+    )
+    if (result === 'discarded') {
+      setPendingAttempt(null)
+      setFeedback(null)
+    }
+    setAttemptAction('idle')
+  }
+
+  const replacePendingAttempt = async (): Promise<void> => {
+    if (!pendingAttempt || attemptAction !== 'idle') return
+    setAttemptAction('replacing')
+    const result = await replaceMobileTrainingAttempt(
+      async () => {
+        const discarded = await queue.discard(pendingAttempt.item.recordingId)
+        if (discarded) {
+          setPendingAttempt(null)
+          setFeedback(null)
+        }
+        return discarded
+      },
+      startTrainingAttempt,
+    )
+    if (result === 'start_failed') {
+      Alert.alert('旧录音已撤回', '新录音没有开始，请检查麦克风权限后重新点击录音。')
+    }
+    setAttemptAction('idle')
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.heroHeading}>
-        <Pressable accessibilityRole="button" onPress={onBack} style={styles.textAction}>
+        <Pressable accessibilityRole="button" accessibilityState={{ disabled: attemptLocked }} disabled={attemptLocked} onPress={onBack} style={styles.textAction}>
           <Text style={styles.textActionText}>← 返回练习选择</Text>
         </Pressable>
         <Text style={styles.eyebrow}>{flow === 'assessment' ? '能力筛查' : '数据录入'}</Text>
@@ -1769,7 +1848,7 @@ function PracticeScreen({
             <Pressable
               accessibilityRole="tab"
               accessibilityState={{ selected: collectionSource === 'catalog' }}
-              disabled={queue.isRecording}
+              disabled={queue.isRecording || attemptLocked}
               onPress={() => setCollectionSource('catalog')}
               style={[styles.segmentedTab, collectionSource === 'catalog' ? styles.segmentedTabActive : null]}
             >
@@ -1778,7 +1857,7 @@ function PracticeScreen({
             <Pressable
               accessibilityRole="tab"
               accessibilityState={{ selected: collectionSource === 'prepared_material' }}
-              disabled={queue.isRecording || materialExercises.length === 0}
+              disabled={queue.isRecording || attemptLocked || materialExercises.length === 0}
               onPress={() => setCollectionSource('prepared_material')}
               style={[styles.segmentedTab, collectionSource === 'prepared_material' ? styles.segmentedTabActive : null]}
             >
@@ -1794,7 +1873,7 @@ function PracticeScreen({
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ selected: catalog.selectedCategory === category.id }}
-                  disabled={queue.isRecording}
+                  disabled={queue.isRecording || attemptLocked}
                   key={category.id}
                   onPress={() => void catalog.selectCategory(category.id)}
                   style={({ pressed }) => [styles.categoryRow, pressed ? styles.pressed : null]}
@@ -1824,7 +1903,8 @@ function PracticeScreen({
               <Text style={styles.timer}>{formatDuration(queue.durationMs)}</Text>
             </View>
             <PrimaryButton
-              label={queue.isRecording ? '说完了' : flow === 'assessment' ? '开始说这个词' : '开始说这句话'}
+              disabled={!queue.isRecording && attemptLocked}
+              label={queue.isRecording ? '说完了' : attemptAction === 'analyzing' ? '正在整理本次录音…' : pendingAttempt ? '请先决定是否收录' : flow === 'assessment' ? '开始说这个词' : '开始说这句话'}
               onPress={() => {
                 if (queue.isRecording) {
                   void stopAndAnalyze()
@@ -1843,6 +1923,22 @@ function PracticeScreen({
                 <Text style={styles.feedbackHeard}>{feedback.normalizedHeard || '暂时没有听清'}</Text>
                 <Text style={styles.feedbackSummary}>{feedback.summary}</Text>
                 <Text style={styles.mutedText}>{feedback.suggestion}</Text>
+                {pendingAttempt ? (
+                  <View style={styles.confirmationActions}>
+                    <Text style={styles.confirmationHint}>录音仍保存在本机，确认后才会上传。</Text>
+                    <PrimaryButton
+                      disabled={attemptAction !== 'idle'}
+                      label={attemptAction === 'uploading' ? '正在收录…' : '确认收录'}
+                      onPress={() => void confirmPendingAttempt()}
+                    />
+                    <View style={styles.actionRow}>
+                      <SecondaryButton disabled={attemptAction !== 'idle'} label="回听" onPress={() => queue.playRecording(pendingAttempt.item.recordingId)} />
+                      <SecondaryButton disabled={attemptAction !== 'idle'} label={attemptAction === 'replacing' ? '正在替换…' : '重录这一句'} onPress={() => void replacePendingAttempt()} />
+                      <SecondaryButton destructive disabled={attemptAction !== 'idle'} label={attemptAction === 'discarding' ? '正在撤回…' : '不收录'} onPress={() => void discardPendingAttempt()} />
+                    </View>
+                    <Text style={styles.confirmationHint}>重录会先撤回旧录音；撤回失败时不会开始新录音。</Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
             {flow === 'assessment' ? (
@@ -1874,8 +1970,8 @@ function PracticeScreen({
               </View>
             ) : null}
             <View style={styles.stepActions}>
-              <SecondaryButton disabled={exerciseIndex === 0 || queue.isRecording} label="上一句" onPress={() => selectExerciseAt(exerciseIndex - 1)} />
-              <SecondaryButton disabled={exerciseIndex >= visibleExercises.length - 1 || queue.isRecording} label="下一句" onPress={() => selectExerciseAt(exerciseIndex + 1)} />
+              <SecondaryButton disabled={exerciseIndex === 0 || queue.isRecording || attemptLocked} label="上一句" onPress={() => selectExerciseAt(exerciseIndex - 1)} />
+              <SecondaryButton disabled={exerciseIndex >= visibleExercises.length - 1 || queue.isRecording || attemptLocked} label="下一句" onPress={() => selectExerciseAt(exerciseIndex + 1)} />
             </View>
           </View>
 
@@ -1892,7 +1988,7 @@ function PracticeScreen({
         <Text style={styles.fieldLabel}>改成自己的句子</Text>
         <TextInput
           accessibilityLabel="练习句"
-          editable={!queue.isRecording}
+          editable={!queue.isRecording && !attemptLocked}
           multiline
           onChangeText={onPracticeTextChange}
           placeholder={preparedLines[0] ?? '输入想练习的一句话'}
@@ -1900,7 +1996,7 @@ function PracticeScreen({
           style={styles.practiceInput}
           value={practiceText}
         />
-        <Text style={styles.mutedText}>输入后会替换上方目标句；录音仍会自动保存，失败时留在本机。</Text>
+        <Text style={styles.mutedText}>输入后会替换上方目标句；录完先由你确认，网络失败时仍留在本机。</Text>
       </View> : null}
 
       <><Pressable
@@ -2910,6 +3006,8 @@ const styles = StyleSheet.create({
   feedbackLabel: { color: '#D4A68E', fontSize: 12, fontWeight: '800' },
   feedbackHeard: { color: '#FFFFFF', fontSize: 21, fontWeight: '800', lineHeight: 30 },
   feedbackSummary: { color: '#E9E2DB', fontSize: 14, lineHeight: 21 },
+  confirmationActions: { borderTopColor: '#514840', borderTopWidth: 1, gap: 10, marginTop: 8, paddingTop: 14 },
+  confirmationHint: { color: '#CFC7BF', fontSize: 12, lineHeight: 18 },
   assessmentProgress: { backgroundColor: COLORS.surfaceMuted, borderRadius: 14, gap: 4, padding: 14 },
   stepActions: { flexDirection: 'row', gap: 8 },
   customPracticePanel: { borderTopColor: COLORS.border, borderTopWidth: 1, gap: 10, paddingTop: 18 },

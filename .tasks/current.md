@@ -12,6 +12,8 @@
 - 第 4 项已完成代码切片：Mobile 准备页可用 Android/iOS 系统文件选择器导入 `.txt/.md`（500 KB 上限）、自动带入文件名和正文并保存到现有材料库；训练首页多份材料可直接选择，激活 API 同时返回新的 workspace snapshot，避免异步刷新时录错材料。
 - 切句唯一事实源已收口到 backend `prepared-expression.service`：workspace `prepared_expression.practice_lines` 直接返回逐句录音清单和段落关联，Web/Mobile 都只消费该协议；两端旧的原文切句算法已删除，滚动部署期间仅回退既有结构化 section 行。
 - 第 4 项验证通过：backend prepared-expression 回归与 build、Web 材料练习 5 项回归/TypeScript/production build（24/24 页面）、Mobile tests/check/typecheck/Android+iOS export、`git diff --check`。下一步严格进入第 5 项录后确认、严格重录替换、不收录；第 6–7 项尚未开始。
+- 第 5 项已完成代码切片：Mobile 停止录音后只写入本机队列并进入明确确认页，不再自动上传；提供回听、确认收录、重录这一句和不收录。筛查结果也只在确认收录后计入完成进度。
+- 重录采用严格替换：先撤回当前录音，撤回失败不开始新录音；不收录会复用 queue 的本机删除/云端撤回能力，失败时保留当前录音和确认页。待确认或处理期间锁住返回、换句、换题库、改文字和重复操作。
 - 已知非阻塞警告：Expo export 继承了当前 shell 的 `NODE_TLS_REJECT_UNAUTHORIZED=0` 并打印 TLS warning；双平台 bundle 均成功。
 
 ## 2026-08-26 Web 训练录音区产品化重构
