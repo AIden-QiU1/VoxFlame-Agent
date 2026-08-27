@@ -3,7 +3,7 @@
     "name": "VoxFlame",
     "owner": "qiuds-team",
     "slug": "voxflame-mobile-workbench",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "orientation": "portrait",
     "scheme": "voxflame",
     "icon": "../../frontend/public/icons/icon-512x512.png",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.voxflame.mobileworkbench",
-      "buildNumber": "5",
+      "buildNumber": "6",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "VoxFlame 需要麦克风权限用于沟通、练习录音和用户确认后的训练样本采集。",
         "ITSAppUsesNonExemptEncryption": false
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "org.voxflame.mobileworkbench",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "../../frontend/public/icons/icon-maskable-512x512.png",
         "backgroundColor": "#F5F1EA"

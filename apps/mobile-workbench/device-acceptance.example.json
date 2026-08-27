@@ -1,0 +1,24 @@
+{
+  "platform": "android",
+  "device_model": "填写真实机型",
+  "os_version": "填写系统版本",
+  "app_version": "0.1.5",
+  "build_number": "6",
+  "tested_at": "2026-08-27T00:00:00+08:00",
+  "tester_id": "匿名测试人编号",
+  "flows": [
+    { "id": "login", "status": "pending", "evidence": "" },
+    { "id": "signed_out_quick_expression", "status": "pending", "evidence": "" },
+    { "id": "quick_expression_tts_copy_large_text", "status": "pending", "evidence": "" },
+    { "id": "assistant_rtc_voice_and_text", "status": "pending", "evidence": "" },
+    { "id": "training_home_eight_topics_and_modern_reading", "status": "pending", "evidence": "" },
+    { "id": "material_import_select_and_sentence_split", "status": "pending", "evidence": "" },
+    { "id": "record_review_confirm", "status": "pending", "evidence": "" },
+    { "id": "strict_replace_recording", "status": "pending", "evidence": "" },
+    { "id": "discard_local_and_uploaded_recording", "status": "pending", "evidence": "" },
+    { "id": "scene_template_selection", "status": "pending", "evidence": "" },
+    { "id": "custom_hotword_crud", "status": "pending", "evidence": "" },
+    { "id": "profile_material_phrase_crud", "status": "pending", "evidence": "" },
+    { "id": "offline_recording_and_retry", "status": "pending", "evidence": "" }
+  ]
+}

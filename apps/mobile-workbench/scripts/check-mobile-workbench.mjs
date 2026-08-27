@@ -119,6 +119,7 @@ for (const [scriptName, scriptValue] of Object.entries(packageJson.scripts ?? {}
 }
 assert(packageJson.scripts?.['smoke:real-workspace'] === 'node scripts/smoke-real-workspace.mjs', 'real workspace smoke script is missing')
 assert(packageJson.scripts?.['smoke:device-env'] === 'node scripts/smoke-device-env.mjs', 'device env smoke script is missing')
+assert(packageJson.scripts?.['validate:device-acceptance'] === 'node scripts/validate-device-acceptance.mjs', 'full device acceptance validator is missing')
 assert(appJson.expo?.slug === 'voxflame-mobile-workbench', 'expo slug must be stable')
 assert(appJson.expo?.owner === 'qiuds-team', 'Expo owner must stay on the qiuds-team account')
 assert(appJson.expo?.extra?.rtcSurface === 'mobile_workbench', 'expo extra.rtcSurface must be mobile_workbench')
