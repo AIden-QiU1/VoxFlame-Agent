@@ -7,7 +7,10 @@ import {
   deleteMobileQuickPhrase,
   fetchMobilePreparedExpressionLibrary,
   fetchMobileQuickPhrases,
+  fetchMobileSceneTemplates,
   saveMobilePreparedExpression,
+  saveMobileHotwordProfiles,
+  saveMobileSceneTemplates,
   saveMobileUserProfileMemory,
   updateMobileQuickPhrase,
   type MobileQuickPhrase,
@@ -15,6 +18,8 @@ import {
 import type { MobileAuthTokenProvider } from '../api/mobile-workbench-client'
 import type {
   MobilePreparedExpressionLibrary,
+  MobileHotwordProfile,
+  MobileSceneTemplate,
   MobileUserProfileMemory,
 } from '../contracts/workspace-read-model'
 import { toMobileProductMessage } from '../ui/product-message'
@@ -27,6 +32,9 @@ export function useMobileMemoryEditor(params: {
 }) {
   const [library, setLibrary] = useState<MobilePreparedExpressionLibrary | null>(null)
   const [phrases, setPhrases] = useState<MobileQuickPhrase[]>([])
+  const [sceneTemplates, setSceneTemplates] = useState<MobileSceneTemplate[]>([])
+  const [selectedSceneTemplateIds, setSelectedSceneTemplateIds] = useState<string[]>([])
+  const [hotwordProfiles, setHotwordProfiles] = useState<MobileHotwordProfile[]>([])
   const [status, setStatus] = useState<'idle' | 'loading' | 'saving' | 'ready' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -40,12 +48,15 @@ export function useMobileMemoryEditor(params: {
     setStatus('loading')
     setErrorMessage(null)
     try {
-      const [nextLibrary, nextPhrases] = await Promise.all([
+      const [nextLibrary, nextPhrases, nextSceneTemplates] = await Promise.all([
         fetchMobilePreparedExpressionLibrary(params.userId, clientOptions),
         fetchMobileQuickPhrases(params.userId, clientOptions),
+        fetchMobileSceneTemplates(params.userId, clientOptions),
       ])
       setLibrary(nextLibrary)
       setPhrases(nextPhrases)
+      setSceneTemplates(nextSceneTemplates.library)
+      setSelectedSceneTemplateIds(nextSceneTemplates.selectedIds)
       setStatus('ready')
     } catch (error) {
       setStatus('error')
@@ -72,9 +83,31 @@ export function useMobileMemoryEditor(params: {
   return {
     library,
     phrases,
+    sceneTemplates,
+    selectedSceneTemplateIds,
+    hotwordProfiles,
     status,
     errorMessage,
     refresh,
+    hydrateHotwords(profiles: MobileHotwordProfile[]) {
+      setHotwordProfiles(profiles)
+    },
+    async saveSceneTemplateSelection(selectedIds: string[]) {
+      const userId = params.userId
+      if (!userId || !clientOptions) return false
+      const saved = await mutate(() => saveMobileSceneTemplates(userId, selectedIds, clientOptions))
+      if (!saved) return false
+      setSelectedSceneTemplateIds(saved)
+      return true
+    },
+    async saveHotwords(profiles: MobileHotwordProfile[]) {
+      const userId = params.userId
+      if (!userId || !clientOptions) return false
+      const saved = await mutate(() => saveMobileHotwordProfiles(userId, profiles, clientOptions))
+      if (!saved) return false
+      setHotwordProfiles(saved)
+      return true
+    },
     async saveMaterial(input: { id?: string; title: string; scene?: string | null; source?: string; content: string; make_active?: boolean }) {
       const userId = params.userId
       if (!userId || !clientOptions) return false

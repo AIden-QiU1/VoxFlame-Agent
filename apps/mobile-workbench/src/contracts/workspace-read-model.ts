@@ -111,8 +111,43 @@ export interface MobileUserProfileMemory {
   updated_at?: string
 }
 
+export interface MobileSceneTemplate {
+  id: string
+  title: string
+  summary: string
+  scenario: string
+  severity_hint: string
+  condition_hint: string
+  communication_goal: string
+  source_basis: string
+  focus_priority: string[]
+  risky_terms: string[]
+  support_strategies: string[]
+  starter_phrases: string[]
+  hotwords: Array<{
+    phrase: string
+    category: string
+    note: string
+  }>
+  updated_at: string
+}
+
+export interface MobileHotwordProfile {
+  id: string
+  phrase: string
+  category: 'medical' | 'profession' | 'family' | 'daily' | 'emergency' | 'custom'
+  scenario: string
+  note?: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface MobileWorkspaceSnapshotContract {
   user_profile_memory: MobileUserProfileMemory
+  scene_templates: {
+    selected_ids: string[]
+    library: MobileSceneTemplate[]
+  }
   preparation: {
     overview: string
     immediate_goal: string | null
@@ -130,6 +165,7 @@ export interface MobileWorkspaceSnapshotContract {
   prepared_expression: MobilePreparedExpressionSnapshot | null
   expression_kit: {
     recommended_phrases: MobileExpressionKitSuggestion[]
+    hotword_profiles: MobileHotwordProfile[]
     quick_phrases: Array<{
       id: string
       text: string

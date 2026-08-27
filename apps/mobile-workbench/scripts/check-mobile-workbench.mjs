@@ -80,6 +80,7 @@ assert(packageJson.scripts?.check === 'node scripts/check-mobile-workbench.mjs',
 assert(packageJson.scripts?.['test:communication'] === 'node scripts/test-mobile-quick-expression.mjs', 'mobile communication regression script is missing')
 assert(packageJson.scripts?.['test:training']?.includes('test-mobile-training-feedback.mjs'), 'mobile training feedback regression is missing')
 assert(packageJson.scripts?.['test:training']?.includes('test-mobile-attempt-confirmation.mjs'), 'mobile attempt confirmation regression is missing')
+assert(packageJson.scripts?.['test:memory'] === 'node scripts/test-mobile-memory-editor.mjs', 'mobile memory regression is missing')
 assert(sourceText.includes('confirmMobileTrainingAttempt'), 'recordings must wait for explicit confirmation before upload')
 assert(sourceText.includes('replaceMobileTrainingAttempt'), 'strict recording replacement orchestration is missing')
 assert(packageJson.scripts?.web === undefined, 'web script must stay disabled until web dependencies are explicit')
@@ -241,6 +242,8 @@ for (const requiredToken of [
   'collection_plan_id: flow === \'collection\' ? collectionPlanId : undefined',
   '/prepared-expressions/active',
   '/profile-memory',
+  '/scene-templates',
+  '/memory/hotwords',
   '/phrases/user/',
   'EXPO_PUBLIC_API_BASE_URL',
   '/mobile/diagnostics',
@@ -341,6 +344,7 @@ for (const contractToken of [
 for (const workspaceRoute of [
   "memoryRouter.get('/workspace/:userId'",
   "memoryRouter.get('/workspace/:userId/prepared-expressions'",
+  "memoryRouter.post('/hotwords'",
 ]) {
   assert(backendIndex.includes(workspaceRoute), `backend workspace route missing: ${workspaceRoute}`)
 }
