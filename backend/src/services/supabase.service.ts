@@ -681,7 +681,16 @@ export class SupabaseService {
   async getHotwordProfiles(userId: string): Promise<HotwordProfileRecord[]> {
     const userProfile = await this.getUserProfile(userId);
     const selectedTemplateIds = this.getSelectedSceneTemplateIdsFromProfile(userProfile);
-    return buildHotwordProfilesFromSceneTemplateIds(selectedTemplateIds);
+    const preferences = isRecord(userProfile?.preferences) ? userProfile.preferences : {};
+    const customProfiles = normalizeHotwordProfiles(preferences.hotword_profiles);
+    const templateProfiles = buildHotwordProfilesFromSceneTemplateIds(selectedTemplateIds);
+    const seenPhrases = new Set<string>();
+    return [...customProfiles, ...templateProfiles].filter((profile) => {
+      const key = profile.phrase.trim().toLocaleLowerCase();
+      if (!key || seenPhrases.has(key)) return false;
+      seenPhrases.add(key);
+      return true;
+    });
   }
 
   getSceneTemplateCatalog(): WorkspaceMemorySnapshot['scene_templates']['library'] {
@@ -713,9 +722,9 @@ export class SupabaseService {
       ...existingPreferences,
       selected_scene_template_ids: normalizedTemplateIds,
     };
-    delete nextPreferences.hotword_profiles;
-
     const templateHotwords = buildHotwordProfilesFromSceneTemplateIds(normalizedTemplateIds)
+      .map((profile) => profile.phrase);
+    const customHotwords = normalizeHotwordProfiles(existingPreferences.hotword_profiles)
       .map((profile) => profile.phrase);
     const preparedExpressionAsset = this.readPreparedExpressionAssetFromProfile(userProfile);
 
@@ -724,6 +733,7 @@ export class SupabaseService {
       hotwords: dedupeStrings(
         [
           ...templateHotwords,
+          ...customHotwords,
           ...(preparedExpressionAsset?.structured.hotwords ?? []),
         ],
         20,
@@ -867,7 +877,13 @@ export class SupabaseService {
       hotword_profiles: normalizedProfiles,
     };
     const nextHotwords = Array.from(
-      new Set(normalizedProfiles.map((profile) => profile.phrase)),
+      new Set([
+        ...buildHotwordProfilesFromSceneTemplateIds(
+          this.getSelectedSceneTemplateIdsFromProfile(userProfile),
+        ).map((profile) => profile.phrase),
+        ...normalizedProfiles.map((profile) => profile.phrase),
+        ...(this.readPreparedExpressionAssetFromProfile(userProfile)?.structured.hotwords ?? []),
+      ]),
     ).slice(0, 20);
 
     const updated = await this.updateUserProfile(userId, {
@@ -916,6 +932,7 @@ export class SupabaseService {
   async updateUserProfileMemory(
     userId: string,
     input: UserProfileMemoryRecord,
+    options: { replaceLists?: boolean; replaceFields?: boolean } = {},
   ): Promise<UserProfileMemoryRecord> {
     await this.ensureUserProfile(userId);
 
@@ -929,31 +946,19 @@ export class SupabaseService {
     const normalizedInput = normalizeUserProfileMemory(input);
     const updatedAt = normalizedInput.updated_at ?? new Date().toISOString();
     const nextProfileMemory: UserProfileMemoryRecord = {
-      etiology: normalizedInput.etiology ?? existingProfileMemory.etiology,
-      severity: normalizedInput.severity ?? existingProfileMemory.severity,
-      document: normalizedInput.document ?? existingProfileMemory.document,
+      etiology: options.replaceFields ? normalizedInput.etiology : normalizedInput.etiology ?? existingProfileMemory.etiology,
+      severity: options.replaceFields ? normalizedInput.severity : normalizedInput.severity ?? existingProfileMemory.severity,
+      document: options.replaceFields ? normalizedInput.document : normalizedInput.document ?? existingProfileMemory.document,
       summary: normalizedInput.summary ?? existingProfileMemory.summary,
-      common_scenarios: dedupeStrings(
-        [
-          ...(normalizedInput.common_scenarios ?? []),
-          ...(existingProfileMemory.common_scenarios ?? []),
-        ],
-        6,
-      ),
-      risky_terms: dedupeStrings(
-        [
-          ...(normalizedInput.risky_terms ?? []),
-          ...(existingProfileMemory.risky_terms ?? []),
-        ],
-        6,
-      ),
-      support_strategies: dedupeStrings(
-        [
-          ...(normalizedInput.support_strategies ?? []),
-          ...(existingProfileMemory.support_strategies ?? []),
-        ],
-        6,
-      ),
+      common_scenarios: dedupeStrings(options.replaceLists
+        ? normalizedInput.common_scenarios ?? []
+        : [...(normalizedInput.common_scenarios ?? []), ...(existingProfileMemory.common_scenarios ?? [])], 6),
+      risky_terms: dedupeStrings(options.replaceLists
+        ? normalizedInput.risky_terms ?? []
+        : [...(normalizedInput.risky_terms ?? []), ...(existingProfileMemory.risky_terms ?? [])], 6),
+      support_strategies: dedupeStrings(options.replaceLists
+        ? normalizedInput.support_strategies ?? []
+        : [...(normalizedInput.support_strategies ?? []), ...(existingProfileMemory.support_strategies ?? [])], 6),
       updated_at: updatedAt,
     };
 

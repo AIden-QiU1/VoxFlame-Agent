@@ -113,6 +113,7 @@ memoryRouter.delete('/workspace/:userId/prepared-expressions/:assetId', authMidd
 memoryRouter.post('/workspace/:userId/prepared-expressions/:assetId/summarize', authMiddleware, validateUserId, memoryController.summarizePreparedExpressionAsset.bind(memoryController))
 memoryRouter.put('/workspace/:userId/preferences', authMiddleware, validateUserId, memoryController.syncCommunicationPreferences.bind(memoryController))
 memoryRouter.put('/workspace/:userId/profile-memory', authMiddleware, validateUserId, memoryController.syncUserProfileMemory.bind(memoryController))
+memoryRouter.post('/hotwords', authMiddleware, memoryController.syncHotwords.bind(memoryController))
 memoryRouter.get('/profile/:userId', authMiddleware, validateUserId, memoryController.getUserMemoryProfile.bind(memoryController))
 memoryRouter.get('/search', authMiddleware, memoryController.searchMemories.bind(memoryController))
 memoryRouter.put('/:memoryId', authMiddleware, memoryController.updateMemory.bind(memoryController))

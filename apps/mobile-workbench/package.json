@@ -30,6 +30,7 @@
     "typecheck": "tsc --noEmit",
     "test:communication": "node scripts/test-mobile-quick-expression.mjs",
     "test:training": "node scripts/test-mobile-training-feedback.mjs && node scripts/test-mobile-attempt-confirmation.mjs",
+    "test:memory": "node scripts/test-mobile-memory-editor.mjs",
     "check": "node scripts/check-mobile-workbench.mjs",
     "smoke:real-workspace": "node scripts/smoke-real-workspace.mjs",
     "smoke:device-env": "node scripts/smoke-device-env.mjs"

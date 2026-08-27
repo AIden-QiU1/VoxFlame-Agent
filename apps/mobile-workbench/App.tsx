@@ -69,6 +69,11 @@ import {
   MOBILE_COLLECTION_PLANS,
 } from './src/training/collection-protocol'
 import { useMobileMemoryEditor } from './src/memory/use-mobile-memory-editor'
+import {
+  removeMobileHotwordProfile,
+  upsertMobileHotwordProfile,
+} from './src/memory/mobile-hotword-editor'
+import type { MobileHotwordProfile } from './src/contracts/workspace-read-model'
 import type {
   MobileTrainingCategory,
   MobileTrainingExercise,
@@ -2078,25 +2083,50 @@ function MemoryScreen({
   readModel: MobileWorkspaceReadModel
   snapshot: MobileWorkspaceSnapshotContract | null
 }) {
-  const [section, setSection] = useState<'overview' | 'materials' | 'profile' | 'phrases'>('overview')
+  const [section, setSection] = useState<'overview' | 'materials' | 'profile' | 'scenes' | 'phrases'>('overview')
   const [materialId, setMaterialId] = useState<string | undefined>()
   const [materialTitle, setMaterialTitle] = useState('')
   const [materialContent, setMaterialContent] = useState('')
   const [materialSource, setMaterialSource] = useState('manual_input')
   const [materialStatus, setMaterialStatus] = useState<string | null>(null)
   const [profileDocument, setProfileDocument] = useState('')
+  const [profileEtiology, setProfileEtiology] = useState('')
+  const [profileSeverity, setProfileSeverity] = useState('')
   const [profileScenarios, setProfileScenarios] = useState('')
+  const [profileRiskyTerms, setProfileRiskyTerms] = useState('')
   const [profileStrategies, setProfileStrategies] = useState('')
   const [phraseId, setPhraseId] = useState<string | undefined>()
   const [phraseText, setPhraseText] = useState('')
+  const [hotwordId, setHotwordId] = useState<string | undefined>()
+  const [hotwordPhrase, setHotwordPhrase] = useState('')
+  const [hotwordCategory, setHotwordCategory] = useState<MobileHotwordProfile['category']>('custom')
+  const [hotwordScenario, setHotwordScenario] = useState('')
+  const [hotwordNote, setHotwordNote] = useState('')
+  const [sceneStatus, setSceneStatus] = useState<string | null>(null)
   const busy = loading || editor.status === 'loading' || editor.status === 'saving'
 
   useEffect(() => {
     const profile = snapshot?.user_profile_memory
+    setProfileEtiology(profile?.etiology ?? '')
+    setProfileSeverity(profile?.severity ?? '')
     setProfileDocument(profile?.document ?? '')
     setProfileScenarios((profile?.common_scenarios ?? []).join('\n'))
+    setProfileRiskyTerms((profile?.risky_terms ?? []).join('\n'))
     setProfileStrategies((profile?.support_strategies ?? []).join('\n'))
   }, [snapshot?.user_profile_memory])
+
+  useEffect(() => {
+    const templatePhrases = new Set(
+      editor.sceneTemplates
+        .filter((template) => editor.selectedSceneTemplateIds.includes(template.id))
+        .flatMap((template) => template.hotwords.map((entry) => entry.phrase.trim().toLocaleLowerCase())),
+    )
+    editor.hydrateHotwords(
+      (snapshot?.expression_kit.hotword_profiles ?? []).filter(
+        (profile) => !templatePhrases.has(profile.phrase.trim().toLocaleLowerCase()),
+      ),
+    )
+  }, [editor.sceneTemplates, editor.selectedSceneTemplateIds, snapshot?.expression_kit.hotword_profiles])
 
   const editMaterial = (id?: string): void => {
     const asset = editor.library?.assets.find((item) => item.draft.id === id)
@@ -2164,6 +2194,40 @@ function MemoryScreen({
     .map((item) => item.trim())
     .filter(Boolean)
 
+  const resetHotwordEditor = (): void => {
+    setHotwordId(undefined)
+    setHotwordPhrase('')
+    setHotwordCategory('custom')
+    setHotwordScenario('')
+    setHotwordNote('')
+  }
+
+  const saveHotword = async (): Promise<void> => {
+    const nextProfiles = upsertMobileHotwordProfile(editor.hotwordProfiles, {
+      id: hotwordId,
+      phrase: hotwordPhrase,
+      category: hotwordCategory,
+      scenario: hotwordScenario,
+      note: hotwordNote,
+    })
+    if (await editor.saveHotwords(nextProfiles)) {
+      resetHotwordEditor()
+      onRefresh()
+    }
+  }
+
+  const toggleSceneTemplate = async (templateId: string): Promise<void> => {
+    setSceneStatus(null)
+    const selected = editor.selectedSceneTemplateIds.includes(templateId)
+    const nextIds = selected
+      ? editor.selectedSceneTemplateIds.filter((id) => id !== templateId)
+      : [...editor.selectedSceneTemplateIds, templateId]
+    if (await editor.saveSceneTemplateSelection(nextIds)) {
+      setSceneStatus(selected ? '这套模板已停用。' : '这套模板已启用，下次沟通会自动带上重点词和策略。')
+      onRefresh()
+    }
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.heroHeading}>
@@ -2177,6 +2241,7 @@ function MemoryScreen({
           ['overview', '概览'],
           ['materials', '材料'],
           ['profile', '画像'],
+          ['scenes', '场景'],
           ['phrases', '短句'],
         ] as const).map(([id, label]) => (
           <Pressable
@@ -2317,17 +2382,101 @@ function MemoryScreen({
         <Text style={styles.mutedText}>只写对沟通有帮助的事实，不需要医学化描述自己。</Text>
         <Text style={styles.fieldLabel}>希望别人怎样理解我</Text>
         <TextInput accessibilityLabel="沟通画像" editable={!busy} multiline onChangeText={setProfileDocument} placeholder="例如：我理解没有问题，但需要更多时间把话说完整。" placeholderTextColor={COLORS.subtle} style={styles.practiceInput} value={profileDocument} />
+        <View style={styles.inlineFields}>
+          <View style={styles.inlineField}><Text style={styles.fieldLabel}>情况 / 病因（可选）</Text><View style={styles.chipWrap}>{([['unknown', '暂不确定'], ['stroke', '脑卒中'], ['parkinsons', '帕金森'], ['cerebral_palsy', '脑瘫'], ['brain_injury', '脑损伤'], ['hearing_loss', '听力相关'], ['neuromuscular', '神经肌肉'], ['other', '其他']] as const).map(([id, label]) => <Pressable accessibilityRole="button" accessibilityState={{ selected: profileEtiology === id }} key={id} onPress={() => setProfileEtiology(profileEtiology === id ? '' : id)} style={[styles.filterChip, profileEtiology === id ? styles.filterChipActive : null]}><Text style={[styles.filterChipText, profileEtiology === id ? styles.filterChipTextActive : null]}>{label}</Text></Pressable>)}</View></View>
+          <View style={styles.inlineField}><Text style={styles.fieldLabel}>表达支持程度（可选）</Text><View style={styles.chipWrap}>{([['unsure', '暂不确定'], ['mild', '较少支持'], ['moderate', '中等支持'], ['severe', '较多支持']] as const).map(([id, label]) => <Pressable accessibilityRole="button" accessibilityState={{ selected: profileSeverity === id }} key={id} onPress={() => setProfileSeverity(profileSeverity === id ? '' : id)} style={[styles.filterChip, profileSeverity === id ? styles.filterChipActive : null]}><Text style={[styles.filterChipText, profileSeverity === id ? styles.filterChipTextActive : null]}>{label}</Text></Pressable>)}</View></View>
+        </View>
         <Text style={styles.fieldLabel}>常见场景（每行一项）</Text>
         <TextInput accessibilityLabel="常见沟通场景" editable={!busy} multiline onChangeText={setProfileScenarios} placeholder="工作会议\n就医沟通" placeholderTextColor={COLORS.subtle} style={styles.practiceInput} value={profileScenarios} />
+        <Text style={styles.fieldLabel}>容易被听错的词（每行一项）</Text>
+        <TextInput accessibilityLabel="容易被听错的词" editable={!busy} multiline onChangeText={setProfileRiskyTerms} placeholder="药名\n人名\n专业词" placeholderTextColor={COLORS.subtle} style={styles.practiceInput} value={profileRiskyTerms} />
         <Text style={styles.fieldLabel}>有效支持方式（每行一项）</Text>
         <TextInput accessibilityLabel="有效支持方式" editable={!busy} multiline onChangeText={setProfileStrategies} placeholder="让我先说完\n必要时看手机文字" placeholderTextColor={COLORS.subtle} style={styles.practiceInput} value={profileStrategies} />
         <PrimaryButton disabled={busy} label={busy ? '正在保存…' : '保存画像'} onPress={() => void editor.saveProfile({
           ...snapshot?.user_profile_memory,
+          etiology: profileEtiology.trim(),
+          severity: profileSeverity.trim(),
           document: profileDocument.trim(),
           common_scenarios: splitLines(profileScenarios),
+          risky_terms: splitLines(profileRiskyTerms),
           support_strategies: splitLines(profileStrategies),
         }).then((saved) => { if (saved) onRefresh() })} />
       </View> : null}
+
+      {section === 'scenes' ? <>
+        <View style={styles.sectionIntro}>
+          <Text style={styles.sectionTitle}>场景模板</Text>
+          <Text style={styles.mutedText}>模板由系统统一维护；你决定启用哪些，沟通时会自动带上对应策略和重点词。</Text>
+        </View>
+        {sceneStatus ? <InlineMessage tone="success" text={sceneStatus} /> : null}
+        {editor.sceneTemplates.map((template) => {
+          const selected = editor.selectedSceneTemplateIds.includes(template.id)
+          return (
+            <View key={template.id} style={[styles.libraryItem, selected ? styles.libraryItemActive : null]}>
+              <View style={styles.cardHeader}>
+                <View style={styles.cardHeaderCopy}>
+                  <Text style={styles.cardTitle}>{template.title}</Text>
+                  <Text style={styles.mutedText}>{template.summary}</Text>
+                </View>
+                {selected ? <Text style={styles.activeBadge}>已启用</Text> : null}
+              </View>
+              <Text style={styles.mutedText}>目标：{template.communication_goal}</Text>
+              <View style={styles.chipWrap}>
+                {template.hotwords.slice(0, 6).map((item) => <View key={`${template.id}-${item.phrase}`} style={styles.chip}><Text style={styles.chipText}>{item.phrase}</Text></View>)}
+              </View>
+              <Text style={styles.mutedText}>开口句：{template.starter_phrases.slice(0, 2).join('；')}</Text>
+              <SecondaryButton disabled={busy} label={selected ? '停用这套模板' : '启用这套模板'} onPress={() => void toggleSceneTemplate(template.id)} />
+            </View>
+          )
+        })}
+
+        <View style={styles.sectionIntro}>
+          <Text style={styles.sectionTitle}>我的重点词</Text>
+          <Text style={styles.mutedText}>添加人名、药名、地点或专业词，Web、App 和语音助手会使用同一份列表。</Text>
+        </View>
+        {editor.hotwordProfiles.map((profile) => (
+          <View key={profile.id} style={styles.phraseEditorRow}>
+            <View style={styles.cardHeaderCopy}>
+              <Text style={styles.preparedText}>{profile.phrase}</Text>
+              <Text style={styles.mutedText}>{profile.scenario || '通用场景'}{profile.note ? ` · ${profile.note}` : ''}</Text>
+            </View>
+            <View style={styles.compactActions}>
+              <SecondaryButton compact label="编辑" onPress={() => {
+                setHotwordId(profile.id)
+                setHotwordPhrase(profile.phrase)
+                setHotwordCategory(profile.category)
+                setHotwordScenario(profile.scenario)
+                setHotwordNote(profile.note ?? '')
+              }} />
+              <SecondaryButton compact destructive label="删除" onPress={() => Alert.alert(
+                '删除这个重点词？',
+                'Web、App 和后续沟通中都会移除。',
+                [{ text: '取消', style: 'cancel' }, { text: '删除', style: 'destructive', onPress: () => void editor.saveHotwords(removeMobileHotwordProfile(editor.hotwordProfiles, profile.id)).then((saved) => { if (saved) onRefresh() }) }],
+              )} />
+            </View>
+          </View>
+        ))}
+        <View style={styles.editorPanel}>
+          <Text style={styles.cardTitle}>{hotwordId ? '编辑重点词' : '新增重点词'}</Text>
+          <TextInput accessibilityLabel="重点词" editable={!busy} onChangeText={setHotwordPhrase} placeholder="例如：左旋多巴" placeholderTextColor={COLORS.subtle} style={styles.input} value={hotwordPhrase} />
+          <TextInput accessibilityLabel="重点词使用场景" editable={!busy} onChangeText={setHotwordScenario} placeholder="例如：神经内科复诊" placeholderTextColor={COLORS.subtle} style={styles.input} value={hotwordScenario} />
+          <TextInput accessibilityLabel="重点词备注" editable={!busy} onChangeText={setHotwordNote} placeholder="可选：希望系统特别注意什么" placeholderTextColor={COLORS.subtle} style={styles.input} value={hotwordNote} />
+          <View style={styles.chipWrap}>
+            {([
+              ['custom', '通用'], ['medical', '医疗'], ['profession', '工作'],
+              ['family', '家庭'], ['daily', '日常'], ['emergency', '紧急'],
+            ] as const).map(([id, label]) => (
+              <Pressable accessibilityRole="button" accessibilityState={{ selected: hotwordCategory === id }} key={id} onPress={() => setHotwordCategory(id)} style={[styles.filterChip, hotwordCategory === id ? styles.filterChipActive : null]}>
+                <Text style={[styles.filterChipText, hotwordCategory === id ? styles.filterChipTextActive : null]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.actionRow}>
+            {hotwordId ? <SecondaryButton label="取消" onPress={resetHotwordEditor} /> : null}
+            <PrimaryButton disabled={busy || !hotwordPhrase.trim()} label={busy ? '正在保存…' : '保存重点词'} onPress={() => void saveHotword()} />
+          </View>
+        </View>
+      </> : null}
 
       {section === 'phrases' ? <>
         <View style={styles.sectionIntro}>
@@ -3087,11 +3236,15 @@ const styles = StyleSheet.create({
   },
   preparedIndex: { color: COLORS.accent, fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800', paddingTop: 3 },
   preparedText: { color: COLORS.ink, flex: 1, fontSize: 15, lineHeight: 23 },
-  segmentedTabs: { backgroundColor: '#EAE4DC', borderRadius: 14, flexDirection: 'row', gap: 3, padding: 4 },
-  segmentedTab: { alignItems: 'center', borderRadius: 10, flex: 1, justifyContent: 'center', minHeight: 42 },
+  segmentedTabs: { backgroundColor: '#EAE4DC', borderRadius: 14, flexDirection: 'row', flexWrap: 'wrap', gap: 3, padding: 4 },
+  segmentedTab: { alignItems: 'center', borderRadius: 10, flexBasis: 64, flexGrow: 1, justifyContent: 'center', minHeight: 42 },
   segmentedTabActive: { backgroundColor: COLORS.surface },
   segmentedTabText: { color: COLORS.muted, fontSize: 13, fontWeight: '700' },
   segmentedTabTextActive: { color: COLORS.ink, fontWeight: '800' },
+  filterChip: { backgroundColor: COLORS.surfaceMuted, borderColor: COLORS.border, borderRadius: 999, borderWidth: 1, minHeight: 38, paddingHorizontal: 12, justifyContent: 'center' },
+  filterChipActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
+  filterChipText: { color: COLORS.muted, fontSize: 12, fontWeight: '700' },
+  filterChipTextActive: { color: COLORS.accent, fontWeight: '800' },
   sectionIntro: { gap: 5, paddingTop: 2 },
   libraryItem: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 16, borderWidth: 1, gap: 13, padding: 16 },
   libraryItemActive: { borderColor: COLORS.accent },

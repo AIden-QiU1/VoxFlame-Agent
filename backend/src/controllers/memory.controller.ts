@@ -56,6 +56,8 @@ interface MemoryUserProfileMemoryRequestBody {
   common_scenarios?: string[];
   risky_terms?: string[];
   support_strategies?: string[];
+  replace_lists?: boolean;
+  replace_fields?: boolean;
 }
 
 interface MemoryPreparedExpressionRequestBody {
@@ -395,6 +397,8 @@ export class MemoryController {
         common_scenarios,
         risky_terms,
         support_strategies,
+        replace_lists,
+        replace_fields,
       } = req.body as MemoryUserProfileMemoryRequestBody;
 
       if (!authenticatedUserId) {
@@ -422,6 +426,10 @@ export class MemoryController {
           common_scenarios: Array.isArray(common_scenarios) ? common_scenarios : undefined,
           risky_terms: Array.isArray(risky_terms) ? risky_terms : undefined,
           support_strategies: Array.isArray(support_strategies) ? support_strategies : undefined,
+        },
+        {
+          replaceLists: replace_lists === true,
+          replaceFields: replace_fields === true,
         },
       );
 
