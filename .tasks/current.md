@@ -1,6 +1,6 @@
 # 当前任务状态
 
-> 最后更新: 2026-08-26
+> 最后更新: 2026-08-27
 
 ## 2026-08-26 App 完整替代 Web 七步优化
 
@@ -18,6 +18,9 @@
 - Backend 已正式挂载自定义热词 API，并修复模板热词覆盖自定义热词的问题：模板与用户重点词分别持久化、合并消费，切换模板不再删除用户重点词。显式画像编辑支持替换/清空列表和可选字段，会话自动维护仍保持增量合并。
 - 第 7 项工程验收闭环已补齐：新增 Android/iPhone 共用的 13 项完整业务流验收清单、JSON 证据模板和严格校验器，覆盖登录/匿名快速表达、TTS/复制/大字、RTC 语音与文字、8 主题与现代文章、文件导入、录后确认、严格替换、不收录、完整记忆 CRUD 和断网恢复；空证据或 `fail/pending` 无法通过。
 - Android EAS 发布时检测到远端已有更高 build，发布脚本按唯一递增规则自动升到 `0.1.7`、Android `versionCode=8`、iOS `buildNumber=8`。Android build `463f705e-a125-43d6-a6dc-b5df98e74673` 已发布到 `https://voxember.com/download/android`，SHA256 `821d0a3573c4738811bbe75085dd4eefab31d6c8f6cfe1f11941ed2ee8775762`。当前 Linux 主机无 adb 设备、无 macOS/iOS 工具链，因此实体 Android/iPhone 的逐项点击、麦克风、蓝牙/有线路由和 Apple 安装证据仍必须由设备持有人完成，不能由 bundle 构建替代。
+- 第 6 项 Backend 已于 2026-08-27 从发布提交 `d0a0525` 的隔离源码构建并部署，没有混入当前工作树的 PWA/RTC 改动。生产 `/api/rtc/health` 返回 200，`POST /api/memory/hotwords` 未登录返回 401，Backend 容器健康；旧镜像保留为 `voxflame-agent-backend:pre-mobile-0.1.7` 可回滚。
+- iOS `0.1.7 (8)` Preview 云构建已实际发起。EAS 正常加载 Preview 环境，但项目显示 `No credentials set up yet`，且没有适用于内部分发的 Provisioning Profile；非交互构建无法注册测试设备。下一步必须由 Apple 账号持有人完成登录、设备登记和签名凭据生成后重跑。
+- 真机门当前仍严格 pending：本机 USB 仅有 Linux root hub，没有连接 Android/iPhone，也没有 `adb`、`xcrun` 或 macOS/iOS 工具链。Android/iPhone 各自填写验收 JSON 并通过 `npm run validate:device-acceptance -- <result.json>` 前，不宣称 App 已完全替代 Web。
 - 已知非阻塞警告：Expo export 继承了当前 shell 的 `NODE_TLS_REJECT_UNAUTHORIZED=0` 并打印 TLS warning；双平台 bundle 均成功。
 
 ## 2026-08-26 Web 训练录音区产品化重构
