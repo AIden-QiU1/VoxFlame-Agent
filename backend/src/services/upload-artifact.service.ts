@@ -8,6 +8,7 @@ const UPLOAD_METADATA_KEYS = new Set([
   'kind', 'sentence_id', 'target_text', 'spoken_text', 'recognized_text',
   'prompt_aligned_transcript', 'etiology', 'severity', 'age_band', 'sex',
   'consent_scope', 'consent_version', 'collection_plan_id',
+  'reading_assistance_used',
   // Retry de-duplication and prompt lineage.
   'recording_id', 'session_id', 'prompt_group_key', 'prompt_fingerprint',
   'recording_dedupe_key', 'duplicate_policy', 'repeated_prompt_strategy',
@@ -26,6 +27,10 @@ const UPLOAD_METADATA_KEYS = new Set([
   'pronunciation_summary', 'pronunciation_targets',
   'prepared_expression_id', 'prepared_expression_section_id',
   'prepared_expression_section_title',
+  // Long-form reading lineage. Article bodies stay in the versioned catalog.
+  'reading_material_kind', 'reading_article_id', 'reading_article_version',
+  'reading_segment_id', 'reading_segment_index', 'reading_segment_count',
+  'reading_round_id',
 ])
 
 export interface UploadCompletePayload {
@@ -64,6 +69,22 @@ export interface DiscardUploadResult {
   removedAudioObject: boolean
   removedManifestEntry: boolean
   removedTranscriptEntry: boolean
+}
+
+export interface RecordingProgressRow {
+  sentence_id?: string | null
+  duration_seconds?: number | null
+  created_at?: string | null
+  metadata?: Record<string, unknown> | null
+}
+
+export interface RecordingProgressSnapshot {
+  recordedSentenceIds: string[]
+  recordedReadingSegmentIds: string[]
+  recordedReadingRoundKeys: string[]
+  readingArticleRoundIds: Record<string, string>
+  todayDurationSeconds: number
+  totalDurationSeconds: number
 }
 
 interface ContributionRecord {
@@ -166,6 +187,72 @@ function toErrorMessage(error: unknown): string {
   }
 
   return 'unknown_error'
+}
+
+function toSafeDurationSeconds(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0
+}
+
+function toTimestamp(value: unknown): number | null {
+  if (typeof value !== 'string' || !value.trim()) {
+    return null
+  }
+
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
+/** Build the privacy-minimal progress payload returned to an authenticated user. */
+export function summarizeRecordingProgress(
+  rows: RecordingProgressRow[],
+  timezoneOffsetMinutes: number,
+  nowMs: number = Date.now(),
+): RecordingProgressSnapshot {
+  const safeOffsetMinutes = Number.isFinite(timezoneOffsetMinutes)
+    ? Math.max(-840, Math.min(840, Math.round(timezoneOffsetMinutes)))
+    : 0
+  const localNow = new Date(nowMs - safeOffsetMinutes * 60_000)
+  const localDayStartUtc = Date.UTC(
+    localNow.getUTCFullYear(),
+    localNow.getUTCMonth(),
+    localNow.getUTCDate(),
+  ) + safeOffsetMinutes * 60_000
+  const localDayEndUtc = localDayStartUtc + 86_400_000
+  const sentenceIds = new Set<string>()
+  const readingSegmentIds = new Set<string>()
+  const readingRoundKeys = new Set<string>()
+  let todayDurationSeconds = 0
+  let totalDurationSeconds = 0
+
+  for (const row of rows) {
+    const durationSeconds = toSafeDurationSeconds(row.duration_seconds)
+    totalDurationSeconds += durationSeconds
+
+    const createdAt = toTimestamp(row.created_at)
+    if (createdAt !== null && createdAt >= localDayStartUtc && createdAt < localDayEndUtc) {
+      todayDurationSeconds += durationSeconds
+    }
+
+    if (typeof row.sentence_id === 'string' && row.sentence_id.trim()) {
+      sentenceIds.add(row.sentence_id.trim())
+    }
+
+    const readingSegmentId = readString(row.metadata ?? undefined, 'reading_segment_id')
+    if (readingSegmentId) {
+      readingSegmentIds.add(readingSegmentId)
+      const readingRoundId = readString(row.metadata ?? undefined, 'reading_round_id') ?? 'initial'
+      readingRoundKeys.add(`${readingRoundId}:${readingSegmentId}`)
+    }
+  }
+
+  return {
+    recordedSentenceIds: Array.from(sentenceIds).sort(),
+    recordedReadingSegmentIds: Array.from(readingSegmentIds).sort(),
+    recordedReadingRoundKeys: Array.from(readingRoundKeys).sort(),
+    readingArticleRoundIds: {},
+    todayDurationSeconds: Math.round(todayDurationSeconds * 1000) / 1000,
+    totalDurationSeconds: Math.round(totalDurationSeconds * 1000) / 1000,
+  }
 }
 
 export function buildRecordingManifestEntry(
@@ -592,6 +679,104 @@ async function deleteContribution(contributorId: string, contributionId: string)
 }
 
 export class UploadArtifactService {
+  async getRecordingProgress(
+    contributorId: string,
+    timezoneOffsetMinutes: number,
+  ): Promise<RecordingProgressSnapshot> {
+    if (!supabase) {
+      return summarizeRecordingProgress([], timezoneOffsetMinutes)
+    }
+
+    const rows: RecordingProgressRow[] = []
+    const pageSize = 1000
+    let from = 0
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('voice_contributions')
+        .select('sentence_id, duration_seconds, created_at, metadata')
+        .eq('contributor_id', contributorId)
+        .order('created_at', { ascending: true })
+        .range(from, from + pageSize - 1)
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      const page = Array.isArray(data) ? data as RecordingProgressRow[] : []
+      rows.push(...page)
+      if (page.length < pageSize) {
+        break
+      }
+      from += pageSize
+    }
+
+    const snapshot = summarizeRecordingProgress(rows, timezoneOffsetMinutes)
+    const { data: readingProgressData, error: readingProgressError } = await supabase
+      .from('reading_article_progress')
+      .select('article_id, current_round')
+      .eq('contributor_id', contributorId)
+
+    if (readingProgressError) {
+      throw new Error(readingProgressError.message)
+    }
+
+    snapshot.readingArticleRoundIds = Object.fromEntries(
+      (Array.isArray(readingProgressData) ? readingProgressData : [])
+        .flatMap((row) => (
+          typeof row.article_id === 'string'
+          && typeof row.current_round === 'number'
+          && Number.isInteger(row.current_round)
+          && row.current_round > 0
+            ? [[row.article_id, `round-${row.current_round}`] as const]
+            : []
+        )),
+    )
+    return snapshot
+  }
+
+  async resetReadingArticleProgress(
+    contributorId: string,
+    articleId: string,
+  ): Promise<{ articleId: string; roundId: string }> {
+    if (!supabase) {
+      throw new Error('reading_progress_storage_unavailable')
+    }
+
+    const { data: existing, error: readError } = await supabase
+      .from('reading_article_progress')
+      .select('current_round')
+      .eq('contributor_id', contributorId)
+      .eq('article_id', articleId)
+      .maybeSingle()
+
+    if (readError) {
+      throw new Error(readError.message)
+    }
+
+    const currentRound = existing
+      && typeof existing.current_round === 'number'
+      && Number.isInteger(existing.current_round)
+      && existing.current_round >= 0
+        ? existing.current_round
+        : 0
+    const nextRound = currentRound + 1
+    const { error: writeError } = await supabase
+      .from('reading_article_progress')
+      .upsert({
+        contributor_id: contributorId,
+        article_id: articleId,
+        current_round: nextRound,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'contributor_id,article_id' })
+
+    if (writeError) {
+      throw new Error(writeError.message)
+    }
+
+    return { articleId, roundId: `round-${nextRound}` }
+  }
+
   async persistCompletedUpload(payload: UploadCompletePayload): Promise<UploadArtifactResult> {
     const manifestPath = `dataset/${payload.contributorId}/manifest.jsonl`
     const sanitizedMetadata = sanitizeUploadMetadata({

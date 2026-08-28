@@ -110,6 +110,10 @@ export function useVoiceUpload() {
     }
   }, [])
 
+  useEffect(() => {
+    void refreshLocalQueueCount()
+  }, [refreshLocalQueueCount])
+
   /**
    * 本地降级存储
    */

@@ -1,26 +1,4 @@
 /** @type {import('next').NextConfig} */
-const normalizedPwaFlag = (process.env.VOXFLAME_ENABLE_PWA || "").trim().toLowerCase();
-const normalizedPwaDevFlag = (process.env.VOXFLAME_ENABLE_PWA_DEV || "").trim().toLowerCase();
-const pwaEnabled = !["0", "false", "no"].includes(normalizedPwaFlag);
-const pwaEnabledInDevelopment = ["1", "true", "yes"].includes(normalizedPwaDevFlag);
-const withPWA = require("@ducanh2912/next-pwa").default({
-  dest: "public",
-  register: false,
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: true,
-  swcMinify: true,
-  disable:
-    !pwaEnabled ||
-    (process.env.NODE_ENV === "development" && !pwaEnabledInDevelopment),
-  fallbacks: {
-    document: "/~offline",
-  },
-  workboxOptions: {
-    disableDevLogs: true,
-  },
-});
-
 const nextConfig = {
   // Generate standalone output for Docker runtime
   output: 'standalone',
@@ -36,8 +14,6 @@ const nextConfig = {
     NEXT_PUBLIC_ICP_BEIAN_NUMBER: process.env.NEXT_PUBLIC_ICP_BEIAN_NUMBER,
     NEXT_PUBLIC_ICP_BEIAN_URL: process.env.NEXT_PUBLIC_ICP_BEIAN_URL,
     NEXT_PUBLIC_ICP_BEIAN_COMPANY_NAME: process.env.NEXT_PUBLIC_ICP_BEIAN_COMPANY_NAME,
-    NEXT_PUBLIC_PWA_ENABLED: pwaEnabled ? "1" : "0",
-    NEXT_PUBLIC_PWA_ALLOW_LOCALHOST: pwaEnabledInDevelopment ? "1" : "0",
   },
   async rewrites() {
     const backendUrl =
@@ -90,4 +66,4 @@ const nextConfig = {
   }
 };
 
-module.exports = withPWA(nextConfig);
+module.exports = nextConfig;

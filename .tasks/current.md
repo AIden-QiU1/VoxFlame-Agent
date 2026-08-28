@@ -2,6 +2,28 @@
 
 > 最后更新: 2026-08-27
 
+## 2026-08-28 普通话长文朗读材料区与账户级全局进度
+
+- 录音首页已按低认知收成两张主卡：“用自己的材料 / 选择已有材料”；已有材料进入独立第二层，Web 桌面为 3 列、手机与 App 为单列可见列表，不使用下拉。第二层共有 9 区：8 个原题库（其中现代文章题库改称“短句朗读”）+“完整文章 60 篇”。Web 已以 frontend 最小重建部署并健康。
+- `/api/training/catalog` 已扩展返回 `readingArticles` 和 `readingArticleId` 定向片段；生产实测返回 60 篇，`reading-001` 返回版本 `2.0.0` 的 35 个片段。Mobile 已新增 `practice_materials / practice_readings` 两层页面和文章 lineage 上传 metadata，typecheck/check/training tests 及 Android/iOS bundle 均通过；仍需新 App 构建发布，旧安装包不会自动获得本次 UI。
+- 新增 `/contribute/readings`、文章详情和文章逐段录音路由，首批包含 60 篇燃言原创现代汉语材料；每篇保留完整原文，由代码按自然标点切成通常几十个 6–16 字片段，代码校验全文长度、片段覆盖、篇数、ID、标题、长度、版本与 SHA-256。材料明确不是 PSC 官方作品，未抓取或冒充未授权题库。
+- 长文不保存为单个大文件：沿用现役逐句 recorder/upload/offline queue，每段独立 WAV，并通过 `reading_article_id / version / segment_id / index / count / round_id` 保留文章顺序和轮次。正文只保存在版本化材料库，不在每条上传 metadata 重复保存。
+- 新增认证进度接口 `GET /api/upload/progress`：只返回已录 sentence/segment ID、文章轮次 key、今日录音秒数、累计录音秒数和当前文章轮次，不返回正文、转写或音频路径；前端合并 IndexedDB 待同步录音，断网也能即时标记已录并计入时长。
+- 新增账户级 `reading_article_progress` 表与 `POST /api/upload/reading/reset`。整篇完成前已录段不再出现；完成后用户可“重置本篇进度”，只创建下一轮待录清单、不删除历史录音。重置动作当下写云端，所以即使未录新一轮第一句就刷新、退出重登或换设备，新轮次的 0/N 状态仍保持。
+- 用户负担收口：顶部醒目展示“今天已录 / 累计已录”时长，不用句数做每日目标；材料库自动按当前轮次完成度从低到高排序，只给一个推荐继续动作；文章页自动展示已录/待录，无手动排序或勾选。
+- 验证已通过：Frontend TypeScript、100 项全量测试（另含长文材料/排序/本地时长/轮次定向测试）、Next production build（27 路由）；Backend upload metadata/progress 测试与 TypeScript build；未登录浏览器 smoke 确认材料库和文章详情保留精确 `next`、console 0 error，375×812 登录页无横向裁切。仍需部署 migration/backend/frontend 后完成真实账号、麦克风、跨设备与离线补登 smoke。
+
+## 2026-08-27 cpu1 频繁掉线根因调查与可靠性加固
+
+- 根因边界已确认：2026-08-27 15:59:01 后宿主日志突然中断，16:17:41 冷启动；没有正常 shutdown、OOM、kernel panic、磁盘 I/O、网卡错误、容器 OOM/重启、`sudo/systemctl reboot` 或无人值守自动重启证据。Docker 运行内存约 540 MiB，不是本次掉线根因。最终宿主层归因必须在腾讯云控制台核对实例 `ins-ehhkm5us`（广州）15:59—16:17 的实例事件、操作审计、迁移和强制重启记录。
+- SSH 可连接性另有明确根因：当天出现 5,000+ 次未认证异常并多次触发 `MaxStartups throttling`。已安装 Fail2ban，关闭密码和交互认证，收紧登录窗口/尝试次数并调整并发节流；重启后 Fail2ban 已实际封禁来源 `185.233.82.69`，合法公钥登录成功。
+- 系统已更新 OpenSSH、OpenSSL、curl、systemd、libc 和 Linux 内核，并完成受控重启；当前内核为 `5.15.0-190-generic`。没有升级 Docker 26.1.3 到 29，因为日志不支持 Docker 版本根因，生产跨大版本升级风险高于收益。
+- 已增加 2 GiB `/swapfile` 紧急缓冲，重启后自动挂载且当前使用 0；五个生产容器设置独立内存/PID/日志轮转边界和 `unless-stopped` 自动恢复。受控重启后五容器全部自动恢复，backend/frontend healthy，容器 OOM/restart 均为 0，本机 3000/3001 与公网 RTC health 均为 200。
+- 已按仓库安全策略执行 `scripts/docker_disk_maintenance.sh prune-safe`，回收约 490.8 MB，只清理旧悬空镜像，保留运行镜像、卷、`latest`、`pre-*` 和近期 build cache。
+- GitHub HTTPS 出口存在 90—130 秒超时/GnuTLS 中断。Android fallback 已改为 API SHA 预检、15 分钟加随机抖动，有更新才通过 `ssh.github.com:443` 拉取；cpu1 专用密钥已登记为仓库只读 deploy key，受限用户 `git ls-remote` 和 systemd 服务均成功。
+- 已启用每分钟健康探针，持续记录 boot ID、上次探针、内存/Swap、磁盘、负载、默认路由、GitHub、DashScope、生产 RTC 和 Docker 状态；本次受控重启已记录 `boot_changed`。后续若再掉线，先用探针最后一条记录定位是宿主中断、外网异常还是应用故障。
+- 验证通过：Shell 语法、`sshd -t`、`docker compose config`、systemd unit verify、定向 `git diff --check`；受控重启后内核/Swap/SSH/Docker/Fail2ban/timers/Android 同步/公网健康全部恢复。
+
 ## 2026-08-26 App 完整替代 Web 七步优化
 
 - 第 1 项已完成：Mobile parity 通过 PR #17 合入 `main`，版本为 `0.1.4`、Android `versionCode=5`、iOS `buildNumber=5`；新版 APK 已构建并发布到 `https://voxember.com/download/android`。GitHub Actions 因账号 billing lock 未启动，按用户授权以完整本地验证替代 CI 后直接合并。
@@ -130,6 +152,8 @@
 - 验证证据：`~/.vscode-server/data/logs/20260818T092800/exthost1/openai.chatgpt/Codex.log` 显示新 app-server 仍收到 `127.0.0.1:7897`，同时 `chatgpt.com`/`ab.chatgpt.com` 请求 `fetch failed`；Extension Host 环境本身无代理，代理来自扩展读取的 VS Code 应用级 `http.proxy`。官方 Codex app-server 文档（Context7 `/openai/codex`）说明 VS Code 扩展与 CLI 共享 `~/.codex/config.toml`/`auth.json`，但插件远端目录/账户请求仍受 ChatGPT auth 与网络约束。
 
 ## 当前主线
+
+- 2026-08-27 已完成 Web App/PWA 退役收口：Web 仅保留直接打开即用的产品面，原生 Android / iPhone 内测统一从 `/download` 获取；移除 PWA 配置、manifest、service worker、Workbox 资产、安装/更新/离线提示与旧协议枚举，新增一次性旧运行时清理（仅注销 service worker / Cache Storage，不触碰 IndexedDB recorder queue）。前端 product-message 测试、Next production build、后端 RTC 测试、Playwright 页面 smoke 与 `git diff --check` 通过。
 
 - 主任务：在不破坏 Web/PWA 现役主链的前提下，开始 `App / Mobile Workbench` Phase 0 调研与 RFC；移动端目标从薄 companion 升级为完整移动端工作台。
 - 当前执行面：`frontend -> backend -> self-hosted livekit-server -> livekit_agent`。

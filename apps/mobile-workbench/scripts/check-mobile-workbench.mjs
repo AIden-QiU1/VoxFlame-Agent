@@ -241,6 +241,8 @@ for (const requiredToken of [
   '我同意本次录音用于训练',
   'MOBILE_COLLECTION_PLANS',
   'collection_plan_id: flow === \'collection\' ? collectionPlanId : undefined',
+  'reading_assistance_used: readingAssistanceKeysRef.current.has(readingAssistanceKey)',
+  "label={isReadingAssistancePlaying ? '正在朗读' : '听一下'}",
   '/prepared-expressions/active',
   '/profile-memory',
   '/scene-templates',
@@ -265,6 +267,8 @@ for (const taskRoute of [
   'communication_setup',
   'communication_live',
   'practice_home',
+  'practice_materials',
+  'practice_readings',
   'assessment',
   'collection',
 ]) {
@@ -278,6 +282,8 @@ for (const taskScreen of [
   'function CommunicationSetupScreen',
   'function CommunicationScreen',
   'function PracticeHomeScreen',
+  'function PracticeMaterialAreasScreen',
+  'function PracticeReadingArticlesScreen',
   'function PracticeScreen',
 ]) {
   assert(appSource.includes(taskScreen), `missing separated mobile task screen: ${taskScreen}`)
@@ -285,11 +291,11 @@ for (const taskScreen of [
 assert(appSource.includes('不连接助手，也不上传声音'), 'quick expression must disclose its local-only boundary')
 assert(appSource.includes('onOpenQuickExpression'), 'signed-out users must be able to open quick expression')
 for (const practiceHomeToken of [
-  '马上录',
-  '自己的材料',
-  '按主题选择',
-  '现代文章朗读',
-  'collectionCategories.length',
+  '用自己的材料',
+  '选择已有材料',
+  '9 个材料区',
+  '完整文章',
+  'readingArticles',
 ]) {
   assert(appSource.includes(practiceHomeToken), `mobile practice home is missing: ${practiceHomeToken}`)
 }

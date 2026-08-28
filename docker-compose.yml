@@ -2,6 +2,12 @@
 x-npm-args: &npm-args
   npm_config_registry: https://registry.npmmirror.com
 
+x-runtime-logging: &runtime-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   livekit-server:
     image: ${LIVEKIT_SERVER_IMAGE:-docker.m.daocloud.io/livekit/livekit-server:v1.10.1}
@@ -24,6 +30,10 @@ services:
       - ./infra/livekit/start-livekit.sh:/etc/livekit/start-livekit.sh:ro
       - caddy_data:/var/lib/caddy:ro
     restart: unless-stopped
+    mem_limit: 512m
+    mem_reservation: 64m
+    pids_limit: 128
+    logging: *runtime-logging
 
   frontend:
     image: voxflame-agent-frontend:latest
@@ -43,7 +53,6 @@ services:
         NEXT_PUBLIC_IOS_APP_DOWNLOAD_URL: ${NEXT_PUBLIC_IOS_APP_DOWNLOAD_URL:-}
         BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:3001}
         VOXFLAME_PUBLIC_BASE_URL: ${VOXFLAME_PUBLIC_BASE_URL:-https://voxember.com}
-        VOXFLAME_ENABLE_PWA: ${VOXFLAME_ENABLE_PWA:-1}
         <<: *npm-args
     container_name: voxflame-frontend
     ports:
@@ -52,7 +61,6 @@ services:
       - NODE_ENV=production
       - BACKEND_INTERNAL_URL=http://backend:3001
       - VOXFLAME_PUBLIC_BASE_URL=${VOXFLAME_PUBLIC_BASE_URL:-https://voxember.com}
-      - VOXFLAME_ENABLE_PWA=${VOXFLAME_ENABLE_PWA:-1}
       - NEXT_PUBLIC_RTC_EXECUTION_BACKEND=${NEXT_PUBLIC_RTC_EXECUTION_BACKEND:-livekit}
       - LIVEKIT_SIGNAL_PROXY_TARGET=${LIVEKIT_SIGNAL_PROXY_TARGET:-http://host.docker.internal:7880}
       - npm_config_registry=https://registry.npmmirror.com
@@ -69,6 +77,10 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    mem_limit: 768m
+    mem_reservation: 128m
+    pids_limit: 256
+    logging: *runtime-logging
     networks:
       - voxflame-network
 
@@ -120,6 +132,10 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    mem_limit: 768m
+    mem_reservation: 128m
+    pids_limit: 256
+    logging: *runtime-logging
     networks:
       - voxflame-network
 
@@ -159,6 +175,10 @@ services:
     depends_on:
       - livekit-server
     restart: unless-stopped
+    mem_limit: 2g
+    mem_reservation: 512m
+    pids_limit: 512
+    logging: *runtime-logging
     network_mode: host
 
   caddy:
@@ -177,6 +197,10 @@ services:
     depends_on:
       - frontend
     restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 32m
+    pids_limit: 128
+    logging: *runtime-logging
 
   # Qdrant (向量数据库 - 可选)
   qdrant:

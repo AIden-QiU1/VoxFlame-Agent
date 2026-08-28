@@ -2,50 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* PWA 动画 */
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse-ring {
-  0% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-slide-up {
-  animation: slide-up 0.3s ease-out;
-}
-
-.animate-pulse-ring {
-  animation: pulse-ring 1.5s ease-out infinite;
-}
-
-.animate-fade-in {
-  animation: fade-in 0.2s ease-out;
-}
-
 /* 录音按钮呼吸效果 */
 @keyframes recording-pulse {
   0%, 100% {
@@ -62,9 +18,6 @@
 
 /* 无障碍：减少动画 */
 @media (prefers-reduced-motion: reduce) {
-  .animate-slide-up,
-  .animate-pulse-ring,
-  .animate-fade-in,
   .animate-recording-pulse {
     animation: none;
   }

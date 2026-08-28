@@ -112,6 +112,8 @@ type MobileTaskRoute =
   | 'communication_setup'
   | 'communication_live'
   | 'practice_home'
+  | 'practice_materials'
+  | 'practice_readings'
   | 'assessment'
   | 'collection'
 
@@ -549,31 +551,39 @@ export default function App() {
             taskRoute === 'practice_home' ? (
               <PracticeHomeScreen
                 catalog={trainingCatalog}
-                dailyTarget={workspace.readModel.dailyTargetCount}
-                materialLibrary={memoryEditor.library}
-                onOpenAssessment={() => {
-                  const assessment = trainingCatalog.categories.find((category) => category.kind === 'assessment')
-                  if (assessment) {
-                    void trainingCatalog.selectCategory(assessment.id)
-                    setTaskRoute('assessment')
-                  }
-                }}
                 onOpenCollection={(categoryId, source = 'catalog') => {
                   setCollectionEntrySource(source)
                   setSelectedPreparedExpression(null)
                   if (categoryId) void trainingCatalog.selectCategory(categoryId)
                   setTaskRoute('collection')
                 }}
+                onOpenMaterialAreas={() => setTaskRoute('practice_materials')}
                 onOpenMaterials={() => changeSurface('memory')}
-                onSelectMaterial={async (assetId) => {
-                  const nextSnapshot = await memoryEditor.activateMaterial(assetId)
-                  if (!nextSnapshot) return
-                  setSelectedPreparedExpression(nextSnapshot.prepared_expression)
-                  workspace.refresh()
-                  setCollectionEntrySource('prepared_material')
+                preparedExpression={workspace.snapshot?.prepared_expression ?? null}
+              />
+            ) : taskRoute === 'practice_materials' ? (
+              <PracticeMaterialAreasScreen
+                catalog={trainingCatalog}
+                onBack={() => setTaskRoute('practice_home')}
+                onOpenCategory={(categoryId) => {
+                  setCollectionEntrySource('catalog')
+                  setSelectedPreparedExpression(null)
+                  void trainingCatalog.selectCategory(categoryId)
                   setTaskRoute('collection')
                 }}
-                preparedExpression={workspace.snapshot?.prepared_expression ?? null}
+                onOpenReadings={() => setTaskRoute('practice_readings')}
+              />
+            ) : taskRoute === 'practice_readings' ? (
+              <PracticeReadingArticlesScreen
+                articles={trainingCatalog.readingArticles}
+                loading={trainingCatalog.status === 'loading'}
+                onBack={() => setTaskRoute('practice_materials')}
+                onSelect={(articleId) => {
+                  setCollectionEntrySource('catalog')
+                  setSelectedPreparedExpression(null)
+                  void trainingCatalog.selectReadingArticle(articleId)
+                  setTaskRoute('collection')
+                }}
               />
             ) : (
               <PracticeScreen
@@ -1353,26 +1363,17 @@ function CommunicationScreen({
 
 function PracticeHomeScreen({
   catalog,
-  dailyTarget,
-  materialLibrary,
-  onOpenAssessment,
   onOpenCollection,
+  onOpenMaterialAreas,
   onOpenMaterials,
-  onSelectMaterial,
   preparedExpression,
 }: {
   catalog: ReturnType<typeof useMobileTrainingCatalog>
-  dailyTarget: number
-  materialLibrary: ReturnType<typeof useMobileMemoryEditor>['library']
-  onOpenAssessment(): void
   onOpenCollection(categoryId?: string, source?: MobileCollectionSource): void
+  onOpenMaterialAreas(): void
   onOpenMaterials(): void
-  onSelectMaterial(assetId: string): Promise<void>
   preparedExpression: MobileWorkspaceSnapshotContract['prepared_expression']
 }) {
-  const collectionCategories = catalog.categories.filter((category) => category.kind === 'collection')
-  const recommendedCategory = collectionCategories.find((category) => category.id === '日常与出行')
-    ?? collectionCategories[0]
   const materialExercises = buildMobilePreparedMaterialExercises(preparedExpression)
 
   return (
@@ -1380,54 +1381,11 @@ function PracticeHomeScreen({
       <View style={styles.heroHeading}>
         <Text style={styles.eyebrow}>练习</Text>
         <Text style={styles.pageTitle}>录下你真正会说的话</Text>
-        <Text style={styles.pageCopy}>从一句今天用得上的话开始，也可以用自己的材料或按主题选择。</Text>
+        <Text style={styles.pageCopy}>选择一种方式开始。</Text>
       </View>
 
       <Pressable
-        accessibilityHint="直接进入日常与出行主题，开始录第一句"
-        accessibilityRole="button"
-        disabled={!recommendedCategory}
-        onPress={() => onOpenCollection(recommendedCategory?.id)}
-        style={({ pressed }) => [styles.practiceStartCard, pressed ? styles.pressed : null]}
-      >
-        <View style={styles.practiceStartHeader}>
-          <Text style={styles.taskCardEyebrow}>马上录</Text>
-          <Text style={styles.practiceCountBadge}>建议 {dailyTarget} 句</Text>
-        </View>
-        <Text style={styles.practiceStartTitle}>先录几句今天用得上的话</Text>
-        <Text style={styles.taskCardCopy}>见面、出门、乘车、点餐和付款。按平时的方式说，不用一次录完。</Text>
-        <Text style={styles.practiceStartAction}>录第一句 ›</Text>
-      </Pressable>
-      {(materialLibrary?.assets.length ?? 0) > 1 ? (
-        <View style={styles.materialChoiceList}>
-          <Text style={styles.cardLabel}>选择一份材料</Text>
-          {materialLibrary?.assets.map((asset) => {
-            const active = materialLibrary.active_asset_id === asset.draft.id
-            return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                key={asset.draft.id}
-                onPress={() => void onSelectMaterial(asset.draft.id)}
-                style={({ pressed }) => [
-                  styles.materialChoiceRow,
-                  active ? styles.materialChoiceRowActive : null,
-                  pressed ? styles.pressed : null,
-                ]}
-              >
-                <View style={styles.categoryCopy}>
-                  <Text style={styles.categoryTitle}>{asset.draft.title}</Text>
-                  <Text numberOfLines={1} style={styles.mutedText}>{asset.structured.summary}</Text>
-                </View>
-                <Text style={active ? styles.activeBadge : styles.categoryCount}>{active ? '当前' : '选择'}</Text>
-              </Pressable>
-            )
-          })}
-        </View>
-      ) : null}
-
-      <Pressable
-        accessibilityHint={materialExercises.length > 0 ? '继续录自己的材料' : '查看自己的材料录音入口'}
+        accessibilityHint="使用自己上传或粘贴的材料"
         accessibilityRole="button"
         onPress={() => {
           if (materialExercises.length > 0) {
@@ -1438,53 +1396,21 @@ function PracticeHomeScreen({
         }}
         style={({ pressed }) => [styles.ownMaterialCard, pressed ? styles.pressed : null]}
       >
-        <Text style={styles.taskCardEyebrow}>自己的材料</Text>
-        <Text style={styles.taskCardTitle}>
-          {preparedExpression ? `继续录《${preparedExpression.title}》` : '用自己的内容来录'}
-        </Text>
-        <Text style={styles.taskCardCopy}>
-          {materialExercises.length > 0
-            ? `已经切成 ${materialExercises.length} 句，从上次的位置继续。`
-            : '把工作发言、复诊说明或常用文章放进准备页后，就能逐句录音。'}
-        </Text>
-        <Text style={styles.materialAction}>{materialExercises.length > 0 ? '继续录音 ›' : '查看材料入口 ›'}</Text>
+        <Text style={styles.taskCardTitle}>用自己的材料</Text>
+        {preparedExpression ? <Text numberOfLines={1} style={styles.mutedText}>《{preparedExpression.title}》</Text> : null}
+        <Text style={styles.materialAction}>›</Text>
       </Pressable>
 
-      <SectionHeader aside={`${collectionCategories.length} 个主题`} title="按主题选择" />
-      <Text style={styles.sectionSummary}>每个主题都显示当前可录句数，点开后直接进入对应题库。</Text>
-      <View style={styles.practiceTopicList}>
-        {collectionCategories.map((category) => (
-          <Pressable
-            accessibilityHint={`进入${category.label}录音题库`}
-            accessibilityRole="button"
-            key={category.id}
-            onPress={() => onOpenCollection(category.id)}
-            style={({ pressed }) => [
-              styles.practiceTopicRow,
-              category.id === '现代文章朗读' ? styles.practiceTopicRowFeatured : null,
-              pressed ? styles.pressed : null,
-            ]}
-          >
-            <View style={styles.categoryCopy}>
-              <Text style={styles.categoryTitle}>{category.label}</Text>
-              <Text numberOfLines={2} style={styles.mutedText}>{category.description}</Text>
-            </View>
-            <View style={styles.practiceTopicMeta}>
-              {category.id === '现代文章朗读' ? <Text style={styles.readingBadge}>连续朗读</Text> : null}
-              <Text style={styles.categoryCount}>{category.count} 句</Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
-
-      <View style={styles.assessmentEntry}>
-        <View style={styles.categoryCopy}>
-          <Text style={styles.cardLabel}>想先了解目前表现？</Text>
-          <Text style={styles.categoryTitle}>20 词能力筛查</Text>
-          <Text style={styles.mutedText}>完成整组后只给训练支持建议，不作为医学评估。</Text>
-        </View>
-        <SecondaryButton compact label="开始筛查" onPress={onOpenAssessment} />
-      </View>
+      <Pressable
+        accessibilityHint="进入九个已有材料区"
+        accessibilityRole="button"
+        onPress={onOpenMaterialAreas}
+        style={({ pressed }) => [styles.ownMaterialCard, pressed ? styles.pressed : null]}
+      >
+        <Text style={styles.taskCardTitle}>选择已有材料</Text>
+        <Text style={styles.mutedText}>9 个材料区</Text>
+        <Text style={styles.materialAction}>›</Text>
+      </Pressable>
       {preparedExpression?.training_reports ? (
         <View style={styles.trainingReportPreview}>
           <View style={styles.sectionIntro}>
@@ -1503,6 +1429,80 @@ function PracticeHomeScreen({
       ) : null}
       {catalog.status === 'loading' ? <ActivityIndicator color={COLORS.accent} /> : null}
       {catalog.errorMessage ? <InlineMessage tone="danger" text={catalog.errorMessage} /> : null}
+    </View>
+  )
+}
+
+function PracticeMaterialAreasScreen({
+  catalog,
+  onBack,
+  onOpenCategory,
+  onOpenReadings,
+}: {
+  catalog: ReturnType<typeof useMobileTrainingCatalog>
+  onBack(): void
+  onOpenCategory(categoryId: string): void
+  onOpenReadings(): void
+}) {
+  const categories = catalog.categories.filter((category) => category.kind === 'collection')
+  return (
+    <View style={styles.screen}>
+      <SecondaryButton compact label="返回" onPress={onBack} />
+      <Text style={styles.pageTitle}>选择已有材料</Text>
+      <View style={styles.practiceTopicList}>
+        {categories.map((category) => (
+          <Pressable
+            accessibilityRole="button"
+            key={category.id}
+            onPress={() => onOpenCategory(category.id)}
+            style={({ pressed }) => [styles.practiceTopicRow, pressed ? styles.pressed : null]}
+          >
+            <Text style={styles.categoryTitle}>{category.id === '现代文章朗读' ? '短句朗读' : category.label}</Text>
+            <Text style={styles.categoryCount}>{category.count} 句　›</Text>
+          </Pressable>
+        ))}
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenReadings}
+          style={({ pressed }) => [styles.practiceTopicRow, pressed ? styles.pressed : null]}
+        >
+          <Text style={styles.categoryTitle}>完整文章</Text>
+          <Text style={styles.categoryCount}>{catalog.readingArticles.length || 60} 篇　›</Text>
+        </Pressable>
+      </View>
+    </View>
+  )
+}
+
+function PracticeReadingArticlesScreen({
+  articles,
+  loading,
+  onBack,
+  onSelect,
+}: {
+  articles: ReturnType<typeof useMobileTrainingCatalog>['readingArticles']
+  loading: boolean
+  onBack(): void
+  onSelect(articleId: string): void
+}) {
+  return (
+    <View style={styles.screen}>
+      <SecondaryButton compact label="返回" onPress={onBack} />
+      <Text style={styles.pageTitle}>完整文章</Text>
+      {loading ? <ActivityIndicator color={COLORS.accent} /> : null}
+      <View style={styles.practiceTopicList}>
+        {articles.map((article) => (
+          <Pressable
+            accessibilityRole="button"
+            key={article.id}
+            onPress={() => onSelect(article.id)}
+            style={({ pressed }) => [styles.practiceTopicRow, pressed ? styles.pressed : null]}
+          >
+            <Text style={styles.categoryTitle}>{article.title}</Text>
+            <Text style={styles.categoryCount}>{article.segmentCount} 段　›</Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   )
 }
@@ -1553,6 +1553,9 @@ function PracticeScreen({
   const [consentReady, setConsentReady] = useState(false)
   const [ageBand, setAgeBand] = useState('')
   const [sex, setSex] = useState('')
+  const [isReadingAssistancePlaying, setIsReadingAssistancePlaying] = useState(false)
+  const [readingAssistanceStatus, setReadingAssistanceStatus] = useState<string | null>(null)
+  const readingAssistanceKeysRef = useRef<Set<string>>(new Set())
   const materialExercises = useMemo(
     () => buildMobilePreparedMaterialExercises(preparedExpression),
     [preparedExpression],
@@ -1564,7 +1567,7 @@ function PracticeScreen({
     (category) => category.id === catalog.selectedCategory,
   )
   const collectionPlanId = getMobileCollectionPlanId({
-    category: selectedCategory?.id,
+    category: catalog.selectedReadingArticle ? '完整文章' : selectedCategory?.id,
     usesPreparedMaterial,
   })
   const collectionPlan = MOBILE_COLLECTION_PLANS.find((plan) => plan.id === collectionPlanId)
@@ -1580,6 +1583,7 @@ function PracticeScreen({
         text: targetText,
         category: '自定义练习',
       }
+  const readingAssistanceKey = `${effectiveExercise.id}:${targetText}`
   const assessmentSummary = summarizeMobileAssessment(
     assessmentAttempts,
     flow === 'assessment' ? visibleTotal : 20,
@@ -1600,6 +1604,41 @@ function PracticeScreen({
     if (!practiceText.trim()) setFeedback(null)
   }, [practiceText])
 
+  useEffect(() => {
+    Speech.stop()
+    setIsReadingAssistancePlaying(false)
+    setReadingAssistanceStatus(null)
+  }, [readingAssistanceKey])
+
+  useEffect(() => () => {
+    Speech.stop()
+  }, [])
+
+  const playReadingAssistance = (): void => {
+    if (queue.isRecording || attemptLocked || isReadingAssistancePlaying) return
+
+    Speech.stop()
+    setIsReadingAssistancePlaying(true)
+    setReadingAssistanceStatus('正在准备朗读，听完后再开始录音。')
+    Speech.speak(targetText, {
+      language: 'zh-CN',
+      rate: 0.85,
+      onStart: () => {
+        readingAssistanceKeysRef.current.add(readingAssistanceKey)
+        setReadingAssistanceStatus('正在朗读，听完后再开始录音。')
+      },
+      onDone: () => {
+        setIsReadingAssistancePlaying(false)
+        setReadingAssistanceStatus('朗读完成，请按你平时的方式说。')
+      },
+      onStopped: () => setIsReadingAssistancePlaying(false),
+      onError: () => {
+        setIsReadingAssistancePlaying(false)
+        setReadingAssistanceStatus('朗读没有完成，可以再点一次或换一句。')
+      },
+    })
+  }
+
   const confirmDiscard = (item: MobileWorkbenchRecorderQueueItem): void => {
     Alert.alert(
       '删除这条录音？',
@@ -1619,6 +1658,10 @@ function PracticeScreen({
 
   const startTrainingAttempt = async (): Promise<boolean> => {
     setFeedback(null)
+    if (isReadingAssistancePlaying) {
+      Alert.alert('示例还在朗读', '请等朗读结束后再开始录音。')
+      return false
+    }
     if (!collectionPreflightReady) {
       Alert.alert('先完成采集前确认', '请确认环境安静、麦克风位置稳定，并确认本次训练数据授权后再开始。')
       return false
@@ -1635,11 +1678,18 @@ function PracticeScreen({
         training_flow: flow,
         collection_source: usesPreparedMaterial ? 'prepared_material' : 'catalog',
         collection_plan_id: flow === 'collection' ? collectionPlanId : undefined,
+        reading_material_kind: catalog.selectedReadingArticle ? 'voxflame_original' : undefined,
+        reading_article_id: catalog.selectedReadingArticle?.id,
+        reading_article_version: catalog.selectedReadingArticle?.version,
+        reading_segment_id: catalog.selectedReadingArticle ? effectiveExercise.id : undefined,
+        reading_segment_index: catalog.selectedReadingArticle ? exerciseIndex : undefined,
+        reading_segment_count: catalog.selectedReadingArticle?.segmentCount,
         client_capture_id: captureId,
         age_band: ageBand.trim() || undefined,
         sex: sex.trim() || undefined,
         etiology: profileEtiology || undefined,
         severity: profileSeverity || undefined,
+        reading_assistance_used: readingAssistanceKeysRef.current.has(readingAssistanceKey),
       },
     })
     if (!started) {
@@ -1897,10 +1947,22 @@ function PracticeScreen({
       <>
           <View style={styles.trainingStage}>
             <View style={styles.trainingProgressRow}>
-              <Text style={styles.cardLabel}>{usesPreparedMaterial ? '自定义材料' : selectedCategory?.label ?? '训练题库'}</Text>
+              <Text style={styles.cardLabel}>{usesPreparedMaterial ? '自定义材料' : catalog.selectedReadingArticle?.title ?? selectedCategory?.label ?? '训练题库'}</Text>
               <Text style={styles.trainingProgressText}>{exerciseIndex + 1} / {visibleTotal || 1}</Text>
             </View>
             <Text style={styles.trainingTarget}>{targetText}</Text>
+            <View style={styles.readingAssistanceRow}>
+              <Text style={styles.readingAssistancePrompt}>有字不认识？</Text>
+              <SecondaryButton
+                compact
+                disabled={queue.isRecording || attemptLocked || isReadingAssistancePlaying}
+                label={isReadingAssistancePlaying ? '正在朗读' : '听一下'}
+                onPress={playReadingAssistance}
+              />
+            </View>
+            <Text accessibilityLiveRegion="polite" style={styles.readingAssistanceStatus}>
+              {readingAssistanceStatus ?? '只在需要时播放，听完仍按你平时的方式说。'}
+            </Text>
             <View style={styles.recordingMeta}>
               <Text style={styles.recordingMetaText}>
                 {queue.isRecording ? '正在听你说' : feedback ? '本次反馈' : `麦克风${permissionLabel(queue.permissionStatus)}`}
@@ -1908,7 +1970,7 @@ function PracticeScreen({
               <Text style={styles.timer}>{formatDuration(queue.durationMs)}</Text>
             </View>
             <PrimaryButton
-              disabled={!queue.isRecording && attemptLocked}
+              disabled={!queue.isRecording && (attemptLocked || isReadingAssistancePlaying)}
               label={queue.isRecording ? '说完了' : attemptAction === 'analyzing' ? '正在整理本次录音…' : pendingAttempt ? '请先决定是否收录' : flow === 'assessment' ? '开始说这个词' : '开始说这句话'}
               onPress={() => {
                 if (queue.isRecording) {
@@ -3151,6 +3213,9 @@ const styles = StyleSheet.create({
   trainingProgressRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   trainingProgressText: { color: '#CFC7BF', fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800' },
   trainingTarget: { color: '#FFFFFF', fontSize: 30, fontWeight: '800', lineHeight: 43 },
+  readingAssistanceRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  readingAssistancePrompt: { color: '#E9E2DB', fontSize: 13, lineHeight: 20 },
+  readingAssistanceStatus: { color: '#CFC7BF', fontSize: 12, lineHeight: 18 },
   feedbackPanel: { backgroundColor: '#312A25', borderRadius: 16, gap: 6, padding: 15 },
   feedbackLabel: { color: '#D4A68E', fontSize: 12, fontWeight: '800' },
   feedbackHeard: { color: '#FFFFFF', fontSize: 21, fontWeight: '800', lineHeight: 30 },

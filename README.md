@@ -38,7 +38,7 @@ Frontend LiveKit RTC/Data
   -> DashScope / Qwen ASR / TTS / correction
 ```
 
-- `Frontend`：LiveKit RTC 音频、room data 文本/控制、沟通页与训练页；PWA 已恢复为正式能力，默认随前端容器开启。
+- `Frontend`：LiveKit RTC 音频、room data 文本/控制、沟通页与训练页；Web 直接打开即用，Android / iPhone 原生内测包统一从 `/download` 获取。
 - `Backend`：RTC session orchestration、memory API、phrases API、upload API。
 - `LiveKit Agent`：位于 [livekit_agent/](/home/ubuntu/VoxFlame-Agent/livekit_agent)；当前已承接沟通/训练的执行面主链。
 - 旧运行时 `websocket` 主链已经退役，不再作为兼容路径保留。
@@ -55,7 +55,7 @@ Frontend LiveKit RTC/Data
 
 - 沟通主链已经能用；沟通页首屏已经从 `chat-first` 收成 `starter kit + live session + expression kit drawer`，首页、练习页和沟通档案页的顶层信息也开始从“说明书式页面”收成“任务入口 + 资源入口 + 低压力提示”。
 - 训练数据入口这轮也开始扎实起来：前端已围绕 `recording envelope -> recorder queue -> upload receipt` 收口，后端 `/api/upload/complete` 已开始按 `audio_path` 复用已有 contribution / manifest，减少补传和重试时的重复写入。
-- 本地待同步录音现在不再只是“有个数量提示”，而是会带 `syncStatus / syncAttempts / lastAttemptAt / lastError` 显式展示，后续 PWA、Web 和 mobile workbench 可以围绕同一套 recorder queue contract 继续扩展。
+- 本地待同步录音现在不再只是“有个数量提示”，而是会带 `syncStatus / syncAttempts / lastAttemptAt / lastError` 显式展示；Web 和 mobile workbench 可以围绕同一套 recorder queue contract 继续扩展。
 - [useRtcAgentSession.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/hooks/useRtcAgentSession.ts) 同时承担会话启动、RTM 事件路由、字幕聚合、voice profile 同步和本地 memory session 管理，已经逼近“第二控制面”。
 - 长期用户状态正在继续收口到前端 [memory-service.ts](/home/ubuntu/VoxFlame-Agent/frontend/src/lib/memory/memory-service.ts) 与后端 [supabase.service.ts](/home/ubuntu/VoxFlame-Agent/backend/src/services/supabase.service.ts) 共同维护的 `workspace snapshot / memory profile / expression kit` 读写链，不再继续向旧执行面分叉。
 - 记忆系统当前重点不是继续堆训练复盘，而是把“用户画像、常见场景、即将面对场景的准备、热词、发音规律、补救策略”压缩成可直接服务沟通与训练的 owner 数据。
@@ -108,7 +108,7 @@ cp livekit_agent/.env.example livekit_agent/.env
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `NEXT_PUBLIC_API_URL`：本地开发时使用 `http://localhost:3001`
 - `FRONTEND_NEXT_PUBLIC_API_URL`：Docker 部署时推荐固定为 `/api`
-- `VOXFLAME_ENABLE_PWA`：默认 `1`；如需排查 `localhost` 缓存 / service worker 干扰，可临时设为 `0`
+- Web 不再注册 service worker 或提供 PWA 安装入口；原生 App 下载统一走 `/download`
 
 ### 启动
 

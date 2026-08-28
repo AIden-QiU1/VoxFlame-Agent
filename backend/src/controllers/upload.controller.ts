@@ -5,6 +5,62 @@ import { uploadArtifactService } from '../services/upload-artifact.service';
 const router = Router();
 
 /**
+ * GET /api/upload/progress
+ * Return only identifiers and aggregate durations needed by recording UI.
+ */
+router.get('/progress', async (req, res) => {
+    try {
+        const contributorId = req.user?.id;
+        if (!contributorId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const rawOffset = Array.isArray(req.query.timezoneOffsetMinutes)
+            ? req.query.timezoneOffsetMinutes[0]
+            : req.query.timezoneOffsetMinutes;
+        const parsedOffset = typeof rawOffset === 'string' ? Number(rawOffset) : 0;
+        const timezoneOffsetMinutes = Number.isFinite(parsedOffset) ? parsedOffset : 0;
+        const progress = await uploadArtifactService.getRecordingProgress(
+            contributorId,
+            timezoneOffsetMinutes,
+        );
+
+        res.json(progress);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Internal Server Error';
+        console.error('[Upload] Progress error:', message);
+        res.status(500).json({ error: message });
+    }
+});
+
+/** Advance one article to a new account-level cycle without deleting audio. */
+router.post('/reading/reset', async (req, res) => {
+    try {
+        const contributorId = req.user?.id;
+        if (!contributorId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const articleId = typeof req.body?.articleId === 'string'
+            ? req.body.articleId.trim()
+            : '';
+        if (!/^reading-\d{3}$/.test(articleId)) {
+            return res.status(400).json({ error: 'Invalid articleId' });
+        }
+
+        const result = await uploadArtifactService.resetReadingArticleProgress(
+            contributorId,
+            articleId,
+        );
+        res.json(result);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Internal Server Error';
+        console.error('[Upload] Reading reset error:', message);
+        res.status(500).json({ error: message });
+    }
+});
+
+/**
  * POST /api/upload/sign
  * Generate a signed URL for client-side upload
  */

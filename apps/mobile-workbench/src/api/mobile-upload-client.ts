@@ -88,6 +88,7 @@ const TRAINING_METADATA_KEYS = new Set([
   'recognized_text',
   'consent_version',
   'collection_plan_id',
+  'reading_assistance_used',
   'etiology',
   'severity',
   'age_band',

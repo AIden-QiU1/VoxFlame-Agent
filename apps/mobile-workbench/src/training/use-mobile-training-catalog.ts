@@ -6,6 +6,7 @@ import {
   fetchMobileTrainingCatalog,
   type MobileTrainingCategory,
   type MobileTrainingExercise,
+  type MobileReadingArticleSummary,
 } from './training-catalog'
 
 export function useMobileTrainingCatalog(params: {
@@ -16,11 +17,13 @@ export function useMobileTrainingCatalog(params: {
   const [categories, setCategories] = useState<MobileTrainingCategory[]>([])
   const [exercises, setExercises] = useState<MobileTrainingExercise[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [readingArticles, setReadingArticles] = useState<MobileReadingArticleSummary[]>([])
+  const [selectedReadingArticle, setSelectedReadingArticle] = useState<MobileReadingArticleSummary | null>(null)
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const load = useCallback(async (category?: string): Promise<void> => {
+  const load = useCallback(async (category?: string, readingArticleId?: string): Promise<void> => {
     if (!params.enabled || !params.apiBaseUrl) {
       return
     }
@@ -30,11 +33,13 @@ export function useMobileTrainingCatalog(params: {
       const catalog = await fetchMobileTrainingCatalog(
         params.apiBaseUrl,
         params.tokenProvider,
-        category ? { category, limit: 120 } : undefined,
+        category || readingArticleId ? { category, readingArticleId, limit: 120 } : undefined,
       )
       setCategories(catalog.categories)
       setExercises(catalog.exercises)
       setSelectedCategory(catalog.selectedCategory)
+      setReadingArticles(catalog.readingArticles)
+      setSelectedReadingArticle(catalog.selectedReadingArticle)
       setTotal(catalog.total)
       setStatus('ready')
     } catch (error) {
@@ -47,7 +52,7 @@ export function useMobileTrainingCatalog(params: {
     if (
       !params.enabled
       || !params.apiBaseUrl
-      || !selectedCategory
+      || (!selectedCategory && !selectedReadingArticle)
       || exercises.length >= total
     ) {
       return
@@ -57,7 +62,12 @@ export function useMobileTrainingCatalog(params: {
       const catalog = await fetchMobileTrainingCatalog(
         params.apiBaseUrl,
         params.tokenProvider,
-        { category: selectedCategory, limit: 120, offset: exercises.length },
+        {
+          category: selectedCategory ?? undefined,
+          readingArticleId: selectedReadingArticle?.id,
+          limit: 120,
+          offset: exercises.length,
+        },
       )
       setExercises((current) => [...current, ...catalog.exercises])
       setStatus('ready')
@@ -71,6 +81,7 @@ export function useMobileTrainingCatalog(params: {
     params.enabled,
     params.tokenProvider,
     selectedCategory,
+    selectedReadingArticle,
     total,
   ])
 
@@ -82,10 +93,13 @@ export function useMobileTrainingCatalog(params: {
     categories,
     exercises,
     selectedCategory,
+    readingArticles,
+    selectedReadingArticle,
     total,
     status,
     errorMessage,
     selectCategory: load,
+    selectReadingArticle: (articleId: string) => load(undefined, articleId),
     loadMore,
   }
 }
