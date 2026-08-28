@@ -9,9 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 export default function HomePage() {
   const router = useRouter()
   const [isOpeningCommunicate, setIsOpeningCommunicate] = useState(false)
-  const { isLoading: authLoading, isAuthenticated } = useAuth({
-    timeoutBehavior: 'guest',
-  })
+  const { isLoading: authLoading, isAuthenticated, error: authError } = useAuth()
   const openCommunicateView = async () => {
     if (isOpeningCommunicate) {
       return
@@ -24,12 +22,14 @@ export default function HomePage() {
     })
   }
 
-  if (authLoading) {
+  if (authLoading || authError) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-stone-50">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">正在准备燃言首页...</p>
+          <p className="text-gray-600">
+            {authError ? '登录状态暂时无法确认，请刷新后继续。' : '正在准备燃言首页...'}
+          </p>
         </div>
       </div>
     )

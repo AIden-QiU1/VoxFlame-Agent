@@ -4,7 +4,7 @@
  * 单一 Agent 架构 - 后端当前主要负责：
  * 1. RTC session orchestration
  * 2. 记忆 / 短语 / 上传 API
- * 3. 基础 HTTP 健康检查与 compat 接口
+ * 3. 基础 HTTP 健康检查
  * 
  * 语音处理（RTC/ASR/LLM/TTS）由 LiveKit + livekit_agent 承接
  */
@@ -12,8 +12,6 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import { agentRouter } from './controllers/agent.controller'
-import sessionRouter from './controllers/session.controller'
 import rtcRouter from './controllers/rtc.controller'
 import { memoryController } from './controllers/memory.controller'
 import { uploadRouter } from './controllers/upload.controller'
@@ -89,12 +87,6 @@ app.get('/health', (req, res) => {
   })
 })
 
-// Agent API 路由 (用户画像与兼容层)
-app.use('/api/agent', agentRouter)
-
-// Session API 路由 (compat only; runtime sessions now bootstrap via /api/rtc/session/start)
-app.use('/api/session', sessionRouter)
-
 // RTC orchestration API 路由；/api/rtc/health 在 router 内保持无认证，session/control 端点仍需认证。
 app.use('/api/rtc', rtcRouter)
 
@@ -151,7 +143,9 @@ app.post('/api/webhook/conversation', (req, res) => {
   }
 
   const { text, is_final, data_type, conversation_id, message_id } = req.body
-  console.log('[Webhook] ' + (data_type || 'message') + ': ' + (text?.substring(0, 50) || '') + '...')
+  console.log(
+    `[Webhook] type=${data_type || 'message'} conversationId=${conversation_id || 'null'} messageId=${message_id || 'null'} isFinal=${Boolean(is_final)} hasText=${typeof text === 'string' && text.length > 0}`,
+  )
   res.json({ success: true, received: true })
 })
 
@@ -177,17 +171,6 @@ app.listen(PORT, () => {
   console.log('   - POST /api/rtc/session/start')
   console.log('   - POST /api/rtc/session/ping')
   console.log('   - POST /api/rtc/session/stop')
-
-  console.log('')
-  console.log('⚠️ Compat API 端点:')
-  console.log('   - POST /api/session/start (compat: 501; use /api/rtc/session/start)')
-  console.log('   - POST /api/session/stop (compat: 501; use /api/rtc/session/stop)')
-  console.log('   - POST /api/session/reload-hotwords (compat: 501)')
-  console.log('   - GET  /api/session/:sessionId (compat: 501)')
-  console.log('   - POST /api/agent/session/log (compat: 501)')
-  console.log('   - GET  /api/agent/session/history/:userId (compat: 501)')
-  console.log('   - POST /api/agent/tool/log (compat: 501)')
-  console.log('   - POST /api/agent/tool/execute (compat: 501)')
 
   console.log('')
   console.log('💾 Memory API 端点:')

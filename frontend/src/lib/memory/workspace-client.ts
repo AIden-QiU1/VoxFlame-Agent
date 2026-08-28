@@ -1,7 +1,7 @@
 'use client'
 
 import { config } from '@/lib/config'
-import { getValidToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/supabase/client'
 import type { CommunicationSceneId } from '@/lib/communication/communication-scene'
 import type { CommunicationPreferences } from '@/lib/communication/communication-preferences'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
@@ -134,7 +134,7 @@ export async function fetchWorkspaceSnapshot(
   userId: string,
   sceneId?: CommunicationSceneId,
 ): Promise<WorkspaceMemorySnapshot | null> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     return null
   }
@@ -156,7 +156,7 @@ export async function saveWorkspaceSceneTemplates(
   userId: string,
   selectedTemplateIds: string[],
 ): Promise<string[]> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     return []
   }
@@ -188,7 +188,7 @@ export async function saveWorkspaceCommunicationPreferences(
   userId: string,
   communicationPreferences: CommunicationPreferences,
 ): Promise<CommunicationPreferences | null> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     return null
   }
@@ -220,7 +220,7 @@ export async function saveWorkspaceUserProfileMemory(
   userId: string,
   input: UserProfileMemoryAsset,
 ): Promise<UserProfileMemoryAsset | null> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     return null
   }
@@ -251,7 +251,7 @@ export async function saveWorkspaceUserProfileMemory(
 export async function fetchPreparedExpressionLibrary(
   userId: string,
 ): Promise<PreparedExpressionLibraryAsset | null> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     return null
   }
@@ -284,7 +284,7 @@ export async function savePreparedExpressionAsset(
     make_active?: boolean
   },
 ): Promise<PreparedExpressionLibraryAsset | null> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     return null
   }
@@ -316,7 +316,7 @@ export async function deletePreparedExpressionAsset(
   userId: string,
   assetId: string,
 ): Promise<PreparedExpressionLibraryAsset | null> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     return null
   }
@@ -343,7 +343,7 @@ export async function activatePreparedExpressionAsset(
   userId: string,
   assetId: string,
 ): Promise<PreparedExpressionLibraryAsset | null> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     return null
   }
@@ -376,7 +376,7 @@ export async function summarizePreparedExpressionAsset(
   assetId: string,
   trigger: 'manual' | 'periodic_auto' = 'manual',
 ): Promise<PreparedExpressionLibraryAsset | null> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     return null
   }

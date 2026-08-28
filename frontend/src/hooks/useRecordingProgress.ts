@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { config } from '@/lib/config'
 import type { VoxFlameRecorderQueueItem } from '@/lib/recording/recording-contract'
-import { getValidToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/supabase/client'
 
 export interface CloudRecordingProgress {
   recordedSentenceIds: string[]
@@ -117,7 +117,7 @@ export function useRecordingProgress(
     setIsLoading(true)
     setError(null)
     try {
-      const token = await getValidToken()
+      const token = await getAccessToken()
       if (!token) {
         throw new Error('auth_required')
       }

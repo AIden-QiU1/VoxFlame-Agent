@@ -1,10 +1,10 @@
 import { config } from '@/lib/config'
-import { getValidToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/supabase/client'
 
 export async function resetReadingArticleProgress(
   articleId: string,
 ): Promise<{ articleId: string; roundId: string }> {
-  const token = await getValidToken()
+  const token = await getAccessToken()
   if (!token) {
     throw new Error('auth_required')
   }

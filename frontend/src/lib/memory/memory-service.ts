@@ -1,7 +1,7 @@
 // Memory Service
 
 import { config } from '@/lib/config'
-import { getValidToken } from '@/lib/supabase/client'
+import { getAccessToken } from '@/lib/supabase/client'
 import {
   buildTrainingVoiceProfilePayload,
   getTrainingProfileSnapshot,
@@ -771,7 +771,7 @@ class MemoryService {
       return false
     }
 
-    const token = await getValidToken()
+    const token = await getAccessToken()
     if (!token) {
       return false
     }
@@ -795,7 +795,7 @@ class MemoryService {
 
   private async syncBackend() {
     if (!this.queue.length && !this.sessionQueue.length) return
-    const token = await getValidToken()
+    const token = await getAccessToken()
     if (!token) {
       this.saveQueue()
       this.saveSessionQueue()

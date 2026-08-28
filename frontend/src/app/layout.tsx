@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { LegacyPwaCleanup } from '@/components/pwa/LegacyPwaCleanup'
 import { Toaster } from "@/components/ui/toaster"
+import { AuthProvider } from '@/hooks/useAuth'
 import './globals.css'
 
 const siteOrigin = process.env.VOXFLAME_PUBLIC_BASE_URL || 'https://voxember.com'
@@ -80,7 +81,7 @@ export default function RootLayout({
         >
           跳转到主要内容
         </a>
-        {children}
+        <AuthProvider>{children}</AuthProvider>
         <LegacyPwaCleanup />
         <Toaster />
       </body>

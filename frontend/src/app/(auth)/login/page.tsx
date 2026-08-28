@@ -9,7 +9,7 @@ import {
     buildLegalConsentUserData,
     persistLocalLegalConsent,
 } from '@/lib/auth/legal-consent'
-import { createClient, getFreshSession } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import {
     displayMainlandPhone,
     normalizeMainlandPhone,
@@ -137,7 +137,6 @@ export default function LoginPage() {
             }).catch((updateError) => {
                 console.warn('[login] updateUser skipped after sign-in:', updateError)
             })
-            await getFreshSession()
             window.location.replace(nextPath)
         }
 
@@ -175,7 +174,6 @@ export default function LoginPage() {
                 description: "已自动登录，正在跳转...",
             })
             persistLocalLegalConsent(consentSnapshot)
-            await getFreshSession()
             window.location.replace(nextPath)
         } else {
             toast({
@@ -292,7 +290,6 @@ export default function LoginPage() {
         }).catch((updateError) => {
             console.warn('[login] updateUser skipped after phone sign-in:', updateError)
         })
-        await getFreshSession()
         window.location.replace(nextPath)
     }
 

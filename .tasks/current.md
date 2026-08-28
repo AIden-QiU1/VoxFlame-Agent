@@ -1,6 +1,18 @@
 # 当前任务状态
 
-> 最后更新: 2026-08-27
+> 最后更新: 2026-08-28
+
+## 2026-08-28 账号 308 活跃录音“像退出登录”根因收口
+
+- 生产日志定量确认：约 24 小时内录音持久化成功 852 次，`/api/upload/progress` 失败 896 次，Backend token/JWT 校验失败 0 次。直接故障是 `reading_article_progress` 未部署导致进度 API 持续 500；同时 Frontend 发布窗口使经 Frontend 转发的 `/api/upload/sign` 反复 502，旧录音 hook 每 2 秒自动重排队，放大为请求风暴。账号 308 没有被后端判定为登出。
+- 认证架构已收口到 Supabase SDK + 单个全局 `AuthProvider`：业务请求不再手动调用 `refreshSession()`，不再在刷新失败时返回旧 token；middleware 使用 `getClaims()`；`UserNav` 不再单独 `getUser()`/订阅 session；移除 3 秒 unresolved-session -> guest 降级。只有明确 `SIGNED_OUT` 或已确认初始空 session 才显示退出。
+- IndexedDB 录音队列现在是 local-first 录音事实源：失败结果明确为 `local_only`，按账户隔离，使用 single-flight 同步；后台只在登录恢复、online、页面重新可见等恢复事件触发，并使用指数冷却，遇首个基础设施失败即停止批次。已删除 2 秒无限自重试和“本地排队等于云端成功”的假降级。
+- 已部署 `20260828000000_create_reading_article_progress.sql`，确认 browser `anon/authenticated` 无表权限、`service_role` 具备读写权限，并登记远端 applied。迁移部署后缺表错误消失，活跃账号 308 继续成功持久化至少 12 条新录音。
+- Caddy 路由所有权已分离：`/rtc/*` 到 LiveKit；Next-owned `/api/training/catalog`、`/api/corpus-review/*` 到 Frontend；其余 `/api/*` 直接到 Backend。Frontend 不再依赖 Backend 启动，Caddy 依赖两者；Frontend 构建或重启不再成为录音 API 的故障域。
+- 已删除无调用、只返回 501 的 `/api/session/*`、`/api/agent/*` controller、挂载、启动日志和共享 compat response。生产验证旧路由返回 404，`/api/rtc/health` 返回 200，未认证 `/api/upload/progress` 返回 401；唯一会话事实源保持 `/api/rtc/session/*`。
+- 隐私日志已收口：上传成功/撤回只记录不透明 recording/contribution ID，conversation webhook 只记录类型、ID 和布尔元数据，不再记录目标句、表达正文或账户存储路径。
+- 验证通过：Frontend 104 项测试、TypeScript 与 production build；Backend build、RTC orchestration、upload metadata 4 项、SMS auth；Compose/Caddy 校验、AI docs、`git diff --check`。Playwright 匿名首页初始与 4 秒后认证显示稳定，保护页精确跳转 `/login?next=...`，console 0 error/0 warning；无可安全复用的已登录浏览器 session 和麦克风设备，因此真实账号浏览器录音仍保留为设备 smoke。
+- 剩余迁移债务：远端存在、本地缺 SQL 的 `20260228000002`—`20260228000006`。必须先重建 SQL 并核对实际数据库状态，禁止用虚假 `migration repair` 或强推掩盖历史漂移。
 
 ## 2026-08-28 普通话长文朗读材料区与账户级全局进度
 
@@ -11,7 +23,7 @@
 - 新增认证进度接口 `GET /api/upload/progress`：只返回已录 sentence/segment ID、文章轮次 key、今日录音秒数、累计录音秒数和当前文章轮次，不返回正文、转写或音频路径；前端合并 IndexedDB 待同步录音，断网也能即时标记已录并计入时长。
 - 新增账户级 `reading_article_progress` 表与 `POST /api/upload/reading/reset`。整篇完成前已录段不再出现；完成后用户可“重置本篇进度”，只创建下一轮待录清单、不删除历史录音。重置动作当下写云端，所以即使未录新一轮第一句就刷新、退出重登或换设备，新轮次的 0/N 状态仍保持。
 - 用户负担收口：顶部醒目展示“今天已录 / 累计已录”时长，不用句数做每日目标；材料库自动按当前轮次完成度从低到高排序，只给一个推荐继续动作；文章页自动展示已录/待录，无手动排序或勾选。
-- 验证已通过：Frontend TypeScript、100 项全量测试（另含长文材料/排序/本地时长/轮次定向测试）、Next production build（27 路由）；Backend upload metadata/progress 测试与 TypeScript build；未登录浏览器 smoke 确认材料库和文章详情保留精确 `next`、console 0 error，375×812 登录页无横向裁切。仍需部署 migration/backend/frontend 后完成真实账号、麦克风、跨设备与离线补登 smoke。
+- 已部署 migration/backend/frontend/Caddy 并通过生产路由与活跃录音验证。仍需具备真实账号、麦克风和第二设备后完成整篇轮次、跨设备与离线补登的设备 smoke。
 
 ## 2026-08-27 cpu1 频繁掉线根因调查与可靠性加固
 

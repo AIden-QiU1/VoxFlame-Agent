@@ -120,7 +120,7 @@ router.post('/complete', async (req, res) => {
         });
 
         console.log(
-            `[Upload] Persisted audioPath=${audioPath} target="${text}" contributionId=${result.contributionId ?? 'null'} reusedContribution=${result.reusedContribution} manifestAlreadySynced=${result.manifestAlreadySynced} transcriptAlreadySynced=${result.transcriptAlreadySynced ?? 'n/a'}`,
+            `[Upload] Persisted recordingId=${result.recordingId ?? 'null'} contributionId=${result.contributionId ?? 'null'} reusedContribution=${result.reusedContribution} manifestAlreadySynced=${result.manifestAlreadySynced} transcriptAlreadySynced=${result.transcriptAlreadySynced ?? 'n/a'}`,
         );
 
         res.json({
@@ -176,7 +176,7 @@ router.delete('/contribution', async (req, res) => {
         });
 
         console.log(
-            `[Upload] Discarded recordingId=${result.recordingId ?? 'null'} audioPath=${result.audioPath ?? 'null'} contributionId=${result.contributionId ?? 'null'}`,
+            `[Upload] Discarded recordingId=${result.recordingId ?? 'null'} contributionId=${result.contributionId ?? 'null'}`,
         );
 
         res.json({

@@ -68,8 +68,6 @@ services:
       - ./logs:/app/logs
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    depends_on:
-      - backend
     healthcheck:
       test: ["CMD-SHELL", "IP=$$(hostname -I | awk '{print $$1}'); node -e \"require('http').get('http://$$IP:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))\""]
       interval: 30s
@@ -196,6 +194,7 @@ services:
       - caddy_config:/config
     depends_on:
       - frontend
+      - backend
     restart: unless-stopped
     mem_limit: 256m
     mem_reservation: 32m

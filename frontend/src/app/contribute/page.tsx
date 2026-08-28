@@ -176,7 +176,7 @@ const UPLOAD_STATUS_LABELS: Record<TrainingAttemptUploadStatus, string> = {
   idle: '这条录音还没进入保存流程',
   saving: '正在自动保存',
   uploaded: '已写入训练语料',
-  retrying: '正在后台自动补登',
+  local_only: '已安全保存在本机',
   auth_required: '需要重新登录恢复自动保存',
   failed: '保存失败',
   discarding: '正在撤回收录',
@@ -1809,10 +1809,10 @@ export function TrainingRecorderPage({
       return
     }
 
-    if (result.status === 'retrying') {
+    if (result.status === 'local_only') {
       setNotice({
         tone: 'info',
-        message: '录音已保存，稍后会自动同步。',
+        message: '录音已安全保存在本机；网络或服务恢复后会在明确的恢复事件上继续同步。',
       })
       return
     }
@@ -2563,8 +2563,8 @@ export function TrainingRecorderPage({
                       ? '正在自动保存，你可以先确认系统听到的内容。'
                       : attempt.uploadStatus === 'uploaded'
                         ? '已经安全保存到你的训练数据中。'
-                        : attempt.uploadStatus === 'retrying'
-                          ? '录音已留在本机，网络恢复后会自动补登。'
+                        : attempt.uploadStatus === 'local_only'
+                          ? '录音已留在本机，网络或服务恢复后再继续同步。'
                           : '你可以回听、重录或继续下一句。'}
                   </p>
                 </div>
