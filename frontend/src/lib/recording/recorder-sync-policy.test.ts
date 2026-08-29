@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import type { VoxFlameRecorderQueueItem } from './recording-contract'
-import { selectRecorderQueueItemsForSync } from './recorder-sync-policy'
+import {
+  selectRecorderQueueItemsForAccount,
+  selectRecorderQueueItemsForSync,
+} from './recorder-sync-policy'
 
 function queueItem(overrides: Partial<VoxFlameRecorderQueueItem>): VoxFlameRecorderQueueItem {
   return {
@@ -45,6 +48,20 @@ test('background sync never uploads another account queue', () => {
   ], 'account-a')
 
   assert.deepEqual(selected.map((item) => item.recordingId), ['a'])
+})
+
+test('local progress exposes only the active account queue and survives sign-out', () => {
+  const items = [
+    queueItem({ recordingId: 'a', contributorId: 'account-a' }),
+    queueItem({ recordingId: 'b', contributorId: 'account-b' }),
+  ]
+
+  assert.deepEqual(
+    selectRecorderQueueItemsForAccount(items, 'account-a').map((item) => item.recordingId),
+    ['a'],
+  )
+  assert.deepEqual(selectRecorderQueueItemsForAccount(items, null), [])
+  assert.equal(items.length, 2)
 })
 
 test('background sync applies exponential cooldown while explicit sync can force a retry', () => {

@@ -10,23 +10,35 @@ export interface CloudRecordingProgress {
   recordedReadingSegmentIds: string[]
   recordedReadingRoundKeys: string[]
   readingArticleRoundIds: Record<string, string>
+  lastRecordedExerciseIds: Record<string, string>
   todayDurationSeconds: number
   totalDurationSeconds: number
 }
 
 export interface RecordingProgress extends CloudRecordingProgress {
   isLoading: boolean
+  isRefreshing: boolean
   error: string | null
   refresh: () => Promise<void>
 }
+
+const RECORDING_PROGRESS_TIMEOUT_MS = 8_000
 
 const EMPTY_PROGRESS: CloudRecordingProgress = {
   recordedSentenceIds: [],
   recordedReadingSegmentIds: [],
   recordedReadingRoundKeys: [],
   readingArticleRoundIds: {},
+  lastRecordedExerciseIds: {},
   todayDurationSeconds: 0,
   totalDurationSeconds: 0,
+}
+
+export function isRecordingProgressRequestTimedOut(
+  startedAt: number,
+  now: number,
+): boolean {
+  return now - startedAt >= RECORDING_PROGRESS_TIMEOUT_MS
 }
 
 function isToday(value: string): boolean {
@@ -81,6 +93,42 @@ export function mergeRecordingProgress(
       : 'initial'
     return [`${roundId || 'initial'}:${segmentId}`]
   })
+  const localResumeAnchors = new Map<string, { exerciseId: string; createdAt: number; order: number }>()
+  for (const [order, item] of localQueueItems.entries()) {
+    const exerciseId = item.sentenceId?.trim() ?? ''
+    if (!exerciseId) continue
+
+    const preparedExpressionId = typeof item.metadata.prepared_expression_id === 'string'
+      ? item.metadata.prepared_expression_id.trim()
+      : ''
+    const readingArticleId = typeof item.metadata.reading_article_id === 'string'
+      ? item.metadata.reading_article_id.trim()
+      : ''
+    const exerciseCategory = typeof item.metadata.exercise_category === 'string'
+      ? item.metadata.exercise_category.trim()
+      : ''
+    const scopeKey = preparedExpressionId
+      ? `prepared_expression:${preparedExpressionId}`
+      : !readingArticleId && exerciseCategory
+        ? `category:${exerciseCategory}`
+        : null
+    if (!scopeKey) continue
+
+    const createdAt = Date.parse(item.createdAt)
+    const candidate = {
+      exerciseId,
+      createdAt: Number.isFinite(createdAt) ? createdAt : Number.NEGATIVE_INFINITY,
+      order,
+    }
+    const existing = localResumeAnchors.get(scopeKey)
+    if (
+      !existing
+      || candidate.createdAt > existing.createdAt
+      || (candidate.createdAt === existing.createdAt && candidate.order > existing.order)
+    ) {
+      localResumeAnchors.set(scopeKey, candidate)
+    }
+  }
 
   return {
     recordedSentenceIds: uniqueStrings([...cloud.recordedSentenceIds, ...localSentenceIds]),
@@ -93,6 +141,12 @@ export function mergeRecordingProgress(
       ...localReadingRoundKeys,
     ]),
     readingArticleRoundIds: cloud.readingArticleRoundIds,
+    lastRecordedExerciseIds: {
+      ...cloud.lastRecordedExerciseIds,
+      ...Object.fromEntries(
+        Array.from(localResumeAnchors.entries()).map(([key, value]) => [key, value.exerciseId]),
+      ),
+    },
     todayDurationSeconds: cloud.todayDurationSeconds + localTodayDurationSeconds,
     totalDurationSeconds: cloud.totalDurationSeconds + localDurationSeconds,
   }
@@ -104,65 +158,102 @@ export function useRecordingProgress(
 ): RecordingProgress {
   const [cloud, setCloud] = useState<CloudRecordingProgress>(EMPTY_PROGRESS)
   const [isLoading, setIsLoading] = useState(isAuthenticated)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const previousLocalQueueCountRef = useRef(localQueueItems.length)
+  const hasLoadedRef = useRef(false)
+  const refreshPromiseRef = useRef<Promise<void> | null>(null)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(() => {
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current
+    }
+
     if (!isAuthenticated) {
       setCloud(EMPTY_PROGRESS)
       setIsLoading(false)
-      return
+      setIsRefreshing(false)
+      hasLoadedRef.current = false
+      return Promise.resolve()
     }
 
-    setIsLoading(true)
+    const isInitialLoad = !hasLoadedRef.current
+    if (isInitialLoad) {
+      setIsLoading(true)
+    } else {
+      setIsRefreshing(true)
+    }
     setError(null)
-    try {
-      const token = await getAccessToken()
-      if (!token) {
-        throw new Error('auth_required')
-      }
 
-      const timezoneOffsetMinutes = new Date().getTimezoneOffset()
-      const response = await fetch(
-        `${config.api.baseUrl}/upload/progress?timezoneOffsetMinutes=${timezoneOffsetMinutes}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
-      if (!response.ok) {
-        throw new Error(`progress_${response.status}`)
-      }
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), RECORDING_PROGRESS_TIMEOUT_MS)
+    const request = (async () => {
+      try {
+        const token = await getAccessToken()
+        if (!token) {
+          throw new Error('auth_required')
+        }
 
-      const payload = await response.json() as Partial<CloudRecordingProgress>
-      setCloud({
-        recordedSentenceIds: Array.isArray(payload.recordedSentenceIds)
-          ? payload.recordedSentenceIds.filter((item): item is string => typeof item === 'string')
-          : [],
-        recordedReadingSegmentIds: Array.isArray(payload.recordedReadingSegmentIds)
-          ? payload.recordedReadingSegmentIds.filter((item): item is string => typeof item === 'string')
-          : [],
-        recordedReadingRoundKeys: Array.isArray(payload.recordedReadingRoundKeys)
-          ? payload.recordedReadingRoundKeys.filter((item): item is string => typeof item === 'string')
-          : [],
-        readingArticleRoundIds: payload.readingArticleRoundIds
-          && typeof payload.readingArticleRoundIds === 'object'
-          && !Array.isArray(payload.readingArticleRoundIds)
-            ? Object.fromEntries(
-                Object.entries(payload.readingArticleRoundIds)
-                  .filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
-              )
-            : {},
-        todayDurationSeconds: typeof payload.todayDurationSeconds === 'number'
-          ? Math.max(0, payload.todayDurationSeconds)
-          : 0,
-        totalDurationSeconds: typeof payload.totalDurationSeconds === 'number'
-          ? Math.max(0, payload.totalDurationSeconds)
-          : 0,
-      })
-    } catch (refreshError) {
-      console.error('[recording-progress] refresh failed:', refreshError)
-      setError('录音时长暂时没有更新，本机待同步录音仍会计入。')
-    } finally {
-      setIsLoading(false)
-    }
+        const timezoneOffsetMinutes = new Date().getTimezoneOffset()
+        const response = await fetch(
+          `${config.api.baseUrl}/upload/progress?timezoneOffsetMinutes=${timezoneOffsetMinutes}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          },
+        )
+        if (!response.ok) {
+          throw new Error(`progress_${response.status}`)
+        }
+
+        const payload = await response.json() as Partial<CloudRecordingProgress>
+        setCloud({
+          recordedSentenceIds: Array.isArray(payload.recordedSentenceIds)
+            ? payload.recordedSentenceIds.filter((item): item is string => typeof item === 'string')
+            : [],
+          recordedReadingSegmentIds: Array.isArray(payload.recordedReadingSegmentIds)
+            ? payload.recordedReadingSegmentIds.filter((item): item is string => typeof item === 'string')
+            : [],
+          recordedReadingRoundKeys: Array.isArray(payload.recordedReadingRoundKeys)
+            ? payload.recordedReadingRoundKeys.filter((item): item is string => typeof item === 'string')
+            : [],
+          readingArticleRoundIds: payload.readingArticleRoundIds
+            && typeof payload.readingArticleRoundIds === 'object'
+            && !Array.isArray(payload.readingArticleRoundIds)
+              ? Object.fromEntries(
+                  Object.entries(payload.readingArticleRoundIds)
+                    .filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+                )
+              : {},
+          lastRecordedExerciseIds: payload.lastRecordedExerciseIds
+            && typeof payload.lastRecordedExerciseIds === 'object'
+            && !Array.isArray(payload.lastRecordedExerciseIds)
+              ? Object.fromEntries(
+                  Object.entries(payload.lastRecordedExerciseIds)
+                    .filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+                )
+              : {},
+          todayDurationSeconds: typeof payload.todayDurationSeconds === 'number'
+            ? Math.max(0, payload.todayDurationSeconds)
+            : 0,
+          totalDurationSeconds: typeof payload.totalDurationSeconds === 'number'
+            ? Math.max(0, payload.totalDurationSeconds)
+            : 0,
+        })
+      } catch (refreshError) {
+        console.error('[recording-progress] refresh failed:', refreshError)
+        setError('云端录音进度暂时没有更新；页面仍可继续录音，本机记录不会丢失。')
+      } finally {
+        window.clearTimeout(timeoutId)
+        hasLoadedRef.current = true
+        setIsLoading(false)
+        setIsRefreshing(false)
+        refreshPromiseRef.current = null
+      }
+    })()
+
+    refreshPromiseRef.current = request
+    return request
   }, [isAuthenticated])
 
   useEffect(() => {
@@ -185,6 +276,7 @@ export function useRecordingProgress(
   return {
     ...merged,
     isLoading,
+    isRefreshing,
     error,
     refresh,
   }

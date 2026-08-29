@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mergeRecordingProgress } from './useRecordingProgress'
+import {
+  isRecordingProgressRequestTimedOut,
+  mergeRecordingProgress,
+} from './useRecordingProgress'
 import type { VoxFlameRecorderQueueItem } from '@/lib/recording/recording-contract'
 
 function queueItem(overrides: Partial<VoxFlameRecorderQueueItem>): VoxFlameRecorderQueueItem {
@@ -47,6 +50,7 @@ test('merge progress includes local pending durations and de-duplicates sentence
     recordedReadingSegmentIds: ['reading-001-segment-01'],
     recordedReadingRoundKeys: ['initial:reading-001-segment-01'],
     readingArticleRoundIds: {},
+    lastRecordedExerciseIds: {},
     todayDurationSeconds: 60,
     totalDurationSeconds: 120,
   }, [queueItem({})])
@@ -56,4 +60,26 @@ test('merge progress includes local pending durations and de-duplicates sentence
   assert.deepEqual(result.recordedSentenceIds, ['reading-001-segment-01'])
   assert.deepEqual(result.recordedReadingSegmentIds, ['reading-001-segment-01'])
   assert.deepEqual(result.recordedReadingRoundKeys, ['initial:reading-001-segment-01'])
+})
+
+test('merge progress advances the resume anchor from a local pending recording', () => {
+  const result = mergeRecordingProgress({
+    recordedSentenceIds: ['daily-1'],
+    recordedReadingSegmentIds: [],
+    recordedReadingRoundKeys: [],
+    readingArticleRoundIds: {},
+    lastRecordedExerciseIds: { 'category:日常与出行': 'daily-1' },
+    todayDurationSeconds: 0,
+    totalDurationSeconds: 0,
+  }, [queueItem({
+    sentenceId: 'daily-2',
+    metadata: { exercise_category: '日常与出行' },
+  })])
+
+  assert.equal(result.lastRecordedExerciseIds['category:日常与出行'], 'daily-2')
+})
+
+test('recording progress request stops blocking after the bounded timeout', () => {
+  assert.equal(isRecordingProgressRequestTimedOut(1_000, 8_999), false)
+  assert.equal(isRecordingProgressRequestTimedOut(1_000, 9_000), true)
 })

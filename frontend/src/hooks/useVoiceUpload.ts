@@ -19,7 +19,10 @@ import type {
   VoxFlameRecorderQueueItem,
   VoxFlameRecordingEnvelope,
 } from '@/lib/recording/recording-contract'
-import { selectRecorderQueueItemsForSync } from '@/lib/recording/recorder-sync-policy'
+import {
+  selectRecorderQueueItemsForAccount,
+  selectRecorderQueueItemsForSync,
+} from '@/lib/recording/recorder-sync-policy'
 import { getAccessToken } from '@/lib/supabase/client'
 import { useAuth } from './useAuth'
 import { config } from '@/lib/config'
@@ -107,16 +110,17 @@ export function useVoiceUpload() {
 
   const refreshLocalQueueCount = useCallback(async () => {
     try {
-      const items = await listRecorderQueueItems()
-      setLocalQueueItems(items)
-      setLocalQueueCount(items.length)
-      return items.length
+      const allItems = await listRecorderQueueItems()
+      const accountItems = selectRecorderQueueItemsForAccount(allItems, userId)
+      setLocalQueueItems(accountItems)
+      setLocalQueueCount(accountItems.length)
+      return accountItems.length
     } catch {
       setLocalQueueItems([])
       setLocalQueueCount(0)
       return 0
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     void refreshLocalQueueCount()

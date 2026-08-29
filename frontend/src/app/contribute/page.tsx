@@ -106,9 +106,11 @@ import {
 } from '@/lib/training/phonology-groups'
 import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
 import type { MandarinReadingArticle } from '@/lib/corpus/reading-articles'
+import { shouldBlockTrainingPageForProgress } from '@/lib/training/training-page-loading'
 
 type AttemptSaveTrigger = 'auto' | 'manual'
 type CollectionFlowStep = 'prepare' | 'record' | 'review'
+type ExerciseStatusFilter = 'unread' | 'read' | 'all'
 
 type PracticeSourceMode = 'prepared_content' | 'sentence_corpus'
 type PracticeExercise = MandarinTrainingExercise | PreparedExpressionPracticeExercise
@@ -783,6 +785,8 @@ export function TrainingRecorderPage({
   const [selectedExerciseId, setSelectedExerciseId] = useState(
     '',
   )
+  const [exerciseStatusFilter, setExerciseStatusFilter] = useState<ExerciseStatusFilter>('unread')
+  const [visibleInventoryLimit, setVisibleInventoryLimit] = useState(DEFAULT_VISIBLE_SENTENCES)
   const [selectedPhonologyGroupId, setSelectedPhonologyGroupId] = useState<PhonologyGroupId>(
     topicSelection.category === '音系强化' ? DEFAULT_PHONOLOGY_GROUP_ID : 'all',
   )
@@ -818,6 +822,7 @@ export function TrainingRecorderPage({
   const discardedAttemptIdsRef = useRef<Set<number>>(new Set())
   const pendingReplacementExerciseRef = useRef<PracticeExercise | null>(null)
   const recordingExerciseRef = useRef<PracticeExercise | null>(null)
+  const exerciseSelectionTouchedRef = useRef(false)
   const recordingReadingAssistanceRef = useRef(false)
   const readingAssistanceExerciseIdsRef = useRef<Set<string>>(new Set())
   const materialFileInputRef = useRef<HTMLInputElement | null>(null)
@@ -909,10 +914,31 @@ export function TrainingRecorderPage({
     const persistedExerciseIds = userId ? getUploadedTrainingExerciseIds(userId) : []
     return [...persistedExerciseIds, ...recordingProgress.recordedSentenceIds]
   }, [recordingProgress.recordedSentenceIds, userId])
+  const recordedExerciseIdSet = useMemo(
+    () => new Set(recordedExerciseIds),
+    [recordedExerciseIds],
+  )
+  const recordedCategoryExerciseCount = useMemo(
+    () => categoryExercises.reduce(
+      (count, exercise) => count + (recordedExerciseIdSet.has(exercise.id) ? 1 : 0),
+      0,
+    ),
+    [categoryExercises, recordedExerciseIdSet],
+  )
+  const unreadCategoryExerciseCount = Math.max(
+    0,
+    categoryExercises.length - recordedCategoryExerciseCount,
+  )
   const effectiveReadingRoundId = readingArticle
     ? recordingProgress.readingArticleRoundIds[readingArticle.id] ?? readingRoundId
     : null
   const effectiveAllowRecordedExercises = allowRecordedExercises || Boolean(effectiveReadingRoundId)
+  const resumeScopeKey = practiceMode === 'prepared_content' && preparedExpression?.id
+    ? `prepared_expression:${preparedExpression.id}`
+    : `category:${selectedCategory}`
+  const resumeAfterExerciseId = readingArticle
+    ? null
+    : recordingProgress.lastRecordedExerciseIds[resumeScopeKey] ?? null
 
   const selectableExerciseState = useMemo(
     () => {
@@ -940,9 +966,10 @@ export function TrainingRecorderPage({
         exercises: categoryExercises,
         recordedExerciseIds,
         sessionExerciseIds: sessionPracticedExerciseIds,
+        resumeAfterExerciseId,
       })
     },
-    [categoryExercises, effectiveAllowRecordedExercises, effectiveReadingRoundId, readingArticle, recordedExerciseIds, recordingProgress.recordedReadingRoundKeys, sessionPracticedExerciseIds],
+    [categoryExercises, effectiveAllowRecordedExercises, effectiveReadingRoundId, readingArticle, recordedExerciseIds, recordingProgress.recordedReadingRoundKeys, resumeAfterExerciseId, sessionPracticedExerciseIds],
   )
 
   const normalizedQuery = exerciseQuery.trim().toLowerCase()
@@ -961,17 +988,37 @@ export function TrainingRecorderPage({
     [matchingExercises, normalizedQuery],
   )
 
+  const inventoryMatchingExercises = useMemo(() => {
+    const byStatus = categoryExercises.filter((exercise) => {
+      const isRecorded = recordedExerciseIdSet.has(exercise.id)
+      if (exerciseStatusFilter === 'read') return isRecorded
+      if (exerciseStatusFilter === 'unread') return !isRecorded
+      return true
+    })
+
+    if (!normalizedQuery) return byStatus
+    return byStatus.filter((exercise) => exercise.text.toLowerCase().includes(normalizedQuery))
+  }, [categoryExercises, exerciseStatusFilter, normalizedQuery, recordedExerciseIdSet])
+  const visibleInventoryExercises = useMemo(
+    () => inventoryMatchingExercises.slice(0, visibleInventoryLimit),
+    [inventoryMatchingExercises, visibleInventoryLimit],
+  )
+
   const currentExercise = useMemo(
     () => (
       selectableExerciseState.exercises.find((exercise) => exercise.id === selectedExerciseId) ??
+      (!readingArticle ? categoryExercises.find((exercise) => exercise.id === selectedExerciseId) : null) ??
       visibleExercises[0] ??
       selectableExerciseState.exercises[0] ??
-      (!readingArticle ? categoryExercises.find((exercise) => exercise.id === selectedExerciseId) : null) ??
       (!readingArticle ? categoryExercises[0] : null) ??
       null
     ),
     [categoryExercises, readingArticle, selectableExerciseState.exercises, selectedExerciseId, visibleExercises],
   )
+
+  useEffect(() => {
+    setVisibleInventoryLimit(normalizedQuery ? SEARCH_VISIBLE_SENTENCES : DEFAULT_VISIBLE_SENTENCES)
+  }, [exerciseStatusFilter, normalizedQuery])
 
   useEffect(() => {
     setReadingAssistanceStatus(null)
@@ -1218,6 +1265,9 @@ export function TrainingRecorderPage({
     setSessionPracticedExerciseIds([])
     setAssessmentAttemptsByExercise({})
     setSelectedPhonologyGroupId(topicSelection.category === '音系强化' ? DEFAULT_PHONOLOGY_GROUP_ID : 'all')
+    setExerciseStatusFilter('unread')
+    setVisibleInventoryLimit(DEFAULT_VISIBLE_SENTENCES)
+    exerciseSelectionTouchedRef.current = false
     setAttempt(null)
     setCollectionFlowStep('prepare')
     void refreshLocalQueueCount()
@@ -1239,15 +1289,21 @@ export function TrainingRecorderPage({
   }, [])
 
   useEffect(() => {
-    if (!visibleExercises.length) {
+    const selectionPool = readingArticle ? visibleExercises : categoryExercises
+    if (!selectionPool.length) {
       return
     }
 
-    const stillVisible = visibleExercises.some((exercise) => exercise.id === selectedExerciseId)
-    if (!stillVisible) {
-      setSelectedExerciseId(visibleExercises[0].id)
+    const stillVisible = selectionPool.some((exercise) => exercise.id === selectedExerciseId)
+    const shouldApplyCloudResume = !recordingProgress.isLoading && !exerciseSelectionTouchedRef.current
+    const nextDefaultExercise = visibleExercises[0] ?? selectableExerciseState.exercises[0]
+    if ((!stillVisible || shouldApplyCloudResume) && nextDefaultExercise) {
+      setSelectedExerciseId(nextDefaultExercise.id)
+      if (shouldApplyCloudResume) {
+        exerciseSelectionTouchedRef.current = true
+      }
     }
-  }, [selectedExerciseId, visibleExercises])
+  }, [categoryExercises, readingArticle, recordingProgress.isLoading, selectableExerciseState.exercises, selectedExerciseId, visibleExercises])
 
   useEffect(() => {
     if (!isRecording) {
@@ -1347,6 +1403,7 @@ export function TrainingRecorderPage({
       if (refreshedExercises.length > 0) {
         setIsMaterialEditorOpen(false)
         setCollectionFlowStep('prepare')
+        exerciseSelectionTouchedRef.current = true
         setSelectedExerciseId(refreshedExercises[0].id)
       }
     } catch (error) {
@@ -1375,6 +1432,7 @@ export function TrainingRecorderPage({
     }
 
     const nextIndex = (currentIndex + offset + visibleExercises.length) % visibleExercises.length
+    exerciseSelectionTouchedRef.current = true
     setSelectedExerciseId(visibleExercises[nextIndex].id)
     setAttempt(null)
   }, [currentExercise, isProcessing, isRecording, visibleExercises])
@@ -1383,6 +1441,7 @@ export function TrainingRecorderPage({
     if (isRecording || isProcessing) {
       return
     }
+    exerciseSelectionTouchedRef.current = true
     setSelectedExerciseId(exerciseId)
     setAttempt(null)
   }, [isProcessing, isRecording])
@@ -1393,6 +1452,7 @@ export function TrainingRecorderPage({
     }
 
     setSelectedPhonologyGroupId(groupId)
+    exerciseSelectionTouchedRef.current = false
     setSelectedExerciseId('')
     setExerciseQuery('')
     setAttempt(null)
@@ -1482,6 +1542,7 @@ export function TrainingRecorderPage({
   }, [isAssessmentTopic])
 
   const startReplacementRecording = useCallback(async (exerciseToRetry: PracticeExercise) => {
+    exerciseSelectionTouchedRef.current = true
     setSelectedExerciseId(exerciseToRetry.id)
     setAttempt(null)
     setCollectionFlowStep('record')
@@ -1991,6 +2052,7 @@ export function TrainingRecorderPage({
         : null
 
       if (nextExercise && nextExercise.id !== recordedExercise.id) {
+        exerciseSelectionTouchedRef.current = true
         setSelectedExerciseId(nextExercise.id)
       }
 
@@ -2034,7 +2096,7 @@ export function TrainingRecorderPage({
     visibleExercises,
   ])
 
-  if (isLoading || (readingArticle && recordingProgress.isLoading)) {
+  if (isLoading || shouldBlockTrainingPageForProgress(Boolean(readingArticle), recordingProgress.isLoading)) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-stone-50">
         <div className="text-center text-sm text-gray-600">正在准备训练页...</div>
@@ -2252,6 +2314,21 @@ export function TrainingRecorderPage({
             isLoading={recordingProgress.isLoading}
             error={recordingProgress.error}
           />
+          {!readingArticle ? (
+            <section aria-label="账户录音进度" className="rounded-2xl border border-stone-200 bg-white px-4 py-4 sm:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-stone-950">这个账号的句子记录</p>
+                  <p className="mt-1 text-sm text-stone-600">刷新、退出再登录或换设备，都会读取同一份云端记录。</p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-sm tabular-nums">
+                  <span className="rounded-full bg-stone-100 px-3 py-1.5 text-stone-700">全部 {categoryExercises.length}</span>
+                  <span className="rounded-full bg-emerald-100 px-3 py-1.5 font-medium text-emerald-800">已读 {recordedCategoryExerciseCount}</span>
+                  <span className="rounded-full bg-amber-100 px-3 py-1.5 font-medium text-amber-900">未读 {unreadCategoryExerciseCount}</span>
+                </div>
+              </div>
+            </section>
+          ) : null}
           <nav aria-label="数据录入进度" className="rounded-2xl border border-stone-200 bg-white px-4 py-4 sm:px-6">
             <ol className="grid grid-cols-3 gap-2">
               {flowSteps.map((step, index) => {
@@ -2481,10 +2558,36 @@ export function TrainingRecorderPage({
 
               <details className="mt-6 rounded-2xl border border-stone-200">
                 <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
-                  <span>换一句</span>
-                  <span className="text-xs font-normal text-stone-500">当前主题还有 {matchingExercises.length} 句</span>
+                  <span>{readingArticle ? '换一句' : '查看已读和未读'}</span>
+                  <span className="text-xs font-normal text-stone-500">
+                    {readingArticle ? `当前还有 ${matchingExercises.length} 句` : `已读 ${recordedCategoryExerciseCount} · 未读 ${unreadCategoryExerciseCount}`}
+                  </span>
                 </summary>
                 <div className="border-t border-stone-200 p-4">
+                  {!readingArticle ? (
+                    <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="按朗读状态筛选">
+                      {([
+                        ['unread', `未读 ${unreadCategoryExerciseCount}`],
+                        ['read', `已读 ${recordedCategoryExerciseCount}`],
+                        ['all', `全部 ${categoryExercises.length}`],
+                      ] as Array<[ExerciseStatusFilter, string]>).map(([filter, label]) => (
+                        <button
+                          key={filter}
+                          type="button"
+                          aria-pressed={exerciseStatusFilter === filter}
+                          onClick={() => setExerciseStatusFilter(filter)}
+                          className={cn(
+                            'min-h-10 rounded-full px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2',
+                            exerciseStatusFilter === filter
+                              ? 'bg-amber-700 text-white'
+                              : 'bg-stone-100 text-stone-700 hover:bg-stone-200',
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   <label className="block">
                     <span className="sr-only">搜索训练句子</span>
                     <input
@@ -2495,8 +2598,9 @@ export function TrainingRecorderPage({
                     />
                   </label>
                   <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
-                    {visibleExercises.map((exercise) => {
+                    {(readingArticle ? visibleExercises : visibleInventoryExercises).map((exercise) => {
                       const isActive = currentExercise.id === exercise.id
+                      const isRecorded = recordedExerciseIdSet.has(exercise.id)
                       return (
                         <button
                           key={exercise.id}
@@ -2509,11 +2613,37 @@ export function TrainingRecorderPage({
                             isActive ? 'border-amber-400 bg-amber-50 text-stone-950' : 'border-stone-200 bg-white text-stone-700 hover:border-amber-300',
                           )}
                         >
-                          {exercise.text}
+                          <span className="flex items-start justify-between gap-3">
+                            <span>{exercise.text}</span>
+                            {!readingArticle ? (
+                              <span className={cn(
+                                'shrink-0 rounded-full px-2.5 py-1 text-xs font-medium',
+                                isRecorded
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-900',
+                              )}>
+                                {isRecorded ? '已读' : '未读'}
+                              </span>
+                            ) : null}
+                          </span>
                         </button>
                       )
                     })}
+                    {!readingArticle && visibleInventoryExercises.length === 0 ? (
+                      <p className="rounded-xl bg-stone-50 px-4 py-5 text-center text-sm text-stone-600">
+                        当前筛选下没有句子。
+                      </p>
+                    ) : null}
                   </div>
+                  {!readingArticle && visibleInventoryExercises.length < inventoryMatchingExercises.length ? (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleInventoryLimit((current) => current + DEFAULT_VISIBLE_SENTENCES)}
+                      className="mt-3 min-h-11 w-full rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                    >
+                      显示更多（还有 {inventoryMatchingExercises.length - visibleInventoryExercises.length} 句）
+                    </button>
+                  ) : null}
                 </div>
               </details>
 

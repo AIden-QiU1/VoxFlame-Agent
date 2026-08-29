@@ -83,6 +83,7 @@ export interface RecordingProgressSnapshot {
   recordedReadingSegmentIds: string[]
   recordedReadingRoundKeys: string[]
   readingArticleRoundIds: Record<string, string>
+  lastRecordedExerciseIds: Record<string, string>
   todayDurationSeconds: number
   totalDurationSeconds: number
 }
@@ -101,6 +102,16 @@ interface UploadReceiptMetadata extends JsonRecord {
   manifest_synced?: boolean
   synced_at?: string
 }
+
+interface RecordingProgressCacheEntry {
+  rows: RecordingProgressRow[]
+  refreshedAt: number
+}
+
+const RECORDING_PROGRESS_CACHE_TTL_MS = 30 * 60 * 1000
+const RECORDING_PROGRESS_CACHE_MAX_ACCOUNTS = 32
+const recordingProgressCache = new Map<string, RecordingProgressCacheEntry>()
+const recordingProgressLoads = new Map<string, Promise<RecordingProgressRow[]>>()
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -202,6 +213,70 @@ function toTimestamp(value: unknown): number | null {
   return Number.isFinite(timestamp) ? timestamp : null
 }
 
+function storeRecordingProgressRows(
+  contributorId: string,
+  rows: RecordingProgressRow[],
+): RecordingProgressRow[] {
+  recordingProgressCache.delete(contributorId)
+  recordingProgressCache.set(contributorId, {
+    rows,
+    refreshedAt: Date.now(),
+  })
+
+  while (recordingProgressCache.size > RECORDING_PROGRESS_CACHE_MAX_ACCOUNTS) {
+    const oldestContributorId = recordingProgressCache.keys().next().value
+    if (typeof oldestContributorId !== 'string') {
+      break
+    }
+    recordingProgressCache.delete(oldestContributorId)
+  }
+
+  return rows
+}
+
+function appendRecordingProgressRow(
+  contributorId: string,
+  row: RecordingProgressRow,
+): void {
+  const cached = recordingProgressCache.get(contributorId)
+  if (!cached) {
+    return
+  }
+
+  storeRecordingProgressRows(contributorId, [...cached.rows, row])
+}
+
+function invalidateRecordingProgress(contributorId: string): void {
+  recordingProgressCache.delete(contributorId)
+}
+
+function readStringRecord(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {}
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  )
+}
+
+function normalizeRecordingProgressSnapshot(value: unknown): RecordingProgressSnapshot | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    recordedSentenceIds: readStringArray(value, 'recordedSentenceIds') ?? [],
+    recordedReadingSegmentIds: readStringArray(value, 'recordedReadingSegmentIds') ?? [],
+    recordedReadingRoundKeys: readStringArray(value, 'recordedReadingRoundKeys') ?? [],
+    readingArticleRoundIds: readStringRecord(value.readingArticleRoundIds),
+    lastRecordedExerciseIds: readStringRecord(value.lastRecordedExerciseIds),
+    todayDurationSeconds: toSafeDurationSeconds(value.todayDurationSeconds),
+    totalDurationSeconds: toSafeDurationSeconds(value.totalDurationSeconds),
+  }
+}
+
 /** Build the privacy-minimal progress payload returned to an authenticated user. */
 export function summarizeRecordingProgress(
   rows: RecordingProgressRow[],
@@ -221,10 +296,11 @@ export function summarizeRecordingProgress(
   const sentenceIds = new Set<string>()
   const readingSegmentIds = new Set<string>()
   const readingRoundKeys = new Set<string>()
+  const latestExerciseByScope = new Map<string, { exerciseId: string; createdAt: number; order: number }>()
   let todayDurationSeconds = 0
   let totalDurationSeconds = 0
 
-  for (const row of rows) {
+  for (const [order, row] of rows.entries()) {
     const durationSeconds = toSafeDurationSeconds(row.duration_seconds)
     totalDurationSeconds += durationSeconds
 
@@ -234,7 +310,33 @@ export function summarizeRecordingProgress(
     }
 
     if (typeof row.sentence_id === 'string' && row.sentence_id.trim()) {
-      sentenceIds.add(row.sentence_id.trim())
+      const exerciseId = row.sentence_id.trim()
+      sentenceIds.add(exerciseId)
+
+      const preparedExpressionId = readString(row.metadata ?? undefined, 'prepared_expression_id')
+      const readingArticleId = readString(row.metadata ?? undefined, 'reading_article_id')
+      const exerciseCategory = readString(row.metadata ?? undefined, 'exercise_category')
+      const scopeKey = preparedExpressionId
+        ? `prepared_expression:${preparedExpressionId}`
+        : !readingArticleId && exerciseCategory
+          ? `category:${exerciseCategory}`
+          : null
+
+      if (scopeKey) {
+        const candidate = {
+          exerciseId,
+          createdAt: createdAt ?? Number.NEGATIVE_INFINITY,
+          order,
+        }
+        const existing = latestExerciseByScope.get(scopeKey)
+        if (
+          !existing
+          || candidate.createdAt > existing.createdAt
+          || (candidate.createdAt === existing.createdAt && candidate.order > existing.order)
+        ) {
+          latestExerciseByScope.set(scopeKey, candidate)
+        }
+      }
     }
 
     const readingSegmentId = readString(row.metadata ?? undefined, 'reading_segment_id')
@@ -250,6 +352,9 @@ export function summarizeRecordingProgress(
     recordedReadingSegmentIds: Array.from(readingSegmentIds).sort(),
     recordedReadingRoundKeys: Array.from(readingRoundKeys).sort(),
     readingArticleRoundIds: {},
+    lastRecordedExerciseIds: Object.fromEntries(
+      Array.from(latestExerciseByScope.entries()).map(([key, value]) => [key, value.exerciseId]),
+    ),
     todayDurationSeconds: Math.round(todayDurationSeconds * 1000) / 1000,
     totalDurationSeconds: Math.round(totalDurationSeconds * 1000) / 1000,
   }
@@ -679,6 +784,73 @@ async function deleteContribution(contributorId: string, contributionId: string)
 }
 
 export class UploadArtifactService {
+  private async loadRecordingProgressRows(contributorId: string): Promise<RecordingProgressRow[]> {
+    const cached = recordingProgressCache.get(contributorId)
+    if (cached && Date.now() - cached.refreshedAt < RECORDING_PROGRESS_CACHE_TTL_MS) {
+      recordingProgressCache.delete(contributorId)
+      recordingProgressCache.set(contributorId, cached)
+      return cached.rows
+    }
+
+    const existingLoad = recordingProgressLoads.get(contributorId)
+    if (existingLoad) {
+      return existingLoad
+    }
+
+    const load = (async () => {
+      const rows: RecordingProgressRow[] = []
+      const pageSize = 1000
+      let from = 0
+
+      while (true) {
+        const { data, error } = await supabase!
+          .from('voice_contributions')
+          .select(`
+            sentence_id,
+            duration_seconds,
+            created_at,
+            reading_segment_id:metadata->>reading_segment_id,
+            reading_round_id:metadata->>reading_round_id,
+            reading_article_id:metadata->>reading_article_id,
+            prepared_expression_id:metadata->>prepared_expression_id,
+            exercise_category:metadata->>exercise_category
+          `)
+          .eq('contributor_id', contributorId)
+          .order('created_at', { ascending: true })
+          .range(from, from + pageSize - 1)
+
+        if (error) {
+          throw new Error(error.message)
+        }
+
+        const page = (Array.isArray(data) ? data : []).map((row) => ({
+          sentence_id: typeof row.sentence_id === 'string' ? row.sentence_id : null,
+          duration_seconds: typeof row.duration_seconds === 'number' ? row.duration_seconds : null,
+          created_at: typeof row.created_at === 'string' ? row.created_at : null,
+          metadata: {
+            reading_segment_id: typeof row.reading_segment_id === 'string' ? row.reading_segment_id : undefined,
+            reading_round_id: typeof row.reading_round_id === 'string' ? row.reading_round_id : undefined,
+            reading_article_id: typeof row.reading_article_id === 'string' ? row.reading_article_id : undefined,
+            prepared_expression_id: typeof row.prepared_expression_id === 'string' ? row.prepared_expression_id : undefined,
+            exercise_category: typeof row.exercise_category === 'string' ? row.exercise_category : undefined,
+          },
+        })) satisfies RecordingProgressRow[]
+        rows.push(...page)
+        if (page.length < pageSize) {
+          break
+        }
+        from += pageSize
+      }
+
+      return storeRecordingProgressRows(contributorId, rows)
+    })().finally(() => {
+      recordingProgressLoads.delete(contributorId)
+    })
+
+    recordingProgressLoads.set(contributorId, load)
+    return load
+  }
+
   async getRecordingProgress(
     contributorId: string,
     timezoneOffsetMinutes: number,
@@ -687,30 +859,24 @@ export class UploadArtifactService {
       return summarizeRecordingProgress([], timezoneOffsetMinutes)
     }
 
-    const rows: RecordingProgressRow[] = []
-    const pageSize = 1000
-    let from = 0
-
-    while (true) {
-      const { data, error } = await supabase
-        .from('voice_contributions')
-        .select('sentence_id, duration_seconds, created_at, metadata')
-        .eq('contributor_id', contributorId)
-        .order('created_at', { ascending: true })
-        .range(from, from + pageSize - 1)
-
-      if (error) {
-        throw new Error(error.message)
+    const { data: aggregated, error: aggregateError } = await supabase.rpc(
+      'get_recording_progress',
+      {
+        p_contributor_id: contributorId,
+        p_timezone_offset_minutes: timezoneOffsetMinutes,
+      },
+    )
+    if (!aggregateError) {
+      const normalized = normalizeRecordingProgressSnapshot(aggregated)
+      if (normalized) {
+        return normalized
       }
-
-      const page = Array.isArray(data) ? data as RecordingProgressRow[] : []
-      rows.push(...page)
-      if (page.length < pageSize) {
-        break
-      }
-      from += pageSize
+    } else if (!aggregateError.message.includes('get_recording_progress')) {
+      throw new Error(aggregateError.message)
     }
 
+    // Compatibility fallback for a rolling deploy before the RPC migration lands.
+    const rows = await this.loadRecordingProgressRows(contributorId)
     const snapshot = summarizeRecordingProgress(rows, timezoneOffsetMinutes)
     const { data: readingProgressData, error: readingProgressError } = await supabase
       .from('reading_article_progress')
@@ -888,6 +1054,15 @@ export class UploadArtifactService {
       }
     }
 
+    if (!reusedContribution && existing?.id) {
+      appendRecordingProgressRow(payload.contributorId, {
+        sentence_id: payload.sentenceId ?? null,
+        duration_seconds: typeof payload.duration === 'number' ? payload.duration : null,
+        created_at: new Date().toISOString(),
+        metadata: sanitizedMetadata,
+      })
+    }
+
     return {
       contributionId: existing?.id ?? null,
       recordingId: manifestEntry.recording_id,
@@ -918,6 +1093,9 @@ export class UploadArtifactService {
     const removedContribution = contributionId
       ? await deleteContribution(payload.contributorId, contributionId)
       : false
+    if (removedContribution) {
+      invalidateRecordingProgress(payload.contributorId)
+    }
     const removedManifestEntry = await removeRecordingFromManifest(
       manifestPath,
       recordingId,

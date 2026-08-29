@@ -90,7 +90,7 @@ test('recording progress separates local calendar day and returns safe identifie
         sentence_id: 'ordinary-1',
         duration_seconds: 25.5,
         created_at: '2026-08-27T15:59:00.000Z',
-        metadata: {},
+        metadata: { exercise_category: '日常与出行' },
       },
       {
         sentence_id: 'reading-001-segment-01',
@@ -123,6 +123,37 @@ test('recording progress separates local calendar day and returns safe identifie
     'initial:reading-001-segment-02',
   ])
   assert.deepEqual(snapshot.readingArticleRoundIds, {})
+  assert.deepEqual(snapshot.lastRecordedExerciseIds, {
+    'category:日常与出行': 'ordinary-1',
+  })
   assert.equal(snapshot.todayDurationSeconds, 54.5)
   assert.equal(snapshot.totalDurationSeconds, 80)
+})
+
+test('recording progress keeps the latest resume anchor per category or prepared material', () => {
+  const snapshot = summarizeRecordingProgress([
+    {
+      sentence_id: 'daily-1',
+      created_at: '2026-08-28T01:00:00.000Z',
+      metadata: { exercise_category: '日常与出行' },
+    },
+    {
+      sentence_id: 'daily-2',
+      created_at: '2026-08-28T02:00:00.000Z',
+      metadata: { exercise_category: '日常与出行' },
+    },
+    {
+      sentence_id: 'prepared-1',
+      created_at: '2026-08-28T03:00:00.000Z',
+      metadata: {
+        exercise_category: '现代文章朗读',
+        prepared_expression_id: 'material-1',
+      },
+    },
+  ], 0)
+
+  assert.deepEqual(snapshot.lastRecordedExerciseIds, {
+    'category:日常与出行': 'daily-2',
+    'prepared_expression:material-1': 'prepared-1',
+  })
 })

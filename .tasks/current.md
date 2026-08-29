@@ -2,6 +2,24 @@
 
 > 最后更新: 2026-08-28
 
+## 2026-08-28 长时录音账号每句保存后卡“正在准备训练页”根因修复
+
+- 账号 308 当时已有 2772 条 `voice_contributions`、2001 个不同句 ID。旧 `/api/upload/progress` 每次把该账号全部记录（含约 7.8 MB JSON metadata）分 3 页搬到 Backend 再汇总，生产只读实测约 6.2 秒；这不是 2 小时音频文件本身压垮系统，而是历史进度查询随记录数线性变慢。
+- 直接卡页链路已确认：录音保存后 `persistTrainingAttempt()` 主动刷新一次，本机 queue 从 1 变 0 又自动刷新一次；今天为防止刷新时先闪到第一句，普通训练页又被改成任何 progress refresh 都整页显示“正在准备训练页”。因此每录一句都会触发重复的 6 秒级读取并隐藏整个页面，请求悬挂时可永久白屏。
+- 新增并精确部署 migration `20260828010000_optimize_recording_progress.sql`：`get_recording_progress` 在 PostgreSQL 内汇总已读 ID、长文 segment/round、材料区最后位置和时长，只允许 `service_role` 调用；增加 `(contributor_id, created_at, id)` 组合索引。未执行全量 `db push`，没有触碰历史缺失迁移。账号 308 实测 RPC 首次约 1.22–1.47 秒，后续约 0.26–0.53 秒，响应约 74 KB；`anon/authenticated/service_role` 权限为 `false/false/true`。
+- Frontend 将 progress 初次加载和后台刷新分开：single-flight 去重、8 秒 AbortController 边界、普通训练后台刷新不再遮住页面；云端恢复完成后若用户尚未主动选句，仍会准确切到账号续读位置。长文页继续等待首次 round 状态，但失败/超时后可进入页面并显示可继续录音的提示。
+- 旧 `MemoryService` 也改为 single-flight drain：新条目在当前请求期间进入队列不会被旧请求覆盖，失败时停止而不是并发重放整队列。生产日志中服务切换窗口曾观察到同一客户端 23 次 `/api/memory/add` 502，本次已消除此类并发放大器。
+- 验证：Frontend 111 项、TypeScript、production build；Backend upload metadata 5 项、build、RTC、SMS；AI docs、`git diff --check` 均通过。数据库函数真实账号与权限实测通过。Backend/Frontend 已按最小影响 sudo 路径部署，均 healthy、restart 0、OOM false；公网 RTC 200、未认证 progress 401、保护路由精确 307，Playwright 登录页刷新后 console 0 error/0 warning。缺少可安全复用的 308 登录态和当前机器麦克风，仍需本人设备录 2–3 句确认视觉体验，但核心重复刷新、全量传输和无限白屏路径已从代码与生产数据层移除。
+
+## 2026-08-28 训练句子账户级已读 / 未读清单与跨登录续读
+
+- 纠正了“已有进度功能就等于能续读”的误判：旧实现只会在一个主题尚未全部录完时跳过已录句；一旦整组都录过，新登录会话会进入复练并从题库第一句开始。根因是云端只有已录 ID 集合，没有每个材料区的最后成功句锚点；普通训练页还会在云端进度返回前短暂按空进度选择第一句。
+- `voice_contributions` 继续作为唯一账户事实源，不新增游标表或 localStorage 兼容层。Backend 进度响应现在从现有记录推导：全局 `recordedSentenceIds`、每篇长文 round/segment，以及每个普通主题/自定义材料的 `lastRecordedExerciseIds`。退出登录、重新登录、刷新和换设备都读取同一份账号记录。
+- 选择器按最后成功句旋转原始题序：优先进入下一条未读句；全部读完后从上次最后一句之后继续循环复练，不再回到第一句。自定义材料按 `prepared_expression_id` 隔离，普通题库按 category 隔离，长文继续使用已有 article round/segment 唯一事实源。
+- 训练页新增明确的账户清单：显示全部、已读、未读数量；“查看已读和未读”支持 `未读 / 已读 / 全部` 筛选、搜索、逐句状态标记和按需“显示更多”。已读句可主动复练，但不会被误算为未读。
+- IndexedDB 待同步录音仍保留在设备上且绑定 contributor ID；页面和进度只合并当前登录账号的数据。退出时不删除，重新登录同一账号恢复；登录其他账号不会看到或统计前一账号的本机录音。
+- 生产只读验证：账号 308 当前有 1943 个不同已读句 ID，9 个训练材料区均能从同一云端记录推导最后位置。Frontend 108 项测试、TypeScript、production build；Backend build、RTC、upload metadata 5 项、SMS auth；AI docs 与 `git diff --check` 均通过。Backend/Frontend 已最小影响部署且 healthy；公网 RTC 200、未认证 progress 401、保护路由 307 精确回跳，Playwright console 0 error/0 warning。当前没有可安全复用的账号 308 浏览器 session，因此已登录视觉 smoke 仍需本人刷新页面确认。
+
 ## 2026-08-28 账号 308 活跃录音“像退出登录”根因收口
 
 - 生产日志定量确认：约 24 小时内录音持久化成功 852 次，`/api/upload/progress` 失败 896 次，Backend token/JWT 校验失败 0 次。直接故障是 `reading_article_progress` 未部署导致进度 API 持续 500；同时 Frontend 发布窗口使经 Frontend 转发的 `/api/upload/sign` 反复 502，旧录音 hook 每 2 秒自动重排队，放大为请求风暴。账号 308 没有被后端判定为登出。
