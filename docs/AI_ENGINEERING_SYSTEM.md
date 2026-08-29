@@ -1,6 +1,6 @@
 # VoxFlame AI Engineering System
 
-> 更新日期：2026-08-17
+> 更新日期：2026-08-29
 >
 > 本文档基于三类输入收敛：
 > 1. OpenAI《Harness Engineering》
@@ -13,7 +13,7 @@
 
 ## 1. 本轮升级要解决什么
 
-过去我们已经完成了第一轮 `Harness Engineering` 化：把入口文件缩短、把深规则移到 `docs/`、把最小验证和状态同步纳入仓库。
+过去我们已经完成了第一轮 `Harness Engineering` 化：把入口文件缩短、把深规则移到 `docs/`、把最小验证和状态同步纳入仓库。当前入口进一步收口为：根 `AGENTS.md` 负责任务分流，`docs/aiprompts/HARNESS_ENTRY_CONTRACT.md` 负责交付契约，`research/HARNESS_RULES.yaml` 负责机器可读阈值和动作边界。
 
 但这只解决了“不要把 prompt 写成百科全书”。
 
@@ -405,7 +405,9 @@ compat 层必须同时具备：
 - `scripts/check_ai_governance.sh`：阻止 compat 路径和旧页面入口重新被新代码引用
 - `.github/workflows/ai-doc-guard.yml`：在 CI 中同时执行文档 harness 与治理守卫
 - `scripts/docker-rebuild-core-fast.sh`：生产 Docker 部署 harness；环境变量更新使用 `env-backend` 只重建 backend，单服务代码改动使用 `backend` / `frontend`，只有核心链路共同变化才使用默认 `core`，不先执行 `docker compose down`
-- `scripts/docker_disk_maintenance.sh`：Docker 磁盘维护 harness；`status` 先盘点，`prune-safe` 只清理 7 天前的 dangling images 与 build cache，保留运行容器、卷、`latest` 和 `pre-*` 回滚镜像
+- `scripts/docker_disk_maintenance.sh`：Docker 磁盘维护 harness；`status` 先盘点，`prune-safe` 清理全部 dangling images、7 天前停止容器、未使用网络和全部未使用 Build Cache；Build Cache/停止容器/未使用网络可重建，运行容器、卷、`latest` 和 `pre-*` 回滚镜像保留。持久化卷不自动删除，只盘点并告警
+- `voxflame-docker-disk-maintenance.timer`：每日自动检查根盘；达到 `VOXFLAME_DOCKER_AUTO_PRUNE_ROOT_THRESHOLD_PERCENT`（默认 75%）才调用 `auto -> prune-safe`，不清理运行容器、卷、`latest` 或 `pre-*` 回滚镜像
+- `/etc/logrotate.d/voxflame-host-logs`：宿主机 bind-mounted `logs/*.log` 每日轮转，单文件达到 50 MiB 时提前轮转，保留 14 份压缩副本；不删除 JSONL 诊断或业务数据文件
 
 另外，仓库级 instructions 至少要明确：
 
@@ -468,6 +470,13 @@ compat 层必须同时具备：
   - 守卫脚本
   - CI / lint
 - 一句话：日志追加和长期规则不能混写在一个层里。
+
+### 6.1.1 Harness 入口与规则单一事实源
+
+- 每轮任务先读取根 `AGENTS.md`，再按 `docs/aiprompts/HARNESS_ENTRY_CONTRACT.md` 判断是回答、诊断、变更、研究、遥测触发还是高风险变更。
+- 研究生命周期和证据门只写在 `research/RESEARCH_HARNESS.md`；阈值、状态集合、自动动作和人工确认边界只写在 `research/HARNESS_RULES.yaml`。
+- `scripts/research/` 只能读取并执行上述规则，禁止复制一套隐藏阈值或自行改变研究状态。
+- 动态事实放摘要/任务/研究条目；长期规则放入口/体系文档；运行时配置放代码与部署文件。三者必须通过脚本和文档检查保持可追溯。
 
 ### 6.3 研究事实源与应用回流
 

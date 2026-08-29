@@ -37,6 +37,11 @@ sudo install -m 0644 "$REPO_ROOT/infra/systemd/swapfile.swap" /etc/systemd/syste
 sudo install -m 0755 "$REPO_ROOT/scripts/ops/voxflame-host-health-probe.sh" /usr/local/libexec/voxflame-host-health-probe
 sudo install -m 0644 "$REPO_ROOT/infra/systemd/voxflame-host-health-probe.service" /etc/systemd/system/voxflame-host-health-probe.service
 sudo install -m 0644 "$REPO_ROOT/infra/systemd/voxflame-host-health-probe.timer" /etc/systemd/system/voxflame-host-health-probe.timer
+sudo install -m 0755 "$REPO_ROOT/scripts/docker_disk_maintenance.sh" /usr/local/libexec/voxflame-docker-disk-maintenance
+sudo install -m 0644 "$REPO_ROOT/infra/systemd/voxflame-docker-disk-maintenance.service" /etc/systemd/system/voxflame-docker-disk-maintenance.service
+sudo install -m 0644 "$REPO_ROOT/infra/systemd/voxflame-docker-disk-maintenance.timer" /etc/systemd/system/voxflame-docker-disk-maintenance.timer
+sudo install -d -m 0755 /etc/logrotate.d
+sudo install -m 0644 "$REPO_ROOT/infra/logrotate/voxflame-host-logs" /etc/logrotate.d/voxflame-host-logs
 sudo install -m 0755 "$REPO_ROOT/scripts/ops/sync-android-main-release.sh" /usr/local/libexec/voxflame-android-main-sync
 sudo install -m 0644 "$REPO_ROOT/infra/systemd/voxflame-android-main-sync.service" /etc/systemd/system/voxflame-android-main-sync.service
 sudo install -m 0644 "$REPO_ROOT/infra/systemd/voxflame-android-main-sync.timer" /etc/systemd/system/voxflame-android-main-sync.timer
@@ -46,6 +51,7 @@ sudo systemctl enable --now swapfile.swap
 sudo systemctl enable --now fail2ban
 sudo systemctl reload ssh
 sudo systemctl enable --now voxflame-host-health-probe.timer
+sudo systemctl enable --now voxflame-docker-disk-maintenance.timer
 sudo systemctl enable --now voxflame-android-main-sync.timer
 sudo systemctl start voxflame-host-health-probe.service
 

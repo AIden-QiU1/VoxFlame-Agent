@@ -9,6 +9,7 @@
 3. [主项目 README](../README.md)：架构、启动和协作入口。
 4. [AI 工程系统](AI_ENGINEERING_SYSTEM.md)：仓库治理、安全与 AI 协作规则。
 5. [AI 执行计划模板](AI_EXECUTION_PLAN_TEMPLATE.md)：复杂任务计划与验证模板。
+6. [Harness 入口契约](aiprompts/HARNESS_ENTRY_CONTRACT.md)：从 AGENTS.md 分流到研究、实施、验证和人工确认。
 
 ## 研究入口
 

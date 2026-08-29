@@ -16,6 +16,7 @@ required_files=(
   "research/OUTCOME_REVIEW.md"
   "research/PIPELINE.yaml"
   "research/FEEDBACK_REGISTRY.yaml"
+  "research/HARNESS_RULES.yaml"
   "research/evidence/RO-000.yaml"
   "research/outcome-reviews/RO-000.md"
   "research/templates/RESEARCH_OPPORTUNITY_TEMPLATE.md"

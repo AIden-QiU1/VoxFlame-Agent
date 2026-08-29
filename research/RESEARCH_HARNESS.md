@@ -1,5 +1,7 @@
 # VoxFlame 研究—发现—实验—落地 Harness
 
+> 入口契约：每轮任务先从根 [`AGENTS.md`](../AGENTS.md) 分流；本文件负责研究对象的生命周期和证据门，机器规则以 [`HARNESS_RULES.yaml`](HARNESS_RULES.yaml) 为准，脚本只执行规则，不另立阈值。
+
 ## 目标
 
 把“发现新信息”变成可复核、可实验、可落地、可回退的单一闭环。研究不以文章数量或模型分数为完成标准，而以是否改善真实沟通成功率、训练反馈质量或部署可靠性为最终标准。
@@ -23,6 +25,8 @@ Research Opportunity (RO)
 每个 `research_id` 还必须挂一份 `review_report`。它是发布/申请/扩展前的初步审查与改进建议记录；报告缺失时，流程只能停在内部研究。
 
 ## 生命周期状态
+
+状态是研究对象的事实状态，不等同于应用回流中的 `adopt / validate / hold / reject` 决策。任何状态变更都必须在 Pipeline、证据包、反馈和应用回流之间保持同一 `research_id`。
 
 | 阶段 | 进入条件 | 必须产物 | 退出门槛 |
 | --- | --- | --- | --- |
@@ -185,6 +189,32 @@ Research Opportunity (RO)
 ```
 
 禁止直接把用户反馈改成 prompt、模型参数或产品功能；先写成可证伪假设，再进入实验。
+
+## 自动触发与人工确认边界
+
+触发器只负责把可观察信号变成 `FEEDBACK_REGISTRY.yaml` 的待处理输入，不自动宣称结论、扩大用户承诺或执行高风险变更。触发来源包括：
+
+- 用户明确报告故障，或同类故障在 7 天内重复出现；
+- API/RTC 的 P95/P99、5xx、429、超时、丢包、Job 拒绝率超过 RO 中的保护阈值；
+- 根盘达到 70%（告警）、75%（安全清理）或 85%（人工升级）；
+- Agent/ASR/TTS 资源达到内存、连接数、文件描述符或并发信号量上限；
+- 修复已部署但缺少真实设备/用户场景证据；新设备、语言、人群或场景准备扩大范围。
+
+触发后的最小动作是：生成或更新反馈 ID，关联唯一 `research_id`，记录指标快照和证据路径，给出可证伪假设、owner、验证指标和停止条件。低风险工程指标可以自动进入 `new` 或 `triaged`；以下事项必须人工确认后才能继续：真实设备/目标用户试点、生产流量扩大、扩容采购、数据库或对象存储删除、医疗/健康主张、对外发布和默认能力升级。
+
+闭环完成定义：反馈有证据 → RO 有 baseline/停止条件 → 实验或最小实现可回退 → 结果写入 outcome review → 场景/保护指标验证 → 应用回流登记 → 设定下一次复核日期。没有验证结果的“已处理”只能保持 `validating` 或 `improving`，不能标记 `resolved`/`adopted`。
+
+推荐命令：
+
+```bash
+python3 scripts/research/check-research-triggers.py metrics.json
+python3 scripts/research/create-feedback-entry.py --research-id RO-014 --source telemetry --scenario "RTC 阶梯压测" --observation "ASR P95 超过阈值" --severity high --failure-type network --evidence-ref artifacts/run.json --hypothesis "外部 provider 并发达到上限" --owner "livekit_agent" --action "停止加压并补信号量" --validation "ASR P95 <2s 且 429=0"
+python3 scripts/research/validate-research-loop.py
+```
+
+触发器不读取 secrets、不删除数据、不直接修改运行时配置；所有副作用操作仍沿现有部署和审批流程执行。
+
+触发器的阈值、允许动作、禁止动作和人工确认清单不得在报告或业务脚本中重复定义；修改阈值时先改 `HARNESS_RULES.yaml`，再运行研究系统检查和触发器回归。
 
 反馈不是附录，而是优化输入。每次反馈必须有来源、场景、严重度、影响指标、归因置信度、责任 owner、动作、验证结果和关闭条件；没有动作或验证的“收集意见”不算完成闭环。
 

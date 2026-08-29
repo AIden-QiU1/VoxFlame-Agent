@@ -26,6 +26,8 @@
 - Docker 部署优先使用 `../scripts/docker-rebuild-core-fast.sh` 的最小影响模式，不默认先执行 `docker compose down`；清理先运行 `../scripts/docker_disk_maintenance.sh status`，只用 `prune-safe` 保留运行与 `pre-*` 回滚镜像。
 - 任务完成后，同步更新 `../.claude-summary.md` 和 `../.tasks/current.md`。
 - 研究统一进入 `../research/`；模型实验原始事实来自 `../references/clear-vox-model` submodule，只有登记为 `adopt` 且完成应用验证的结论才能进入产品或部署。
+- 研究故障和遥测问题按 `../research/RESEARCH_HARNESS.md` 进入发现→证据→反馈→实施→验证闭环；`../scripts/research/*` 触发器只生成待审输入，不自动删除、扩容、发布或采用。
+- 每轮任务先按 `../docs/aiprompts/HARNESS_ENTRY_CONTRACT.md` 分流；阈值和人工确认边界只以 `../research/HARNESS_RULES.yaml` 为准。
 - 硬件/辅助器具/重大采购先把供应商稿、竞品功能和 AI 草案当待验证假设；先做 COTS/ODM 真实任务 A/B，再用用户价值、支付方、完全落地成本、工程与责任 Gate 冻结架构/BOM。外部 PDF/规格书必须核验实际类型、标题/页数、来源和哈希，不能把网页壳或搜索摘要当原文。
 - 硬件文档按内部决策、原供应商反馈、中性供应商征询分层；原供应商稿保留熟悉的章节骨架和表格入口，中性外发稿独立呈现完整功能、路线、工程输入、验证、交付和报价。两者都隔离不需要的原稿对照、研究过程、角色阅读分工、内部预算/毛利和签批意见；参数逐项区分原厂事实、候选配置、测试目标和未知，并检查品牌禁词、无装饰图、DOCX 元数据/媒体、A4/PDF 无裁切。
 

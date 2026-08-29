@@ -74,7 +74,19 @@ _sanitize_proxy_env_for_local_livekit()
 # Self-hosted LiveKit worker registration should bypass shell-level HTTP proxies.
 # The default AgentServer behavior inherits HTTP_PROXY/HTTPS_PROXY, which caused
 # local `/agent` websocket registration to be routed to 127.0.0.1:7897 and fail.
-server = AgentServer(host="127.0.0.1", http_proxy=None)
+# Keep one process per CPU as the SDK default, but make the admission policy
+# explicit so a saturated worker stops accepting new rooms instead of allowing
+# unbounded process growth.  The production default (0.7) is intentionally
+# conservative on the current 4-vCPU host and can be overridden per deployment.
+server = AgentServer(
+    host="127.0.0.1",
+    http_proxy=None,
+    load_threshold=float(os.getenv("VOXFLAME_AGENT_LOAD_THRESHOLD", "0.7")),
+    num_idle_processes=int(os.getenv("VOXFLAME_AGENT_IDLE_PROCESSES", "2")),
+    job_memory_warn_mb=float(os.getenv("VOXFLAME_AGENT_JOB_MEMORY_WARN_MB", "450")),
+    job_memory_limit_mb=float(os.getenv("VOXFLAME_AGENT_JOB_MEMORY_LIMIT_MB", "700")),
+    prometheus_port=(int(os.getenv("VOXFLAME_AGENT_PROMETHEUS_PORT", "0")) or None),
+)
 
 
 @server.on("worker_started")

@@ -32,6 +32,9 @@
 - [GOVERNANCE_PROMPT_TEMPLATE.md](GOVERNANCE_PROMPT_TEMPLATE.md)
   用于迁移、统一、兼容层、废弃路径、双轨实现收口等治理型任务。
 
+- [HARNESS_ENTRY_CONTRACT.md](HARNESS_ENTRY_CONTRACT.md)
+  从根 `AGENTS.md` 开始判断任务是否进入研究闭环、工程实施、验证或人工确认。
+
 ## 推荐读取顺序
 
 ### 要调整 AGENTS 入口组织方式

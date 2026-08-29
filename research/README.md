@@ -50,6 +50,7 @@
 ## 端到端 Harness
 
 - [研究 Harness](RESEARCH_HARNESS.md)：统一 `研究 → 发现 → 证据 → 实验 → 学术/专利 → 产品场景 → 反馈优化` 的生命周期、状态和硬门禁。
+- [Harness 规则](HARNESS_RULES.yaml)：阈值、状态、自动动作和人工确认边界的机器可读事实源。
 - [Pipeline registry](PIPELINE.yaml)：每个研究机会的唯一 `research_id` 和阶段索引。
 - [Feedback registry](FEEDBACK_REGISTRY.yaml)：用户、沟通伙伴、专家、遥测和失败样本的优化输入。
 - [Evidence package](evidence/RO-000.yaml)：强证据、独立复核、可复现性和成果/产品门禁的事实包模板。
@@ -58,6 +59,12 @@
 所有论文、专利和产品试点都必须关联同一 `research_id`，并通过独立证据包；没有强证据只能保持候选、内部研究或隔离试点状态。
 
 发布论文、专利、公开数据/代码、产品默认能力，或把 idea 扩大到新用户/病因/语言/设备/场景之前，必须通过证据包中的 `authority_gate`。闸门未通过时只能 `internal_only` 或 `hold`，不能对外宣称或扩大承诺。
+
+### 自动触发与闭环入口
+
+工程遥测和用户反馈可以通过 `scripts/research/check-research-triggers.py` 生成待处理触发信号，再用 `create-feedback-entry.py` 写入反馈登记。触发器只产生证据化输入，不自动执行清理、扩容、发布或把研究标为 `adopted`。每个条目必须继续经过 owner、baseline、停止条件、可回退实现和场景验证；`scripts/research/validate-research-loop.py` 用于阻止缺少证据包、成果审查或反馈关联的研究条目进入闭环。
+
+默认触发条件包括：同类故障 7 天内重复、P95/P99/5xx/429/超时/丢包或 Job 拒绝超过保护阈值、根盘达到 70/75/85% 阈值、修复缺少真实设备证据，以及准备扩大用户/设备/语言/场景范围。真实用户试点、生产流量扩大、扩容采购、数据删除、健康主张和对外发布必须由负责人确认。
 
 国内成果初审规则见 [国内成果初步审查与改进建议](OUTCOME_REVIEW.md)。论文、专利、软件著作权和产品分别使用不同检查项；初步审查报告只能帮助发现材料缺口和改进方向，不能替代版权登记、专利代理/法律意见或期刊同行评审。
 

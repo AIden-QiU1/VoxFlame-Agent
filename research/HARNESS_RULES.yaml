@@ -1,0 +1,47 @@
+version: 1
+updated_at: 2026-08-29
+schema: voxflame-research-harness-rules-v1
+entrypoint: AGENTS.md
+registries:
+  pipeline: research/PIPELINE.yaml
+  feedback: research/FEEDBACK_REGISTRY.yaml
+  application_feedback: research/APPLICATION_FEEDBACK_REGISTRY.md
+  evidence_dir: research/evidence
+  outcome_review_dir: research/outcome-reviews
+  trigger_scripts: scripts/research
+states:
+  research: [discovered, evidence_review, experiment_ready, experimenting, outcome_review, authority_review, scholarly_ip, software_copyright_review, scenario_pilot, adopted, improving, hold, rejected]
+  feedback: [new, triaged, experiment_ready, validating, resolved, rejected, accepted_risk]
+  terminal_research: [adopted, hold, rejected]
+  terminal_feedback: [resolved, rejected, accepted_risk]
+automatic_actions:
+  allowed: [create_feedback, update_feedback, request_evidence, mark_threshold_breached]
+  forbidden: [delete_data, expand_production, purchase_capacity, publish_claim, mark_adopted, change_runtime_config]
+manual_confirmation_required:
+  - real_device_or_target_user_pilot
+  - production_traffic_expansion
+  - capacity_purchase_or_server_resize
+  - database_object_storage_deletion
+  - medical_or_health_claim
+  - public_release_or_scope_expansion
+triggers:
+  disk:
+    warning_percent: 70
+    safe_cleanup_percent: 75
+    human_escalation_percent: 85
+  training_progress:
+    p95_ms: 2000
+    recovery_rate_min: 0.99
+  realtime:
+    job_reject_rate_max: 0.01
+    asr_p95_ms: 2000
+    tts_first_byte_p95_ms: 1500
+    packet_loss_rate_max: 0.01
+    provider_429_rate_max: 0
+  repeated_failure:
+    window_days: 7
+    count_min: 2
+completion:
+  required_artifacts: [problem, evidence_package, feedback_ref, baseline, metrics, stop_conditions, rollback, outcome_review, next_review_date]
+  required_verification: [mechanism_or_engineering, product_or_scenario_when_claimed]
+  prohibited_shortcuts: [analysis_only, deployed_without_verification, single_http_test_as_rtc_capacity, single_user_as_population_proof]

@@ -2,6 +2,23 @@
 
 > 最后更新: 2026-08-28
 
+## 2026-08-29 服务器容量与 Docker 自动清理
+
+## 2026-08-29 三个工程问题纳入 Research Harness 闭环
+
+- Harness 入口已从 `AGENTS.md` 深化：任务先按 `docs/aiprompts/HARNESS_ENTRY_CONTRACT.md` 分流；阈值、状态和自动/人工动作边界统一在 `research/HARNESS_RULES.yaml`；`validate-research-loop.py` 已升级为 YAML 关联校验，防止研究条目缺证据、反馈或应用回流。
+
+- 根 `AGENTS.md` 已按“入口只放稳定规则”原则重写；历史故障、容量数字和临时状态留在摘要、任务、研究报告和专项文档，不再污染 agent 入口。
+
+- 新增 `RO-012`（训练进度长历史稳定性）、`RO-013`（Docker/宿主资源治理）、`RO-014`（LiveKit/ASR/Agent 并发容量），分别登记证据包、成果初审报告、反馈 `FB-001`—`FB-003` 和应用回流 `RF-012`—`RF-014`。
+- 新增 `scripts/research/check-research-triggers.py`、`create-feedback-entry.py`、`validate-research-loop.py`。触发器只生成待审反馈，不直接删除、扩容、发布或自动采用；真实设备、用户试点、数据删除、扩容采购和范围扩展需要人工确认。
+- RO-012、RO-013 当前为 `improving/validate`：修复与自动治理已部署，仍需设备 smoke、趋势与保护对象验证。RO-014 为 `experiment_ready/validate`：必须完成 5→10→20→50 路真实 RTC+ASR/TTS/LLM 阶梯压测，不能从 HTTP 压测或单用户时长推算 1000 路。
+
+- 当前生产主机实测为 4 vCPU、约 7.3 GiB RAM、根盘 59 GiB（可用约 21 GiB，使用率约 65%）；五个运行容器合计内存约 0.6 GiB，当前没有立即扩容证据。
+- 低风险生产压测：`/api/rtc/health` 在 30 并发/300 请求下 296 次 200、4 次客户端连接失败，成功请求平均约 0.287 秒、最大约 1.51 秒；容器无 OOM/restart/5xx 迹象。该结果只代表 HTTP 网关，不代表 1000 路同时 RTC/ASR。
+- `docker system df` 显示 build cache 约 4.03 GiB、可回收镜像约 1.95 GiB；现有清理脚本此前只有人工入口。已增加 `auto` 模式和 `voxflame-docker-disk-maintenance.timer`，每日检查根盘，默认 75% 才执行 `prune-safe`；`prune-safe` 现在清理全部 dangling images、7 天前停止容器、未使用网络和全部未使用 Build Cache，保留运行镜像、卷、`latest` 与 `pre-*` 回滚镜像。
+- 宿主机 `logs/backend.log` 约 3.7 MiB，原先不受 Docker json-file 轮转约束；已加入 `/etc/logrotate.d/voxflame-host-logs`，每日轮转并保留 14 份压缩副本，JSONL 诊断/业务数据不自动删除。
+
 ## 2026-08-28 长时录音账号每句保存后卡“正在准备训练页”根因修复
 
 - 账号 308 当时已有 2772 条 `voice_contributions`、2001 个不同句 ID。旧 `/api/upload/progress` 每次把该账号全部记录（含约 7.8 MB JSON metadata）分 3 页搬到 Backend 再汇总，生产只读实测约 6.2 秒；这不是 2 小时音频文件本身压垮系统，而是历史进度查询随记录数线性变慢。

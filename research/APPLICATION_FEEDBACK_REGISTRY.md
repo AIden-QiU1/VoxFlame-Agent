@@ -32,6 +32,12 @@
 
 ## 新条目要求
 
+## 2026-08-29 工程可靠性闭环
+
+| RF-012 | 训练进度与长历史稳定性 | [RO-012 报告](product-engineering/RO-012-training-progress-stability-2026-08-29.md) · 生产日志与 migration 20260828010000 | 数据库聚合与刷新去重已消除已知循环放大器；真实设备和大历史回归仍待完成 | `validate` | 训练工作台 owner；完成 308 账号设备 smoke、1k/5k/20k 基准后再升级 | progress P95、恢复率、重复刷新率、跨设备一致性 |
+| RF-013 | Docker 与宿主资源治理 | [RO-013 报告](product-engineering/RO-013-docker-resource-governance-2026-08-29.md) · Docker 官方 prune 文档 · 主机 df/定时器证据 | 安全清理与日志轮转已部署；需要连续趋势和保护对象验证 | `validate` | 平台 owner；维持每日 timer，达到扩容门再评估 | 根盘趋势、回收量、清理耗时、卷/回滚保护 |
+| RF-014 | LiveKit/ASR/Agent 实时并发容量 | [RO-014 LiveKit 报告](voice-agent/RO-014-livekit-asr-concurrency-capacity-2026-08-29.md) · [跨模态对照](agent-systems/RO-014-cross-modal-realtime-capacity-2026-08-29.md) · LiveKit 官方文档 | 单 Worker/外部 provider 可能是瓶颈，但尚无真实 RTC 容量结论；不能承诺 1000 路 | `validate` | livekit_agent + 平台 owner；先做 5→10→20→50 路，达标再考虑多 Worker/扩容 | Job、ASR/TTS/LLM P95/P99、拒绝/429、丢包、CPU/RAM/FD |
+
 每个新条目至少回答：
 
 - 来源是否固定到 commit / 版本？

@@ -16,6 +16,11 @@ required_files=(
   "research/README.md"
   "research/APPLICATION_FEEDBACK_REGISTRY.md"
   "research/speech-health/MANDARIN_RECORDING_CORPUS_EVIDENCE_GATE.md"
+  "docs/aiprompts/HARNESS_ENTRY_CONTRACT.md"
+  "research/HARNESS_RULES.yaml"
+  "scripts/research/check-research-triggers.py"
+  "scripts/research/create-feedback-entry.py"
+  "scripts/research/validate-research-loop.py"
 )
 
 assert_file() {
@@ -50,6 +55,8 @@ assert_contains "docs/README.md" "AI_EXECUTION_PLAN_TEMPLATE.md"
 assert_contains "docs/README.md" "../research/README.md"
 assert_contains "AGENTS.md" "research/APPLICATION_FEEDBACK_REGISTRY.md"
 assert_contains "AGENTS.md" "可复现证据门"
+assert_contains "AGENTS.md" "HARNESS_ENTRY_CONTRACT.md"
+assert_contains "AGENTS.md" "HARNESS_RULES.yaml"
 assert_contains "docs/AI_ENGINEERING_SYSTEM.md" "普通话录音语料"
 
 bash "${ROOT_DIR}/scripts/check_research_system.sh"

@@ -1,5 +1,5 @@
-version: 1
-updated_at: 2026-08-14
+version: 2
+updated_at: 2026-08-29
 schema: research-opportunity-v1
 state_machine:
   terminal: [adopted, hold, rejected]
@@ -34,25 +34,69 @@ required_fields:
   - authority_gate
   - review_report
 entries:
-  - research_id: RO-000
-    title: TEMPLATE - replace before use
-    topic: agent-systems
-    state: discovered
-    owner: TBD
-    problem: TBD
-    target_scenario: TBD
-    current_gate: source_identity
-    next_action: replace this template entry
-    evidence_package: research/evidence/RO-000.yaml
-    feedback_refs: []
-    release_intents: []
-    authority_gate: research/evidence/RO-000.yaml#authority_gate
-    review_report: research/outcome-reviews/RO-000.md
-    source_refs: []
-    evidence_refs: []
+  - research_id: RO-012
+    title: 训练进度与长历史数据稳定性
+    topic: product-engineering
+    state: improving
+    owner: frontend + backend training workbench
+    problem: 账号 308 长期录音后保存一句反复显示“正在准备训练页”，由全量历史进度读取、重复刷新和遮挡式 loading 叠加造成。
+    target_scenario: 认证用户连续录音、刷新、退出重登和跨设备续读
+    current_gate: production_regression_and_device_smoke
+    next_action: 用真实账号设备连续录 2–3 句并验证失败恢复、跨设备和离线补登
+    evidence_package: research/evidence/RO-012.yaml
+    feedback_refs: [FB-001]
+    release_intents: [product_default]
+    authority_gate: research/evidence/RO-012.yaml#authority_gate
+    review_report: research/outcome-reviews/RO-012.md
+    source_refs: [local-prod-logs-2026-08-28, local-progress-rpc-2026-08-28, nextjs-fetch-abort-docs]
+    evidence_refs: [research/product-engineering/RO-012-training-progress-stability-2026-08-29.md]
     experiment_refs: []
     scholarly_ip_refs: []
-    product_refs: []
-    metrics: []
-    risks: []
-    rollback: TBD
+    product_refs: [backend-recording-progress, frontend-training-refresh]
+    metrics: [progress_p95_ms, refresh_duplicate_rate, upload_success_rate, page_recovery_rate]
+    risks: [stale-progress, migration-drift, device-only-regression]
+    rollback: 保留旧接口兼容响应；关闭后台刷新优化开关并回滚前端/SQL migration
+  - research_id: RO-013
+    title: Docker 与宿主资源自动治理
+    topic: product-engineering
+    state: improving
+    owner: platform operations
+    problem: Build Cache、悬空镜像、停止容器和宿主日志会随部署累积，人工清理增加磁盘耗尽和不可回滚风险。
+    target_scenario: 单机 Docker 生产主机每日运行、部署、异常重启与回滚
+    current_gate: scheduled-maintenance_observability
+    next_action: 验证 timer 执行记录、阈值触发、日志轮转和运行卷/回滚镜像保护
+    evidence_package: research/evidence/RO-013.yaml
+    feedback_refs: [FB-002]
+    release_intents: [product_default]
+    authority_gate: research/evidence/RO-013.yaml#authority_gate
+    review_report: research/outcome-reviews/RO-013.md
+    source_refs: [docker-pruning-docs, local-docker-df-2026-08-29, systemd-timer-manual]
+    evidence_refs: [research/product-engineering/RO-013-docker-resource-governance-2026-08-29.md]
+    experiment_refs: []
+    scholarly_ip_refs: []
+    product_refs: [docker_disk_maintenance, voxflame-docker-disk-maintenance.timer, voxflame-host-logs]
+    metrics: [root_disk_used_pct, reclaimable_bytes, cleanup_duration, protected_resource_count, log_rotation_age]
+    risks: [over-prune, volume-data-loss, rollback-image-loss, noisy-alerts]
+    rollback: 停用 timer，恢复手工 prune-safe；禁止 volume 删除并保留 latest/pre-* 镜像
+  - research_id: RO-014
+    title: LiveKit/ASR/Agent 实时并发容量与隔离
+    topic: voice-agent
+    state: experiment_ready
+    owner: livekit_agent + platform operations
+    problem: 单 Agent Worker 按房间创建独立 Job 进程，每路持有 ASR/TTS/LLM 与音频状态；外部服务配额、8001 ASR 实例和 TURN/网络容量尚未被真实 RTC 压测证明。
+    target_scenario: 5、10、20、50 路并发实时语音，逐级观察拒绝、延迟、错误和资源边界
+    current_gate: reproducible_rtc_load_test
+    next_action: 固定音频样本和测试账号，完成 5→10→20→50 路 RTC+ASR/TTS/LLM 压测并记录 p95/p99
+    evidence_package: research/evidence/RO-014.yaml
+    feedback_refs: [FB-003]
+    release_intents: [internal_only]
+    authority_gate: research/evidence/RO-014.yaml#authority_gate
+    review_report: research/outcome-reviews/RO-014.md
+    source_refs: [livekit-agents-server-options, livekit-self-hosting, livekit-cli-load-test, local-livekit-agent-source, local-runtime-config]
+    evidence_refs: [research/voice-agent/RO-014-livekit-asr-concurrency-capacity-2026-08-29.md, research/agent-systems/RO-014-cross-modal-realtime-capacity-2026-08-29.md]
+    experiment_refs: []
+    scholarly_ip_refs: []
+    product_refs: [livekit_agent, livekit-server, backend-rtc-session]
+    metrics: [active_jobs, job_start_p95_ms, asr_p95_ms, tts_first_byte_p95_ms, llm_p95_ms, rtc_packet_loss, provider_429_rate, cpu_pct, memory_mb, fd_count]
+    risks: [single-worker, provider-quota, asr-8001-unknown, turn-bandwidth, privacy-leakage]
+    rollback: 保持单 Worker 小流量；超过保护阈值拒绝新 Job，不扩大用户承诺；可回滚 load/memory 配置
