@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { MobileAuthTokenProvider } from '../api/mobile-workbench-client'
 import { toMobileProductMessage } from '../ui/product-message'
@@ -8,6 +8,13 @@ import {
   type MobileTrainingExercise,
   type MobileReadingArticleSummary,
 } from './training-catalog'
+
+export function isCurrentMobileCatalogRequest(
+  requestGeneration: number,
+  currentGeneration: number,
+): boolean {
+  return requestGeneration === currentGeneration
+}
 
 export function useMobileTrainingCatalog(params: {
   apiBaseUrl: string | null
@@ -22,6 +29,21 @@ export function useMobileTrainingCatalog(params: {
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const requestGenerationRef = useRef(0)
+  const activeControllerRef = useRef<AbortController | null>(null)
+
+  const beginRequest = useCallback(() => {
+    activeControllerRef.current?.abort()
+    const controller = new AbortController()
+    const generation = requestGenerationRef.current + 1
+    requestGenerationRef.current = generation
+    activeControllerRef.current = controller
+    return { controller, generation }
+  }, [])
+
+  const isCurrentRequest = useCallback((generation: number): boolean => (
+    isCurrentMobileCatalogRequest(generation, requestGenerationRef.current)
+  ), [])
 
   const load = useCallback(async (category?: string, readingArticleId?: string): Promise<void> => {
     if (!params.enabled || !params.apiBaseUrl) {
@@ -29,12 +51,15 @@ export function useMobileTrainingCatalog(params: {
     }
     setStatus('loading')
     setErrorMessage(null)
+    const request = beginRequest()
     try {
       const catalog = await fetchMobileTrainingCatalog(
         params.apiBaseUrl,
         params.tokenProvider,
         category || readingArticleId ? { category, readingArticleId, limit: 120 } : undefined,
+        request.controller.signal,
       )
+      if (!isCurrentRequest(request.generation)) return
       setCategories(catalog.categories)
       setExercises(catalog.exercises)
       setSelectedCategory(catalog.selectedCategory)
@@ -43,21 +68,27 @@ export function useMobileTrainingCatalog(params: {
       setTotal(catalog.total)
       setStatus('ready')
     } catch (error) {
+      if (!isCurrentRequest(request.generation)) return
       setStatus('error')
       setErrorMessage(toMobileProductMessage(error, 'recording'))
     }
-  }, [params.apiBaseUrl, params.enabled, params.tokenProvider])
+  }, [beginRequest, isCurrentRequest, params.apiBaseUrl, params.enabled, params.tokenProvider])
 
-  const loadMore = useCallback(async (): Promise<void> => {
+  const loadMore = useCallback(async (): Promise<MobileTrainingExercise[]> => {
     if (
       !params.enabled
       || !params.apiBaseUrl
       || (!selectedCategory && !selectedReadingArticle)
       || exercises.length >= total
     ) {
-      return
+      return []
     }
     setStatus('loading')
+    setErrorMessage(null)
+    const request = beginRequest()
+    const expectedCategory = selectedCategory
+    const expectedArticleId = selectedReadingArticle?.id ?? null
+    const expectedOffset = exercises.length
     try {
       const catalog = await fetchMobileTrainingCatalog(
         params.apiBaseUrl,
@@ -66,17 +97,35 @@ export function useMobileTrainingCatalog(params: {
           category: selectedCategory ?? undefined,
           readingArticleId: selectedReadingArticle?.id,
           limit: 120,
-          offset: exercises.length,
+          offset: expectedOffset,
         },
+        request.controller.signal,
       )
-      setExercises((current) => [...current, ...catalog.exercises])
+      if (
+        !isCurrentRequest(request.generation)
+        || selectedCategory !== expectedCategory
+        || (selectedReadingArticle?.id ?? null) !== expectedArticleId
+      ) return []
+      setExercises((current) => {
+        if (current.length !== expectedOffset) return current
+        const existingIds = new Set(current.map((exercise) => exercise.id))
+        return [
+          ...current,
+          ...catalog.exercises.filter((exercise) => !existingIds.has(exercise.id)),
+        ]
+      })
       setStatus('ready')
+      return catalog.exercises
     } catch (error) {
+      if (!isCurrentRequest(request.generation)) return []
       setStatus('error')
       setErrorMessage(toMobileProductMessage(error, 'recording'))
+      return []
     }
   }, [
+    beginRequest,
     exercises.length,
+    isCurrentRequest,
     params.apiBaseUrl,
     params.enabled,
     params.tokenProvider,
@@ -88,6 +137,11 @@ export function useMobileTrainingCatalog(params: {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => () => {
+    requestGenerationRef.current += 1
+    activeControllerRef.current?.abort()
+  }, [])
 
   return {
     categories,

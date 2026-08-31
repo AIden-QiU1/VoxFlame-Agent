@@ -41,6 +41,15 @@ export function isRecordingProgressRequestTimedOut(
   return now - startedAt >= RECORDING_PROGRESS_TIMEOUT_MS
 }
 
+export function isCurrentRecordingProgressRequest(
+  requestUserId: string,
+  requestGeneration: number,
+  currentUserId: string | null,
+  currentGeneration: number,
+): boolean {
+  return requestUserId === currentUserId && requestGeneration === currentGeneration
+}
+
 function isToday(value: string): boolean {
   const timestamp = Date.parse(value)
   if (!Number.isFinite(timestamp)) {
@@ -153,30 +162,47 @@ export function mergeRecordingProgress(
 }
 
 export function useRecordingProgress(
+  userId: string | null,
   isAuthenticated: boolean,
   localQueueItems: VoxFlameRecorderQueueItem[] = [],
 ): RecordingProgress {
-  const [cloud, setCloud] = useState<CloudRecordingProgress>(EMPTY_PROGRESS)
-  const [isLoading, setIsLoading] = useState(isAuthenticated)
+  const [cloudState, setCloudState] = useState<{
+    userId: string | null
+    progress: CloudRecordingProgress
+  }>({ userId: null, progress: EMPTY_PROGRESS })
+  const [isLoading, setIsLoading] = useState(Boolean(isAuthenticated && userId))
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const previousLocalQueueCountRef = useRef(localQueueItems.length)
   const hasLoadedRef = useRef(false)
-  const refreshPromiseRef = useRef<Promise<void> | null>(null)
+  const requestGenerationRef = useRef(0)
+  const activeRequestRef = useRef<{
+    userId: string
+    generation: number
+    controller: AbortController
+    promise: Promise<void>
+  } | null>(null)
 
   const refresh = useCallback(() => {
-    if (refreshPromiseRef.current) {
-      return refreshPromiseRef.current
-    }
-
-    if (!isAuthenticated) {
-      setCloud(EMPTY_PROGRESS)
+    if (!isAuthenticated || !userId) {
+      activeRequestRef.current?.controller.abort()
+      activeRequestRef.current = null
+      setCloudState({ userId: null, progress: EMPTY_PROGRESS })
       setIsLoading(false)
       setIsRefreshing(false)
       hasLoadedRef.current = false
       return Promise.resolve()
     }
 
+    const activeRequest = activeRequestRef.current
+    if (activeRequest?.userId === userId) {
+      return activeRequest.promise
+    }
+
+    activeRequest?.controller.abort()
+    const requestUserId = userId
+    const requestGeneration = requestGenerationRef.current + 1
+    requestGenerationRef.current = requestGeneration
     const isInitialLoad = !hasLoadedRef.current
     if (isInitialLoad) {
       setIsLoading(true)
@@ -207,7 +233,16 @@ export function useRecordingProgress(
         }
 
         const payload = await response.json() as Partial<CloudRecordingProgress>
-        setCloud({
+        if (!isCurrentRecordingProgressRequest(
+          requestUserId,
+          requestGeneration,
+          userId,
+          requestGenerationRef.current,
+        )) {
+          return
+        }
+
+        setCloudState({ userId: requestUserId, progress: {
           recordedSentenceIds: Array.isArray(payload.recordedSentenceIds)
             ? payload.recordedSentenceIds.filter((item): item is string => typeof item === 'string')
             : [],
@@ -239,22 +274,55 @@ export function useRecordingProgress(
           totalDurationSeconds: typeof payload.totalDurationSeconds === 'number'
             ? Math.max(0, payload.totalDurationSeconds)
             : 0,
-        })
+        } })
       } catch (refreshError) {
+        if (!isCurrentRecordingProgressRequest(
+          requestUserId,
+          requestGeneration,
+          userId,
+          requestGenerationRef.current,
+        )) {
+          return
+        }
         console.error('[recording-progress] refresh failed:', refreshError)
         setError('云端录音进度暂时没有更新；页面仍可继续录音，本机记录不会丢失。')
       } finally {
         window.clearTimeout(timeoutId)
+        if (!isCurrentRecordingProgressRequest(
+          requestUserId,
+          requestGeneration,
+          userId,
+          requestGenerationRef.current,
+        )) {
+          return
+        }
         hasLoadedRef.current = true
         setIsLoading(false)
         setIsRefreshing(false)
-        refreshPromiseRef.current = null
+        activeRequestRef.current = null
       }
     })()
 
-    refreshPromiseRef.current = request
+    activeRequestRef.current = {
+      userId: requestUserId,
+      generation: requestGeneration,
+      controller,
+      promise: request,
+    }
     return request
-  }, [isAuthenticated])
+  }, [isAuthenticated, userId])
+
+  useEffect(() => {
+    requestGenerationRef.current += 1
+    activeRequestRef.current?.controller.abort()
+    activeRequestRef.current = null
+    hasLoadedRef.current = false
+    previousLocalQueueCountRef.current = localQueueItems.length
+    setCloudState({ userId: null, progress: EMPTY_PROGRESS })
+    setError(null)
+    setIsRefreshing(false)
+    setIsLoading(Boolean(isAuthenticated && userId))
+  }, [isAuthenticated, userId])
 
   useEffect(() => {
     void refresh()
@@ -263,10 +331,18 @@ export function useRecordingProgress(
   useEffect(() => {
     const previousCount = previousLocalQueueCountRef.current
     previousLocalQueueCountRef.current = localQueueItems.length
-    if (isAuthenticated && localQueueItems.length < previousCount) {
+    if (isAuthenticated && userId && localQueueItems.length < previousCount) {
       void refresh()
     }
-  }, [isAuthenticated, localQueueItems.length, refresh])
+  }, [isAuthenticated, localQueueItems.length, refresh, userId])
+
+  useEffect(() => () => {
+    requestGenerationRef.current += 1
+    activeRequestRef.current?.controller.abort()
+    activeRequestRef.current = null
+  }, [])
+
+  const cloud = cloudState.userId === userId ? cloudState.progress : EMPTY_PROGRESS
 
   const merged = useMemo(
     () => mergeRecordingProgress(cloud, localQueueItems),

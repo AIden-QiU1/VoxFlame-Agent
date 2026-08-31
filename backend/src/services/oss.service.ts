@@ -70,6 +70,7 @@ export class OssService {
         const client = this.client;
         const content = line + '\n';
         const buf = Buffer.from(content);
+        let lastError: unknown = null;
 
         // Simple retry logic for concurrency
         for (let i = 0; i < 3; i++) {
@@ -85,7 +86,20 @@ export class OssService {
                     }).res?.headers ?? {};
                     const type = headers['x-oss-object-type'];
                     if (type === 'Normal') {
-                        console.warn(`[OSS] ${name} is Normal type, cannot append. Skipping.`);
+                        const current = await client.get(name);
+                        const currentContent = Buffer.isBuffer(current.content)
+                            ? current.content
+                            : Buffer.from(current.content);
+                        const currentHeaders = (current as {
+                            res?: { headers?: Record<string, string | number | string[] | undefined> };
+                        }).res?.headers ?? {};
+                        const etag = currentHeaders.etag;
+                        if (typeof etag !== 'string' || !etag.trim()) {
+                            throw new Error(`OSS object ${name} is missing an ETag`);
+                        }
+                        await client.put(name, Buffer.concat([currentContent, buf]), {
+                            headers: { 'If-Match': etag },
+                        });
                         return;
                     }
                     const nextPosition = headers['x-oss-next-append-position'];
@@ -100,15 +114,20 @@ export class OssService {
                 // Success
                 return;
             } catch (e: unknown) {
-                if (isOssPositionConflictError(e)) {
-                    // Concurrent append happened, retry
-                    console.log(`[OSS] Append position mismatch for ${name}, retrying...`);
+                lastError = e;
+                if (isOssPositionConflictError(e) || isOssPreconditionFailure(e)) {
+                    // Concurrent append/replace happened, re-read and retry.
+                    console.log(`[OSS] Concurrent text log update for ${name}, retrying...`);
                     continue;
                 }
                 console.error(`[OSS] Failed to append to ${name}:`, e);
-                break;
+                throw e;
             }
         }
+
+        throw lastError instanceof Error
+            ? lastError
+            : new Error(`OSS append retries exhausted for ${name}`);
     }
 
     /**
@@ -149,6 +168,56 @@ export class OssService {
     }
 
     /**
+     * Rewrite one text object with an ETag precondition. A failed or competing
+     * write leaves the previous object intact; conflicts are re-read and retried.
+     */
+    async rewriteTextObject(
+        name: string,
+        rewrite: (content: string) => string,
+    ): Promise<boolean> {
+        if (!this.isConfigured || !this.client) {
+            return false;
+        }
+
+        const client = this.client;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            let result: Awaited<ReturnType<OSS['get']>>;
+            try {
+                result = await client.get(name);
+            } catch (error: unknown) {
+                if (isOssNotFoundError(error)) return false;
+                throw error;
+            }
+
+            const current = Buffer.isBuffer(result.content)
+                ? result.content.toString('utf8')
+                : Buffer.from(result.content).toString('utf8');
+            const next = rewrite(current);
+            if (next === current) return false;
+
+            const headers = (result as {
+                res?: { headers?: Record<string, string | number | string[] | undefined> };
+            }).res?.headers ?? {};
+            const etag = headers.etag;
+            if (typeof etag !== 'string' || !etag.trim()) {
+                throw new Error(`OSS object ${name} is missing an ETag`);
+            }
+
+            try {
+                await client.put(name, Buffer.from(next), {
+                    headers: { 'If-Match': etag },
+                });
+                return true;
+            } catch (error: unknown) {
+                if (isOssPreconditionFailure(error)) continue;
+                throw error;
+            }
+        }
+
+        throw new Error(`OSS conditional rewrite retries exhausted for ${name}`);
+    }
+
+    /**
      * Delete an object from OSS. Missing objects are treated as already deleted.
      */
     async deleteObject(name: string): Promise<void> {
@@ -168,23 +237,6 @@ export class OssService {
         }
     }
 
-    /**
-     * Replace an append log while preserving append-object compatibility.
-     */
-    async replaceTextLog(name: string, lines: string[]): Promise<void> {
-        if (!this.isConfigured || !this.client) {
-            return;
-        }
-
-        await this.deleteObject(name);
-
-        for (const line of lines) {
-            const normalized = line.trim();
-            if (normalized) {
-                await this.appendTextLog(name, normalized);
-            }
-        }
-    }
 }
 
 export const ossService = new OssService();
@@ -213,4 +265,8 @@ function isOssNotFoundError(error: unknown): boolean {
 
 function isOssPositionConflictError(error: unknown): boolean {
     return readOssErrorCode(error) === 'PositionNotEqualToLength' || readOssErrorStatus(error) === 409;
+}
+
+function isOssPreconditionFailure(error: unknown): boolean {
+    return readOssErrorCode(error) === 'PreconditionFailed' || readOssErrorStatus(error) === 412;
 }

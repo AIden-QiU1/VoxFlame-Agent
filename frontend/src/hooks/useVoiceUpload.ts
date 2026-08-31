@@ -405,12 +405,11 @@ export function useVoiceUpload() {
   const discardUploadedRecording = useCallback(async (
     options: DiscardUploadOptions,
   ): Promise<DiscardUploadResult> => {
-    if (options.recordingId) {
-      await removeRecorderQueueItem(options.recordingId)
-      await refreshLocalQueueCount()
-    }
-
     if (!options.contributionId && !options.storagePath) {
+      if (options.recordingId) {
+        await removeRecorderQueueItem(options.recordingId)
+        await refreshLocalQueueCount()
+      }
       return {
         ok: true,
         status: 'discarded',
@@ -456,6 +455,10 @@ export function useVoiceUpload() {
         throw new Error(`discard_upload_${response.status}`)
       }
 
+      if (options.recordingId) {
+        await removeRecorderQueueItem(options.recordingId)
+        await refreshLocalQueueCount()
+      }
       setLastError(null)
       setLastUploadReceipt(null)
       return {

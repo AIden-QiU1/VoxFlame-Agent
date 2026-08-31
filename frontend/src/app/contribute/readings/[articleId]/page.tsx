@@ -19,12 +19,12 @@ export default function ReadingArticlePage({ params }: { params: { articleId: st
   const [resetError, setResetError] = useState<string | null>(null)
   const article = getReadingArticle(params.articleId)
   const path = `/contribute/readings/${params.articleId}`
-  const { isLoading: isAuthLoading, isAuthenticated } = useAuth({
+  const { userId, isLoading: isAuthLoading, isAuthenticated } = useAuth({
     redirectToLogin: true,
     nextPath: path,
   })
   const { localQueueItems } = useVoiceUpload()
-  const progress = useRecordingProgress(isAuthenticated, localQueueItems)
+  const progress = useRecordingProgress(userId, isAuthenticated, localQueueItems)
 
   if (!article) {
     notFound()

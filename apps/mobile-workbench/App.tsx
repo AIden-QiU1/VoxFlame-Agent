@@ -68,6 +68,12 @@ import {
   isMobileCollectionPreflightReady,
   MOBILE_COLLECTION_PLANS,
 } from './src/training/collection-protocol'
+import {
+  captureStillBelongsToContributor,
+  decideMobileAdvance,
+  reconcileMobileExerciseSelection,
+  type MobileTrainingCaptureSnapshot,
+} from './src/training/mobile-recording-workflow'
 import { useMobileMemoryEditor } from './src/memory/use-mobile-memory-editor'
 import {
   removeMobileHotwordProfile,
@@ -120,6 +126,7 @@ type MobileTaskRoute =
 type MobileCollectionSource = 'catalog' | 'prepared_material'
 
 type MobileAttemptAction = 'idle' | 'analyzing' | 'uploading' | 'discarding' | 'replacing'
+type MobileExerciseSequenceStatus = 'active' | 'load_failed' | 'complete'
 
 interface MobilePendingAttempt {
   item: MobileWorkbenchRecorderQueueItem
@@ -587,6 +594,7 @@ export default function App() {
               />
             ) : (
               <PracticeScreen
+              authUserId={auth.user?.id ?? null}
               dailyTarget={workspace.readModel.dailyTargetCount}
               onPracticeTextChange={setPracticeText}
               practiceText={practiceText}
@@ -1508,6 +1516,7 @@ function PracticeReadingArticlesScreen({
 }
 
 function PracticeScreen({
+  authUserId,
   catalog,
   dailyTarget,
   ensureTrainingConnection,
@@ -1523,6 +1532,7 @@ function PracticeScreen({
   initialCollectionSource,
   onBack,
 }: {
+  authUserId: string | null
   catalog: ReturnType<typeof useMobileTrainingCatalog>
   dailyTarget: number
   ensureTrainingConnection(): Promise<boolean>
@@ -1540,8 +1550,7 @@ function PracticeScreen({
 }) {
   const [selectedExercise, setSelectedExercise] = useState<MobileTrainingExercise | null>(null)
   const [exerciseIndex, setExerciseIndex] = useState(0)
-  const [activeCaptureId, setActiveCaptureId] = useState<string | null>(null)
-  const activeCaptureIdRef = useRef<string | null>(null)
+  const activeCaptureRef = useRef<MobileTrainingCaptureSnapshot | null>(null)
   const [feedback, setFeedback] = useState<MobileTrainingFeedback | null>(null)
   const [pendingAttempt, setPendingAttempt] = useState<MobilePendingAttempt | null>(null)
   const [attemptAction, setAttemptAction] = useState<MobileAttemptAction>('idle')
@@ -1555,7 +1564,9 @@ function PracticeScreen({
   const [sex, setSex] = useState('')
   const [isReadingAssistancePlaying, setIsReadingAssistancePlaying] = useState(false)
   const [readingAssistanceStatus, setReadingAssistanceStatus] = useState<string | null>(null)
+  const [exerciseSequenceStatus, setExerciseSequenceStatus] = useState<MobileExerciseSequenceStatus>('active')
   const readingAssistanceKeysRef = useRef<Set<string>>(new Set())
+  const selectionScopeRef = useRef<string | null>(null)
   const materialExercises = useMemo(
     () => buildMobilePreparedMaterialExercises(preparedExpression),
     [preparedExpression],
@@ -1594,11 +1605,23 @@ function PracticeScreen({
     understandsConsent: consentReady,
   })
   const attemptLocked = pendingAttempt !== null || attemptAction !== 'idle'
+  const selectionScopeKey = usesPreparedMaterial
+    ? `prepared:${preparedExpression?.id ?? 'none'}`
+    : catalog.selectedReadingArticle
+      ? `reading:${catalog.selectedReadingArticle.id}`
+      : `category:${catalog.selectedCategory ?? 'none'}`
 
   useEffect(() => {
-    setSelectedExercise(visibleExercises[0] ?? null)
-    setExerciseIndex(0)
-  }, [collectionSource, flow, visibleExercises])
+    const scopeChanged = selectionScopeRef.current !== selectionScopeKey
+    const nextSelection = reconcileMobileExerciseSelection(
+      visibleExercises,
+      scopeChanged ? null : selectedExercise?.id ?? null,
+    )
+    selectionScopeRef.current = selectionScopeKey
+    setSelectedExercise(nextSelection.exercise)
+    setExerciseIndex(nextSelection.index)
+    if (scopeChanged) setExerciseSequenceStatus('active')
+  }, [selectedExercise?.id, selectionScopeKey, visibleExercises])
 
   useEffect(() => {
     if (!practiceText.trim()) setFeedback(null)
@@ -1657,6 +1680,9 @@ function PracticeScreen({
   }
 
   const startTrainingAttempt = async (): Promise<boolean> => {
+    if (activeCaptureRef.current || queue.isRecording || attemptAction !== 'idle') {
+      return false
+    }
     setFeedback(null)
     if (isReadingAssistancePlaying) {
       Alert.alert('示例还在朗读', '请等朗读结束后再开始录音。')
@@ -1667,8 +1693,15 @@ function PracticeScreen({
       return false
     }
     const captureId = `mobile-training-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    activeCaptureIdRef.current = captureId
-    setActiveCaptureId(captureId)
+    if (!authUserId) return false
+    const captureSnapshot: MobileTrainingCaptureSnapshot = {
+      captureId,
+      contributorId: authUserId,
+      exercise: effectiveExercise,
+      exerciseIndex,
+      preparedExpressionId: usesPreparedMaterial ? preparedExpression?.id : undefined,
+    }
+    activeCaptureRef.current = captureSnapshot
     const connectionPromise = ensureTrainingConnection()
     const started = await queue.startRecording(targetText, {
       sentenceId: effectiveExercise.id,
@@ -1693,38 +1726,41 @@ function PracticeScreen({
       },
     })
     if (!started) {
-      activeCaptureIdRef.current = null
-      setActiveCaptureId(null)
+      activeCaptureRef.current = null
       return false
     }
     void connectionPromise.then(async (connected) => {
-      if (!connected || activeCaptureIdRef.current !== captureId) return
+      if (!connected || activeCaptureRef.current?.captureId !== captureId) return
       await trainingConnection.startTrainingCapture(captureId, flow === 'assessment')
     })
     return true
   }
 
   const stopAndAnalyze = async (): Promise<void> => {
-    const captureId = activeCaptureId
-    if (!captureId) return
+    const capture = activeCaptureRef.current
+    if (!capture) return
+    activeCaptureRef.current = null
     setAttemptAction('analyzing')
-    activeCaptureIdRef.current = null
-    setActiveCaptureId(null)
     const connected = trainingConnection.status === 'connected'
     const [item, stopped] = await Promise.all([
       queue.stopRecording(),
       connected
-        ? trainingConnection.stopTrainingCapture(captureId)
+        ? trainingConnection.stopTrainingCapture(capture.captureId)
         : Promise.resolve(false),
     ])
     if (!item) {
       setAttemptAction('idle')
       return
     }
+    if (!captureStillBelongsToContributor(capture, authUserId)) {
+      setAttemptAction('idle')
+      Alert.alert('账号已经切换', '这条录音已安全保存在原账号的本机队列中，请切回原账号后处理。')
+      return
+    }
     const heardText = stopped || connected
-      ? await trainingConnection.waitForFinalTranscript(captureId)
+      ? await trainingConnection.waitForFinalTranscript(capture.captureId)
       : ''
-    const exercise = effectiveExercise
+    const exercise = capture.exercise
     const nextFeedback = analyzeMobileTrainingAttempt(exercise, heardText)
     setFeedback(nextFeedback)
     const enrichedItem = await queue.attachRecognition(item.recordingId, heardText, {
@@ -1740,14 +1776,14 @@ function PracticeScreen({
         : nextFeedback.status === 'close' ? 0.78 : nextFeedback.status === 'retry' ? 0.48 : 0.2,
       missing_chars: nextFeedback.missingChars,
       extra_chars: nextFeedback.extraChars,
-      ...(usesPreparedMaterial && preparedExpression
-        ? { prepared_expression_id: preparedExpression.id }
+      ...(capture.preparedExpressionId
+        ? { prepared_expression_id: capture.preparedExpressionId }
         : {}),
     })
-    const assessmentAttempt = flow === 'assessment' && selectedExercise
+    const assessmentAttempt = flow === 'assessment'
       ? {
-          exerciseId: selectedExercise.id,
-          targetText: selectedExercise.text,
+          exerciseId: exercise.id,
+          targetText: exercise.text,
           heardText,
           normalizedTarget: nextFeedback.normalizedTarget,
           normalizedHeard: nextFeedback.normalizedHeard,
@@ -1771,6 +1807,7 @@ function PracticeScreen({
     setSelectedExercise(visibleExercises[bounded] ?? null)
     onPracticeTextChange('')
     setFeedback(null)
+    setExerciseSequenceStatus('active')
   }
 
   const confirmPendingAttempt = async (): Promise<void> => {
@@ -1789,8 +1826,26 @@ function PracticeScreen({
       }
       setPendingAttempt(null)
       setFeedback(null)
-      if (exerciseIndex < visibleExercises.length - 1) {
-        selectExerciseAt(exerciseIndex + 1)
+      const advance = decideMobileAdvance({
+        currentIndex: exerciseIndex,
+        loadedCount: visibleExercises.length,
+        totalCount: visibleTotal,
+      })
+      if (advance.kind === 'select_loaded') {
+        selectExerciseAt(advance.index)
+      } else if (advance.kind === 'load_more' && !usesPreparedMaterial) {
+        const nextPage = await catalog.loadMore()
+        const nextExercise = nextPage[0] ?? null
+        if (nextExercise) {
+          setExerciseIndex(advance.nextIndex)
+          setSelectedExercise(nextExercise)
+          onPracticeTextChange('')
+          setExerciseSequenceStatus('active')
+        } else {
+          setExerciseSequenceStatus('load_failed')
+        }
+      } else {
+        setExerciseSequenceStatus('complete')
       }
     }
     setAttemptAction('idle')
@@ -1970,8 +2025,8 @@ function PracticeScreen({
               <Text style={styles.timer}>{formatDuration(queue.durationMs)}</Text>
             </View>
             <PrimaryButton
-              disabled={!queue.isRecording && (attemptLocked || isReadingAssistancePlaying)}
-              label={queue.isRecording ? '说完了' : attemptAction === 'analyzing' ? '正在整理本次录音…' : pendingAttempt ? '请先决定是否收录' : flow === 'assessment' ? '开始说这个词' : '开始说这句话'}
+              disabled={!queue.isRecording && (attemptLocked || isReadingAssistancePlaying || exerciseSequenceStatus !== 'active')}
+              label={queue.isRecording ? '说完了' : exerciseSequenceStatus === 'complete' ? '本组已经完成' : exerciseSequenceStatus === 'load_failed' ? '下一句尚未加载' : attemptAction === 'analyzing' ? '正在整理本次录音…' : pendingAttempt ? '请先决定是否收录' : flow === 'assessment' ? '开始说这个词' : '开始说这句话'}
               onPress={() => {
                 if (queue.isRecording) {
                   void stopAndAnalyze()
@@ -1981,6 +2036,11 @@ function PracticeScreen({
               }}
               tone={queue.isRecording ? 'neutral' : 'accent'}
             />
+            {exerciseSequenceStatus === 'complete' ? (
+              <InlineMessage tone="success" text="本组已经完成。选择其他材料，或主动返回上一句复练。" />
+            ) : exerciseSequenceStatus === 'load_failed' ? (
+              <InlineMessage tone="danger" text="录音已经收下，但下一页暂时没有加载成功。请点击下方“加载更多句子”继续。" />
+            ) : null}
             {friendlyError(queue.errorMessage) ? (
               <InlineMessage tone="danger" text={friendlyError(queue.errorMessage) ?? ''} />
             ) : null}
@@ -2044,9 +2104,17 @@ function PracticeScreen({
 
           {!usesPreparedMaterial && catalog.exercises.length < catalog.total ? (
             <SecondaryButton
-              disabled={catalog.status === 'loading'}
+              disabled={catalog.status === 'loading' || queue.isRecording || attemptLocked}
               label={catalog.status === 'loading' ? '正在加载…' : '加载更多句子'}
-              onPress={() => void catalog.loadMore()}
+              onPress={() => {
+                void catalog.loadMore().then((nextPage) => {
+                  if (exerciseSequenceStatus !== 'load_failed' || nextPage.length === 0) return
+                  setExerciseIndex(exerciseIndex + 1)
+                  setSelectedExercise(nextPage[0])
+                  onPracticeTextChange('')
+                  setExerciseSequenceStatus('active')
+                })
+              }}
             />
           ) : null}
         </>

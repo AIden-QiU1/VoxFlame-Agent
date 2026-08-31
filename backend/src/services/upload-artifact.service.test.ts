@@ -3,9 +3,192 @@ import test from 'node:test'
 
 import {
   buildRecordingManifestEntry,
+  classifyManifestRecordingState,
+  executeRecoverableDiscard,
+  removeManifestRecordingLines,
+  removeTranscriptRecordingLines,
+  resolveDiscardContributionMatches,
+  resolveActiveManifestRows,
+  runSerializedArtifactOperation,
   sanitizeUploadMetadata,
   summarizeRecordingProgress,
 } from './upload-artifact.service'
+
+test('append-only discard events hide matching manifest recordings without deleting siblings', () => {
+  const active = resolveActiveManifestRows([
+    { recording_id: 'rec-1', audio: { path: 'dataset/u/rec-1.wav' } },
+    { recording_id: 'rec-2', audio: { path: 'dataset/u/rec-2.wav' } },
+    {
+      event: 'recording_discarded',
+      schema_version: '1.0',
+      recording_id: 'rec-1',
+      audio: { path: 'dataset/u/rec-1.wav' },
+    },
+  ])
+
+  assert.deepEqual(active, [
+    { recording_id: 'rec-2', audio: { path: 'dataset/u/rec-2.wav' } },
+  ])
+})
+
+test('discard events remain terminal when a delayed duplicate manifest row arrives', () => {
+  const active = resolveActiveManifestRows([
+    { recording_id: 'rec-1', audio: { path: 'dataset/u/rec-1.wav' } },
+    { event: 'recording_discarded', recording_id: 'rec-1', audio: { path: 'dataset/u/rec-1.wav' } },
+    { recording_id: 'rec-1', audio: { path: 'dataset/u/rec-1.wav' } },
+  ])
+
+  assert.deepEqual(active, [])
+})
+
+test('manifest state rejects a late upload after an append-only discard event', () => {
+  assert.equal(classifyManifestRecordingState([
+    { recording_id: 'rec-1', audio: { path: 'dataset/u/rec-1.wav' } },
+    { event: 'recording_discarded', recording_id: 'rec-1', audio: { path: 'dataset/u/rec-1.wav' } },
+    { recording_id: 'rec-1', audio: { path: 'dataset/u/rec-1.wav' } },
+  ], 'rec-1', 'dataset/u/rec-1.wav'), 'discarded')
+  assert.equal(classifyManifestRecordingState([
+    { recording_id: 'rec-2', audio: { path: 'dataset/u/rec-2.wav' } },
+  ], 'rec-2', 'dataset/u/rec-2.wav'), 'active')
+  assert.equal(classifyManifestRecordingState([], 'rec-3', 'dataset/u/rec-3.wav'), 'missing')
+})
+
+test('manifest scrub removes target text while preserving its tombstone and sibling recordings', () => {
+  const content = [
+    JSON.stringify({ recording_id: 'rec-1', prompt: { text: '需要撤回的正文' }, audio: { path: 'dataset/u/rec-1.wav' } }),
+    JSON.stringify({ recording_id: 'rec-2', prompt: { text: '保留的正文' }, audio: { path: 'dataset/u/rec-2.wav' } }),
+    JSON.stringify({ event: 'recording_discarded', recording_id: 'rec-1', audio: { path: 'dataset/u/rec-1.wav' } }),
+  ].join('\n') + '\n'
+
+  const scrubbed = removeManifestRecordingLines(content, 'rec-1', 'dataset/u/rec-1.wav')
+  assert.equal(scrubbed.includes('需要撤回的正文'), false)
+  assert.equal(scrubbed.includes('保留的正文'), true)
+  assert.equal(scrubbed.includes('recording_discarded'), true)
+})
+
+test('transcript scrub removes only the matching audio line', () => {
+  const content = [
+    'rec-1\tdataset/u/rec-1.wav\t需要撤回的正文',
+    'rec-2\tdataset/u/rec-2.wav\t保留的正文',
+  ].join('\n') + '\n'
+
+  assert.equal(
+    removeTranscriptRecordingLines(content, 'dataset/u/rec-1.wav', 'rec-1'),
+    'rec-2\tdataset/u/rec-2.wav\t保留的正文\n',
+  )
+})
+
+test('discard identifiers must resolve to the same recording', () => {
+  const recordingA = {
+    id: 'contribution-a',
+    audio_path: 'dataset/u/rec-a.wav',
+    sentence_id: 'sentence-a',
+    metadata: { recording_id: 'rec-a' },
+  }
+  const recordingB = {
+    id: 'contribution-b',
+    audio_path: 'dataset/u/rec-b.wav',
+    sentence_id: 'sentence-b',
+    metadata: { recording_id: 'rec-b' },
+  }
+
+  assert.equal(resolveDiscardContributionMatches({
+    contributorId: 'u',
+    contributionId: recordingA.id,
+    audioPath: recordingA.audio_path,
+    recordingId: 'rec-a',
+  }, {
+    contributionId: recordingA,
+    audioPath: recordingA,
+    recordingId: recordingA,
+  }), recordingA)
+
+  assert.throws(() => resolveDiscardContributionMatches({
+    contributorId: 'u',
+    contributionId: recordingA.id,
+    audioPath: recordingB.audio_path,
+    recordingId: 'rec-a',
+  }, {
+    contributionId: recordingA,
+    audioPath: recordingB,
+    recordingId: recordingA,
+  }), /discard_identifier_mismatch/)
+})
+
+test('discard rejects a stale identifier when another supplied identifier still resolves', () => {
+  const recording = {
+    id: 'contribution-a',
+    audio_path: 'dataset/u/rec-a.wav',
+    sentence_id: 'sentence-a',
+    metadata: { recording_id: 'rec-a' },
+  }
+
+  assert.throws(() => resolveDiscardContributionMatches({
+    contributorId: 'u',
+    contributionId: 'wrong-contribution',
+    audioPath: recording.audio_path,
+    recordingId: 'rec-a',
+  }, {
+    contributionId: null,
+    audioPath: recording,
+    recordingId: recording,
+  }), /discard_identifier_mismatch/)
+
+  const historicalRecording = {
+    ...recording,
+    metadata: {},
+  }
+  assert.equal(resolveDiscardContributionMatches({
+    contributorId: 'u',
+    contributionId: historicalRecording.id,
+    audioPath: historicalRecording.audio_path,
+    recordingId: 'rec-a',
+  }, {
+    contributionId: historicalRecording,
+    audioPath: historicalRecording,
+    recordingId: null,
+  }), historicalRecording)
+
+  assert.equal(resolveDiscardContributionMatches({
+    contributorId: 'u',
+    contributionId: 'already-removed',
+    audioPath: recording.audio_path,
+    recordingId: 'rec-a',
+  }, {
+    contributionId: null,
+    audioPath: null,
+    recordingId: null,
+  }), null)
+})
+
+test('discard rejects mismatched path and recording ID without relying on a database row', () => {
+  assert.throws(() => resolveDiscardContributionMatches({
+    contributorId: 'u',
+    audioPath: 'dataset/u/mobile-workbench/rec-a.wav',
+    recordingId: 'rec-b',
+  }, {
+    contributionId: null,
+    audioPath: null,
+    recordingId: null,
+  }), /discard_identifier_mismatch/)
+})
+
+test('shared artifact mutations are serialized per contributor', async () => {
+  const calls: string[] = []
+  await Promise.all([
+    runSerializedArtifactOperation('account-a', async () => {
+      calls.push('upload:start')
+      await Promise.resolve()
+      calls.push('upload:end')
+    }),
+    runSerializedArtifactOperation('account-a', async () => {
+      calls.push('discard:start')
+      calls.push('discard:end')
+    }),
+  ])
+
+  assert.deepEqual(calls, ['upload:start', 'upload:end', 'discard:start', 'discard:end'])
+})
 
 test('server upload metadata allow-list drops device, browser, and arbitrary fields', () => {
   assert.deepEqual(
@@ -155,5 +338,91 @@ test('recording progress keeps the latest resume anchor per category or prepared
   assert.deepEqual(snapshot.lastRecordedExerciseIds, {
     'category:日常与出行': 'daily-2',
     'prepared_expression:material-1': 'prepared-1',
+  })
+})
+
+for (const failure of [
+  { step: 'manifest', expectedCalls: ['manifest'] },
+  { step: 'transcript', expectedCalls: ['manifest', 'transcript'] },
+  { step: 'audio', expectedCalls: ['manifest', 'transcript', 'audio'] },
+] as const) {
+  test(`discard keeps the durable contribution when ${failure.step} cleanup fails`, async () => {
+    const calls: string[] = []
+    const runStep = async (step: string): Promise<boolean> => {
+      calls.push(step)
+      if (step === failure.step) throw new Error(`${step} unavailable`)
+      return true
+    }
+
+    await assert.rejects(
+      executeRecoverableDiscard({
+        removeManifestEntry: () => runStep('manifest'),
+        removeTranscriptEntry: () => runStep('transcript'),
+        removeAudioObject: () => runStep('audio'),
+        removeContribution: () => runStep('database'),
+      }),
+      new RegExp(`${failure.step} unavailable`),
+    )
+
+    assert.deepEqual(calls, failure.expectedCalls)
+    assert.equal(calls.includes('database'), false)
+  })
+}
+
+test('discard reports a database failure only after all external cleanup completed', async () => {
+  const calls: string[] = []
+
+  await assert.rejects(
+    executeRecoverableDiscard({
+      removeManifestEntry: async () => {
+        calls.push('manifest')
+        return true
+      },
+      removeTranscriptEntry: async () => {
+        calls.push('transcript')
+        return true
+      },
+      removeAudioObject: async () => {
+        calls.push('audio')
+        return true
+      },
+      removeContribution: async () => {
+        calls.push('database')
+        throw new Error('database unavailable')
+      },
+    }),
+    /database unavailable/,
+  )
+
+  assert.deepEqual(calls, ['manifest', 'transcript', 'audio', 'database'])
+})
+
+test('discard removes the contribution last after external cleanup completes', async () => {
+  const calls: string[] = []
+  const result = await executeRecoverableDiscard({
+    removeManifestEntry: async () => {
+      calls.push('manifest')
+      return true
+    },
+    removeTranscriptEntry: async () => {
+      calls.push('transcript')
+      return true
+    },
+    removeAudioObject: async () => {
+      calls.push('audio')
+      return true
+    },
+    removeContribution: async () => {
+      calls.push('database')
+      return true
+    },
+  })
+
+  assert.deepEqual(calls, ['manifest', 'transcript', 'audio', 'database'])
+  assert.deepEqual(result, {
+    removedContribution: true,
+    removedAudioObject: true,
+    removedManifestEntry: true,
+    removedTranscriptEntry: true,
   })
 })

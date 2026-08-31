@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "bash ../scripts/check_frontend_product_messages.sh && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types \"src/**/*.test.ts\"",
+    "test": "bash ../scripts/check_frontend_product_messages.sh && node --test scripts/recording-manifest-events.test.mjs && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types \"src/**/*.test.ts\"",
     "build:phonology-index": "node scripts/build-phonology-index.mjs",
     "test:phonology-index": "node --test scripts/build-phonology-index.test.mjs",
     "export:training-corpus": "node --import ./test/register-runtime-test-hooks.mjs --experimental-strip-types scripts/export-training-corpus.mjs",

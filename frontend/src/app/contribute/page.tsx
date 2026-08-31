@@ -77,6 +77,7 @@ import {
   assessTrainingSampleQuality,
   type TrainingSampleQuality,
 } from '@/lib/training/training-sample-quality'
+import { getNextExerciseAfterAcceptedRecording } from '@/lib/training/training-attempt-navigation'
 import {
   calculateCharacterEditDistance,
   summarizeAssessmentAttempts,
@@ -584,7 +585,7 @@ export default function ContributePage() {
     isAuthenticated,
   })
   const { localQueueItems } = useVoiceUpload()
-  const recordingProgress = useRecordingProgress(isAuthenticated, localQueueItems)
+  const recordingProgress = useRecordingProgress(userId, isAuthenticated, localQueueItems)
 
   const preparedExpression = workspaceSnapshot?.prepared_expression ?? null
   const preparedExpressionExercises = useMemo(
@@ -773,7 +774,7 @@ export function TrainingRecorderPage({
     isUploading,
     localQueueItems,
   } = useVoiceUpload()
-  const recordingProgress = useRecordingProgress(isAuthenticated, localQueueItems)
+  const recordingProgress = useRecordingProgress(userId, isAuthenticated, localQueueItems)
   const {
     snapshot: workspaceSnapshot,
     refresh: refreshWorkspaceSnapshot,
@@ -1914,18 +1915,6 @@ export function TrainingRecorderPage({
       return
     }
 
-    discardedAttemptIdsRef.current.add(attempt.createdAt)
-    setSessionPracticedExerciseIds((currentIds) => (
-      currentIds.filter((exerciseId) => exerciseId !== attempt.exercise.id)
-    ))
-    if (isAssessmentTopic) {
-      setAssessmentAttemptsByExercise((current) => {
-        const next = { ...current }
-        delete next[attempt.exercise.id]
-        return next
-      })
-    }
-
     setAttempt((current) => (
       current?.createdAt === attempt.createdAt
         ? {
@@ -1936,6 +1925,7 @@ export function TrainingRecorderPage({
     ))
 
     if (attempt.uploadStatus === 'saving') {
+      discardedAttemptIdsRef.current.add(attempt.createdAt)
       setNotice({
         tone: 'info',
         message: '已标记不收录；如果上传已经开始，完成后会自动撤回。',
@@ -1950,6 +1940,7 @@ export function TrainingRecorderPage({
     })
 
     if (result.ok) {
+      removeAttemptFromProgress(attempt)
       if (userId) {
         removeUploadedTrainingRecord(userId, attempt.recording.recordingId)
       }
@@ -1982,7 +1973,7 @@ export function TrainingRecorderPage({
       tone: 'error',
       message: result.errorMessage || '撤回失败，请稍后再试。',
     })
-  }, [attempt, discardUploadedRecording, isAssessmentTopic, recordingProgress, userId])
+  }, [attempt, discardUploadedRecording, recordingProgress, removeAttemptFromProgress, userId])
 
   const handleStopRecording = useCallback(async () => {
     const recordedExercise = recordingExerciseRef.current
@@ -2039,17 +2030,14 @@ export function TrainingRecorderPage({
           [recordedExercise.id]: nextAttempt,
         }))
       }
-      const currentIndex = visibleExercises.findIndex((exercise) => exercise.id === recordedExercise.id)
-      const shouldAutoAdvance = isAssessmentTopic
-        ? hasUsableAssessmentTranscript && visibleExercises.length > 1 && currentIndex >= 0
-        : (
-            sampleQuality.action !== 'retry'
-            && visibleExercises.length > 1
-            && currentIndex >= 0
-          )
-      const nextExercise = shouldAutoAdvance
-        ? visibleExercises[(currentIndex + 1) % visibleExercises.length]
-        : null
+      const nextExercise = getNextExerciseAfterAcceptedRecording({
+        accepted: Boolean(result.recording) && (!isAssessmentTopic || hasUsableAssessmentTranscript),
+        currentExerciseId: recordedExercise.id,
+        activeExercises: matchingExercises,
+        fallbackExercises: !readingArticle && normalizedQuery.length === 0
+          ? categoryExercises
+          : [],
+      })
 
       if (nextExercise && nextExercise.id !== recordedExercise.id) {
         exerciseSelectionTouchedRef.current = true
@@ -2090,10 +2078,13 @@ export function TrainingRecorderPage({
     }
   }, [
     canSaveTrainingSample,
+    categoryExercises,
     isAssessmentTopic,
+    matchingExercises,
+    normalizedQuery.length,
     persistTrainingAttempt,
+    readingArticle,
     stopRecording,
-    visibleExercises,
   ])
 
   if (isLoading || shouldBlockTrainingPageForProgress(Boolean(readingArticle), recordingProgress.isLoading)) {

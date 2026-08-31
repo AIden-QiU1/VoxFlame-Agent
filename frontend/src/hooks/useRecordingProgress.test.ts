@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  isCurrentRecordingProgressRequest,
   isRecordingProgressRequestTimedOut,
   mergeRecordingProgress,
 } from './useRecordingProgress'
@@ -82,4 +83,10 @@ test('merge progress advances the resume anchor from a local pending recording',
 test('recording progress request stops blocking after the bounded timeout', () => {
   assert.equal(isRecordingProgressRequestTimedOut(1_000, 8_999), false)
   assert.equal(isRecordingProgressRequestTimedOut(1_000, 9_000), true)
+})
+
+test('recording progress accepts only the current account request generation', () => {
+  assert.equal(isCurrentRecordingProgressRequest('user-a', 3, 'user-a', 3), true)
+  assert.equal(isCurrentRecordingProgressRequest('user-a', 3, 'user-b', 3), false)
+  assert.equal(isCurrentRecordingProgressRequest('user-a', 2, 'user-a', 3), false)
 })

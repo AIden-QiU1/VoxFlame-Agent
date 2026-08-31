@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ossService } from '../services/oss.service';
 import { uploadArtifactService } from '../services/upload-artifact.service';
+import { uploadPathBelongsToContributor } from '../services/upload-path-policy';
 
 const router = Router();
 
@@ -67,9 +68,17 @@ router.post('/reading/reset', async (req, res) => {
 router.post('/sign', async (req, res) => {
     try {
         const { filename, contentType } = req.body;
+        const contributorId = req.user?.id;
+
+        if (!contributorId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         if (!filename || !contentType) {
             return res.status(400).json({ error: 'Missing filename or contentType' });
+        }
+        if (!uploadPathBelongsToContributor(filename, contributorId)) {
+            return res.status(403).json({ error: 'Upload path does not belong to authenticated user' });
         }
 
         const url = await ossService.generateUploadUrl(filename, contentType);
@@ -106,6 +115,9 @@ router.post('/complete', async (req, res) => {
 
         if (!contributorId) {
             return res.status(401).json({ error: 'Unauthorized' });
+        }
+        if (!uploadPathBelongsToContributor(audioPath, contributorId)) {
+            return res.status(403).json({ error: 'Upload path does not belong to authenticated user' });
         }
 
         const result = await uploadArtifactService.persistCompletedUpload({
@@ -166,6 +178,9 @@ router.delete('/contribution', async (req, res) => {
             typeof recordingId !== 'string'
         ) {
             return res.status(400).json({ error: 'Missing contributionId, audioPath, or recordingId' });
+        }
+        if (typeof audioPath === 'string' && !uploadPathBelongsToContributor(audioPath, contributorId)) {
+            return res.status(403).json({ error: 'Upload path does not belong to authenticated user' });
         }
 
         const result = await uploadArtifactService.discardCompletedUpload({

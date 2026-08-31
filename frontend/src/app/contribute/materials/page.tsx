@@ -9,12 +9,12 @@ import { useVoiceUpload } from '@/hooks/useVoiceUpload'
 import { TRAINING_MATERIAL_AREAS } from '@/lib/training/material-areas'
 
 export default function TrainingMaterialsPage() {
-  const { isLoading, isAuthenticated } = useAuth({
+  const { userId, isLoading, isAuthenticated } = useAuth({
     redirectToLogin: true,
     nextPath: '/contribute/materials',
   })
   const { localQueueItems } = useVoiceUpload()
-  const progress = useRecordingProgress(isAuthenticated, localQueueItems)
+  const progress = useRecordingProgress(userId, isAuthenticated, localQueueItems)
 
   if (isLoading || !isAuthenticated) {
     return <div className="flex min-h-dvh items-center justify-center bg-stone-50 text-sm text-stone-600">正在准备材料区…</div>

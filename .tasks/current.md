@@ -1,6 +1,22 @@
 # 当前任务状态
 
-> 最后更新: 2026-08-28
+> 最后更新: 2026-08-29
+
+## 2026-08-29 录音工作流五步可靠性收口
+
+- 账号 308 的连续大量录制把一个确定性状态机错误放大：普通数据录入把“是否进入下一句”错误绑定到 ASR 对齐质量。只要 `sampleQuality.action` 为 `retry`，完整录音虽然已经保存、结果页主按钮也明确写着“继续下一句”，代码却不推进题目游标；点击按钮只关闭结果页，因此再次显示刚录过的句子。问题不是题库重复，也不是用户没有点对。
+- 根本边界已收口：录音是否推进只由采集事实决定。普通数据录入只要生成完整 recording envelope 就进入下一句；ASR 识别差异和收音质量只提供回看/主动重录建议，不再控制游标。20 词筛查仍要求有效 transcript 后才推进。
+- 新增独立导航函数与回归测试；下一句从当前完整可录集合计算，不再受页面只展示前 120 条的窗口限制，因此同时消除了超大题库到可见窗口末尾后回绕重复的问题。若当前未读池只剩一条，则按稳定主题顺序进入下一条复练，而不是原地重复。
+- Web 已把 progress 请求按 `userId + generation + AbortController` 隔离，退出/换号会清空旧派生状态；撤回只有后端成功后才移除本轮进度和本机队列，迟到结果不能污染新账号。
+- Mobile 已冻结开始录音时的账号、题目和材料 lineage；catalog/memory 使用 latest-wins generation，本机队列按 contributor 隔离且读改写串行；加载更多保留当前游标，页末自动进入下一页或明确完成态。
+- Backend 已把同账号 artifact 操作串行化；撤回先写 tombstone，再以 ETag 条件重写擦除 manifest 正文和 transcript，随后删音频、最后删 DB。迟到 complete 遇到 tombstone 会清理本录音而不能复活；存储路径必须属于已认证账号，撤回的 contribution ID、audio path、recording ID 必须一致，避免跨账号路径与同账号误删相邻录音。
+- 所有仓库内 manifest 消费者已统一折叠 tombstone，撤回录音不会继续进入审计、覆盖、split、review queue 或受控音频读取。
+- 自动验证通过：Frontend 116 项、TypeScript、Next production build（25/25）；Backend RTC、路径策略 2 项、artifact/撤回 19 项和 build；Mobile training、memory/account scope、typecheck、静态检查、Android/iOS Expo export。
+- 已完成同类问题审计和完整工程/测试方案：[录音工作流可靠性治理与完整测试计划](../docs/RECORDING_WORKFLOW_RELIABILITY_PLAN_2026-08-29.md)。方案采用 5 个可回退阶段：当前止血发布、共享 reducer/invariant、Web 收敛、Mobile 收敛、Backend 资产生命周期与跨设备对等；不做全仓重写。
+- 审计识别的 P0 代码风险已按依赖顺序收口：Mobile 错绑/页末/目录乱序、Web 账号响应与撤回回滚、Backend 半删除/迟到复活/路径归属及多标识误删均已有实现保护与针对性自动测试。
+- 测试计划以 10 条产品不变量为合同，列出 28 个场景及其事件序列、最终状态、持久层断言、UI 断言、Playwright/真机要求和通过门槛；覆盖 ASR/目录/progress 乱序、迟到 receipt、断网队列、撤回故障、退出/换号、双击、120 条边界、长文轮次和双设备并发。
+- 当前状态：五步现役风险收口和自动验证已完成，未部署。完整共享 reducer/model-based 100×200 状态遍历、28 场景组件/E2E 全覆盖、真实多实例/数据库 50 轮并发并未完成，不能把本轮称为整个框架 Definition of Done。
+- 人工阻断门：账号 308 Web 真机连续 5 句（含低 ASR 差异）、Android/iOS 真机账号切换/断网补传/撤回、双设备并发及生产 canary。Expo export 发现宿主继承 `NODE_TLS_REJECT_UNAUTHORIZED=0`；发布构建前必须移除并重新打包验证。
 
 ## 2026-08-29 服务器容量与 Docker 自动清理
 

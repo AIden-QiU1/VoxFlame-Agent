@@ -105,6 +105,13 @@ const TRAINING_METADATA_KEYS = new Set([
   'speech_patterns',
   'articulation_tips',
   'pronunciation_summary',
+  'reading_material_kind',
+  'reading_article_id',
+  'reading_article_version',
+  'reading_segment_id',
+  'reading_segment_index',
+  'reading_segment_count',
+  'reading_round_id',
 ])
 
 function isNonEmptyString(value: unknown): value is string {

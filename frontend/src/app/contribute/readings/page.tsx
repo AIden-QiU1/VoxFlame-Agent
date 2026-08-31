@@ -10,12 +10,12 @@ import { MANDARIN_READING_ARTICLES } from '@/lib/corpus/reading-articles'
 import { rankReadingArticles } from '@/lib/corpus/reading-progress'
 
 export default function ReadingLibraryPage() {
-  const { isLoading: isAuthLoading, isAuthenticated } = useAuth({
+  const { userId, isLoading: isAuthLoading, isAuthenticated } = useAuth({
     redirectToLogin: true,
     nextPath: '/contribute/readings',
   })
   const { localQueueItems } = useVoiceUpload()
-  const progress = useRecordingProgress(isAuthenticated, localQueueItems)
+  const progress = useRecordingProgress(userId, isAuthenticated, localQueueItems)
   const rankedArticles = rankReadingArticles(
     MANDARIN_READING_ARTICLES,
     progress.recordedReadingSegmentIds,

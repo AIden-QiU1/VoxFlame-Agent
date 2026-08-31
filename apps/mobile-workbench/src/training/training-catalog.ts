@@ -53,6 +53,7 @@ export async function fetchMobileTrainingCatalog(
   apiBaseUrl: string,
   tokenProvider: MobileAuthTokenProvider,
   options?: { category?: string; readingArticleId?: string; query?: string; limit?: number; offset?: number },
+  signal?: AbortSignal,
 ): Promise<MobileTrainingCatalogResponse> {
   const token = await tokenProvider.getAccessToken()
   if (!token) {
@@ -61,6 +62,7 @@ export async function fetchMobileTrainingCatalog(
 
   const response = await fetch(buildCatalogUrl(apiBaseUrl, options), {
     headers: { Authorization: `Bearer ${token}` },
+    signal,
   })
   if (!response.ok) {
     throw new Error(`training_catalog_${response.status}`)
