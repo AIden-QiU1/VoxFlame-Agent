@@ -78,6 +78,7 @@ import {
   type TrainingSampleQuality,
 } from '@/lib/training/training-sample-quality'
 import { getNextExerciseAfterAcceptedRecording } from '@/lib/training/training-attempt-navigation'
+import { shouldDisableTrainingRecordingControl } from '@/lib/training/training-recording-control'
 import {
   calculateCharacterEditDistance,
   summarizeAssessmentAttempts,
@@ -771,7 +772,6 @@ export function TrainingRecorderPage({
     uploadRecording,
     discardUploadedRecording,
     refreshLocalQueueCount,
-    isUploading,
     localQueueItems,
   } = useVoiceUpload()
   const recordingProgress = useRecordingProgress(userId, isAuthenticated, localQueueItems)
@@ -1460,7 +1460,7 @@ export function TrainingRecorderPage({
   }, [isProcessing, isRecording, selectedPhonologyGroupId])
 
   const handlePlayReadingAssistance = useCallback(() => {
-    if (!currentExercise || isRecording || isProcessing || isUploading) {
+    if (!currentExercise || isRecording || isProcessing) {
       return
     }
 
@@ -1488,10 +1488,10 @@ export function TrainingRecorderPage({
       setReadingAssistanceStatus('朗读没有完成，可以再点一次或换一句。')
     }
     window.speechSynthesis.speak(utterance)
-  }, [currentExercise, isProcessing, isRecording, isUploading])
+  }, [currentExercise, isProcessing, isRecording])
 
   const handleStartRecording = useCallback(async () => {
-    if (!currentExercise || isUploading || isProcessing) {
+    if (!currentExercise || isProcessing) {
       return
     }
 
@@ -1527,7 +1527,7 @@ export function TrainingRecorderPage({
         message: '录音失败，请重试。',
       })
     }
-  }, [collectionPreflightReady, currentExercise, isProcessing, isReadingAssistancePlaying, isUploading, startRecording])
+  }, [collectionPreflightReady, currentExercise, isProcessing, isReadingAssistancePlaying, startRecording])
 
   const removeAttemptFromProgress = useCallback((attemptToRemove: PracticeAttempt) => {
     setSessionPracticedExerciseIds((currentIds) => (
@@ -2269,13 +2269,6 @@ export function TrainingRecorderPage({
   }
 
   if (usesGuidedCollectionFlow(isAssessmentTopic)) {
-    const flowSteps: Array<{ id: CollectionFlowStep; label: string }> = [
-      { id: 'prepare', label: '准备' },
-      { id: 'record', label: '录一句' },
-      { id: 'review', label: '确认结果' },
-    ]
-    const activeStepIndex = flowSteps.findIndex((step) => step.id === collectionFlowStep)
-
     return (
       <div className="min-h-dvh bg-stone-50">
         <header className="border-b border-stone-200 bg-white">
@@ -2291,63 +2284,10 @@ export function TrainingRecorderPage({
               <h1 className="mt-1 text-balance text-2xl font-semibold text-gray-900">{topicSelection.label}</h1>
               <p className="mt-1 text-pretty text-sm text-gray-600">一次只做一步，录完再确认结果。</p>
             </div>
-            <span className="hidden rounded-full bg-white px-4 py-2 text-sm text-stone-600 ring-1 ring-stone-200 sm:block">
-              本轮已完成 {sessionPracticedExerciseIds.length} 句
-            </span>
           </div>
         </header>
 
-          <main className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-5 sm:px-6 sm:py-8">
-          <RecordingDurationSummary
-            compact
-            todayDurationSeconds={recordingProgress.todayDurationSeconds}
-            totalDurationSeconds={recordingProgress.totalDurationSeconds}
-            isLoading={recordingProgress.isLoading}
-            error={recordingProgress.error}
-          />
-          {!readingArticle ? (
-            <section aria-label="账户录音进度" className="rounded-2xl border border-stone-200 bg-white px-4 py-4 sm:px-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-stone-950">这个账号的句子记录</p>
-                  <p className="mt-1 text-sm text-stone-600">刷新、退出再登录或换设备，都会读取同一份云端记录。</p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-sm tabular-nums">
-                  <span className="rounded-full bg-stone-100 px-3 py-1.5 text-stone-700">全部 {categoryExercises.length}</span>
-                  <span className="rounded-full bg-emerald-100 px-3 py-1.5 font-medium text-emerald-800">已读 {recordedCategoryExerciseCount}</span>
-                  <span className="rounded-full bg-amber-100 px-3 py-1.5 font-medium text-amber-900">未读 {unreadCategoryExerciseCount}</span>
-                </div>
-              </div>
-            </section>
-          ) : null}
-          <nav aria-label="数据录入进度" className="rounded-2xl border border-stone-200 bg-white px-4 py-4 sm:px-6">
-            <ol className="grid grid-cols-3 gap-2">
-              {flowSteps.map((step, index) => {
-                const isActive = step.id === collectionFlowStep
-                const isComplete = index < activeStepIndex
-                return (
-                  <li key={step.id} className="flex items-center gap-2 sm:gap-3">
-                    <span
-                      aria-current={isActive ? 'step' : undefined}
-                      className={cn(
-                        'flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold',
-                        isActive
-                          ? 'bg-amber-600 text-white'
-                          : isComplete
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-stone-100 text-stone-500',
-                      )}
-                    >
-                      {isComplete ? <Check className="size-4" aria-hidden="true" /> : index + 1}
-                    </span>
-                    <span className={cn('text-sm font-medium', isActive ? 'text-stone-950' : 'text-stone-500')}>
-                      {step.label}
-                    </span>
-                  </li>
-                )
-              })}
-            </ol>
-          </nav>
+        <main className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-5 sm:px-6 sm:py-8">
 
           {notice ? (
             <div
@@ -2370,8 +2310,7 @@ export function TrainingRecorderPage({
             <section aria-labelledby="collection-prepare-heading" className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-amber-800">第 1 步</p>
-                  <h2 id="collection-prepare-heading" className="mt-2 text-balance text-2xl font-semibold text-stone-950">
+                  <h2 id="collection-prepare-heading" className="text-balance text-2xl font-semibold text-stone-950">
                     准备好后再开始
                   </h2>
                 </div>
@@ -2436,14 +2375,9 @@ export function TrainingRecorderPage({
               <details className="mt-5 rounded-2xl border border-stone-200">
                 <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
                   <span>可选：补充采集资料</span>
-                  <span className="text-xs font-normal text-stone-500">任务、年龄段、性别</span>
+                  <span className="text-xs font-normal text-stone-500">年龄段、性别</span>
                 </summary>
-                <div className="grid gap-4 border-t border-stone-200 p-4 sm:grid-cols-3">
-                  <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
-                    <span className="text-sm font-medium text-stone-700">本次任务</span>
-                    <p className="mt-1 text-sm font-semibold text-stone-950">{collectionPlan.label}</p>
-                    <p className="mt-1 text-pretty text-xs leading-5 text-stone-600">由当前主题自动确定，避免录音被分到错误任务。</p>
-                  </div>
+                <div className="grid gap-4 border-t border-stone-200 p-4 sm:grid-cols-2">
                   <label className="block space-y-2">
                     <span className="text-sm font-medium text-stone-700">年龄段</span>
                     <select value={ageBand} onChange={(event) => setAgeBand(event.target.value)} className="h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500">
@@ -2482,8 +2416,7 @@ export function TrainingRecorderPage({
             <section aria-labelledby="collection-record-heading" className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-amber-800">第 2 步</p>
-                  <h2 id="collection-record-heading" className="mt-2 text-balance text-2xl font-semibold text-stone-950">读出这一句</h2>
+                  <h2 id="collection-record-heading" className="text-balance text-2xl font-semibold text-stone-950">读出这一句</h2>
                   <p className="mt-2 text-pretty text-sm text-stone-600">按平时说话的方式读，读完点停止。</p>
                 </div>
                 <span className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700">
@@ -2492,8 +2425,7 @@ export function TrainingRecorderPage({
               </div>
 
               <div className="mt-6 rounded-3xl bg-amber-50 px-5 py-7 text-center ring-1 ring-amber-200 sm:px-8 sm:py-9">
-                <p className="text-sm font-medium text-amber-800">目标句</p>
-                <p className="mt-3 text-balance text-2xl font-semibold leading-relaxed text-stone-950 sm:text-3xl">{currentExercise.text}</p>
+                <p className="text-balance text-2xl font-semibold leading-relaxed text-stone-950 sm:text-3xl">{currentExercise.text}</p>
                 {currentPhonologyTarget?.focus ? (
                   <p className="mt-3 text-pretty text-sm text-amber-900">本句重点：{currentPhonologyTarget.focus}</p>
                 ) : null}
@@ -2502,7 +2434,7 @@ export function TrainingRecorderPage({
                   <button
                     type="button"
                     onClick={handlePlayReadingAssistance}
-                    disabled={isRecording || isProcessing || isUploading || isReadingAssistancePlaying}
+                    disabled={isRecording || isProcessing || isReadingAssistancePlaying}
                     className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 transition-colors duration-150 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Volume2 className="size-4" aria-hidden="true" />
@@ -2519,7 +2451,11 @@ export function TrainingRecorderPage({
                   type="button"
                   aria-label={isRecording ? '停止录音' : '开始录音'}
                   onClick={isRecording ? () => void handleStopRecording() : () => void handleStartRecording()}
-                  disabled={isUploading || isProcessing || isReadingAssistancePlaying || status === 'connecting'}
+                  disabled={shouldDisableTrainingRecordingControl({
+                    isProcessing,
+                    isReadingAssistancePlaying,
+                    status,
+                  })}
                   className={cn(
                     'flex size-28 items-center justify-center rounded-full text-white shadow-lg transition-transform duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-4 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100',
                     isRecording ? 'bg-rose-600 focus-visible:ring-rose-500' : 'bg-amber-600 focus-visible:ring-amber-500',
@@ -2668,12 +2604,9 @@ export function TrainingRecorderPage({
                     : <Check className="size-6" aria-hidden="true" />}
                 </span>
                 <div>
-                  <p className={cn('text-sm font-medium', isReplacingAttempt ? 'text-amber-900' : 'text-emerald-800')}>
-                    {isReplacingAttempt ? '正在替换' : '录音成功'}
-                  </p>
                   <h2
                     id="collection-review-heading"
-                    className={cn('mt-1 text-balance text-xl font-semibold', isReplacingAttempt ? 'text-amber-950' : 'text-emerald-950')}
+                    className={cn('text-balance text-xl font-semibold', isReplacingAttempt ? 'text-amber-950' : 'text-emerald-950')}
                   >
                     {isReplacingAttempt ? '先撤回旧录音，再重新录这一句' : '很好，这一句已经完整收下了'}
                   </h2>
@@ -2713,8 +2646,6 @@ export function TrainingRecorderPage({
                   </audio>
                 </div>
               ) : null}
-
-              <p className="mt-4 text-pretty text-sm leading-6 text-stone-600">{attempt.sampleQuality.summary}</p>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <button
@@ -3448,7 +3379,11 @@ export function TrainingRecorderPage({
                 <button
                   type="button"
                   onClick={isRecording ? () => void handleStopRecording() : () => void handleStartRecording()}
-                  disabled={isUploading || isProcessing || status === 'connecting'}
+                  disabled={shouldDisableTrainingRecordingControl({
+                    isProcessing,
+                    isReadingAssistancePlaying: false,
+                    status,
+                  })}
                   className={`flex h-28 w-28 items-center justify-center rounded-full text-white shadow-lg transition ${
                     isRecording
                       ? 'bg-rose-500 hover:bg-rose-600'

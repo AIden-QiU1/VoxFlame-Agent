@@ -27,6 +27,7 @@ import { getAccessToken } from '@/lib/supabase/client'
 import { useAuth } from './useAuth'
 import { config } from '@/lib/config'
 import { sanitizeTrainingUploadMetadata } from '@/lib/recording/upload-metadata'
+import { fetchUploadRequest } from '@/lib/recording/upload-request'
 
 interface UploadOptions {
   /** 录音对应的文本内容 */
@@ -96,6 +97,7 @@ export function useVoiceUpload() {
   const [localQueueCount, setLocalQueueCount] = useState(0)
   const [localQueueItems, setLocalQueueItems] = useState<VoxFlameRecorderQueueItem[]>([])
   const [lastUploadReceipt, setLastUploadReceipt] = useState<UploadReceipt | null>(null)
+  const activeUploadCountRef = useRef(0)
   const lastAuthenticatedUserIdRef = useRef<string | null>(null)
   const syncPromiseRef = useRef<Promise<{ synced: number; total: number }> | null>(null)
   const syncLocalRecordingsRef = useRef<(silent?: boolean) => Promise<{ synced: number; total: number }>>(async () => ({ synced: 0, total: 0 }))
@@ -190,6 +192,7 @@ export function useVoiceUpload() {
     audioBlob: Blob,
     options: UploadOptions
   ): Promise<UploadResult> => {
+    activeUploadCountRef.current += 1
     setIsUploading(true)
     setUploadProgress(0)
     setLastError(null)
@@ -274,7 +277,7 @@ export function useVoiceUpload() {
       // 2. 尝试上传到 OSS (通过后端签名)
       try {
         // Use config.api.baseUrl which handles rewrites (e.g. /api)
-        const signRes = await fetch(`${config.api.baseUrl}/upload/sign`, {
+        const signRes = await fetchUploadRequest(`${config.api.baseUrl}/upload/sign`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -290,7 +293,7 @@ export function useVoiceUpload() {
         const { url: uploadUrl } = await signRes.json()
 
         // PUT 上传
-        const uploadRes = await fetch(uploadUrl, {
+        const uploadRes = await fetchUploadRequest(uploadUrl, {
           method: 'PUT',
           headers: { 'Content-Type': normalizedAudioBlob.type || 'audio/wav' },
           body: normalizedAudioBlob
@@ -309,7 +312,7 @@ export function useVoiceUpload() {
       setUploadProgress(50)
 
       // 3. 通知后端完成 (DB写入 + OSS Manifest追加)
-      const completeRes = await fetch(`${config.api.baseUrl}/upload/complete`, {
+      const completeRes = await fetchUploadRequest(`${config.api.baseUrl}/upload/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -398,7 +401,8 @@ export function useVoiceUpload() {
         '云端保存失败',
       )
     } finally {
-      setIsUploading(false)
+      activeUploadCountRef.current = Math.max(0, activeUploadCountRef.current - 1)
+      setIsUploading(activeUploadCountRef.current > 0)
     }
   }, [isAuthenticated, refreshLocalQueueCount, saveLocally, userId])
 

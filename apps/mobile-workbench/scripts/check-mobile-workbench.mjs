@@ -80,6 +80,7 @@ assert(packageJson.scripts?.check === 'node scripts/check-mobile-workbench.mjs',
 assert(packageJson.scripts?.['test:communication'] === 'node scripts/test-mobile-quick-expression.mjs', 'mobile communication regression script is missing')
 assert(packageJson.scripts?.['test:training']?.includes('test-mobile-training-feedback.mjs'), 'mobile training feedback regression is missing')
 assert(packageJson.scripts?.['test:training']?.includes('test-mobile-attempt-confirmation.mjs'), 'mobile attempt confirmation regression is missing')
+assert(packageJson.scripts?.['test:training']?.includes('test-mobile-collection-controls.mjs'), 'mobile collection control regression is missing')
 assert(packageJson.scripts?.['test:memory']?.includes('test-mobile-memory-editor.mjs'), 'mobile memory regression is missing')
 assert(packageJson.scripts?.['test:memory']?.includes('test-mobile-memory-account-scope.mjs'), 'mobile memory account isolation regression is missing')
 assert(sourceText.includes('confirmMobileTrainingAttempt'), 'recordings must wait for explicit confirmation before upload')
@@ -199,6 +200,7 @@ for (const requiredFile of [
   'scripts/save-expo-token.sh',
   'scripts/with-expo-token.sh',
   'scripts/test-mobile-training-feedback.mjs',
+  'scripts/test-mobile-collection-controls.mjs',
   'scripts/test-mobile-quick-expression.mjs',
 ]) {
   assert(existsSync(path.join(appRoot, requiredFile)), `missing required mobile file: ${requiredFile}`)
@@ -277,6 +279,10 @@ for (const taskRoute of [
 }
 assert(!appSource.includes("| 'material'\n"), 'custom material must not return as a top-level mobile task route')
 assert(appSource.includes("type MobileCollectionSource = 'catalog' | 'prepared_material'"), 'data entry must own catalog and custom-material sources')
+assert(appSource.includes('collectionControlState.navigationDisabled'), 'sentence navigation must stay behind recording preflight')
+assert(appSource.includes("只需确认一次，本组录音期间保持有效。"), 'recording preflight must remain next to the main action')
+assert(!appSource.includes("Alert.alert('先完成采集前确认'"), 'hidden preflight must not fall back to an alert-only dead end')
+assert(appSource.includes('mainScrollRef.current?.scrollTo({ animated: false, y: 0 })'), 'task route changes must reset the shared mobile scroll position')
 for (const taskScreen of [
   'function CommunicationHomeScreen',
   'function QuickExpressionScreen',

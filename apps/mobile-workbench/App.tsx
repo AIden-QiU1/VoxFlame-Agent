@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -64,8 +65,8 @@ import {
   replaceMobileTrainingAttempt,
 } from './src/training/mobile-attempt-confirmation'
 import {
+  getMobileCollectionControlState,
   getMobileCollectionPlanId,
-  isMobileCollectionPreflightReady,
   MOBILE_COLLECTION_PLANS,
 } from './src/training/collection-protocol'
 import {
@@ -252,6 +253,7 @@ export default function App() {
   const [displayPhrase, setDisplayPhrase] = useState('')
   const [confirmedOutput, setConfirmedOutput] = useState('')
   const [communicationScene, setCommunicationScene] = useState<MobileWorkbenchScene | null>(null)
+  const mainScrollRef = useRef<ScrollView>(null)
 
   const selectCommunicationScene = (scene: MobileWorkbenchScene | null): void => {
     if (scene && scene !== communicationScene) {
@@ -307,6 +309,10 @@ export default function App() {
   useEffect(() => {
     diagnostics.addBreadcrumb('navigation', 'open_surface', activeSurfaceId)
   }, [activeSurfaceId, diagnostics.addBreadcrumb])
+
+  useEffect(() => {
+    mainScrollRef.current?.scrollTo({ animated: false, y: 0 })
+  }, [activeSurfaceId, taskRoute])
 
   useEffect(() => {
     if (!workspace.errorMessage) {
@@ -504,6 +510,7 @@ export default function App() {
         <ScrollView
           contentContainerStyle={styles.pageContent}
           keyboardShouldPersistTaps="handled"
+          ref={mainScrollRef}
           showsVerticalScrollIndicator={false}
           style={styles.content}
         >
@@ -595,7 +602,6 @@ export default function App() {
             ) : (
               <PracticeScreen
               authUserId={auth.user?.id ?? null}
-              dailyTarget={workspace.readModel.dailyTargetCount}
               onPracticeTextChange={setPracticeText}
               practiceText={practiceText}
               preparedExpression={selectedPreparedExpression ?? workspace.snapshot?.prepared_expression ?? null}
@@ -1518,7 +1524,6 @@ function PracticeReadingArticlesScreen({
 function PracticeScreen({
   authUserId,
   catalog,
-  dailyTarget,
   ensureTrainingConnection,
   onPracticeTextChange,
   practiceText,
@@ -1534,7 +1539,6 @@ function PracticeScreen({
 }: {
   authUserId: string | null
   catalog: ReturnType<typeof useMobileTrainingCatalog>
-  dailyTarget: number
   ensureTrainingConnection(): Promise<boolean>
   onPracticeTextChange(value: string): void
   practiceText: string
@@ -1556,7 +1560,7 @@ function PracticeScreen({
   const [attemptAction, setAttemptAction] = useState<MobileAttemptAction>('idle')
   const [assessmentAttempts, setAssessmentAttempts] = useState<MobileAssessmentAttempt[]>([])
   const [showRecordings, setShowRecordings] = useState(false)
-  const [collectionSource, setCollectionSource] = useState<MobileCollectionSource>(initialCollectionSource)
+  const collectionSource = initialCollectionSource
   const [environmentReady, setEnvironmentReady] = useState(false)
   const [distanceReady, setDistanceReady] = useState(false)
   const [consentReady, setConsentReady] = useState(false)
@@ -1599,11 +1603,11 @@ function PracticeScreen({
     assessmentAttempts,
     flow === 'assessment' ? visibleTotal : 20,
   )
-  const collectionPreflightReady = isMobileCollectionPreflightReady({
+  const collectionControlState = getMobileCollectionControlState({
     environmentReady,
     distanceReady,
     understandsConsent: consentReady,
-  })
+  }, flow === 'assessment' ? '开始说这个词' : '开始说这句话')
   const attemptLocked = pendingAttempt !== null || attemptAction !== 'idle'
   const selectionScopeKey = usesPreparedMaterial
     ? `prepared:${preparedExpression?.id ?? 'none'}`
@@ -1688,8 +1692,7 @@ function PracticeScreen({
       Alert.alert('示例还在朗读', '请等朗读结束后再开始录音。')
       return false
     }
-    if (!collectionPreflightReady) {
-      Alert.alert('先完成采集前确认', '请确认环境安静、麦克风位置稳定，并确认本次训练数据授权后再开始。')
+    if (!collectionControlState.ready) {
       return false
     }
     const captureId = `mobile-training-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -1897,108 +1900,9 @@ function PracticeScreen({
         <Text style={styles.pageCopy}>
           {flow === 'assessment'
             ? '按顺序完成整组，只给训练支持建议，不作为医学评估。'
-            : `今天建议 ${dailyTarget} 句。你可以使用公共题库，也可以录入沟通档案里的自定义材料。`}
+            : `已选择「${usesPreparedMaterial ? '自定义材料' : catalog.selectedReadingArticle?.title ?? selectedCategory?.label ?? '当前材料'}」。确认一次后，可以连续录制这一组。`}
         </Text>
       </View>
-      {flow === 'assessment' ? (
-        <View style={styles.taskCard}>
-          <Text style={styles.taskCardEyebrow}>筛查前确认</Text>
-          <Text style={styles.taskCardCopy}>筛查录音会用于训练支持和系统改进，请先确认环境、距离和本次授权。</Text>
-          <View style={styles.checkRow}>
-            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: environmentReady }} onPress={() => setEnvironmentReady((value) => !value)} style={styles.checkButton}>
-              <Text style={styles.checkMark}>{environmentReady ? '✓' : '○'}</Text>
-              <Text style={styles.mutedText}>环境安静</Text>
-            </Pressable>
-            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: distanceReady }} onPress={() => setDistanceReady((value) => !value)} style={styles.checkButton}>
-              <Text style={styles.checkMark}>{distanceReady ? '✓' : '○'}</Text>
-              <Text style={styles.mutedText}>位置约 20–30 cm</Text>
-            </Pressable>
-            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consentReady }} onPress={() => setConsentReady((value) => !value)} style={styles.checkButton}>
-              <Text style={styles.checkMark}>{consentReady ? '✓' : '○'}</Text>
-              <Text style={styles.mutedText}>我同意本次录音用于训练</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-      {flow === 'collection' ? (
-        <View style={styles.taskCard}>
-          <Text style={styles.taskCardEyebrow}>采集前确认</Text>
-          <Text style={styles.taskCardCopy}>默认只保存音频、目标文本、实际转写和最少训练标签。</Text>
-          <View style={styles.checkRow}>
-            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: environmentReady }} onPress={() => setEnvironmentReady((value) => !value)} style={styles.checkButton}>
-              <Text style={styles.checkMark}>{environmentReady ? '✓' : '○'}</Text>
-              <Text style={styles.mutedText}>环境安静</Text>
-            </Pressable>
-            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: distanceReady }} onPress={() => setDistanceReady((value) => !value)} style={styles.checkButton}>
-              <Text style={styles.checkMark}>{distanceReady ? '✓' : '○'}</Text>
-              <Text style={styles.mutedText}>位置约 20–30 cm</Text>
-            </Pressable>
-            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consentReady }} onPress={() => setConsentReady((value) => !value)} style={styles.checkButton}>
-              <Text style={styles.checkMark}>{consentReady ? '✓' : '○'}</Text>
-              <Text style={styles.mutedText}>我同意本次录音用于训练</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.taskCardEyebrow}>本次任务</Text>
-          <Text style={styles.taskCardTitle}>{collectionPlan?.label ?? '常用表达'}</Text>
-          <Text style={styles.mutedText}>{collectionPlan?.description}</Text>
-          <Text style={styles.mutedText}>任务由当前题库或自定义材料自动确定，避免录音被分到错误区域。</Text>
-          <View style={styles.inlineFields}>
-            <View style={styles.inlineField}>
-              <Text style={styles.fieldLabel}>年龄段</Text>
-              <TextInput accessibilityLabel="年龄段" onChangeText={setAgeBand} placeholder="如 70–79" placeholderTextColor={COLORS.subtle} style={styles.smallInput} value={ageBand} />
-            </View>
-            <View style={styles.inlineField}>
-              <Text style={styles.fieldLabel}>性别</Text>
-              <TextInput accessibilityLabel="性别" onChangeText={setSex} placeholder="可不填" placeholderTextColor={COLORS.subtle} style={styles.smallInput} value={sex} />
-            </View>
-          </View>
-          <Text style={styles.taskCardEyebrow}>录入内容来源</Text>
-          <Text style={styles.taskCardTitle}>这次录什么？</Text>
-          <View accessibilityRole="tablist" style={styles.segmentedTabs}>
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: collectionSource === 'catalog' }}
-              disabled={queue.isRecording || attemptLocked}
-              onPress={() => setCollectionSource('catalog')}
-              style={[styles.segmentedTab, collectionSource === 'catalog' ? styles.segmentedTabActive : null]}
-            >
-              <Text style={[styles.segmentedTabText, collectionSource === 'catalog' ? styles.segmentedTabTextActive : null]}>公共题库</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: collectionSource === 'prepared_material' }}
-              disabled={queue.isRecording || attemptLocked || materialExercises.length === 0}
-              onPress={() => setCollectionSource('prepared_material')}
-              style={[styles.segmentedTab, collectionSource === 'prepared_material' ? styles.segmentedTabActive : null]}
-            >
-              <Text style={[styles.segmentedTabText, collectionSource === 'prepared_material' ? styles.segmentedTabTextActive : null]}>自定义材料</Text>
-            </Pressable>
-          </View>
-          {materialExercises.length === 0 ? (
-            <Text style={styles.mutedText}>沟通档案里还没有可练材料，可以先使用公共题库。</Text>
-          ) : null}
-          {collectionSource === 'catalog' ? (
-            <View style={styles.categoryList}>
-              {catalog.categories.filter((category) => category.kind === 'collection').map((category) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: catalog.selectedCategory === category.id }}
-                  disabled={queue.isRecording || attemptLocked}
-                  key={category.id}
-                  onPress={() => void catalog.selectCategory(category.id)}
-                  style={({ pressed }) => [styles.categoryRow, pressed ? styles.pressed : null]}
-                >
-                  <View style={styles.categoryCopy}>
-                    <Text style={styles.categoryTitle}>{category.label}</Text>
-                    <Text numberOfLines={2} style={styles.mutedText}>{category.description}</Text>
-                  </View>
-                  <Text style={styles.categoryCount}>{category.count} 句</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-        </View>
-      ) : null}
       <>
           <View style={styles.trainingStage}>
             <View style={styles.trainingProgressRow}>
@@ -2006,6 +1910,47 @@ function PracticeScreen({
               <Text style={styles.trainingProgressText}>{exerciseIndex + 1} / {visibleTotal || 1}</Text>
             </View>
             <Text style={styles.trainingTarget}>{targetText}</Text>
+            <View style={styles.preflightPanel}>
+              <Text style={styles.preflightTitle}>{flow === 'assessment' ? '筛查前确认' : '录音前确认'}</Text>
+              <Text style={styles.preflightCopy}>只需确认一次，本组录音期间保持有效。</Text>
+              <View style={styles.preflightChecklist}>
+                <View style={styles.preflightShortRow}>
+                  <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: environmentReady }} onPress={() => setEnvironmentReady((value) => !value)} style={[styles.preflightCheck, styles.preflightShortCheck, environmentReady ? styles.preflightCheckActive : null]}>
+                    <Text style={styles.checkMark}>{environmentReady ? '✓' : '○'}</Text>
+                    <Text style={styles.preflightCheckText}>环境安静</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: distanceReady }} onPress={() => setDistanceReady((value) => !value)} style={[styles.preflightCheck, styles.preflightShortCheck, distanceReady ? styles.preflightCheckActive : null]}>
+                    <Text style={styles.checkMark}>{distanceReady ? '✓' : '○'}</Text>
+                    <Text style={styles.preflightCheckText}>位置稳定</Text>
+                  </Pressable>
+                </View>
+                <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consentReady }} onPress={() => setConsentReady((value) => !value)} style={[styles.preflightCheck, consentReady ? styles.preflightCheckActive : null]}>
+                  <Text style={styles.checkMark}>{consentReady ? '✓' : '○'}</Text>
+                  <Text style={styles.preflightCheckText}>{flow === 'assessment' ? '我同意本次录音用于筛查支持和系统改进' : '我同意本次录音用于训练'}</Text>
+                </Pressable>
+              </View>
+              <Text accessibilityLiveRegion="polite" style={styles.preflightStatus}>
+                {collectionControlState.ready ? '已确认，可以开始录音。' : '完成上面 3 项后即可开始。'}
+              </Text>
+            </View>
+            <View style={styles.recordingMeta}>
+              <Text style={styles.recordingMetaText}>
+                {queue.isRecording ? '正在听你说' : feedback ? '本次反馈' : `麦克风${permissionLabel(queue.permissionStatus)}`}
+              </Text>
+              <Text style={styles.timer}>{formatDuration(queue.durationMs)}</Text>
+            </View>
+            <PrimaryButton
+              disabled={!queue.isRecording && (!collectionControlState.ready || attemptLocked || isReadingAssistancePlaying || exerciseSequenceStatus !== 'active')}
+              label={queue.isRecording ? '说完了' : exerciseSequenceStatus === 'complete' ? '本组已经完成' : exerciseSequenceStatus === 'load_failed' ? '下一句尚未加载' : attemptAction === 'analyzing' ? '正在整理本次录音…' : pendingAttempt ? '请先决定是否收录' : collectionControlState.actionLabel}
+              onPress={() => {
+                if (queue.isRecording) {
+                  void stopAndAnalyze()
+                } else {
+                  void startTrainingAttempt()
+                }
+              }}
+              tone={queue.isRecording ? 'neutral' : 'accent'}
+            />
             <View style={styles.readingAssistanceRow}>
               <Text style={styles.readingAssistancePrompt}>有字不认识？</Text>
               <SecondaryButton
@@ -2018,24 +1963,6 @@ function PracticeScreen({
             <Text accessibilityLiveRegion="polite" style={styles.readingAssistanceStatus}>
               {readingAssistanceStatus ?? '只在需要时播放，听完仍按你平时的方式说。'}
             </Text>
-            <View style={styles.recordingMeta}>
-              <Text style={styles.recordingMetaText}>
-                {queue.isRecording ? '正在听你说' : feedback ? '本次反馈' : `麦克风${permissionLabel(queue.permissionStatus)}`}
-              </Text>
-              <Text style={styles.timer}>{formatDuration(queue.durationMs)}</Text>
-            </View>
-            <PrimaryButton
-              disabled={!queue.isRecording && (attemptLocked || isReadingAssistancePlaying || exerciseSequenceStatus !== 'active')}
-              label={queue.isRecording ? '说完了' : exerciseSequenceStatus === 'complete' ? '本组已经完成' : exerciseSequenceStatus === 'load_failed' ? '下一句尚未加载' : attemptAction === 'analyzing' ? '正在整理本次录音…' : pendingAttempt ? '请先决定是否收录' : flow === 'assessment' ? '开始说这个词' : '开始说这句话'}
-              onPress={() => {
-                if (queue.isRecording) {
-                  void stopAndAnalyze()
-                } else {
-                  void startTrainingAttempt()
-                }
-              }}
-              tone={queue.isRecording ? 'neutral' : 'accent'}
-            />
             {exerciseSequenceStatus === 'complete' ? (
               <InlineMessage tone="success" text="本组已经完成。选择其他材料，或主动返回上一句复练。" />
             ) : exerciseSequenceStatus === 'load_failed' ? (
@@ -2097,8 +2024,8 @@ function PracticeScreen({
               </View>
             ) : null}
             <View style={styles.stepActions}>
-              <SecondaryButton disabled={exerciseIndex === 0 || queue.isRecording || attemptLocked} label="上一句" onPress={() => selectExerciseAt(exerciseIndex - 1)} />
-              <SecondaryButton disabled={exerciseIndex >= visibleExercises.length - 1 || queue.isRecording || attemptLocked} label="下一句" onPress={() => selectExerciseAt(exerciseIndex + 1)} />
+              <SecondaryButton disabled={collectionControlState.navigationDisabled || exerciseIndex === 0 || queue.isRecording || attemptLocked} label="上一句" onPress={() => selectExerciseAt(exerciseIndex - 1)} />
+              <SecondaryButton disabled={collectionControlState.navigationDisabled || exerciseIndex >= visibleExercises.length - 1 || queue.isRecording || attemptLocked} label="下一句" onPress={() => selectExerciseAt(exerciseIndex + 1)} />
             </View>
           </View>
 
@@ -2118,6 +2045,23 @@ function PracticeScreen({
             />
           ) : null}
         </>
+
+      {flow === 'collection' ? (
+        <View style={styles.optionalCollectionCard}>
+          <Text style={styles.taskCardEyebrow}>可选：补充采集资料</Text>
+          <Text style={styles.taskCardCopy}>{collectionPlan?.label ?? '常用表达'} · {collectionPlan?.description}</Text>
+          <View style={styles.inlineFields}>
+            <View style={styles.inlineField}>
+              <Text style={styles.fieldLabel}>年龄段</Text>
+              <TextInput accessibilityLabel="年龄段" onChangeText={setAgeBand} placeholder="如 70–79" placeholderTextColor={COLORS.subtle} style={styles.smallInput} value={ageBand} />
+            </View>
+            <View style={styles.inlineField}>
+              <Text style={styles.fieldLabel}>性别</Text>
+              <TextInput accessibilityLabel="性别" onChangeText={setSex} placeholder="可不填" placeholderTextColor={COLORS.subtle} style={styles.smallInput} value={sex} />
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       {flow === 'collection' ? <View style={styles.customPracticePanel}>
         <Text style={styles.fieldLabel}>改成自己的句子</Text>
@@ -3013,7 +2957,11 @@ function SettingRow({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.background },
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
+  },
   appShell: { flex: 1 },
   content: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingBottom: 32 },
@@ -3274,6 +3222,16 @@ const styles = StyleSheet.create({
   checkRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   checkButton: { alignItems: 'center', backgroundColor: COLORS.surfaceMuted, borderColor: COLORS.border, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 9 },
   checkMark: { color: COLORS.accent, fontSize: 17, fontWeight: '800' },
+  preflightPanel: { backgroundColor: '#312A25', borderColor: '#514840', borderRadius: 16, borderWidth: 1, gap: 10, padding: 14 },
+  preflightTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  preflightCopy: { color: '#D6CEC6', fontSize: 13, lineHeight: 20 },
+  preflightChecklist: { gap: 8 },
+  preflightShortRow: { flexDirection: 'row', gap: 8 },
+  preflightCheck: { alignItems: 'center', backgroundColor: '#211D1A', borderColor: '#62574F', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 8, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10 },
+  preflightShortCheck: { flex: 1 },
+  preflightCheckActive: { backgroundColor: '#26372F', borderColor: '#6D9B82' },
+  preflightCheckText: { color: '#F5F1ED', flex: 1, fontSize: 14, lineHeight: 20 },
+  preflightStatus: { color: '#D6CEC6', fontSize: 12, lineHeight: 18 },
   inlineFields: { flexDirection: 'row', gap: 10 },
   inlineField: { flex: 1, gap: 6 },
   smallInput: { backgroundColor: COLORS.surfaceMuted, borderColor: COLORS.border, borderRadius: 10, borderWidth: 1, color: COLORS.ink, minHeight: 42, paddingHorizontal: 10 },
@@ -3292,6 +3250,7 @@ const styles = StyleSheet.create({
   confirmationHint: { color: '#CFC7BF', fontSize: 12, lineHeight: 18 },
   assessmentProgress: { backgroundColor: COLORS.surfaceMuted, borderRadius: 14, gap: 4, padding: 14 },
   stepActions: { flexDirection: 'row', gap: 8 },
+  optionalCollectionCard: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 16, borderWidth: 1, gap: 10, padding: 14 },
   customPracticePanel: { borderTopColor: COLORS.border, borderTopWidth: 1, gap: 10, paddingTop: 18 },
   recordingDisclosure: { alignItems: 'center', borderTopColor: COLORS.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 56 },
   categoryList: { gap: 8, marginTop: 6 },
