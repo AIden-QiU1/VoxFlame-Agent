@@ -48,3 +48,22 @@ export function isMobileCollectionPreflightReady(
 ): boolean {
   return preflight.environmentReady && preflight.distanceReady && preflight.understandsConsent
 }
+
+export interface MobileCollectionControlState {
+  actionLabel: string
+  navigationDisabled: boolean
+  ready: boolean
+}
+
+/** Keeps recording and sentence navigation behind the same visible preflight gate. */
+export function getMobileCollectionControlState(
+  preflight: MobileCollectionPreflight,
+  readyActionLabel: string,
+): MobileCollectionControlState {
+  const ready = isMobileCollectionPreflightReady(preflight)
+  return {
+    actionLabel: ready ? readyActionLabel : '先完成上方确认',
+    navigationDisabled: !ready,
+    ready,
+  }
+}
