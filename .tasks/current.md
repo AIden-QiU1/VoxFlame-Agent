@@ -39,7 +39,7 @@
 - 新增独立导航函数与回归测试；下一句从当前完整可录集合计算，不再受页面只展示前 120 条的窗口限制，因此同时消除了超大题库到可见窗口末尾后回绕重复的问题。若当前未读池只剩一条，则按稳定主题顺序进入下一条复练，而不是原地重复。
 - Web 已把 progress 请求按 `userId + generation + AbortController` 隔离，退出/换号会清空旧派生状态；撤回只有后端成功后才移除本轮进度和本机队列，迟到结果不能污染新账号。
 - Mobile 已冻结开始录音时的账号、题目和材料 lineage；catalog/memory 使用 latest-wins generation，本机队列按 contributor 隔离且读改写串行；加载更多保留当前游标，页末自动进入下一页或明确完成态。
-- Backend 已把同账号 artifact 操作串行化；撤回先写 tombstone，再以 ETag 条件重写擦除 manifest 正文和 transcript，随后删音频、最后删 DB。迟到 complete 遇到 tombstone 会清理本录音而不能复活；存储路径必须属于已认证账号，撤回的 contribution ID、audio path、recording ID 必须一致，避免跨账号路径与同账号误删相邻录音。
+- Backend 已把同账号 artifact 操作串行化；撤回先写 tombstone，再在该串行边界内重写擦除 manifest 正文和 transcript，随后删音频、最后删 DB。2026-09-03 已移除真实阿里云 OSS 不支持的 PutObject `If-Match` 请求头，并修复 scrub 后 Normal object 的后续追加；Backend 测试、真实 OSS 探针、部署容器完整 discard flow 和健康检查通过，仅重建 Backend。回滚镜像：`voxflame-agent-backend:pre-withdraw-fix-20260903`。迟到 complete 遇到 tombstone 会清理本录音而不能复活；存储路径必须属于已认证账号，撤回的 contribution ID、audio path、recording ID 必须一致，避免跨账号路径与同账号误删相邻录音。
 - 所有仓库内 manifest 消费者已统一折叠 tombstone，撤回录音不会继续进入审计、覆盖、split、review queue 或受控音频读取。
 - 自动验证通过：Frontend 116 项、TypeScript、Next production build（25/25）；Backend RTC、路径策略 2 项、artifact/撤回 19 项和 build；Mobile training、memory/account scope、typecheck、静态检查、Android/iOS Expo export。
 - 已完成同类问题审计和完整工程/测试方案：[录音工作流可靠性治理与完整测试计划](../docs/RECORDING_WORKFLOW_RELIABILITY_PLAN_2026-08-29.md)。方案采用 5 个可回退阶段：当前止血发布、共享 reducer/invariant、Web 收敛、Mobile 收敛、Backend 资产生命周期与跨设备对等；不做全仓重写。

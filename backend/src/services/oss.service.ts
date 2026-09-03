@@ -2,6 +2,23 @@ import OSS from 'ali-oss';
 import dotenv from 'dotenv';
 dotenv.config();
 
+interface TextObjectWriter {
+    put(name: string, content: Buffer): Promise<unknown>;
+}
+
+/**
+ * Aliyun OSS PutObject does not support the HTTP If-Match precondition used by
+ * the previous implementation. Callers serialize each account's artifact
+ * mutations before using this overwrite helper.
+ */
+export async function overwriteTextObject(
+    client: TextObjectWriter,
+    name: string,
+    content: Buffer,
+): Promise<void> {
+    await client.put(name, content);
+}
+
 export class OssService {
     private client: OSS | null = null;
     private isConfigured: boolean = false;
@@ -90,16 +107,7 @@ export class OssService {
                         const currentContent = Buffer.isBuffer(current.content)
                             ? current.content
                             : Buffer.from(current.content);
-                        const currentHeaders = (current as {
-                            res?: { headers?: Record<string, string | number | string[] | undefined> };
-                        }).res?.headers ?? {};
-                        const etag = currentHeaders.etag;
-                        if (typeof etag !== 'string' || !etag.trim()) {
-                            throw new Error(`OSS object ${name} is missing an ETag`);
-                        }
-                        await client.put(name, Buffer.concat([currentContent, buf]), {
-                            headers: { 'If-Match': etag },
-                        });
+                        await overwriteTextObject(client, name, Buffer.concat([currentContent, buf]));
                         return;
                     }
                     const nextPosition = headers['x-oss-next-append-position'];
@@ -115,8 +123,8 @@ export class OssService {
                 return;
             } catch (e: unknown) {
                 lastError = e;
-                if (isOssPositionConflictError(e) || isOssPreconditionFailure(e)) {
-                    // Concurrent append/replace happened, re-read and retry.
+                if (isOssPositionConflictError(e)) {
+                    // Concurrent append happened, re-read and retry.
                     console.log(`[OSS] Concurrent text log update for ${name}, retrying...`);
                     continue;
                 }
@@ -167,10 +175,7 @@ export class OssService {
         }
     }
 
-    /**
-     * Rewrite one text object with an ETag precondition. A failed or competing
-     * write leaves the previous object intact; conflicts are re-read and retried.
-     */
+    /** Rewrite one text object inside the caller's per-account serialized operation. */
     async rewriteTextObject(
         name: string,
         rewrite: (content: string) => string,
@@ -180,41 +185,22 @@ export class OssService {
         }
 
         const client = this.client;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-            let result: Awaited<ReturnType<OSS['get']>>;
-            try {
-                result = await client.get(name);
-            } catch (error: unknown) {
-                if (isOssNotFoundError(error)) return false;
-                throw error;
-            }
-
-            const current = Buffer.isBuffer(result.content)
-                ? result.content.toString('utf8')
-                : Buffer.from(result.content).toString('utf8');
-            const next = rewrite(current);
-            if (next === current) return false;
-
-            const headers = (result as {
-                res?: { headers?: Record<string, string | number | string[] | undefined> };
-            }).res?.headers ?? {};
-            const etag = headers.etag;
-            if (typeof etag !== 'string' || !etag.trim()) {
-                throw new Error(`OSS object ${name} is missing an ETag`);
-            }
-
-            try {
-                await client.put(name, Buffer.from(next), {
-                    headers: { 'If-Match': etag },
-                });
-                return true;
-            } catch (error: unknown) {
-                if (isOssPreconditionFailure(error)) continue;
-                throw error;
-            }
+        let result: Awaited<ReturnType<OSS['get']>>;
+        try {
+            result = await client.get(name);
+        } catch (error: unknown) {
+            if (isOssNotFoundError(error)) return false;
+            throw error;
         }
 
-        throw new Error(`OSS conditional rewrite retries exhausted for ${name}`);
+        const current = Buffer.isBuffer(result.content)
+            ? result.content.toString('utf8')
+            : Buffer.from(result.content).toString('utf8');
+        const next = rewrite(current);
+        if (next === current) return false;
+
+        await overwriteTextObject(client, name, Buffer.from(next));
+        return true;
     }
 
     /**
@@ -265,8 +251,4 @@ function isOssNotFoundError(error: unknown): boolean {
 
 function isOssPositionConflictError(error: unknown): boolean {
     return readOssErrorCode(error) === 'PositionNotEqualToLength' || readOssErrorStatus(error) === 409;
-}
-
-function isOssPreconditionFailure(error: unknown): boolean {
-    return readOssErrorCode(error) === 'PreconditionFailed' || readOssErrorStatus(error) === 412;
 }
