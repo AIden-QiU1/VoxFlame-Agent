@@ -2,6 +2,13 @@
 
 > 最后更新: 2026-08-27
 
+## 2026-09-03 Android 录音确认修复发布
+
+- 根因已由真机录屏确认：录音所需的环境、位置和授权确认与目标句/主按钮相隔数屏；主按钮只弹提示而不把用户带回确认区，上一句/下一句还能绕过同一门禁。
+- 最新 `main` 上的最小修复已完成：3 项确认移到目标句与录音按钮之间；未确认时主按钮显示“先完成上方确认”并禁用，前后切题共用同一门禁；路由/一级页面切换自动回顶，Android 顶部补状态栏安全区。录音、上传、撤回、题库和材料协议未改变。
+- 已新增控制状态单元回归和静态布局守卫；`test:training`、`test:communication`、`test:memory`、`typecheck`、`check`、Android/iOS Expo export 与 `git diff --check` 已通过。
+- 发布进行中：需合入 `main` 后运行 Android Preview 发布事务并核对官网版本、build、SHA256、下载响应和 Backend health。对方安装新包并验证确认、录音、确认收录及连续下一句前，不宣称真机问题已彻底解决。
+
 ## 2026-08-26 App 完整替代 Web 七步优化
 
 - 第 1 项已完成：Mobile parity 通过 PR #17 合入 `main`，版本为 `0.1.4`、Android `versionCode=5`、iOS `buildNumber=5`；新版 APK 已构建并发布到 `https://voxember.com/download/android`。GitHub Actions 因账号 billing lock 未启动，按用户授权以完整本地验证替代 CI 后直接合并。
