@@ -3,7 +3,7 @@ set -euo pipefail
 
 MODE="${1:-status}"
 PRUNE_UNTIL="${VOXFLAME_DOCKER_PRUNE_UNTIL:-168h}"
-AUTO_ROOT_THRESHOLD_PERCENT="${VOXFLAME_DOCKER_AUTO_PRUNE_ROOT_THRESHOLD_PERCENT:-75}"
+AUTO_ROOT_THRESHOLD_PERCENT="${VOXFLAME_DOCKER_AUTO_PRUNE_ROOT_THRESHOLD_PERCENT:-60}"
 
 docker_cmd() {
   if [[ "${EUID}" -eq 0 ]]; then
@@ -28,8 +28,11 @@ print_status() {
   docker_cmd image ls --filter dangling=true --filter "until=${PRUNE_UNTIL}" \
     --format '{{.ID}}\t{{.CreatedSince}}\t{{.Size}}'
   echo
-  echo "[docker] stopped containers older than ${PRUNE_UNTIL}"
-  docker_cmd container ls -a --filter status=created --filter status=exited --filter "until=${PRUNE_UNTIL}" \
+  echo "[docker] stopped containers (container prune keeps only those older than ${PRUNE_UNTIL})"
+  # `docker container ls` does not support the `until` filter on the Docker
+  # version used by cpu1. The destructive prune command below does support it;
+  # keep this status section informational and portable.
+  docker_cmd container ls -a --filter status=created --filter status=exited \
     --format '{{.ID}}\t{{.Names}}\t{{.Status}}'
   echo
   echo "[docker] unused networks (informational; default networks are retained by prune rules)"

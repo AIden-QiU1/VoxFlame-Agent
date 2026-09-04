@@ -38,7 +38,7 @@ export default function ReadingLibraryPage() {
           </Link>
           <h1 className="mt-1 text-balance text-2xl font-semibold text-stone-950">普通话长文朗读</h1>
           <p className="mt-1 max-w-3xl text-pretty text-sm leading-6 text-stone-600">
-            60 篇原创现代汉语材料。系统自动避开已经录过的句子，没读完整篇前不会重复出现。
+            只收录能核验完整正文、底本和权利状态的普通话朗读文章。
           </p>
         </div>
       </header>
@@ -59,9 +59,11 @@ export default function ReadingLibraryPage() {
             <div>
               <p className="text-sm font-semibold text-amber-800">系统推荐 · 完成度较低</p>
               <h2 className="mt-2 text-balance text-2xl font-semibold text-stone-950">《{recommended.article.title}》</h2>
-              <p className="mt-2 text-pretty text-sm leading-6 text-stone-600">{recommended.article.summary}</p>
+              <p className="mt-2 text-pretty text-sm leading-6 text-stone-600">
+                {recommended.article.author} · {recommended.article.summary}
+              </p>
               <p className="mt-3 text-sm font-medium text-stone-700 tabular-nums">
-                {recommended.isStarted ? `已录 ${recommended.recordedCount} / ${recommended.totalCount} 段` : `尚未开始 · 共 ${recommended.totalCount} 段`}
+                {recommended.isStarted ? `已录 ${recommended.recordedCount} / ${recommended.totalCount} 句` : `尚未开始 · 共 ${recommended.totalCount} 句`}
               </p>
             </div>
             <span className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-700 px-5 py-3 text-sm font-semibold text-white">
@@ -71,6 +73,17 @@ export default function ReadingLibraryPage() {
           </Link>
         ) : null}
 
+        {rankedArticles.length === 0 ? (
+          <section className="rounded-3xl border border-stone-200 bg-white px-5 py-8 shadow-sm sm:px-7">
+            <h2 className="text-balance text-xl font-semibold text-stone-950">暂无通过全文核验的材料</h2>
+            <p className="mt-3 max-w-2xl text-pretty text-sm leading-7 text-stone-600">
+              原有 60 条只有概况和提纲，已全部移除。完整正文、作者、可核验底本或权利状态缺任一项，都不会出现在这里。
+            </p>
+            <Link href="/contribute/materials" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-700 px-5 py-3 text-sm font-semibold text-white">
+              返回选择其他材料
+            </Link>
+          </section>
+        ) : (
         <section aria-labelledby="reading-list-heading">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -85,7 +98,7 @@ export default function ReadingLibraryPage() {
               <Link
                 key={item.article.id}
                 href={`/contribute/readings/${item.article.id}`}
-                className="flex min-h-44 flex-col rounded-2xl border border-stone-200 bg-white p-5 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                className="flex flex-col rounded-2xl border border-stone-200 bg-white p-5 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -94,23 +107,26 @@ export default function ReadingLibraryPage() {
                   </div>
                   {item.isComplete ? <CheckCircle2 className="size-5 shrink-0 text-emerald-700" aria-label="已完成" /> : null}
                 </div>
-                <p className="mt-2 line-clamp-2 text-pretty text-sm leading-6 text-stone-600">{item.article.summary}</p>
+                <p className="mt-2 text-pretty text-sm leading-6 text-stone-600">
+                  {item.article.author} · {item.article.summary}
+                </p>
                 <div className="mt-auto pt-4">
                   <div className="h-2 overflow-hidden rounded-full bg-stone-100" aria-hidden="true">
                     <div className="h-full rounded-full bg-amber-600" style={{ width: `${item.completionRatio * 100}%` }} />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                    <span className="text-stone-600 tabular-nums">已录 {item.recordedCount} / {item.totalCount} 段</span>
-                    <span className="font-semibold text-amber-800">{item.isComplete ? '查看' : item.isStarted ? '继续' : '开始'} →</span>
+                    <span className="text-stone-600 tabular-nums">已录 {item.recordedCount} / {item.totalCount} 句</span>
+                    <span className="font-semibold text-amber-800">{item.isComplete ? '查看全文' : item.isStarted ? '继续阅读' : '阅读全文'} →</span>
                   </div>
                 </div>
               </Link>
             ))}
           </div>
         </section>
+        )}
 
         <p className="text-pretty text-xs leading-5 text-stone-500">
-          当前材料为“燃言原创标准现代汉语朗读材料”，不是普通话水平测试官方作品。每段独立保存，方便中断后继续和单句重录。
+          后续材料必须是完整全文，并保留作者、底本链接、权利状态和内容哈希。
         </p>
       </main>
     </div>

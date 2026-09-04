@@ -203,6 +203,15 @@ export class OssService {
         return true;
     }
 
+    /** Write a complete text object when the caller already holds its serialized snapshot. */
+    async writeTextObject(name: string, content: string): Promise<void> {
+        if (!this.isConfigured || !this.client) {
+            return;
+        }
+
+        await overwriteTextObject(this.client, name, Buffer.from(content));
+    }
+
     /**
      * Delete an object from OSS. Missing objects are treated as already deleted.
      */

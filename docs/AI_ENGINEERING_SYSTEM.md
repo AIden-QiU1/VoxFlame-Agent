@@ -406,7 +406,7 @@ compat 层必须同时具备：
 - `.github/workflows/ai-doc-guard.yml`：在 CI 中同时执行文档 harness 与治理守卫
 - `scripts/docker-rebuild-core-fast.sh`：生产 Docker 部署 harness；环境变量更新使用 `env-backend` 只重建 backend，单服务代码改动使用 `backend` / `frontend`，只有核心链路共同变化才使用默认 `core`，不先执行 `docker compose down`
 - `scripts/docker_disk_maintenance.sh`：Docker 磁盘维护 harness；`status` 先盘点，`prune-safe` 清理全部 dangling images、7 天前停止容器、未使用网络和全部未使用 Build Cache；Build Cache/停止容器/未使用网络可重建，运行容器、卷、`latest` 和 `pre-*` 回滚镜像保留。持久化卷不自动删除，只盘点并告警
-- `voxflame-docker-disk-maintenance.timer`：每日自动检查根盘；达到 `VOXFLAME_DOCKER_AUTO_PRUNE_ROOT_THRESHOLD_PERCENT`（默认 75%）才调用 `auto -> prune-safe`，不清理运行容器、卷、`latest` 或 `pre-*` 回滚镜像
+- `voxflame-docker-disk-maintenance.timer`：每日自动检查根盘；达到 `VOXFLAME_DOCKER_AUTO_PRUNE_ROOT_THRESHOLD_PERCENT`（默认 60%）才调用 `auto -> prune-safe`，不清理运行容器、卷、`latest` 或 `pre-*` 回滚镜像
 - `/etc/logrotate.d/voxflame-host-logs`：宿主机 bind-mounted `logs/*.log` 每日轮转，单文件达到 50 MiB 时提前轮转，保留 14 份压缩副本；不删除 JSONL 诊断或业务数据文件
 
 另外，仓库级 instructions 至少要明确：

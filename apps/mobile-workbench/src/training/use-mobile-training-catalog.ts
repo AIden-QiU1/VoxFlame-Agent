@@ -6,6 +6,7 @@ import {
   fetchMobileTrainingCatalog,
   type MobileTrainingCategory,
   type MobileTrainingExercise,
+  type MobileReadingArticleDetail,
   type MobileReadingArticleSummary,
 } from './training-catalog'
 
@@ -25,12 +26,13 @@ export function useMobileTrainingCatalog(params: {
   const [exercises, setExercises] = useState<MobileTrainingExercise[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [readingArticles, setReadingArticles] = useState<MobileReadingArticleSummary[]>([])
-  const [selectedReadingArticle, setSelectedReadingArticle] = useState<MobileReadingArticleSummary | null>(null)
+  const [selectedReadingArticle, setSelectedReadingArticle] = useState<MobileReadingArticleDetail | null>(null)
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const requestGenerationRef = useRef(0)
   const activeControllerRef = useRef<AbortController | null>(null)
+  const catalogCacheRef = useRef(new Map<string, { cachedAt: number; catalog: Awaited<ReturnType<typeof fetchMobileTrainingCatalog>> }>())
 
   const beginRequest = useCallback(() => {
     activeControllerRef.current?.abort()
@@ -52,6 +54,18 @@ export function useMobileTrainingCatalog(params: {
     setStatus('loading')
     setErrorMessage(null)
     const request = beginRequest()
+    const cacheKey = `${category ?? ''}:${readingArticleId ?? ''}:0`
+    const cached = catalogCacheRef.current.get(cacheKey)
+    if (cached && Date.now() - cached.cachedAt < 30_000) {
+      setCategories(cached.catalog.categories)
+      setExercises(cached.catalog.exercises)
+      setSelectedCategory(cached.catalog.selectedCategory)
+      setReadingArticles(cached.catalog.readingArticles)
+      setSelectedReadingArticle(cached.catalog.selectedReadingArticle)
+      setTotal(cached.catalog.total)
+      setStatus('ready')
+      return
+    }
     try {
       const catalog = await fetchMobileTrainingCatalog(
         params.apiBaseUrl,
@@ -60,6 +74,7 @@ export function useMobileTrainingCatalog(params: {
         request.controller.signal,
       )
       if (!isCurrentRequest(request.generation)) return
+      catalogCacheRef.current.set(cacheKey, { cachedAt: Date.now(), catalog })
       setCategories(catalog.categories)
       setExercises(catalog.exercises)
       setSelectedCategory(catalog.selectedCategory)

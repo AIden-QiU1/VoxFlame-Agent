@@ -14,9 +14,9 @@ function queueItem(overrides: Partial<VoxFlameRecorderQueueItem>): VoxFlameRecor
     recordingId: 'recording-1',
     contributorId: 'user-1',
     text: '今天风很轻',
-    sentenceId: 'reading-001-segment-01',
+    sentenceId: 'reading-test-segment-01',
     source: 'guided_recording',
-    metadata: { reading_segment_id: 'reading-001-segment-01' },
+    metadata: { reading_segment_id: 'reading-test-segment-01' },
     consentScope: 'training_only',
     syncStatus: 'local_only',
     syncAttempts: 0,
@@ -47,9 +47,9 @@ function queueItem(overrides: Partial<VoxFlameRecorderQueueItem>): VoxFlameRecor
 
 test('merge progress includes local pending durations and de-duplicates sentence ids', () => {
   const result = mergeRecordingProgress({
-    recordedSentenceIds: ['reading-001-segment-01'],
-    recordedReadingSegmentIds: ['reading-001-segment-01'],
-    recordedReadingRoundKeys: ['initial:reading-001-segment-01'],
+    recordedSentenceIds: ['reading-test-segment-01'],
+    recordedReadingSegmentIds: ['reading-test-segment-01'],
+    recordedReadingRoundKeys: ['initial:reading-test-segment-01'],
     readingArticleRoundIds: {},
     lastRecordedExerciseIds: {},
     todayDurationSeconds: 60,
@@ -58,9 +58,9 @@ test('merge progress includes local pending durations and de-duplicates sentence
 
   assert.equal(result.todayDurationSeconds, 90)
   assert.equal(result.totalDurationSeconds, 150)
-  assert.deepEqual(result.recordedSentenceIds, ['reading-001-segment-01'])
-  assert.deepEqual(result.recordedReadingSegmentIds, ['reading-001-segment-01'])
-  assert.deepEqual(result.recordedReadingRoundKeys, ['initial:reading-001-segment-01'])
+  assert.deepEqual(result.recordedSentenceIds, ['reading-test-segment-01'])
+  assert.deepEqual(result.recordedReadingSegmentIds, ['reading-test-segment-01'])
+  assert.deepEqual(result.recordedReadingRoundKeys, ['initial:reading-test-segment-01'])
 })
 
 test('merge progress advances the resume anchor from a local pending recording', () => {

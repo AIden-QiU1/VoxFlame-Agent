@@ -65,3 +65,31 @@ entries:
     action: 完成5→10→20→50路真实 RTC 阶梯压测，补信号量、熔断和第二 Worker 接管实验。
     validation: OOM=0、拒绝率 <=1%、ASR/TTS/LLM 与丢包保护阈值达标。
     state: experiment_ready
+  - feedback_id: FB-004
+    research_id: RO-015
+    source: maintainer
+    observed_at: 2026-09-03
+    scenario: 注册方言自述并进入训练数据采集
+    observation: 用户希望方言信息在注册时可跳过；有方言时同一句话普通话和方言各说一遍，方言数据需要额外标注以便训练。
+    severity: high
+    failure_type: data
+    evidence_ref: research/speech-health/RO-015-dialect-paired-speech-collection-2026-09-03.md
+    hypothesis: 如果没有语义题面、变体角色、配对 ID、来源和说话人隔离，方言 ASR/书写差异会被误判为用户错误或造成训练泄漏。
+    owner: frontend + backend training workbench + data governance
+    action: 保留用户自报与可选标准标签；实现可跳过的 paired state machine；扩展前后端元数据白名单；按 contributor 做 speaker-disjoint 评测。
+    validation: 方言跳过不阻塞普通话进度；pair_id/role 稳定；证件/电话不出现在 manifest；同一说话人的 pair 不跨 split；ASR 仅诊断不拒收。
+    state: experiment_ready
+  - feedback_id: FB-005
+    research_id: RO-016
+    source: maintainer
+    observed_at: 2026-09-03
+    scenario: Web/App 训练撤回、工作区打开和移动端切换材料
+    observation: 撤回接近 10 秒；审计发现多个远程清理串行、工作区重复查 profile、移动目录重复请求。
+    severity: high
+    failure_type: network
+    evidence_ref: research/product-engineering/RO-016-cross-surface-lookup-efficiency-2026-09-03.md
+    hypothesis: 跨服务往返和全量/重复读取是主要延迟来源，独立步骤并行与短 TTL 去重可降低 P95。
+    owner: frontend + backend + mobile workbench
+    action: 并行撤回外部清理、合并 workspace profile 读取、增加活动与目录短缓存；补阶段耗时指标。
+    validation: discard P95 <3s、progress P95 <2s、无跨账户缓存命中、部分清理可安全重试。
+    state: validating

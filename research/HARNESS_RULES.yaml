@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-08-29
+updated_at: 2026-09-03
 schema: voxflame-research-harness-rules-v1
 entrypoint: AGENTS.md
 registries:
@@ -24,10 +24,16 @@ manual_confirmation_required:
   - database_object_storage_deletion
   - medical_or_health_claim
   - public_release_or_scope_expansion
+cross_platform_contracts:
+  rule: Web 与 App 的注册字段、授权语义、版本号和数据用途必须共享同一事实源；UI 可按平台适配，但不得出现一端有功能、另一端缺失或语义不同。
+  required_registration_consents: [privacy, sensitive_data, data_collection, commercial_use]
+  commercial_use_scope: [model_training, evaluation, product_improvement, service_operations]
+  prohibited_use: [illegal_use, sale_of_identity_information, undisclosed_purpose_expansion]
+  user_controls: [separate_explicit_consent, withdrawal, deletion_request, export_request]
 triggers:
   disk:
-    warning_percent: 70
-    safe_cleanup_percent: 75
+    warning_percent: 50
+    safe_cleanup_percent: 60
     human_escalation_percent: 85
   training_progress:
     p95_ms: 2000

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "import:reading-articles": "node scripts/import-luxun-reading-articles.mjs",
     "start": "next start",
     "lint": "next lint",
     "test": "bash ../scripts/check_frontend_product_messages.sh && node --test scripts/recording-manifest-events.test.mjs && node --import ./test/register-runtime-test-hooks.mjs --test --experimental-strip-types \"src/**/*.test.ts\"",

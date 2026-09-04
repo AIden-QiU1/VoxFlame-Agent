@@ -31,7 +31,6 @@ import { useWorkspaceMemorySnapshot } from '@/hooks/useWorkspaceMemorySnapshot'
 import { type UploadReceipt, useVoiceUpload } from '@/hooks/useVoiceUpload'
 import {
   savePreparedExpressionAsset,
-  saveWorkspaceUserProfileMemory,
 } from '@/lib/memory/workspace-client'
 import {
   LEGAL_CONSENT_VERSION,
@@ -86,8 +85,6 @@ import {
 import { buildSpeechPerformanceReport } from '@/lib/training/speech-performance-report'
 import {
   DEFAULT_TRAINING_GUIDANCE_PROFILE,
-  TRAINING_ETIOLOGY_OPTIONS,
-  type TrainingEtiology,
   type TrainingSeverity,
 } from '@/lib/training/training-guidance-profile'
 import { buildTrainingSampleLineage } from '@/lib/training/training-sample-lineage'
@@ -118,19 +115,13 @@ type PracticeSourceMode = 'prepared_content' | 'sentence_corpus'
 type PracticeExercise = MandarinTrainingExercise | PreparedExpressionPracticeExercise
 
 interface TrainingUploadLabels {
-  etiology?: TrainingEtiology
+  disabilityCategory?: string
+  condition?: string
+  etiology?: string
   severity?: TrainingSeverity
-  ageBand?: string
-  sex?: 'male' | 'female' | 'other' | 'unspecified'
+  hasDialect?: boolean
+  dialectName?: string
 }
-
-const COLLECTION_AGE_BANDS = ['unspecified', '18–39', '40–59', '60–69', '70–79', '80+'] as const
-const COLLECTION_SEX_OPTIONS = [
-  { value: 'unspecified', label: '不愿说明' },
-  { value: 'female', label: '女' },
-  { value: 'male', label: '男' },
-  { value: 'other', label: '其他' },
-] as const
 
 interface PracticeAttempt {
   createdAt: number
@@ -308,20 +299,24 @@ function buildUploadMetadata(
     }
   }
 
+  if (uploadLabels?.disabilityCategory) {
+    metadata.disability_category = uploadLabels.disabilityCategory
+  }
+  if (uploadLabels?.condition) {
+    metadata.condition = uploadLabels.condition
+  }
   if (uploadLabels?.etiology && uploadLabels.etiology !== DEFAULT_TRAINING_GUIDANCE_PROFILE.etiology) {
     metadata.etiology = uploadLabels.etiology
+  }
+
+  if (uploadLabels?.hasDialect && uploadLabels.dialectName) {
+    metadata.dialect_name_user_reported = uploadLabels.dialectName
+    metadata.label_source = 'user_reported'
   }
 
   if (uploadLabels?.severity && uploadLabels.severity !== DEFAULT_TRAINING_GUIDANCE_PROFILE.severity) {
     metadata.severity = uploadLabels.severity
   }
-  if (uploadLabels?.ageBand && uploadLabels.ageBand !== 'unspecified') {
-    metadata.age_band = uploadLabels.ageBand
-  }
-  if (uploadLabels?.sex && uploadLabels.sex !== 'unspecified') {
-    metadata.sex = uploadLabels.sex
-  }
-
   for (const key of Object.keys(metadata)) {
     const value = metadata[key]
     if (Array.isArray(value) && value.length === 0) {
@@ -798,15 +793,11 @@ export function TrainingRecorderPage({
   const [assessmentAttemptsByExercise, setAssessmentAttemptsByExercise] = useState<
     Record<string, PracticeAttempt>
   >({})
-  const [trainingEtiology, setTrainingEtiology] = useState<TrainingEtiology>('unknown')
-  const [isSavingTrainingLabels, setIsSavingTrainingLabels] = useState(false)
   const [notice, setNotice] = useState<NoticeState | null>(null)
   const [isPreparedPreviewOpen, setIsPreparedPreviewOpen] = useState(false)
   const [attemptPlaybackUrl, setAttemptPlaybackUrl] = useState<string | null>(null)
   const [environmentReady, setEnvironmentReady] = useState(false)
   const [distanceReady, setDistanceReady] = useState(false)
-  const [ageBand, setAgeBand] = useState<string>('unspecified')
-  const [sex, setSex] = useState<TrainingUploadLabels['sex']>('unspecified')
   const [collectionFlowStep, setCollectionFlowStep] = useState<CollectionFlowStep>('prepare')
   const [isReplacingAttempt, setIsReplacingAttempt] = useState(false)
   const [isMaterialEditorOpen, setIsMaterialEditorOpen] = useState(wantsNewMaterial)
@@ -1127,14 +1118,24 @@ export function TrainingRecorderPage({
   )
   const trainingUploadLabels = useMemo<TrainingUploadLabels>(() => {
     return {
-      etiology: trainingEtiology,
+      disabilityCategory: workspaceSnapshot?.registration_profile?.disability_category,
+      condition: workspaceSnapshot?.registration_profile?.condition,
+      etiology: workspaceSnapshot?.user_profile_memory?.etiology,
       severity: isAssessmentTopic
         ? undefined
         : workspaceSnapshot?.user_profile_memory?.severity as TrainingSeverity | undefined,
-      ageBand,
-      sex,
+      hasDialect: workspaceSnapshot?.registration_profile?.has_dialect,
+      dialectName: workspaceSnapshot?.registration_profile?.dialect_name,
     }
-  }, [ageBand, isAssessmentTopic, sex, trainingEtiology, workspaceSnapshot?.user_profile_memory?.severity])
+  }, [
+    isAssessmentTopic,
+    workspaceSnapshot?.registration_profile?.condition,
+    workspaceSnapshot?.registration_profile?.disability_category,
+    workspaceSnapshot?.registration_profile?.dialect_name,
+    workspaceSnapshot?.registration_profile?.has_dialect,
+    workspaceSnapshot?.user_profile_memory?.etiology,
+    workspaceSnapshot?.user_profile_memory?.severity,
+  ])
   const recorderStatus = getRecorderStatusCopy(status, sessionError, isAssessmentTopic)
   const currentAttemptCharacterAccuracy = useMemo(() => {
     if (!attempt || !isAssessmentTopic || attempt.feedback.normalizedTarget.length === 0) {
@@ -1273,15 +1274,6 @@ export function TrainingRecorderPage({
     setCollectionFlowStep('prepare')
     void refreshLocalQueueCount()
   }, [refreshLocalQueueCount, topicId, userId])
-
-  useEffect(() => {
-    const etiology = workspaceSnapshot?.user_profile_memory?.etiology
-    setTrainingEtiology(
-      TRAINING_ETIOLOGY_OPTIONS.some((option) => option.value === etiology)
-        ? (etiology as TrainingEtiology)
-        : 'unknown',
-    )
-  }, [workspaceSnapshot?.user_profile_memory?.etiology])
 
   useEffect(() => {
     return () => {
@@ -1674,52 +1666,6 @@ export function TrainingRecorderPage({
     setNotice(null)
     setCollectionFlowStep('record')
   }, [])
-
-  const handleSaveTrainingLabels = useCallback(async () => {
-    if (!userId || !isAuthenticated) {
-      setNotice({
-        tone: 'error',
-        message: '先登录后才能保存训练资料标签。',
-      })
-      return
-    }
-
-    if (trainingEtiology === 'unknown') {
-      setNotice({
-        tone: 'error',
-        message: '请先选择一个疾病种类，再保存训练资料标签。',
-      })
-      return
-    }
-
-    setIsSavingTrainingLabels(true)
-
-    try {
-      await saveWorkspaceUserProfileMemory(userId, {
-        document: workspaceSnapshot?.user_profile_memory.document ?? undefined,
-        etiology: trainingEtiology,
-      })
-      await refreshWorkspaceSnapshot()
-      setNotice({
-        tone: 'success',
-        message: '病因信息已保存。系统听清率和训练支持建议不会写成医学严重程度。',
-      })
-    } catch (error) {
-      console.error('[contribute] save training labels failed:', error)
-      setNotice({
-        tone: 'error',
-        message: '训练资料标签保存失败了，请稍后再试。',
-      })
-    } finally {
-      setIsSavingTrainingLabels(false)
-    }
-  }, [
-    isAuthenticated,
-    refreshWorkspaceSnapshot,
-    trainingEtiology,
-    userId,
-    workspaceSnapshot?.user_profile_memory.document,
-  ])
 
   const persistTrainingAttempt = useCallback(async (
     attemptToPersist: PracticeAttempt,
@@ -2372,27 +2318,6 @@ export function TrainingRecorderPage({
                 </span>
               </div>
 
-              <details className="mt-5 rounded-2xl border border-stone-200">
-                <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500">
-                  <span>可选：补充采集资料</span>
-                  <span className="text-xs font-normal text-stone-500">年龄段、性别</span>
-                </summary>
-                <div className="grid gap-4 border-t border-stone-200 p-4 sm:grid-cols-2">
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium text-stone-700">年龄段</span>
-                    <select value={ageBand} onChange={(event) => setAgeBand(event.target.value)} className="h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500">
-                      {COLLECTION_AGE_BANDS.map((band) => <option key={band} value={band}>{band === 'unspecified' ? '不愿说明' : band}</option>)}
-                    </select>
-                  </label>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium text-stone-700">性别</span>
-                    <select value={sex} onChange={(event) => setSex(event.target.value as TrainingUploadLabels['sex'])} className="h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm text-stone-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500">
-                      {COLLECTION_SEX_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                    </select>
-                  </label>
-                </div>
-              </details>
-
               <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-pretty text-sm text-stone-500">
                   {!environmentReady || !distanceReady ? '完成上面两项确认后即可继续。' : canSaveTrainingSample ? '准备完成，可以录第一句了。' : '需要先补充数据授权。'}
@@ -2719,7 +2644,7 @@ export function TrainingRecorderPage({
             </p>
           </div>
           <div className="hidden rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-gray-700 sm:block">
-            当前账号：{user?.email || '已登录用户'}
+            {workspaceSnapshot?.registration_profile?.full_name || user?.email || '用户'}
           </div>
         </div>
       </header>
@@ -2764,35 +2689,19 @@ export function TrainingRecorderPage({
                   <div>
                     <h2 className="text-2xl font-semibold text-gray-900 text-balance">完成固定词表，建立你的沟通表现基线</h2>
                     <p className="mt-2 text-sm text-gray-600 text-pretty">
-                      疾病种类可选填；报告重点看系统听清、音系差异、节奏和收音，不从一次录音诊断疾病。
+                      注册时登记的残疾类别会自动随样本保存；报告重点看系统听清、音系差异、节奏和收音，不从一次录音诊断疾病。
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveTrainingLabels()}
-                    disabled={isSavingTrainingLabels || trainingEtiology === 'unknown'}
-                    className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSavingTrainingLabels ? '保存中...' : '保存标签'}
-                  </button>
                 </div>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium text-gray-900">疾病种类</span>
-                    <select
-                      value={trainingEtiology}
-                      onChange={(event) => setTrainingEtiology(event.target.value as TrainingEtiology)}
-                      className="h-12 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 text-sm text-gray-900 outline-none transition focus:border-amber-300 focus:bg-white"
-                    >
-                      {TRAINING_ETIOLOGY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
+                    <p className="text-sm font-medium text-gray-900">残疾类别</p>
+                    <p className="mt-2 text-lg font-semibold text-gray-900">
+                      {workspaceSnapshot?.registration_profile?.disability_category || '沿用已有用户资料'}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">来自注册资料，训练页不再重复填写。</p>
+                  </div>
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
                     <p className="text-sm font-medium text-gray-900">训练支持级别</p>
                     <p className="mt-2 text-lg font-semibold text-gray-900">
@@ -2943,25 +2852,13 @@ export function TrainingRecorderPage({
                     <span>麦克风位置稳定，约 20–30 cm</span>
                   </label>
                 </div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="mt-3">
                   <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
                     <span className="text-xs font-medium text-stone-600">本次任务</span>
                     <p className="mt-1 text-sm font-semibold text-stone-900">{collectionPlan.label}</p>
                   </div>
-                  <label className="block space-y-1">
-                    <span className="text-xs font-medium text-stone-600">年龄段（可选）</span>
-                    <select value={ageBand} onChange={(event) => setAgeBand(event.target.value)} className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm">
-                      {COLLECTION_AGE_BANDS.map((band) => <option key={band} value={band}>{band === 'unspecified' ? '不愿说明' : band}</option>)}
-                    </select>
-                  </label>
-                  <label className="block space-y-1">
-                    <span className="text-xs font-medium text-stone-600">性别（可选）</span>
-                    <select value={sex} onChange={(event) => setSex(event.target.value as TrainingUploadLabels['sex'])} className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm">
-                      {COLLECTION_SEX_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                    </select>
-                  </label>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-stone-500">默认只保存音频、目标文本、实际转写、严重程度、病种、年龄段和性别；其他信息只在质检需要时使用。</p>
+                <p className="mt-3 text-xs leading-5 text-stone-500">样本会自动带上注册资料中的残疾类别/病种；姓名、电话和证件号不会写入录音样本。</p>
               </div>
               <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50 p-5">
                 {practiceMode === 'prepared_content' ? (

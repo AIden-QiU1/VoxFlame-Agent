@@ -69,7 +69,13 @@ export default function ReadingArticlePage({ params }: { params: { articleId: st
           </Link>
           <p className="mt-1 text-sm font-medium text-amber-800">{article.theme} · {article.difficulty}</p>
           <h1 className="mt-1 text-balance text-3xl font-semibold text-stone-950">{article.title}</h1>
-          <p className="mt-2 text-pretty text-sm leading-6 text-stone-600">{article.summary}</p>
+          <p className="mt-2 text-pretty text-sm leading-6 text-stone-600">下方是完整正文，不是文章概况。</p>
+          <p className="mt-1 text-pretty text-xs leading-5 text-stone-500">
+            作者：{article.author} · 底本：
+            <a className="underline underline-offset-2" href={article.source.sourceUrl} target="_blank" rel="noreferrer">
+              {article.source.label}
+            </a>
+          </p>
         </div>
       </header>
 
@@ -90,7 +96,7 @@ export default function ReadingArticlePage({ params }: { params: { articleId: st
                 先通读全文，再逐句录音
               </h2>
             </div>
-            <p className="text-sm text-stone-500 tabular-nums">共 {article.segments.length} 个录音片段</p>
+            <p className="text-sm text-stone-500 tabular-nums">共 {article.segments.length} 句</p>
           </div>
           <p className="mt-5 whitespace-pre-wrap text-pretty text-base leading-8 text-stone-800">
             {article.fullText}
@@ -102,7 +108,7 @@ export default function ReadingArticlePage({ params }: { params: { articleId: st
             <div>
               <p className="text-sm font-semibold text-amber-800">文章进度</p>
               <h2 className="mt-2 text-balance text-2xl font-semibold text-stone-950 tabular-nums">
-                {articleProgress.isComplete ? '这篇已经读完' : `已录 ${articleProgress.recordedCount} / ${articleProgress.totalCount} 段`}
+                {articleProgress.isComplete ? '这篇已经读完' : `已录 ${articleProgress.recordedCount} / ${articleProgress.totalCount} 句`}
               </h2>
               <p className="mt-2 text-pretty text-sm text-stone-600">
                 {articleProgress.isComplete ? '系统不会自动重复。想再读一轮时，由你主动开始。' : '录音时只会出现还没录过的句子。'}

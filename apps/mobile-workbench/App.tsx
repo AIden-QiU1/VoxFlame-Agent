@@ -32,6 +32,15 @@ import {
   shouldCreatePhoneUser,
 } from './src/auth/mobile-phone'
 import {
+  buildMobileRegistrationProfileMetadata,
+  MOBILE_DISABILITY_CATEGORY_OPTIONS,
+  MOBILE_ETIOLOGY_OPTIONS,
+  validateMobileRegistrationProfile,
+  type MobileIdentityDocumentType,
+  type MobileRegistrationProfileInput,
+} from './src/auth/registration-profile'
+import { buildMobileLegalConsentMetadata } from './src/auth/legal-consent'
+import {
   MOBILE_WORKBENCH_SURFACES,
   type MobileWorkbenchSurfaceId,
 } from './src/constants/surfaces'
@@ -121,6 +130,7 @@ type MobileTaskRoute =
   | 'practice_home'
   | 'practice_materials'
   | 'practice_readings'
+  | 'practice_reading_detail'
   | 'assessment'
   | 'collection'
 
@@ -503,7 +513,7 @@ export default function App() {
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       <View style={styles.appShell}>
         <AppHeader
-          email={auth.user?.email ?? auth.user?.phone ?? 'VoxFlame 用户'}
+          email={workspace.snapshot?.registration_profile?.full_name?.trim() || auth.user?.email || auth.user?.phone || '用户'}
           status={workspace.status === 'ready' ? '资料已同步' : '正在准备'}
         />
 
@@ -596,8 +606,15 @@ export default function App() {
                   setCollectionEntrySource('catalog')
                   setSelectedPreparedExpression(null)
                   void trainingCatalog.selectReadingArticle(articleId)
-                  setTaskRoute('collection')
+                  setTaskRoute('practice_reading_detail')
                 }}
+              />
+            ) : taskRoute === 'practice_reading_detail' ? (
+              <PracticeReadingArticleScreen
+                article={trainingCatalog.selectedReadingArticle}
+                loading={trainingCatalog.status === 'loading'}
+                onBack={() => setTaskRoute('practice_readings')}
+                onStart={() => setTaskRoute('collection')}
               />
             ) : (
               <PracticeScreen
@@ -675,6 +692,19 @@ function LoginScreen({
   const [email, setEmail] = useState(auth.lastEmail)
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')
+  const [province, setProvince] = useState('')
+  const [city, setCity] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [disabilityCategory, setDisabilityCategory] = useState('')
+  const [etiology, setEtiology] = useState('')
+  const [hasDialect, setHasDialect] = useState<boolean | null>(null)
+  const [dialectName, setDialectName] = useState('')
+  const [identityDocumentType, setIdentityDocumentType] = useState<MobileIdentityDocumentType>('disability_certificate')
+  const [identityDocumentNumber, setIdentityDocumentNumber] = useState('')
+  const [privacyAccepted, setPrivacyAccepted] = useState(false)
+  const [sensitiveDataAccepted, setSensitiveDataAccepted] = useState(false)
+  const [dataCollectionAccepted, setDataCollectionAccepted] = useState(false)
+  const [commercialUseAccepted, setCommercialUseAccepted] = useState(false)
   const [otp, setOtp] = useState('')
   const [phoneCodeSent, setPhoneCodeSent] = useState(false)
   const [resendSeconds, setResendSeconds] = useState(0)
@@ -711,10 +741,35 @@ function LoginScreen({
       return
     }
 
+    if (authMode === 'register') {
+      const profile: MobileRegistrationProfileInput = {
+        province, city, fullName, phone: normalizedPhone, disabilityCategory, etiology,
+        hasDialect, dialectName, identityDocumentType, identityDocumentNumber,
+      }
+      const profileError = validateMobileRegistrationProfile(profile)
+      if (profileError) {
+        setLocalError(profileError)
+        return
+      }
+      if (!privacyAccepted || !sensitiveDataAccepted || !dataCollectionAccepted || !commercialUseAccepted) {
+        setLocalError('请先确认四项授权后再注册。')
+        return
+      }
+    }
     setLocalError(null)
+    const metadata = authMode === 'register'
+      ? {
+          ...buildMobileRegistrationProfileMetadata({
+            province, city, fullName, phone: normalizedPhone, disabilityCategory, etiology,
+            hasDialect, dialectName, identityDocumentType, identityDocumentNumber,
+          }),
+          ...buildMobileLegalConsentMetadata(),
+        }
+      : undefined
     const requested = await auth.requestPhoneLoginCode(
       normalizedPhone,
       shouldCreatePhoneUser(authMode),
+      metadata,
     )
     if (requested) {
       setPhoneCodeSent(true)
@@ -736,7 +791,18 @@ function LoginScreen({
     }
 
     setLocalError(null)
-    await auth.verifyPhoneLoginCode({ phone: normalizedPhone, otp })
+    await auth.verifyPhoneLoginCode({
+      phone: normalizedPhone,
+      otp,
+      consent: authMode === 'login'
+        ? privacyAccepted && sensitiveDataAccepted && dataCollectionAccepted && commercialUseAccepted
+        : false,
+    })
+  }
+
+  const registrationProfile: MobileRegistrationProfileInput = {
+    province, city, fullName, phone, disabilityCategory, etiology,
+    hasDialect, dialectName, identityDocumentType, identityDocumentNumber,
   }
 
   return (
@@ -789,7 +855,7 @@ function LoginScreen({
             </View>
           ) : null}
 
-          {authMode === 'login' && loginMethod === 'email' ? (
+          {loginMethod === 'email' ? (
             <>
               <Text style={styles.fieldLabel}>邮箱</Text>
               <TextInput
@@ -880,6 +946,47 @@ function LoginScreen({
               )}
             </>
           )}
+          {authMode === 'register' ? (
+            <View style={styles.registrationFields}>
+              <Text style={styles.registrationStepActive}>2 填写账户资料</Text>
+              <Text style={styles.mutedText}>注册一次，之后直接进入任务。方言资料可跳过。</Text>
+              {([
+                ['省份', province, setProvince, '例如：广东省'],
+                ['城市', city, setCity, '例如：广州市'],
+                ['姓名', fullName, setFullName, '请输入真实姓名'],
+              ] as const).map(([label, value, setter, placeholder]) => (
+                <View key={label} style={styles.registrationField}>
+                  <Text style={styles.fieldLabel}>{label}</Text>
+                  <TextInput accessibilityLabel={label} editable={!isBusy && !phoneCodeSent} onChangeText={setter} placeholder={placeholder} placeholderTextColor={COLORS.subtle} style={styles.input} value={value} />
+                </View>
+              ))}
+              <Text style={styles.fieldLabel}>残疾类别</Text>
+              <View style={styles.chipWrap}>{MOBILE_DISABILITY_CATEGORY_OPTIONS.map((item) => <Pressable key={item} onPress={() => setDisabilityCategory(item)} style={[styles.filterChip, disabilityCategory === item ? styles.filterChipActive : null]}><Text style={styles.filterChipText}>{item}</Text></Pressable>)}</View>
+              <Text style={styles.fieldLabel}>病种</Text>
+              <View style={styles.chipWrap}>{MOBILE_ETIOLOGY_OPTIONS.map(([value, label]) => <Pressable key={value} onPress={() => setEtiology(value)} style={[styles.filterChip, etiology === value ? styles.filterChipActive : null]}><Text style={styles.filterChipText}>{label}</Text></Pressable>)}</View>
+              <Text style={styles.fieldLabel}>是否使用方言（可跳过）</Text>
+              <View style={styles.chipWrap}>{([['yes', '有方言'], ['no', '没有方言'], ['skip', '暂不填写']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { const next = value === 'skip' ? null : value === 'yes'; setHasDialect(next); if (!next) setDialectName('') }} style={[styles.filterChip, ((hasDialect === true && value === 'yes') || (hasDialect === false && value === 'no') || (hasDialect === null && value === 'skip')) ? styles.filterChipActive : null]}><Text style={styles.filterChipText}>{label}</Text></Pressable>)}</View>
+              {hasDialect ? <><Text style={styles.fieldLabel}>方言名称</Text><TextInput accessibilityLabel="方言名称" editable={!isBusy && !phoneCodeSent} onChangeText={setDialectName} placeholder="例如：粤语、四川话" placeholderTextColor={COLORS.subtle} style={styles.input} value={dialectName} /></> : null}
+              <Text style={styles.fieldLabel}>证件类型</Text>
+              <View style={styles.chipWrap}>{([['disability_certificate', '残疾证号'], ['id_card', '身份证号']] as const).map(([value, label]) => <Pressable key={value} onPress={() => setIdentityDocumentType(value)} style={[styles.filterChip, identityDocumentType === value ? styles.filterChipActive : null]}><Text style={styles.filterChipText}>{label}</Text></Pressable>)}</View>
+              <TextInput accessibilityLabel="证件号" editable={!isBusy && !phoneCodeSent} onChangeText={setIdentityDocumentNumber} placeholder={identityDocumentType === 'id_card' ? '18 位身份证号' : '请输入残疾证号'} placeholderTextColor={COLORS.subtle} style={styles.input} value={identityDocumentNumber} />
+              <View style={styles.consentStack}>
+                <ConsentToggle label="我已阅读《用户隐私》" checked={privacyAccepted} onPress={() => setPrivacyAccepted((value) => !value)} />
+                <ConsentToggle label="我同意处理语音及健康相关敏感信息" checked={sensitiveDataAccepted} onPress={() => setSensitiveDataAccepted((value) => !value)} />
+                <ConsentToggle label="我已阅读《数据采集说明》" checked={dataCollectionAccepted} onPress={() => setDataCollectionAccepted((value) => !value)} />
+                <ConsentToggle label="我同意将授权数据用于商业用途（模型训练、评测、产品改进和服务运营），不会用于违法用途" checked={commercialUseAccepted} onPress={() => setCommercialUseAccepted((value) => !value)} />
+              </View>
+            </View>
+          ) : null}
+          {authMode === 'login' ? (
+            <View style={styles.consentStack}>
+              <Text style={styles.mutedText}>登录前请确认当前版本的数据授权。已有账号只需确认一次，确认后即可继续进入任务。</Text>
+              <ConsentToggle label="我已阅读《用户隐私》" checked={privacyAccepted} onPress={() => setPrivacyAccepted((value) => !value)} />
+              <ConsentToggle label="我同意处理语音及健康相关敏感信息" checked={sensitiveDataAccepted} onPress={() => setSensitiveDataAccepted((value) => !value)} />
+              <ConsentToggle label="我已阅读《数据采集说明》" checked={dataCollectionAccepted} onPress={() => setDataCollectionAccepted((value) => !value)} />
+              <ConsentToggle label="我同意将授权数据用于商业用途（模型训练、评测、产品改进和服务运营），不会用于违法用途" checked={commercialUseAccepted} onPress={() => setCommercialUseAccepted((value) => !value)} />
+            </View>
+          ) : null}
           {localError || friendlyError(auth.errorMessage) ? (
             <InlineMessage tone="danger" text={localError ?? friendlyError(auth.errorMessage) ?? ''} />
           ) : null}
@@ -894,10 +1001,21 @@ function LoginScreen({
                 ? phoneCodeSent
                   ? authMode === 'register' ? '验证并注册' : '验证并登录'
                   : '发送验证码'
-                : '邮箱登录'}
+                : authMode === 'register' ? '提交注册' : '邮箱登录'}
             onPress={() => {
               if (loginMethod === 'email') {
-                void auth.signInWithPassword({ email, password })
+                if (authMode === 'register') {
+                  const profileError = validateMobileRegistrationProfile(registrationProfile)
+                  if (profileError) { setLocalError(profileError); return }
+                  if (!privacyAccepted || !sensitiveDataAccepted || !dataCollectionAccepted || !commercialUseAccepted) { setLocalError('请先确认四项授权后再注册。'); return }
+                  void auth.signUpWithPassword({ email, password, metadata: { ...buildMobileRegistrationProfileMetadata(registrationProfile), ...buildMobileLegalConsentMetadata() } })
+                } else {
+                  if (!privacyAccepted || !sensitiveDataAccepted || !dataCollectionAccepted || !commercialUseAccepted) {
+                    setLocalError('请先确认四项授权后再登录。')
+                    return
+                  }
+                  void auth.signInWithPassword({ email, password, consent: true })
+                }
                 return
               }
               void (phoneCodeSent ? verifyPhoneCode() : requestPhoneCode())
@@ -1475,14 +1593,16 @@ function PracticeMaterialAreasScreen({
             <Text style={styles.categoryCount}>{category.count} 句　›</Text>
           </Pressable>
         ))}
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOpenReadings}
-          style={({ pressed }) => [styles.practiceTopicRow, pressed ? styles.pressed : null]}
-        >
-          <Text style={styles.categoryTitle}>完整文章</Text>
-          <Text style={styles.categoryCount}>{catalog.readingArticles.length || 60} 篇　›</Text>
-        </Pressable>
+        {catalog.readingArticles.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onOpenReadings}
+            style={({ pressed }) => [styles.practiceTopicRow, pressed ? styles.pressed : null]}
+          >
+            <Text style={styles.categoryTitle}>完整文章</Text>
+            <Text style={styles.categoryCount}>{catalog.readingArticles.length} 篇　›</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   )
@@ -1504,6 +1624,9 @@ function PracticeReadingArticlesScreen({
       <SecondaryButton compact label="返回" onPress={onBack} />
       <Text style={styles.pageTitle}>完整文章</Text>
       {loading ? <ActivityIndicator color={COLORS.accent} /> : null}
+      {!loading && articles.length === 0 ? (
+        <InlineMessage tone="danger" text="暂无通过完整正文、底本与权利核验的文章。" />
+      ) : null}
       <View style={styles.practiceTopicList}>
         {articles.map((article) => (
           <Pressable
@@ -1513,10 +1636,44 @@ function PracticeReadingArticlesScreen({
             style={({ pressed }) => [styles.practiceTopicRow, pressed ? styles.pressed : null]}
           >
             <Text style={styles.categoryTitle}>{article.title}</Text>
-            <Text style={styles.categoryCount}>{article.segmentCount} 段　›</Text>
+            <Text style={styles.categoryCount}>{article.segmentCount} 句　›</Text>
           </Pressable>
         ))}
       </View>
+    </View>
+  )
+}
+
+function PracticeReadingArticleScreen({
+  article,
+  loading,
+  onBack,
+  onStart,
+}: {
+  article: ReturnType<typeof useMobileTrainingCatalog>['selectedReadingArticle']
+  loading: boolean
+  onBack(): void
+  onStart(): void
+}) {
+  return (
+    <View style={styles.screen}>
+      <SecondaryButton compact label="返回文章列表" onPress={onBack} />
+      {loading ? <ActivityIndicator color={COLORS.accent} /> : null}
+      {!loading && !article ? (
+        <InlineMessage tone="danger" text="这篇文章没有通过全文核验，已从目录移除。" />
+      ) : null}
+      {article ? (
+        <>
+          <Text style={styles.pageTitle}>{article.title}</Text>
+          <Text style={styles.pageCopy}>{article.author} · {article.summary}</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>完整原文</Text>
+            <Text style={styles.readingFullText}>{article.fullText}</Text>
+          </View>
+          <Text style={styles.mutedText}>底本：{article.sourceLabel} · 共 {article.segmentCount} 个录音句</Text>
+          <PrimaryButton label="通读完成，开始逐句录音" onPress={onStart} />
+        </>
+      ) : null}
     </View>
   )
 }
@@ -1714,7 +1871,7 @@ function PracticeScreen({
         training_flow: flow,
         collection_source: usesPreparedMaterial ? 'prepared_material' : 'catalog',
         collection_plan_id: flow === 'collection' ? collectionPlanId : undefined,
-        reading_material_kind: catalog.selectedReadingArticle ? 'voxflame_original' : undefined,
+        reading_material_kind: catalog.selectedReadingArticle ? 'public_domain_classic' : undefined,
         reading_article_id: catalog.selectedReadingArticle?.id,
         reading_article_version: catalog.selectedReadingArticle?.version,
         reading_segment_id: catalog.selectedReadingArticle ? effectiveExercise.id : undefined,
@@ -2667,7 +2824,7 @@ function AccountScreen({
         <Text style={styles.pageCopy}>只保留开始沟通前真正需要确认的状态。</Text>
       </View>
 
-      <View style={styles.profileCard}>
+          <View style={styles.profileCard}>
         <View style={styles.avatar}><Text style={styles.avatarText}>V</Text></View>
         <View style={styles.profileCopy}>
           <Text style={styles.profileEmail}>
@@ -2899,6 +3056,15 @@ function SectionHeader({ title, aside }: { title: string; aside?: string }) {
   )
 }
 
+function ConsentToggle({ label, checked, onPress }: { label: string; checked: boolean; onPress(): void }) {
+  return (
+    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={onPress} style={styles.consentRow}>
+      <Text style={styles.consentCheck}>{checked ? '✓' : '○'}</Text>
+      <Text style={styles.consentLabel}>{label}</Text>
+    </Pressable>
+  )
+}
+
 function InlineMessage({ text, tone }: { text: string; tone: 'danger' | 'success' }) {
   return (
     <View style={[
@@ -3002,6 +3168,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
   },
+  readingFullText: { color: COLORS.ink, fontSize: 16, lineHeight: 28, marginTop: 12 },
   modeCard: {
     borderRadius: 22,
     borderWidth: 1,
@@ -3471,6 +3638,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  registrationFields: { gap: 10, marginTop: 8 },
+  registrationField: { gap: 6 },
+  registrationStepActive: { color: COLORS.accent, fontSize: 13, fontWeight: '800' },
+  consentStack: { borderTopColor: COLORS.border, borderTopWidth: 1, gap: 10, marginTop: 4, paddingTop: 12 },
+  consentRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 8, minHeight: 38 },
+  consentCheck: { color: COLORS.accent, fontSize: 18, fontWeight: '800', lineHeight: 22 },
+  consentLabel: { color: COLORS.muted, flex: 1, fontSize: 12, lineHeight: 19 },
   otpInput: { fontSize: 20, letterSpacing: 8, textAlign: 'center' },
   phoneCodeActions: { flexDirection: 'row', justifyContent: 'space-between' },
   textAction: { alignItems: 'center', justifyContent: 'center', minHeight: 40, paddingHorizontal: 4 },

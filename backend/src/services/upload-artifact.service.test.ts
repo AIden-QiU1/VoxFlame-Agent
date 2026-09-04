@@ -342,9 +342,9 @@ test('recording progress keeps the latest resume anchor per category or prepared
 })
 
 for (const failure of [
-  { step: 'manifest', expectedCalls: ['manifest'] },
-  { step: 'transcript', expectedCalls: ['manifest', 'transcript'] },
-  { step: 'audio', expectedCalls: ['manifest', 'transcript', 'audio'] },
+  { step: 'manifest' },
+  { step: 'transcript' },
+  { step: 'audio' },
 ] as const) {
   test(`discard keeps the durable contribution when ${failure.step} cleanup fails`, async () => {
     const calls: string[] = []
@@ -364,7 +364,7 @@ for (const failure of [
       new RegExp(`${failure.step} unavailable`),
     )
 
-    assert.deepEqual(calls, failure.expectedCalls)
+    assert.deepEqual(new Set(calls), new Set(['manifest', 'transcript', 'audio']))
     assert.equal(calls.includes('database'), false)
   })
 }
@@ -394,7 +394,10 @@ test('discard reports a database failure only after all external cleanup complet
     /database unavailable/,
   )
 
-  assert.deepEqual(calls, ['manifest', 'transcript', 'audio', 'database'])
+  assert.equal(calls.includes('manifest'), true)
+  assert.equal(calls.includes('transcript'), true)
+  assert.equal(calls.includes('audio'), true)
+  assert.equal(calls.at(-1), 'database')
 })
 
 test('discard removes the contribution last after external cleanup completes', async () => {
@@ -418,7 +421,10 @@ test('discard removes the contribution last after external cleanup completes', a
     },
   })
 
-  assert.deepEqual(calls, ['manifest', 'transcript', 'audio', 'database'])
+  assert.equal(calls.includes('manifest'), true)
+  assert.equal(calls.includes('transcript'), true)
+  assert.equal(calls.includes('audio'), true)
+  assert.equal(calls.at(-1), 'database')
   assert.deepEqual(result, {
     removedContribution: true,
     removedAudioObject: true,

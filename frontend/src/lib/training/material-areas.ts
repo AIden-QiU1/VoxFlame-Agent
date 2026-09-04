@@ -38,11 +38,11 @@ export const TRAINING_MATERIAL_AREAS: readonly TrainingMaterialArea[] = [
       countUnit: '句' as const,
       href: getTrainingTopicHref(getTrainingTopicIdForCategory(category)),
     })),
-  {
+  ...(MANDARIN_READING_ARTICLES.length > 0 ? [{
     id: 'complete-reading',
     title: '完整文章',
     count: MANDARIN_READING_ARTICLES.length,
-    countUnit: '篇',
+    countUnit: '篇' as const,
     href: '/contribute/readings',
-  },
+  }] : []),
 ]

@@ -1,5 +1,24 @@
 # 当前任务状态
 
+## 2026-09-03 Frontend 长文题库类型检查收口
+
+- `frontend/src/lib/corpus/reading-articles.ts` 当前按数据治理门禁保持空库：原 60 条只有提纲/概况，未核验完整正文、底本和权利状态前不进入运行时题库。
+- 更新长文切分测试以匹配自然停顿规则；阅读进度测试改用独立最小夹具，不再直接索引空的生产文章数组；材料区测试明确空库时隐藏“完整文章”入口。
+- 验证通过：`cd frontend && npx tsc --noEmit`、`npm test`（128/128）、`npm run build`（25/25 页面）。
+
+## 2026-09-03 注册画像与方言配对研究
+
+- 已完成 RO-015 研究报告、证据包、成果审查、反馈登记和应用回流。结论：方言登记可选；自报名称保留原文并可选映射 BCP 47/项目代码；普通话/方言按同一语义题面用 `utterance_pair_id` 关联；方言录音可跳过；ASR 只作诊断；speaker-disjoint 按 contributor。
+- 已修复前后端训练元数据白名单丢弃方言字段的问题，并为样本补充用户自报来源标记。
+- 未完成：`TrainingRecorderPage` 方言状态机（普通话确认后选择“方言/跳过”）、配对重录/撤回/刷新恢复测试、migration dry-run、敏感字段访问审计、真实设备验证。保持 `RO-015=evidence_review` / `RF-015=validate`，不得宣称模型收益或默认强制双录。
+
+### 真实注册验证（第 2 项）
+
+- Web 本地生产构建 `npm run build` 通过；Playwright 真实注册页面提交合成测试资料（非真实身份证/病种）和四项授权后，于 `2026-09-03T10:49:17Z` 自动确认邮箱并跳转 `/contribute`，符合“注册后直接开始任务”。
+- 生产 Supabase 核对账号 `voxflame.e2e.20260903@example.com`：`user_profiles` 已写入姓名、手机号、广东省/广州市、言语残疾、`etiology=unknown`、`has_dialect=true`、`dialect_name=粤语`、测试证件号；`user_metadata.legal_consent.version=2026-09-03` 且四项均为 `true`；证件类型和证件号均未进入 Auth metadata。
+- Mobile TypeScript 与 Android/iOS Expo production-config bundle 均通过（`npm run typecheck`、`npm run export:all`）。主机无 `adb`、iOS 工具链或实体设备，且 App 注册需真实短信 OTP；App 真实注册/授权交互保持 pending，不以静态导出替代真机证据。
+- 2026-09-03 修复“退回登录页没有授权”：Web 登录页之前在登录模式隐藏授权并直接放行，导致旧账号无法补当前版本授权；现在 Web/App 登录页均显示四项授权，确认后写回 `legal_consent.version=2026-09-03` 再进入任务。Mobile 邮箱登录及短信登录均支持登录后同步授权；Frontend 128 项测试、TypeScript 与生产构建通过，Mobile typecheck/check 通过。
+
 > 最后更新: 2026-09-01
 
 ## 2026-09-01 Mobile 录音确认与训练页长滚动问题
@@ -62,7 +81,7 @@
 
 - 当前生产主机实测为 4 vCPU、约 7.3 GiB RAM、根盘 59 GiB（可用约 21 GiB，使用率约 65%）；五个运行容器合计内存约 0.6 GiB，当前没有立即扩容证据。
 - 低风险生产压测：`/api/rtc/health` 在 30 并发/300 请求下 296 次 200、4 次客户端连接失败，成功请求平均约 0.287 秒、最大约 1.51 秒；容器无 OOM/restart/5xx 迹象。该结果只代表 HTTP 网关，不代表 1000 路同时 RTC/ASR。
-- `docker system df` 显示 build cache 约 4.03 GiB、可回收镜像约 1.95 GiB；现有清理脚本此前只有人工入口。已增加 `auto` 模式和 `voxflame-docker-disk-maintenance.timer`，每日检查根盘，默认 75% 才执行 `prune-safe`；`prune-safe` 现在清理全部 dangling images、7 天前停止容器、未使用网络和全部未使用 Build Cache，保留运行镜像、卷、`latest` 与 `pre-*` 回滚镜像。
+- `docker system df` 显示 build cache 约 4.03 GiB、可回收镜像约 1.95 GiB；现已增加 `auto` 模式和 `voxflame-docker-disk-maintenance.timer`，每日检查根盘，50% 告警、默认 60% 执行 `prune-safe`；`prune-safe` 清理全部 dangling images、7 天前停止容器、未使用网络和全部未使用 Build Cache，保留运行镜像、卷、`latest` 与 `pre-*` 回滚镜像。2026-09-03 在根盘约 74% 时实际触发并回收约 2.018GB；systemd Docker CLI 配置目录已修复，服务验证为 `0/SUCCESS`。
 - 宿主机 `logs/backend.log` 约 3.7 MiB，原先不受 Docker json-file 轮转约束；已加入 `/etc/logrotate.d/voxflame-host-logs`，每日轮转并保留 14 份压缩副本，JSONL 诊断/业务数据不自动删除。
 
 ## 2026-08-28 长时录音账号每句保存后卡“正在准备训练页”根因修复
@@ -95,16 +114,18 @@
 - 验证通过：Frontend 104 项测试、TypeScript 与 production build；Backend build、RTC orchestration、upload metadata 4 项、SMS auth；Compose/Caddy 校验、AI docs、`git diff --check`。Playwright 匿名首页初始与 4 秒后认证显示稳定，保护页精确跳转 `/login?next=...`，console 0 error/0 warning；无可安全复用的已登录浏览器 session 和麦克风设备，因此真实账号浏览器录音仍保留为设备 smoke。
 - 剩余迁移债务：远端存在、本地缺 SQL 的 `20260228000002`—`20260228000006`。必须先重建 SQL 并核对实际数据库状态，禁止用虚假 `migration repair` 或强推掩盖历史漂移。
 
-## 2026-08-28 普通话长文朗读材料区与账户级全局进度
+## 2026-09-03 普通话完整文章材料替换与自然停顿分句
 
-- 录音首页已按低认知收成两张主卡：“用自己的材料 / 选择已有材料”；已有材料进入独立第二层，Web 桌面为 3 列、手机与 App 为单列可见列表，不使用下拉。第二层共有 9 区：8 个原题库（其中现代文章题库改称“短句朗读”）+“完整文章 60 篇”。Web 已以 frontend 最小重建部署并健康。
-- `/api/training/catalog` 已扩展返回 `readingArticles` 和 `readingArticleId` 定向片段；生产实测返回 60 篇，`reading-001` 返回版本 `2.0.0` 的 35 个片段。Mobile 已新增 `practice_materials / practice_readings` 两层页面和文章 lineage 上传 metadata，typecheck/check/training tests 及 Android/iOS bundle 均通过；仍需新 App 构建发布，旧安装包不会自动获得本次 UI。
-- 新增 `/contribute/readings`、文章详情和文章逐段录音路由，首批包含 60 篇燃言原创现代汉语材料；每篇保留完整原文，由代码按自然标点切成通常几十个 6–16 字片段，代码校验全文长度、片段覆盖、篇数、ID、标题、长度、版本与 SHA-256。材料明确不是 PSC 官方作品，未抓取或冒充未授权题库。
+- 原 60 条所谓“完整文章”实际由概况、八段提纲和重复模板扩写而成，固定出现约 35 个片段，不是真实全文；现已全部从运行时删除，旧 `reading-001` 等 ID 不再可用。
+- 现役目录包含 81 篇鲁迅完整作品，正文取自北京鲁迅博物馆鲁迅著作全文库，并与 GitHub 固定 commit `b859e5043211b9ead7417ba3f5776e81eaf9213c` 的第二底本互校；保存作者、刊载信息、来源 URL、访问日期、原页 SHA-256、公版依据、镜像版本、互校覆盖率和正文 SHA-256。26 篇因缺少对应底本、乱码、过短、疑似残缺或互校覆盖不足被拒绝，不以降低门槛换数量。
+- 81 篇正文共 219991 个汉字，生成 29415 个录音单元。切分依据是逗号、分号、冒号、顿号、句末标点、换行、省略号和破折号等自然停顿，不要求等到句号；16 个汉字是录音单元的优选目标，不是文章原句长度限制。28574 个单元（97.14%）不超过 16 字，841 个（2.86%）因原文没有更细自然停顿而原样保留，绝不硬切或改写全文。
+- `/api/training/catalog` 列表只返回 81 篇摘要；传入有效 `readingArticleId` 时返回该篇完整原文、来源元数据和全部录音单元。Web 详情和 Mobile 均先展示完整原文，再进入逐句录音；Mobile 上传 lineage 标记为 `public_domain_classic`。本轮尚未部署，旧安装包和生产站点不会自动获得新目录。
+- 验证已完成：重复导入保持 81 篇、26 篇拒绝且生成文件哈希不变；Frontend 130 项、TypeScript、Next 25/25 build；Mobile typecheck/check/training tests、Android/iOS export；本地 API 返回 81 篇并能取回《一件小事》完整正文和 122 个录音单元，旧模板 ID 返回空。Playwright 因本地没有可安全复用登录态，只验证了保护页精确登录跳转与 0 console error/warning；发布后仍需已登录页面和真实设备 smoke。
 - 长文不保存为单个大文件：沿用现役逐句 recorder/upload/offline queue，每段独立 WAV，并通过 `reading_article_id / version / segment_id / index / count / round_id` 保留文章顺序和轮次。正文只保存在版本化材料库，不在每条上传 metadata 重复保存。
 - 新增认证进度接口 `GET /api/upload/progress`：只返回已录 sentence/segment ID、文章轮次 key、今日录音秒数、累计录音秒数和当前文章轮次，不返回正文、转写或音频路径；前端合并 IndexedDB 待同步录音，断网也能即时标记已录并计入时长。
 - 新增账户级 `reading_article_progress` 表与 `POST /api/upload/reading/reset`。整篇完成前已录段不再出现；完成后用户可“重置本篇进度”，只创建下一轮待录清单、不删除历史录音。重置动作当下写云端，所以即使未录新一轮第一句就刷新、退出重登或换设备，新轮次的 0/N 状态仍保持。
 - 用户负担收口：顶部醒目展示“今天已录 / 累计已录”时长，不用句数做每日目标；材料库自动按当前轮次完成度从低到高排序，只给一个推荐继续动作；文章页自动展示已录/待录，无手动排序或勾选。
-- 已部署 migration/backend/frontend/Caddy 并通过生产路由与活跃录音验证。仍需具备真实账号、麦克风和第二设备后完成整篇轮次、跨设备与离线补登的设备 smoke。
+- 账户级文章进度所需的 migration/backend/Caddy 此前已部署并通过生产路由与活跃录音验证；本次 81 篇全文目录、Web 页面和 Mobile 预览尚未部署。仍需发布后用真实账号、麦克风和第二设备完成整篇轮次、跨设备与离线补登的设备 smoke。
 
 ## 2026-08-27 cpu1 频繁掉线根因调查与可靠性加固
 
@@ -327,7 +348,7 @@
    - `.playwright-cli/` 和 `output/playwright/` 已加入 `.gitignore`；浏览器快照、console 记录和临时截图只作为当次验证证据，不再长期进入 Git。重要结论继续写入任务状态和测试回归，而不是依赖易失截图。
    - 已删除仓库中历史跟踪的 Playwright 快照与截图；这些文件仍可从旧 Git commit 恢复。
    - 按 `scripts/docker_disk_maintenance.sh status -> prune-safe` 执行定向清理，回收约 `697.7MB`；根盘从 `72%` 降到 `71%`，剩余约 `17GB`。
-   - 运行容器、卷、`latest` 与 `pre-*` 回滚镜像均保留；未满 7 天的 `3.274GB` build cache 未强制删除。后续按月或磁盘超过 `75%` 时运行同一安全脚本，不使用 `docker system prune -af`。
+   - 运行容器、卷、`latest` 与 `pre-*` 回滚镜像均保留；未满 7 天的 `3.274GB` build cache 未强制删除。后续按月或磁盘达到 `60%` 时运行同一安全脚本，不使用 `docker system prune -af`。
 
 0. 2026-08-13 Web 与 Mobile 的信息架构和响应式交互继续收口
    - Web 首页、沟通页、训练入口按“入口选择 -> 当前工作台 -> 训练回顾 / 沟通档案”分层；功能没有删除，只把低频说明、报告和匿名活动移出首屏主动作区。
@@ -337,6 +358,7 @@
    - Mobile 档案编辑器去掉不必要的 non-null assertion；材料、画像、短句操作行在窄屏自动换行，避免组合按钮挤压。
    - 已验证：Web 71 项测试、`npx tsc --noEmit`、Next production build、Playwright 390x844 / 1440x900 首页截图、未登录 `/contribute` 跳转与 console smoke；Mobile check/typecheck。
    - 当前仍不能宣称 App 100% 替代 Web：必须补 Android/iOS 真机的登录、沟通 RTC、训练 RTC + 原生录音并行、最终转写、上传 / 撤回、TTS / 复制以及档案 CRUD smoke。
+   - 2026-09-03 完成 RO-016 第一轮查表/搜索效率审计：撤回的 manifest/transcript/audio 外部清理改为并行、数据库仍最后删除；workspace 快照复用单次 user profile、memories 改显式列、昨日训练活动加 60 秒缓存；Mobile 训练目录加 30 秒按选择/分页缓存。Backend artifact/OSS 19 项、build，Frontend 128 项，Mobile typecheck/training/memory 均通过。尚缺生产阶段耗时埋点、撤回 P95 与 1k/5k/20k 大历史基准，详情见 [RO-016](../research/product-engineering/RO-016-cross-surface-lookup-efficiency-2026-09-03.md)。
 
 0. 2026-08-13 已纠正 Mobile Workbench“只有登录和页面壳、沟通/训练功能近乎为零”的产品与工程偏差
    - 根因确认：Web 长期承载完整产品逻辑，而 Mobile `0.1.x` 当时明确只是 V1 skeleton；App 虽能建 LiveKit room 和保存本机录音，但没有消费实时文本、confirmed output，也没有正式训练题库、筛查/训练分流和自动收集，因此不能视为 Web 一对一替代
@@ -1034,3 +1056,8 @@
    - `cd backend && ./node_modules/.bin/tsc --noEmit --skipLibCheck --esModuleInterop --module commonjs --target ES2020 --moduleResolution node scripts/download_oss_by_account.ts`
    - `cd backend && ./node_modules/.bin/ts-node scripts/download_oss_by_account.ts --dry-run`
    - `cd backend && ./node_modules/.bin/ts-node scripts/download_oss_by_account.ts`
+# 2026-09-03 注册授权与跨端统一
+
+- Web/App 注册与授权规则统一：四项显式授权、版本 `2026-09-03`、商业用途范围和撤回/删除/导出边界已写入前端契约与 Harness。
+- Web 菜单、录音页和 App 顶部改为优先显示真实姓名，减少邮箱等次级标识。
+- 已完成 TypeScript、前端 126 项测试、AI docs/research harness 校验；未部署，App 仍需真机注册与授权交互验收。

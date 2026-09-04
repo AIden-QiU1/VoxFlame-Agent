@@ -139,18 +139,39 @@ export async function fetchWorkspaceSnapshot(
     return null
   }
 
-  const response = await fetch(buildWorkspaceSnapshotUrl(userId, sceneId), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error(`workspace_snapshot_${response.status}`)
+  const requestKey = `${userId}:${sceneId ?? ''}`
+  const existingRequest = workspaceSnapshotRequests.get(requestKey)
+  if (existingRequest) {
+    return existingRequest
   }
 
-  return await response.json() as WorkspaceMemorySnapshot
+  const request = (async () => {
+    const response = await fetch(buildWorkspaceSnapshotUrl(userId, sceneId), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`workspace_snapshot_${response.status}`)
+    }
+
+    return await response.json() as WorkspaceMemorySnapshot
+  })()
+  workspaceSnapshotRequests.set(requestKey, request)
+  try {
+    return await request
+  } finally {
+    if (workspaceSnapshotRequests.get(requestKey) === request) {
+      workspaceSnapshotRequests.delete(requestKey)
+    }
+  }
 }
+
+const workspaceSnapshotRequests = new Map<
+  string,
+  Promise<WorkspaceMemorySnapshot | null>
+>()
 
 export async function saveWorkspaceSceneTemplates(
   userId: string,

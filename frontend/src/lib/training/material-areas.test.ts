@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { TRAINING_MATERIAL_AREAS } from './material-areas'
 
-test('material library exposes nine visible areas including sixty complete articles', () => {
+test('material library exposes the verified full-text reading collection', () => {
   assert.equal(TRAINING_MATERIAL_AREAS.length, 9)
   assert.deepEqual(
     TRAINING_MATERIAL_AREAS.map((area) => area.title),
@@ -22,7 +22,7 @@ test('material library exposes nine visible areas including sixty complete artic
   assert.deepEqual(TRAINING_MATERIAL_AREAS.at(-1), {
     id: 'complete-reading',
     title: '完整文章',
-    count: 60,
+    count: 81,
     countUnit: '篇',
     href: '/contribute/readings',
   })

@@ -9,7 +9,9 @@ const MANIFEST_EVENT_SCHEMA_VERSION = '1.0'
 const UPLOAD_METADATA_KEYS = new Set([
   // Training labels and target/transcript separation.
   'kind', 'sentence_id', 'target_text', 'spoken_text', 'recognized_text',
-  'prompt_aligned_transcript', 'etiology', 'severity', 'age_band', 'sex',
+  'prompt_aligned_transcript', 'disability_category', 'condition', 'etiology', 'severity', 'age_band', 'sex',
+  'speech_variant', 'dialect_name', 'dialect_name_user_reported', 'dialect_code',
+  'language_tag', 'prompt_language', 'spoken_language', 'label_source', 'utterance_pair_id',
   'consent_scope', 'consent_version', 'collection_plan_id',
   'reading_assistance_used',
   // Retry de-duplication and prompt lineage.
@@ -91,9 +93,22 @@ export async function executeRecoverableDiscard(
   DiscardUploadResult,
   'removedContribution' | 'removedAudioObject' | 'removedManifestEntry' | 'removedTranscriptEntry'
 >> {
-  const removedManifestEntry = await steps.removeManifestEntry()
-  const removedTranscriptEntry = await steps.removeTranscriptEntry()
-  const removedAudioObject = await steps.removeAudioObject()
+  // Independent external cleanups run together; the database stays last so a
+  // failed remote cleanup leaves a durable lookup record for safe retry.
+  const externalCleanup = await Promise.allSettled([
+    steps.removeManifestEntry(),
+    steps.removeTranscriptEntry(),
+    steps.removeAudioObject(),
+  ])
+  const rejected = externalCleanup.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected',
+  )
+  if (rejected) {
+    throw rejected.reason
+  }
+  const [removedManifestEntry, removedTranscriptEntry, removedAudioObject] = externalCleanup.map(
+    (result): boolean => result.status === 'fulfilled' ? result.value : false,
+  )
   const removedContribution = await steps.removeContribution()
 
   return {
@@ -959,17 +974,14 @@ async function removeRecordingFromManifest(
     !isRecordingDiscardEvent(row) &&
     manifestRowMatchesRecording(row, recordingId, audioPath)
   ))
-  if (!existingDiscard) {
-    await ossService.appendTextLog(
-      manifestPath,
-      JSON.stringify(buildRecordingDiscardEvent(recordingId, audioPath)),
-    )
-  }
-  if (activeMatch && content) {
-    await ossService.rewriteTextObject(
-      manifestPath,
-      (current) => removeManifestRecordingLines(current, recordingId, audioPath),
-    )
+  if (!existingDiscard || activeMatch) {
+    const remaining = content
+      ? removeManifestRecordingLines(content, recordingId, audioPath)
+      : ''
+    const nextContent = existingDiscard
+      ? remaining
+      : `${remaining}${JSON.stringify(buildRecordingDiscardEvent(recordingId, audioPath))}\n`
+    await ossService.writeTextObject(manifestPath, nextContent)
   }
   return true
 }
@@ -1350,7 +1362,7 @@ export class UploadArtifactService {
   async discardCompletedUpload(payload: DiscardUploadPayload): Promise<DiscardUploadResult> {
     return await runSerializedArtifactOperation(payload.contributorId, async () => {
     const manifestPath = `dataset/${payload.contributorId}/manifest.jsonl`
-    const existing = await findContributionForDiscard(payload)
+  const existing = await findContributionForDiscard(payload)
     const metadata = existing?.metadata ?? {}
     const receipt = readUploadReceipt(metadata)
     const audioPath =
@@ -1365,6 +1377,7 @@ export class UploadArtifactService {
       (audioPath ? audioPath.split('/').pop()?.replace(/\.[^/.]+$/, '') || null : null)
     const contributionId = existing?.id ?? payload.contributionId ?? null
 
+    const discardStartedAt = Date.now()
     const removed = await executeRecoverableDiscard({
       removeManifestEntry: () => removeRecordingFromManifest(
         manifestPath,
@@ -1390,6 +1403,12 @@ export class UploadArtifactService {
     if (removed.removedContribution) {
       invalidateRecordingProgress(payload.contributorId)
     }
+
+    console.log(
+      `[Upload] Discard timing totalMs=${Date.now() - discardStartedAt} `
+      + `manifest=${removed.removedManifestEntry} transcript=${removed.removedTranscriptEntry} `
+      + `audio=${removed.removedAudioObject} contribution=${removed.removedContribution}`,
+    )
 
     return {
       contributionId,

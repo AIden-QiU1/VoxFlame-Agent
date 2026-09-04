@@ -104,6 +104,16 @@ export interface PreparedExpressionSnapshot {
 }
 
 export interface WorkspaceMemorySnapshot {
+  registration_profile: {
+    full_name?: string
+    province?: string
+    city?: string
+    disability_category?: string
+    condition?: string
+    etiology?: string
+    has_dialect?: boolean
+    dialect_name?: string
+  }
   user_profile_memory: {
     etiology?: string
     severity?: string

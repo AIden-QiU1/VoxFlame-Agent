@@ -62,6 +62,11 @@ export function GET(request: NextRequest) {
       id: readingArticle.id,
       version: readingArticle.version,
       title: readingArticle.title,
+      author: readingArticle.author,
+      summary: readingArticle.summary,
+      fullText: readingArticle.fullText,
+      sourceLabel: readingArticle.source.label,
+      sourceUrl: readingArticle.source.sourceUrl,
       segmentCount: readingArticle.segments.length,
     } : null,
     readingArticles: MANDARIN_READING_ARTICLES.map((article) => ({

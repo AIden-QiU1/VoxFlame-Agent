@@ -22,10 +22,18 @@ export interface MobileReadingArticleSummary {
   segmentCount: number
 }
 
+export interface MobileReadingArticleDetail extends MobileReadingArticleSummary {
+  author: string
+  summary: string
+  fullText: string
+  sourceLabel: string
+  sourceUrl: string
+}
+
 export interface MobileTrainingCatalogResponse {
   categories: MobileTrainingCategory[]
   selectedCategory: string | null
-  selectedReadingArticle: MobileReadingArticleSummary | null
+  selectedReadingArticle: MobileReadingArticleDetail | null
   readingArticles: MobileReadingArticleSummary[]
   total: number
   offset: number
