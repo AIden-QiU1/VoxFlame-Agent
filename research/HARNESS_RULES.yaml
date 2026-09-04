@@ -34,6 +34,10 @@ cross_platform_contracts:
 upload_admission:
   runtime_config: backend/src/config/upload-admission.json
   required_server_checks: [current_legal_consent, contributor_path_ownership, stable_recording_id, object_exists, positive_object_size, extension_content_type_match, target_present, positive_duration]
+training_dataset_export:
+  runtime_config: backend/src/config/training-dataset-export.json
+  required_hard_gates: [current_legal_consent, server_admitted, training_consent_scope, valid_target_and_duration, verified_object_size_type_etag, fully_synced_active_manifest_recording, allowed_quality_state, immutable_versioned_snapshot, speaker_disjoint_split]
+  raw_recording_policy: preserve_and_classify_do_not_delete
 triggers:
   disk:
     warning_percent: 50

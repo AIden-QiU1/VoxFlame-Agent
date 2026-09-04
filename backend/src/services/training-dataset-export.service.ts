@@ -251,7 +251,9 @@ export function evaluateTrainingExportCandidate(
   addReason(
     reasons,
     uploadReceipt.manifest_synced !== true
-      || readString(uploadReceipt, 'recording_id') !== recordingId,
+      || readString(uploadReceipt, 'recording_id') !== recordingId
+      || readString(uploadReceipt, 'audio_path') !== row.audio_path
+      || readString(uploadReceipt, 'manifest_path') !== `dataset/${row.contributor_id}/manifest.jsonl`,
     'upload_artifact_not_fully_synced',
   )
 
@@ -341,4 +343,17 @@ export function assertSpeakerDisjoint(
     }
     assignments.set(sample.contributorId, sample.split)
   }
+}
+
+/** An active manifest sample must match as one recording/path pair, not two unrelated rows. */
+export function activeManifestContainsRecording(
+  rows: JsonRecord[],
+  recordingId: string,
+  audioPath: string,
+): boolean {
+  return rows.some((row) => {
+    const audio = isRecord(row.audio) ? row.audio : {}
+    return readString(row, 'recording_id') === recordingId
+      && readString(audio, 'path') === audioPath
+  })
 }

@@ -37,6 +37,8 @@
 
 用户录音进入云端原始语料层时，Backend 必须以 `research/HARNESS_RULES.yaml` 的 `upload_admission` 为机器事实源执行基础准入：授权从已验证 Auth 用户读取，不能信任请求自报；完成登记前核验对象存在、非空、大小和 Content-Type，并绑定账号路径、稳定 recording ID、非空 target 与正时长。客户端质量字段只用于补充诊断，不能替代服务端对象事实。
 
+原始语料进入模型训练前必须再通过独立导出门。现役入口 `backend/scripts/export_audio_target_dataset.ts` 只接受当前授权有效、服务端已准入、用途包含训练、DB upload receipt 与 OSS 活动 manifest 一致、对象大小/类型/ETag 未变化且质量状态未明确拒绝或要求重录的样本。导出必须创建新目录，先在 staging 完整下载和生成 SHA-256，再原子发布版本化快照；不得覆盖既有快照，也不得用 `limit` 静默截断。split 以 contributor 为 speaker 单位确定性生成，禁止同一 contributor 跨 train/validation/test。质量为 `review` 的构音障碍样本可以保留进入快照，明确 `low_confidence`、`retry` 或 `rejected` 的样本只排除出训练快照，不删除原始录音。
+
 ### 2.1 环境优于提示词
 
 稳定知识应落在仓库环境里，而不是依赖某一轮对话记忆。

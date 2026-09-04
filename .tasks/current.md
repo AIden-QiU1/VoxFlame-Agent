@@ -1,11 +1,18 @@
 # 当前任务状态
 
+## 2026-09-04 训练数据导出硬闸门 Phase 2
+
+- 已把现役 `backend/scripts/export_audio_target_dataset.ts` 从“查询即下载”改为 fail-closed 训练导出：逐条复核当前 Auth 四项授权、服务端 `admitted` 版本、训练用途 scope、target/时长、对象大小/类型/ETag、DB upload receipt 与 OSS 活动 manifest；manifest tombstone、缺失对象、授权失效、明确低置信/重录/拒绝状态均不能进入训练快照，原始录音不删除。
+- 导出产物改为版本化不可变目录：既有目标目录拒绝覆盖；先写 staging，完整成功后原子改名；下载前后复核 manifest 和 OSS 对象，音频写入 SHA-256，并产出 `snapshot.json`、全量/分 split JSONL、拒绝原因台账。`--include-pending` 已禁用，候选超过显式 `--limit` 会整批失败，避免静默截断。
+- split 按 contributor 整体确定性分配到 train/validation/test，并在发布前检查 speaker overlap；快照只暴露稳定哈希 speaker ID。保留 `review` 状态，避免把构音障碍差异误当噪声；明确 `low_confidence`、`retry`、`rejected` 才排除。
+- 本阶段没有执行生产导出、部署、历史 backfill 或数据删除。仍待：DB/manifest 持久化 fail-closed 状态机、历史准入审计/backfill dry-run、服务端音频头核验与上传时内容 SHA-256/重复检测、逐题来源 provenance 回填。
+
 ## 2026-09-04 录音基础准入完善 Phase 1
 
 - 已把训练录音上传从“客户端声明即可登记”收紧为 Backend 可信准入：`/api/upload/sign` 和 `/api/upload/complete` 都必须从已验证 Supabase Auth 用户读取当前四项授权，过期、缺项或没有有效 `accepted_at` 的账号不能签名或完成登记；客户端自报授权版本不能覆盖服务端事实。
 - 新增版本化运行配置 `backend/src/config/upload-admission.json`。签名仅允许配置内的音频扩展名与匹配 Content-Type；完成登记前通过 OSS HEAD 核验对象真实存在、非空、32 MiB 上限、实际 Content-Type、客户端文件大小、稳定 `recording_id` 与对象名、非空 target 和 10 分钟时长上限。新样本写入 `admission_status=admitted`、准入版本、核验时间、OSS ETag 和服务端授权快照。
 - Web 录音门不再用 localStorage 授权替代已认证用户授权，避免授权写回失败后仍开始一批无法上传的录音。Mobile 同步核验 Auth metadata，并补齐 sample rate、声道、时长、文件大小、capture transport、surface、collection mode、授权版本和质量状态元数据；旧本机队列不删除，重新确认授权后仍可补传。
-- 兼容边界：本阶段暂时允许旧本机队列缺少 sample rate/channel 声明，但声明了就必须合法；还没有执行历史数据 backfill、音频内容 SHA-256、音频头解析、逐题来源回填或训练导出 hard gate。Backend 的 DB/manifest 跨存储原子性也仍是下一阶段事项。
+- 兼容边界：本阶段暂时允许旧本机队列缺少 sample rate/channel 声明，但声明了就必须合法；还没有执行历史数据 backfill、上传时音频内容 SHA-256、音频头解析或逐题来源回填。训练导出 hard gate 已由 Phase 2 补齐；Backend 的 DB/manifest 跨存储原子性仍是下一阶段事项。
 - 验证通过：Backend build 与上传/撤回 27 项；Frontend 131 项和 TypeScript；Mobile check、typecheck、training tests；AI docs/research harness、research loop、compose 展开、`git diff --check`。使用最近 100 条生产录音和真实 OSS HEAD 做只读兼容模拟，100/100 通过新准入规则；未部署，仍需发布后用当前授权账号做真实 Web/Mobile 上传 smoke。
 
 ## 2026-09-03 Frontend 长文题库类型检查收口

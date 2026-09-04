@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  activeManifestContainsRecording,
   assignSpeakerDisjointSplits,
   assertSpeakerDisjoint,
   evaluateTrainingExportCandidate,
@@ -43,6 +44,8 @@ const row: TrainingExportContributionRow = {
     admission_verified_at: '2026-09-04T02:00:00.000Z',
     upload_receipt: {
       recording_id: 'recording-1',
+      audio_path: 'dataset/account-a/mobile-workbench/recording-1.m4a',
+      manifest_path: 'dataset/account-a/manifest.jsonl',
       manifest_synced: true,
     },
   },
@@ -62,6 +65,16 @@ test('training export admits only a current, fully verified contribution', () =>
     assert.equal(result.sample.consentScope, 'training_only')
     assert.equal(result.sample.objectEtag, 'etag-1')
   }
+})
+
+test('manifest membership requires the recording id and audio path on the same active row', () => {
+  assert.equal(activeManifestContainsRecording([
+    { recording_id: 'recording-1', audio: { path: 'dataset/account-a/other.m4a' } },
+    { recording_id: 'other', audio: { path: row.audio_path } },
+  ], 'recording-1', row.audio_path), false)
+  assert.equal(activeManifestContainsRecording([
+    { recording_id: 'recording-1', audio: { path: row.audio_path } },
+  ], 'recording-1', row.audio_path), true)
 })
 
 test('training export rejects stale consent, unadmitted rows, changed objects, and unusable quality', () => {
@@ -94,6 +107,25 @@ test('training export rejects stale consent, unadmitted rows, changed objects, a
       'audio_object_size_changed',
       'audio_object_etag_changed',
     ]))
+  }
+})
+
+test('training export accepts a valid consent snapshot after same-version re-consent but requires a complete artifact receipt', () => {
+  const result = evaluateTrainingExportCandidate({
+    ...row,
+    metadata: {
+      ...row.metadata,
+      consent_accepted_at: '2026-09-03T01:00:00.000Z',
+      upload_receipt: {
+        recording_id: 'recording-1',
+        manifest_synced: true,
+      },
+    },
+  }, object, currentUserMetadata)
+
+  assert.equal(result.eligible, false)
+  if (!result.eligible) {
+    assert.deepEqual(result.reasons, ['upload_artifact_not_fully_synced'])
   }
 })
 
