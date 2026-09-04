@@ -55,6 +55,8 @@ class ConfigTests(unittest.TestCase):
             "VOXFLAME_PROVIDER_CAPACITY_DIRECTORY": "/tmp/voxflame-test-capacity",
             "VOXFLAME_PROVIDER_ASR_MAX_CONCURRENCY": "7",
             "VOXFLAME_PROVIDER_ASR_WAIT_TIMEOUT_SECONDS": "0.4",
+            "VOXFLAME_PROVIDER_ASR_FALLBACK_MAX_CONCURRENCY": "8",
+            "VOXFLAME_PROVIDER_ASR_FALLBACK_WAIT_TIMEOUT_SECONDS": "0.6",
             "VOXFLAME_PROVIDER_LLM_MAX_CONCURRENCY": "6",
             "VOXFLAME_PROVIDER_LLM_WAIT_TIMEOUT_SECONDS": "0.3",
             "VOXFLAME_PROVIDER_TTS_MAX_CONCURRENCY": "5",
@@ -117,6 +119,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.provider_capacity_directory, "/tmp/voxflame-test-capacity")
         self.assertEqual(config.provider_asr_max_concurrency, 7)
         self.assertEqual(config.provider_asr_wait_timeout_seconds, 0.4)
+        self.assertEqual(config.provider_asr_fallback_max_concurrency, 8)
+        self.assertEqual(config.provider_asr_fallback_wait_timeout_seconds, 0.6)
         self.assertEqual(config.provider_llm_max_concurrency, 6)
         self.assertEqual(config.provider_llm_wait_timeout_seconds, 0.3)
         self.assertEqual(config.provider_tts_max_concurrency, 5)

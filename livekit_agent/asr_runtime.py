@@ -650,6 +650,7 @@ class LiveKitASRRuntime:
     on_audio_telemetry: AudioTelemetryHandler | None = None
     client: ASRClient | None = None
     capacity_pool: ProcessSlotPool | None = None
+    fallback_capacity_pool: ProcessSlotPool | None = None
     _stream_task: asyncio.Task[None] | None = None
     _started: bool = False
     _audio_frame_count: int = 0
@@ -678,6 +679,28 @@ class LiveKitASRRuntime:
     _asr_source: str = "dashscope_realtime_asr"
     _fallback_final_transcript_pending: bool = False
 
+    def _primary_capacity_pool(self) -> ProcessSlotPool:
+        if self.capacity_pool is None:
+            self.capacity_pool = build_provider_pool(
+                provider="asr",
+                slots=self.config.provider_asr_max_concurrency,
+                wait_timeout_seconds=self.config.provider_asr_wait_timeout_seconds,
+                lock_directory=self.config.provider_capacity_directory,
+            )
+        return self.capacity_pool
+
+    def _realtime_fallback_capacity_pool(self) -> ProcessSlotPool:
+        if self.fallback_capacity_pool is None:
+            self.fallback_capacity_pool = build_provider_pool(
+                provider="asr-fallback",
+                slots=self.config.provider_asr_fallback_max_concurrency,
+                wait_timeout_seconds=(
+                    self.config.provider_asr_fallback_wait_timeout_seconds
+                ),
+                lock_directory=self.config.provider_capacity_directory,
+            )
+        return self.fallback_capacity_pool
+
     async def start(self) -> None:
         if self._stream_task is not None:
             return
@@ -690,13 +713,7 @@ class LiveKitASRRuntime:
             return
 
         if self.client is None:
-            if self.capacity_pool is None:
-                self.capacity_pool = build_provider_pool(
-                    provider="asr",
-                    slots=self.config.provider_asr_max_concurrency,
-                    wait_timeout_seconds=self.config.provider_asr_wait_timeout_seconds,
-                    lock_directory=self.config.provider_capacity_directory,
-                )
+            primary_capacity_pool = self._primary_capacity_pool()
             if use_http_asr:
                 account_id = get_asr_account_id(self.ctx)
                 if account_id is None:
@@ -709,7 +726,7 @@ class LiveKitASRRuntime:
                         api_key=self.config.dashscope_api_key,
                         connect_timeout_seconds=self.config.dashscope_asr_connect_timeout_seconds,
                         event_handler=self._handle_server_event,
-                        capacity_pool=self.capacity_pool,
+                        capacity_pool=self._realtime_fallback_capacity_pool(),
                     )
                 self.client = QwenHttpASRClient(
                     url=self.config.qwen_http_asr_url or "",
@@ -719,7 +736,7 @@ class LiveKitASRRuntime:
                     request_timeout_seconds=self.config.qwen_http_asr_timeout_seconds,
                     event_handler=self._handle_server_event,
                     fallback_client=fallback_client,
-                    capacity_pool=self.capacity_pool,
+                    capacity_pool=primary_capacity_pool,
                 )
                 self._asr_source = "qwen_http_asr"
             else:
@@ -729,7 +746,7 @@ class LiveKitASRRuntime:
                     api_key=self.config.dashscope_api_key or "",
                     connect_timeout_seconds=self.config.dashscope_asr_connect_timeout_seconds,
                     event_handler=self._handle_server_event,
-                    capacity_pool=self.capacity_pool,
+                    capacity_pool=primary_capacity_pool,
                 )
                 self._asr_source = "dashscope_realtime_asr"
 

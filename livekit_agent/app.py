@@ -77,7 +77,7 @@ _sanitize_proxy_env_for_local_livekit()
 # local `/agent` websocket registration to be routed to 127.0.0.1:7897 and fail.
 worker_load_threshold = float(os.getenv("VOXFLAME_AGENT_LOAD_THRESHOLD", "0.7"))
 worker_load_policy = WorkerLoadPolicy(
-    max_active_jobs=int(os.getenv("VOXFLAME_AGENT_MAX_ACTIVE_JOBS", "2")),
+    max_active_jobs=int(os.getenv("VOXFLAME_AGENT_MAX_ACTIVE_JOBS", "8")),
     load_threshold=worker_load_threshold,
     memory_limit_percent=float(os.getenv("VOXFLAME_AGENT_MEMORY_PRESSURE_PERCENT", "85")),
 )

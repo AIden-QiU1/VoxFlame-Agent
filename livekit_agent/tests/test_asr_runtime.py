@@ -415,8 +415,12 @@ class TestASRRuntime(unittest.TestCase):
             async def run() -> None:
                 held_lease = await pool.acquire()
                 try:
-                    with self.assertRaises(ProviderCapacityExceeded):
-                        await client._transcribe(b"\x01\x00" * 160)
+                    with patch.dict(
+                        sys.modules,
+                        {"httpx": SimpleNamespace(AsyncClient=FakeHttpClient)},
+                    ):
+                        with self.assertRaises(ProviderCapacityExceeded):
+                            await client._transcribe(b"\x01\x00" * 160)
                 finally:
                     held_lease.release()
 
@@ -535,6 +539,86 @@ class TestASRRuntime(unittest.TestCase):
         self.assertEqual(fallback.commit_calls, 1)
         self.assertEqual(fallback.appended_audio, [b"\x01\x00" * 160])
         self.assertEqual(events[-1]["type"], "input_audio_buffer.committed")
+
+    def test_http_asr_capacity_exhaustion_can_use_independent_realtime_fallback(self) -> None:
+        events: list[dict[str, object]] = []
+        fallback = FakeFallbackASRClient()
+
+        async def handle_event(payload: dict[str, object]) -> None:
+            events.append(payload)
+
+        with tempfile.TemporaryDirectory() as lock_directory:
+            primary_pool = ProcessSlotPool(
+                provider="asr",
+                slots=1,
+                wait_timeout_seconds=0,
+                lock_directory=lock_directory,
+            )
+            fallback_pool = ProcessSlotPool(
+                provider="asr-fallback",
+                slots=1,
+                wait_timeout_seconds=0,
+                lock_directory=lock_directory,
+            )
+            client = QwenHttpASRClient(
+                url="http://asr.example/transcribe",
+                account_id="2307294809",
+                language="Chinese",
+                sample_rate=16000,
+                request_timeout_seconds=3,
+                event_handler=handle_event,
+                fallback_client=fallback,  # type: ignore[arg-type]
+                capacity_pool=primary_pool,
+            )
+
+            async def run_client() -> None:
+                held_primary = await primary_pool.acquire()
+                try:
+                    await client.start({"sample_rate": 16000})
+                    await client.append_audio(b"\x01\x00" * 160)
+                    with patch.dict(
+                        sys.modules,
+                        {"httpx": SimpleNamespace(AsyncClient=FakeHttpClient)},
+                    ):
+                        await client.commit_audio()
+                    async with fallback_pool.lease():
+                        pass
+                finally:
+                    held_primary.release()
+
+            asyncio.run(run_client())
+
+        self.assertTrue(client.fallback_active)
+        self.assertEqual(fallback.commit_calls, 1)
+        self.assertEqual(fallback.appended_audio, [b"\x01\x00" * 160])
+        self.assertEqual(events[-1]["type"], "input_audio_buffer.committed")
+
+    def test_runtime_builds_distinct_primary_and_realtime_fallback_capacity_pools(self) -> None:
+        config = create_config()
+        config = type(config)(
+            **{
+                **config.__dict__,
+                "provider_capacity_directory": "/tmp/voxflame-test-asr-pools",
+                "provider_asr_max_concurrency": 4,
+                "provider_asr_fallback_max_concurrency": 6,
+            }
+        )
+        runtime = LiveKitASRRuntime(
+            config=config,
+            ctx=type("Ctx", (), {"room_name": "room", "participant_identity": "user"})(),
+            participant=None,
+            publish_payload=None,
+            on_final_transcript=None,
+        )
+
+        primary = runtime._primary_capacity_pool()
+        fallback = runtime._realtime_fallback_capacity_pool()
+
+        self.assertIsNot(primary, fallback)
+        self.assertEqual(primary.provider, "asr")
+        self.assertEqual(primary.slots, 4)
+        self.assertEqual(fallback.provider, "asr-fallback")
+        self.assertEqual(fallback.slots, 6)
 
     def test_livekit_audio_apm_defaults_are_conservative_for_remote_tracks(self) -> None:
         options = build_livekit_audio_apm_options(create_config())

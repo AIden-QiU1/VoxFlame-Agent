@@ -2,10 +2,13 @@
 
 ## 2026-09-04 四项采集需求与阿里云扩容总执行入口
 
-- LiveKit 扩容单机保护已落代码：Worker 父进程以 active jobs、CPU、内存联合准入；当前 2 GiB Agent 容器默认 2 个 active jobs，ASR/LLM/TTS 各 2 个跨 Job 进程共享槽位；Agent 增加健康检查和 30 分钟 drain/stop grace。平台总容量仍必须依靠增加健康 Worker、恢复个性化 ASR 网关和确认 Provider 配额，不能把安全上限当成平台规模。
+- LiveKit 扩容单机保护与 8 路完整链路已落代码并部署：Worker 父进程以 active jobs、CPU、内存联合准入；2 GiB Agent 容器最多 8 active jobs。个性化 HTTP ASR 4 槽，独立 DashScope realtime fallback 4 槽，HTTP ASR 5 秒超时；生产 `qwen-flash` 单项 8/8 后 LLM 提升到 8 槽；TTS 因第 4 路直连会 Provider 限流，保持 3 槽并允许 3 秒短队列。新增完整 RTC 探针，8 房间同时开口与 300ms 错峰均为 `8/8 ASR + 8/8 LLM + 8/8 TTS 音轨`；同时开口时 4 路个性化、4 路 realtime fallback，Agent 峰值约 `175.37% CPU / 762.8 MiB / 2 GiB`。300ms 错峰最终轮 8 路全部命中 EXP-25，停说后 ASR/assistant/TTS 首包 P95 为 `1.2736s / 1.7351s / 1.8709s`。当前已证明 8 路完整会话可完成，但 TTS 首包仍未达到 1.5 秒体验门。部署只替换 `livekit-agent`；容器 healthy、restart 0、OOM false，89 项测试通过，直接回滚镜像为 `voxflame-agent-livekit-agent:pre-llm8-tts3-20260904`。
 - 已按官方源码/文档把 LiveKit Agents 从 `1.5.1` 升到 `1.7.1`、LiveKit Server 从 `1.10.1` 升到 `1.13.6`；Agent 升级覆盖内存统计、连接失败和 drain/指标，Server 升级覆盖 Agent 连接关闭、节点统计、负载和 TURN 配额/安全。Server 跨越 TURN TTL/权限变化，生产替换前必须做 RTC/TURN smoke 并保留 `pre-*` 回滚镜像。
 - 每周一 GitHub workflow 自动对比两个精确版本；发现新稳定版会创建/刷新“LiveKit 稳定版升级待评估”Issue 并让工作流标红。它不自动升级生产。
 - 个性化 ASR 8001 的 SSH 反向隧道已恢复，生产 Backend 签发逻辑、三名真实 Supabase 注册用户、8001 注册表和真实 WAV 推理四层一致：`2187054680/2307294809/3083029019` 分别命中 EXP-29/24/25，随机未注册键命中公共 `exp16l3-lambda025`；8000/18000 均无监听。新增 `npm run audit:asr-models` 作升级硬门。ASR 并发容量和高可用仍需模型服务至少双实例及阶梯压测。
+- 已把现有真实训练房间作为第 1 路，直接新增独立合成房间完成第 2 路生产低风险验证：两个房间各有独立 Agent Job，真实用户 ASR 持续正常，合成房间也完成音频发布、8001 转写和数据回传。两路时 Agent 单点观测 `18.32% CPU / 593.8 MiB / 2 GiB / 64 PIDs`，退出后回落到 `518 MiB / 30 PIDs`；Agent/Server 均 restart 0、OOM false，未见 provider capacity exhausted。该测试未同时压满 LLM/TTS，也未证明 8001 请求严格重叠；当前只能确认 2 路 RTC+Agent+ASR 基线，不能外推第 3 路或 1,000 路。
+- 已用独立临时 Worker 完成 4/8/16 路静默 RTC+Agent 分层测试，未修改或重启生产 Worker：错峰启动 4/4、8/8 成功；16 路目标中 12 路成功，第 13—16 路被 CPU/系统负载准入拒绝。12 路临界观测约 `744.2 MiB / 155.58% CPU / 250 PIDs`，主机仍有约 3.4 GiB available memory且 swap 未增长，说明先触线的是 4 核 CPU/准入而非内存。临时容器已删除，生产仍为原 5 容器且 Agent/Server restart 0、OOM false。
+- GPU1 切换新多账户服务后，已从 CPU1 经真实隧道完成严格 1/4/8/16 ASR 复测：所有请求成功且路由 100% 正确，但 16 路仍未达到实时门槛。EXP-25 5.55 秒音频在 4/8/16 路的 P95 为 `1.650s / 4.010s / 18.089s`；混合账户 16 路 P95 `7.602s`；1 秒音频 8 路 P95 `1.629s`、16 路 `3.446s`；2 秒音频 16 路 `9.779s`。因此当前生产采用 8 Job + 4 个性化 ASR + 4 独立 realtime fallback，而不是把个性化主槽直接设 16。16 路完整会话需要至少第二个 8 路 Agent Worker、GPU P95 优化、TTS Provider 扩额和集中配额；LLM 已有 8 路证据，但不能外推到 16。
 
 - 新增 `docs/VOICE_COLLECTION_FOUR_REQUIREMENTS_EXECUTION_2026-09-04.md`，统一记录方言配对、自动/人工质检、1,000–10,000 用户容量和第二品牌采集站的代码状态、Web/App 同步范围、部署顺序、验收门与回滚点。
 - 阿里云扩容明确按控制面、Backend 多实例硬门、单节点 LiveKit、双 Agent Worker、证据驱动的 LiveKit 集群逐步推进；第一批只建议开通同地域 VPC、两台 4c8g 控制面 ECS、ALB/CLB、ACR 和 SLS，不一次购买完整集群。

@@ -38,18 +38,31 @@ def _try_slot_from_child(lock_directory: str, result_queue: multiprocessing.Queu
 class CapacityTests(unittest.TestCase):
     def test_worker_stops_accepting_jobs_at_active_job_limit(self) -> None:
         policy = WorkerLoadPolicy(
-            max_active_jobs=2,
+            max_active_jobs=8,
             load_threshold=0.7,
             memory_limit_percent=85,
             cpu_percent=lambda: 10,
             memory_percent=lambda: 20,
         )
 
-        load = policy(FakeAgentServer(active_jobs=2))
+        load = policy(FakeAgentServer(active_jobs=8))
 
         self.assertEqual(load, 0.7)
         self.assertIsNotNone(policy.last_snapshot)
-        self.assertEqual(policy.last_snapshot.active_jobs, 2)  # type: ignore[union-attr]
+        self.assertEqual(policy.last_snapshot.active_jobs, 8)  # type: ignore[union-attr]
+
+    def test_worker_accepts_an_eighth_job_when_other_resources_are_healthy(self) -> None:
+        policy = WorkerLoadPolicy(
+            max_active_jobs=8,
+            load_threshold=0.7,
+            memory_limit_percent=85,
+            cpu_percent=lambda: 10,
+            memory_percent=lambda: 20,
+        )
+
+        load = policy(FakeAgentServer(active_jobs=7))
+
+        self.assertLess(load, 0.7)
 
     def test_cpu_or_memory_pressure_can_stop_admission_before_job_limit(self) -> None:
         cpu_policy = WorkerLoadPolicy(
