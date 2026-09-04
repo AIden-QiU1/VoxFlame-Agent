@@ -39,7 +39,10 @@ import {
   type MobileIdentityDocumentType,
   type MobileRegistrationProfileInput,
 } from './src/auth/registration-profile'
-import { buildMobileLegalConsentMetadata } from './src/auth/legal-consent'
+import {
+  buildMobileLegalConsentMetadata,
+  hasCurrentMobileLegalConsent,
+} from './src/auth/legal-consent'
 import {
   MOBILE_WORKBENCH_SURFACES,
   type MobileWorkbenchSurfaceId,
@@ -619,6 +622,7 @@ export default function App() {
             ) : (
               <PracticeScreen
               authUserId={auth.user?.id ?? null}
+              hasCurrentLegalConsent={hasCurrentMobileLegalConsent(auth.user?.user_metadata)}
               onPracticeTextChange={setPracticeText}
               practiceText={practiceText}
               preparedExpression={selectedPreparedExpression ?? workspace.snapshot?.prepared_expression ?? null}
@@ -1680,6 +1684,7 @@ function PracticeReadingArticleScreen({
 
 function PracticeScreen({
   authUserId,
+  hasCurrentLegalConsent,
   catalog,
   ensureTrainingConnection,
   onPracticeTextChange,
@@ -1695,6 +1700,7 @@ function PracticeScreen({
   onBack,
 }: {
   authUserId: string | null
+  hasCurrentLegalConsent: boolean
   catalog: ReturnType<typeof useMobileTrainingCatalog>
   ensureTrainingConnection(): Promise<boolean>
   onPracticeTextChange(value: string): void
@@ -1763,7 +1769,7 @@ function PracticeScreen({
   const collectionControlState = getMobileCollectionControlState({
     environmentReady,
     distanceReady,
-    understandsConsent: consentReady,
+    understandsConsent: consentReady && hasCurrentLegalConsent,
   }, flow === 'assessment' ? '开始说这个词' : '开始说这句话')
   const attemptLocked = pendingAttempt !== null || attemptAction !== 'idle'
   const selectionScopeKey = usesPreparedMaterial
@@ -2083,7 +2089,7 @@ function PracticeScreen({
                 </View>
                 <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consentReady }} onPress={() => setConsentReady((value) => !value)} style={[styles.preflightCheck, consentReady ? styles.preflightCheckActive : null]}>
                   <Text style={styles.checkMark}>{consentReady ? '✓' : '○'}</Text>
-                  <Text style={styles.preflightCheckText}>{flow === 'assessment' ? '我同意本次录音用于筛查支持和系统改进' : '我同意本次录音用于训练'}</Text>
+                  <Text style={styles.preflightCheckText}>{hasCurrentLegalConsent ? (flow === 'assessment' ? '我同意本次录音用于筛查支持和系统改进' : '我同意本次录音用于训练') : '当前账号需要重新登录并确认数据授权'}</Text>
                 </Pressable>
               </View>
               <Text accessibilityLiveRegion="polite" style={styles.preflightStatus}>

@@ -8,6 +8,7 @@ import type {
   MobileAuthTokenProvider,
   MobileWorkbenchClientOptions,
 } from './mobile-workbench-client'
+import { MOBILE_LEGAL_CONSENT_VERSION } from '../auth/legal-consent'
 
 interface UploadSignResponse {
   url: string
@@ -153,6 +154,16 @@ function buildUploadMetadata(
     sentence_id: item.sentenceId,
     target_text: item.text,
     audio_format: contentType,
+    sample_rate: item.recording.audio.sampleRate,
+    channel_count: item.recording.audio.channelCount,
+    duration_ms: item.recording.audio.durationMs,
+    file_size_bytes: item.recording.audio.fileSizeBytes,
+    capture_transport: item.recording.audio.captureTransport,
+    source_surface: item.recording.sourceSurface,
+    collection_mode: item.recording.collectionMode,
+    consent_version: MOBILE_LEGAL_CONSENT_VERSION,
+    audio_quality_disposition: item.recording.audio.quality?.disposition,
+    audio_quality_reasons: item.recording.audio.quality?.reasons,
     spoken_text: item.recognizedText ?? '',
   }
 }

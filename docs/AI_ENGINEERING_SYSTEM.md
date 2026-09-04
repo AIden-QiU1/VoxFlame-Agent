@@ -35,6 +35,8 @@
 
 普通话录音语料的候选筛选、覆盖统计和质量状态遵循 [`research/speech-health/MANDARIN_RECORDING_CORPUS_EVIDENCE_GATE.md`](../research/speech-health/MANDARIN_RECORDING_CORPUS_EVIDENCE_GATE.md)。其中来源、整词/整句读音、文本污染、长度/重复和目标映射是可复现硬规则；没有量表和一致性证据的自然度/产品判断不得成为录音前置硬门。
 
+用户录音进入云端原始语料层时，Backend 必须以 `research/HARNESS_RULES.yaml` 的 `upload_admission` 为机器事实源执行基础准入：授权从已验证 Auth 用户读取，不能信任请求自报；完成登记前核验对象存在、非空、大小和 Content-Type，并绑定账号路径、稳定 recording ID、非空 target 与正时长。客户端质量字段只用于补充诊断，不能替代服务端对象事实。
+
 ### 2.1 环境优于提示词
 
 稳定知识应落在仓库环境里，而不是依赖某一轮对话记忆。

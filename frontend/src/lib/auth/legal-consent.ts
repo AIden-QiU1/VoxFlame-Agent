@@ -109,24 +109,12 @@ export function readUserLegalConsent(user: User | null | undefined): LegalConsen
 
 export function hasRequiredLegalConsent(user: User | null | undefined): boolean {
   const userConsent = readUserLegalConsent(user)
-  if (
+  return Boolean(
     userConsent?.version === LEGAL_CONSENT_VERSION
     &&
     userConsent?.privacyAccepted
     && userConsent.sensitiveDataAccepted
     && userConsent.dataCollectionAccepted
-    && userConsent.commercialUseAccepted
-  ) {
-    return true
-  }
-
-  const localConsent = readLocalLegalConsent()
-  return Boolean(
-    localConsent?.version === LEGAL_CONSENT_VERSION
-    &&
-    localConsent?.privacyAccepted
-    && localConsent.sensitiveDataAccepted
-    && localConsent.dataCollectionAccepted
-    && localConsent.commercialUseAccepted,
+    && userConsent.commercialUseAccepted,
   )
 }

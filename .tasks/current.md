@@ -1,5 +1,13 @@
 # 当前任务状态
 
+## 2026-09-04 录音基础准入完善 Phase 1
+
+- 已把训练录音上传从“客户端声明即可登记”收紧为 Backend 可信准入：`/api/upload/sign` 和 `/api/upload/complete` 都必须从已验证 Supabase Auth 用户读取当前四项授权，过期、缺项或没有有效 `accepted_at` 的账号不能签名或完成登记；客户端自报授权版本不能覆盖服务端事实。
+- 新增版本化运行配置 `backend/src/config/upload-admission.json`。签名仅允许配置内的音频扩展名与匹配 Content-Type；完成登记前通过 OSS HEAD 核验对象真实存在、非空、32 MiB 上限、实际 Content-Type、客户端文件大小、稳定 `recording_id` 与对象名、非空 target 和 10 分钟时长上限。新样本写入 `admission_status=admitted`、准入版本、核验时间、OSS ETag 和服务端授权快照。
+- Web 录音门不再用 localStorage 授权替代已认证用户授权，避免授权写回失败后仍开始一批无法上传的录音。Mobile 同步核验 Auth metadata，并补齐 sample rate、声道、时长、文件大小、capture transport、surface、collection mode、授权版本和质量状态元数据；旧本机队列不删除，重新确认授权后仍可补传。
+- 兼容边界：本阶段暂时允许旧本机队列缺少 sample rate/channel 声明，但声明了就必须合法；还没有执行历史数据 backfill、音频内容 SHA-256、音频头解析、逐题来源回填或训练导出 hard gate。Backend 的 DB/manifest 跨存储原子性也仍是下一阶段事项。
+- 验证通过：Backend build 与上传/撤回 27 项；Frontend 131 项和 TypeScript；Mobile check、typecheck、training tests；AI docs/research harness、research loop、compose 展开、`git diff --check`。使用最近 100 条生产录音和真实 OSS HEAD 做只读兼容模拟，100/100 通过新准入规则；未部署，仍需发布后用当前授权账号做真实 Web/Mobile 上传 smoke。
+
 ## 2026-09-03 Frontend 长文题库类型检查收口
 
 - `frontend/src/lib/corpus/reading-articles.ts` 当前按数据治理门禁保持空库：原 60 条只有提纲/概况，未核验完整正文、底本和权利状态前不进入运行时题库。

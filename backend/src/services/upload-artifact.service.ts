@@ -12,7 +12,8 @@ const UPLOAD_METADATA_KEYS = new Set([
   'prompt_aligned_transcript', 'disability_category', 'condition', 'etiology', 'severity', 'age_band', 'sex',
   'speech_variant', 'dialect_name', 'dialect_name_user_reported', 'dialect_code',
   'language_tag', 'prompt_language', 'spoken_language', 'label_source', 'utterance_pair_id',
-  'consent_scope', 'consent_version', 'collection_plan_id',
+  'consent_scope', 'consent_version', 'consent_accepted_at', 'collection_plan_id',
+  'admission_status', 'admission_version', 'admission_verified_at', 'object_etag',
   'reading_assistance_used',
   // Retry de-duplication and prompt lineage.
   'recording_id', 'session_id', 'prompt_group_key', 'prompt_fingerprint',
@@ -527,6 +528,8 @@ export function buildRecordingManifestEntry(
     },
     consent: {
       scope: readString(metadata, 'consent_scope') || 'training_only',
+      version: readString(metadata, 'consent_version'),
+      accepted_at: readString(metadata, 'consent_accepted_at'),
       retention_tier: 'synced_hot',
       sync_status: 'uploaded',
       visibility: 'private',
@@ -1243,7 +1246,10 @@ export class UploadArtifactService {
       reusedContribution = Boolean(existing)
 
       if (!existing) {
-        existing = await upsertContributionSkeleton(payload)
+        existing = await upsertContributionSkeleton({
+          ...payload,
+          metadata: sanitizedMetadata,
+        })
       }
     } catch (error) {
       console.warn(

@@ -61,4 +61,29 @@ await Promise.all([
 ])
 assert.deepEqual(executionOrder, ['first:start', 'first:end', 'second:start', 'second:end'])
 
+const uploadClientSource = await readFile(path.resolve('src/api/mobile-upload-client.ts'), 'utf8')
+for (const requiredField of [
+  'sample_rate:',
+  'channel_count:',
+  'duration_ms:',
+  'file_size_bytes:',
+  'capture_transport:',
+  'source_surface:',
+  'collection_mode:',
+  'consent_version:',
+  'audio_quality_disposition:',
+]) {
+  assert.equal(
+    uploadClientSource.includes(requiredField),
+    true,
+    `mobile upload metadata must include ${requiredField}`,
+  )
+}
+
+const appSource = await readFile(path.resolve('App.tsx'), 'utf8')
+assert.match(appSource, /consentReady\s*&&\s*hasCurrentLegalConsent/)
+
+const legalConsentSource = await readFile(path.resolve('src/auth/legal-consent.ts'), 'utf8')
+assert.match(legalConsentSource, /hasCurrentMobileLegalConsent/)
+
 console.log('mobile recording workflow tests passed')

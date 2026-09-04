@@ -6,6 +6,12 @@ interface TextObjectWriter {
     put(name: string, content: Buffer): Promise<unknown>;
 }
 
+export interface OssObjectInspection {
+    contentLength: number;
+    contentType: string;
+    etag: string | null;
+}
+
 /**
  * Aliyun OSS PutObject does not support the HTTP If-Match precondition used by
  * the previous implementation. Callers serialize each account's artifact
@@ -73,6 +79,31 @@ export class OssService {
             return url;
         } catch (error) {
             console.error('[OSS] Failed to generate signature URL:', error);
+            throw error;
+        }
+    }
+
+    /** Read the immutable object facts used by the upload admission gate. */
+    async inspectObject(name: string): Promise<OssObjectInspection | null> {
+        const client = this.getConfiguredClient();
+
+        try {
+            const result = await client.head(name);
+            const headers = (result as {
+                res?: { headers?: Record<string, string | number | string[] | undefined> };
+            }).res?.headers ?? {};
+            const contentLength = Number(headers['content-length']);
+            const contentType = String(headers['content-type'] ?? '').trim();
+            const rawEtag = headers.etag;
+            const etag = typeof rawEtag === 'string' && rawEtag.trim()
+                ? rawEtag.trim()
+                : null;
+
+            return { contentLength, contentType, etag };
+        } catch (error: unknown) {
+            if (isOssNotFoundError(error)) {
+                return null;
+            }
             throw error;
         }
     }

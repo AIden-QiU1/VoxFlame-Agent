@@ -23,3 +23,25 @@ export function buildMobileLegalConsentMetadata(): MobileLegalConsentMetadata {
     },
   }
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Mirror the backend gate so a user cannot record a batch that cannot upload. */
+export function hasCurrentMobileLegalConsent(userMetadata: unknown): boolean {
+  const metadata = isRecord(userMetadata) ? userMetadata : {}
+  const consent = isRecord(metadata.legal_consent) ? metadata.legal_consent : {}
+  const acceptedAt = typeof consent.accepted_at === 'string'
+    ? Date.parse(consent.accepted_at)
+    : Number.NaN
+
+  return (
+    consent.version === MOBILE_LEGAL_CONSENT_VERSION
+    && Number.isFinite(acceptedAt)
+    && consent.privacy_accepted === true
+    && consent.sensitive_data_accepted === true
+    && consent.data_collection_accepted === true
+    && consent.commercial_use_accepted === true
+  )
+}

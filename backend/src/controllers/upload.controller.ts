@@ -2,6 +2,12 @@ import { Router } from 'express';
 import { ossService } from '../services/oss.service';
 import { uploadArtifactService } from '../services/upload-artifact.service';
 import { uploadPathBelongsToContributor } from '../services/upload-path-policy';
+import {
+    admitCompletedUpload,
+    requireCurrentLegalConsent,
+    UploadAdmissionError,
+    validateUploadSignInput,
+} from '../services/upload-admission.service';
 
 const router = Router();
 
@@ -67,30 +73,31 @@ router.post('/reading/reset', async (req, res) => {
  */
 router.post('/sign', async (req, res) => {
     try {
-        const { filename, contentType } = req.body;
+        const { filename, contentType } = req.body ?? {};
         const contributorId = req.user?.id;
 
         if (!contributorId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        if (!filename || !contentType) {
-            return res.status(400).json({ error: 'Missing filename or contentType' });
-        }
-        if (!uploadPathBelongsToContributor(filename, contributorId)) {
+        requireCurrentLegalConsent(req.user?.userMetadata);
+        const admitted = validateUploadSignInput(filename, contentType);
+        if (!uploadPathBelongsToContributor(admitted.filename, contributorId)) {
             return res.status(403).json({ error: 'Upload path does not belong to authenticated user' });
         }
 
-        const url = await ossService.generateUploadUrl(filename, contentType);
+        const url = await ossService.generateUploadUrl(admitted.filename, admitted.contentType);
 
         if (!url) {
             return res.status(503).json({ error: 'OSS service unavailable' });
         }
 
         res.json({ url });
-    } catch (error: any) {
-        console.error('[Upload] Sign error:', error.message);
-        res.status(500).json({ error: error.message || 'Internal Server Error' });
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Internal Server Error';
+        const status = error instanceof UploadAdmissionError ? error.status : 500;
+        console.error('[Upload] Sign error:', message);
+        res.status(status).json({ error: message });
     }
 });
 
@@ -110,7 +117,7 @@ router.post('/complete', async (req, res) => {
             duration,
             source,
             metadata
-        } = req.body;
+        } = req.body ?? {};
         const contributorId = req.user?.id;
 
         if (!contributorId) {
@@ -120,15 +127,24 @@ router.post('/complete', async (req, res) => {
             return res.status(403).json({ error: 'Upload path does not belong to authenticated user' });
         }
 
-        const result = await uploadArtifactService.persistCompletedUpload({
-            contributorId,
+        const consent = requireCurrentLegalConsent(req.user?.userMetadata);
+        const object = await ossService.inspectObject(audioPath);
+        const admitted = admitCompletedUpload({
             audioPath,
             text,
+            duration,
+            metadata,
+        }, object, consent);
+
+        const result = await uploadArtifactService.persistCompletedUpload({
+            contributorId,
+            audioPath: admitted.audioPath,
+            text: admitted.text,
             recognizedText: typeof recognizedText === 'string' ? recognizedText : null,
             sentenceId,
-            duration: typeof duration === 'number' ? duration : null,
+            duration: admitted.duration,
             source,
-            metadata: metadata || {},
+            metadata: admitted.metadata,
         });
 
         console.log(
@@ -145,9 +161,11 @@ router.post('/complete', async (req, res) => {
             transcriptAlreadySynced: result.transcriptAlreadySynced,
         });
 
-    } catch (error: any) {
-        console.error('[Upload] Complete error:', error.message);
-        res.status(500).json({ error: error.message || 'Internal Server Error' });
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Internal Server Error';
+        const status = error instanceof UploadAdmissionError ? error.status : 500;
+        console.error('[Upload] Complete error:', message);
+        res.status(status).json({ error: message });
     }
 });
 

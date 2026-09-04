@@ -242,6 +242,33 @@ test('manifest keeps explicit pronunciation targets without promoting arbitrary 
   assert.equal(manifest.prompt.text, '阿胶已经开封')
 })
 
+test('manifest carries the server-verified consent snapshot', () => {
+  const manifest = buildRecordingManifestEntry(
+    'contributor-1',
+    'dataset/contributor-1/mobile-workbench/recording-1.m4a',
+    '请再说一次',
+    null,
+    1.5,
+    sanitizeUploadMetadata({
+      recording_id: 'recording-1',
+      consent_scope: 'training_only',
+      consent_version: '2026-09-03',
+      consent_accepted_at: '2026-09-04T01:00:00.000Z',
+      admission_status: 'admitted',
+      admission_version: '2026-09-04.1',
+    }),
+  )
+
+  assert.deepEqual(manifest.consent, {
+    scope: 'training_only',
+    version: '2026-09-03',
+    accepted_at: '2026-09-04T01:00:00.000Z',
+    retention_tier: 'synced_hot',
+    sync_status: 'uploaded',
+    visibility: 'private',
+  })
+})
+
 test('server metadata keeps article lineage without accepting article body', () => {
   assert.deepEqual(
     sanitizeUploadMetadata({
