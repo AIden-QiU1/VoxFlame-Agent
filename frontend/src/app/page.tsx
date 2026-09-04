@@ -5,6 +5,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { HomeDashboard } from '@/components/home'
 import { useAuth } from '@/hooks/useAuth'
+import { getSiteBrand } from '@/lib/site-branding'
+
+const siteBrand = getSiteBrand()
 
 export default function HomePage() {
   const router = useRouter()
@@ -28,7 +31,7 @@ export default function HomePage() {
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600">
-            {authError ? '登录状态暂时无法确认，请刷新后继续。' : '正在准备燃言首页...'}
+            {authError ? '登录状态暂时无法确认，请刷新后继续。' : `正在准备${siteBrand.name}首页...`}
           </p>
         </div>
       </div>
@@ -37,6 +40,7 @@ export default function HomePage() {
 
   return (
     <HomeDashboard
+      brand={siteBrand}
       isAuthenticated={isAuthenticated}
       isOpeningCommunicate={isOpeningCommunicate}
       onStartCommunicate={openCommunicateView}

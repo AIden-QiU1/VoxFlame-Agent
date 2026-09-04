@@ -6,6 +6,45 @@ export interface MobileTrainingCaptureSnapshot {
   exercise: MobileTrainingExercise
   exerciseIndex: number
   preparedExpressionId?: string
+  speechVariant: MobileTrainingSpeechVariant
+  utterancePairId?: string
+}
+
+export type MobileTrainingSpeechVariant = 'mandarin' | 'dialect'
+
+/** Mirrors the Web collection contract without coupling the App bundle to Next.js code. */
+export function createMobileUtterancePairId(
+  now: number = Date.now(),
+  randomValue: number = Math.random(),
+): string {
+  return `pair-${now.toString(36)}-${randomValue.toString(36).slice(2, 10)}`
+}
+
+export function shouldOfferMobileDialectPair(options: {
+  hasDialect: boolean
+  dialectName?: string
+  isAssessment: boolean
+}): boolean {
+  return options.hasDialect
+    && Boolean(options.dialectName?.trim())
+    && !options.isAssessment
+}
+
+export function buildMobileSpeechVariantMetadata(options: {
+  speechVariant: MobileTrainingSpeechVariant
+  utterancePairId?: string
+  dialectName?: string
+}): Record<string, string> {
+  const metadata: Record<string, string> = {
+    speech_variant: options.speechVariant,
+    prompt_language: 'zh-CN',
+    spoken_language: options.speechVariant === 'dialect' ? 'zh-dialect' : 'zh-CN',
+  }
+  if (options.utterancePairId) metadata.utterance_pair_id = options.utterancePairId
+  if (options.speechVariant === 'dialect' && options.dialectName?.trim()) {
+    metadata.dialect_name = options.dialectName.trim()
+  }
+  return metadata
 }
 
 /** A capture may finish after auth changes; it must never be handed to another account. */

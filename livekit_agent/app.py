@@ -16,6 +16,7 @@ from assistant_runtime import (
     estimate_clarity_score,
 )
 from asr_runtime import LiveKitASRRuntime
+from capacity import WorkerLoadPolicy
 from config import load_config, should_bypass_proxy_for_livekit
 from data_contract import (
     build_audio_input_telemetry_output,
@@ -74,14 +75,22 @@ _sanitize_proxy_env_for_local_livekit()
 # Self-hosted LiveKit worker registration should bypass shell-level HTTP proxies.
 # The default AgentServer behavior inherits HTTP_PROXY/HTTPS_PROXY, which caused
 # local `/agent` websocket registration to be routed to 127.0.0.1:7897 and fail.
-# Keep one process per CPU as the SDK default, but make the admission policy
-# explicit so a saturated worker stops accepting new rooms instead of allowing
-# unbounded process growth.  The production default (0.7) is intentionally
-# conservative on the current 4-vCPU host and can be overridden per deployment.
+worker_load_threshold = float(os.getenv("VOXFLAME_AGENT_LOAD_THRESHOLD", "0.7"))
+worker_load_policy = WorkerLoadPolicy(
+    max_active_jobs=int(os.getenv("VOXFLAME_AGENT_MAX_ACTIVE_JOBS", "2")),
+    load_threshold=worker_load_threshold,
+    memory_limit_percent=float(os.getenv("VOXFLAME_AGENT_MEMORY_PRESSURE_PERCENT", "85")),
+)
+
+# LiveKit asks this parent Worker for availability before starting each Job.
+# Additional Workers increase total capacity; a saturated machine stops taking
+# new rooms before it degrades every already-active conversation.
 server = AgentServer(
     host="127.0.0.1",
     http_proxy=None,
-    load_threshold=float(os.getenv("VOXFLAME_AGENT_LOAD_THRESHOLD", "0.7")),
+    load_threshold=worker_load_threshold,
+    load_fnc=worker_load_policy,
+    drain_timeout=int(os.getenv("VOXFLAME_AGENT_DRAIN_TIMEOUT_SECONDS", "1800")),
     num_idle_processes=int(os.getenv("VOXFLAME_AGENT_IDLE_PROCESSES", "2")),
     job_memory_warn_mb=float(os.getenv("VOXFLAME_AGENT_JOB_MEMORY_WARN_MB", "450")),
     job_memory_limit_mb=float(os.getenv("VOXFLAME_AGENT_JOB_MEMORY_LIMIT_MB", "700")),

@@ -52,6 +52,13 @@ class ConfigTests(unittest.TestCase):
             "QWEN_TTS_REALTIME_SAMPLE_RATE": "16000",
             "QWEN_TTS_CONNECT_TIMEOUT_SECONDS": "12",
             "QWEN_TTS_REQUEST_TIMEOUT_SECONDS": "21",
+            "VOXFLAME_PROVIDER_CAPACITY_DIRECTORY": "/tmp/voxflame-test-capacity",
+            "VOXFLAME_PROVIDER_ASR_MAX_CONCURRENCY": "7",
+            "VOXFLAME_PROVIDER_ASR_WAIT_TIMEOUT_SECONDS": "0.4",
+            "VOXFLAME_PROVIDER_LLM_MAX_CONCURRENCY": "6",
+            "VOXFLAME_PROVIDER_LLM_WAIT_TIMEOUT_SECONDS": "0.3",
+            "VOXFLAME_PROVIDER_TTS_MAX_CONCURRENCY": "5",
+            "VOXFLAME_PROVIDER_TTS_WAIT_TIMEOUT_SECONDS": "0.2",
         }
         previous = {key: os.environ.get(key) for key in env_updates}
 
@@ -107,6 +114,13 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.dashscope_tts_sample_rate, 16000)
         self.assertEqual(config.dashscope_tts_connect_timeout_seconds, 12)
         self.assertEqual(config.dashscope_tts_request_timeout_seconds, 21)
+        self.assertEqual(config.provider_capacity_directory, "/tmp/voxflame-test-capacity")
+        self.assertEqual(config.provider_asr_max_concurrency, 7)
+        self.assertEqual(config.provider_asr_wait_timeout_seconds, 0.4)
+        self.assertEqual(config.provider_llm_max_concurrency, 6)
+        self.assertEqual(config.provider_llm_wait_timeout_seconds, 0.3)
+        self.assertEqual(config.provider_tts_max_concurrency, 5)
+        self.assertEqual(config.provider_tts_wait_timeout_seconds, 0.2)
 
 
 if __name__ == "__main__":

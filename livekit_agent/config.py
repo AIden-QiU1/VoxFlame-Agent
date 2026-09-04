@@ -47,6 +47,13 @@ class LiveKitAgentConfig:
     dashscope_tts_connect_timeout_seconds: int
     dashscope_tts_request_timeout_seconds: float
     log_level: str
+    provider_capacity_directory: str = "/tmp/voxflame-provider-capacity"
+    provider_asr_max_concurrency: int = 2
+    provider_asr_wait_timeout_seconds: float = 0.25
+    provider_llm_max_concurrency: int = 2
+    provider_llm_wait_timeout_seconds: float = 0.25
+    provider_tts_max_concurrency: int = 2
+    provider_tts_wait_timeout_seconds: float = 0.25
 
 
 def should_bypass_proxy_for_livekit(livekit_url: str) -> bool:
@@ -167,4 +174,20 @@ def load_config() -> LiveKitAgentConfig:
             os.getenv("QWEN_TTS_REQUEST_TIMEOUT_SECONDS", "20").strip() or "20"
         ),
         log_level=os.getenv("LOG_LEVEL", "info").strip().lower() or "info",
+        provider_capacity_directory=(
+            os.getenv("VOXFLAME_PROVIDER_CAPACITY_DIRECTORY", "/tmp/voxflame-provider-capacity").strip()
+            or "/tmp/voxflame-provider-capacity"
+        ),
+        provider_asr_max_concurrency=int(
+            os.getenv("VOXFLAME_PROVIDER_ASR_MAX_CONCURRENCY", "2").strip() or "2"
+        ),
+        provider_asr_wait_timeout_seconds=float(os.getenv("VOXFLAME_PROVIDER_ASR_WAIT_TIMEOUT_SECONDS", "0.25").strip() or "0.25"),
+        provider_llm_max_concurrency=int(
+            os.getenv("VOXFLAME_PROVIDER_LLM_MAX_CONCURRENCY", "2").strip() or "2"
+        ),
+        provider_llm_wait_timeout_seconds=float(os.getenv("VOXFLAME_PROVIDER_LLM_WAIT_TIMEOUT_SECONDS", "0.25").strip() or "0.25"),
+        provider_tts_max_concurrency=int(
+            os.getenv("VOXFLAME_PROVIDER_TTS_MAX_CONCURRENCY", "2").strip() or "2"
+        ),
+        provider_tts_wait_timeout_seconds=float(os.getenv("VOXFLAME_PROVIDER_TTS_WAIT_TIMEOUT_SECONDS", "0.25").strip() or "0.25"),
     )

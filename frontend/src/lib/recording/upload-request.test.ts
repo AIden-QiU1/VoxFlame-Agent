@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { fetchUploadRequest } from './upload-request'
+import { fetchUploadRequest, fetchUploadRequestWithRetry } from './upload-request'
 
 test('a stalled upload request is aborted at its deadline', async () => {
   const requestSignals: AbortSignal[] = []
@@ -41,4 +41,20 @@ test('a completed upload request is returned unchanged', async () => {
   )
 
   assert.equal(actual, expected)
+})
+
+test('overload responses are retried and eventually returned', async () => {
+  let calls = 0
+  const response = await fetchUploadRequestWithRetry('/api/upload/complete', {}, {
+    attempts: 3,
+    request: async () => {
+      calls += 1
+      return new Response('{}', {
+        status: calls < 3 ? 503 : 200,
+        headers: { 'Retry-After': '0.001' },
+      })
+    },
+  })
+  assert.equal(response.status, 200)
+  assert.equal(calls, 3)
 })

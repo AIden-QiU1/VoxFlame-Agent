@@ -23,6 +23,7 @@ import * as Clipboard from 'expo-clipboard'
 import * as DocumentPicker from 'expo-document-picker'
 import { File } from 'expo-file-system'
 import * as Speech from 'expo-speech'
+import Constants from 'expo-constants'
 
 import { getMobileRuntimeConfig } from './src/api/mobile-config'
 import { useMobileAuth } from './src/auth/use-mobile-auth'
@@ -82,9 +83,13 @@ import {
   MOBILE_COLLECTION_PLANS,
 } from './src/training/collection-protocol'
 import {
+  buildMobileSpeechVariantMetadata,
   captureStillBelongsToContributor,
+  createMobileUtterancePairId,
   decideMobileAdvance,
   reconcileMobileExerciseSelection,
+  shouldOfferMobileDialectPair,
+  type MobileTrainingSpeechVariant,
   type MobileTrainingCaptureSnapshot,
 } from './src/training/mobile-recording-workflow'
 import { useMobileMemoryEditor } from './src/memory/use-mobile-memory-editor'
@@ -98,6 +103,7 @@ import type {
   MobileTrainingExercise,
 } from './src/training/training-catalog'
 import { buildMobileQuickExpressionPhrases } from './src/communication/quick-expression'
+import { getMobileBranding } from './src/config/mobile-branding'
 
 const LOCAL_PREPARED_LINES = [
   '请等我说完，我会用手机把重点给你看。',
@@ -146,7 +152,11 @@ interface MobilePendingAttempt {
   item: MobileWorkbenchRecorderQueueItem
   feedback: MobileTrainingFeedback
   assessmentAttempt: MobileAssessmentAttempt | null
+  speechVariant: MobileTrainingSpeechVariant
+  utterancePairId?: string
 }
+
+const mobileBrand = getMobileBranding(Constants.expoConfig?.name)
 
 const COLORS = {
   background: '#F5F1EA',
@@ -156,7 +166,7 @@ const COLORS = {
   muted: '#71685F',
   subtle: '#A2988E',
   border: '#E5DDD3',
-  accent: '#C65D2E',
+  accent: mobileBrand.accentColor,
   accentSoft: '#F6E7DD',
   success: '#287052',
   successSoft: '#E7F1EC',
@@ -627,6 +637,8 @@ export default function App() {
               practiceText={practiceText}
               preparedExpression={selectedPreparedExpression ?? workspace.snapshot?.prepared_expression ?? null}
               preparedLines={preparedLines}
+              profileHasDialect={Boolean(workspace.snapshot?.registration_profile?.has_dialect)}
+              profileDialectName={workspace.snapshot?.registration_profile?.dialect_name ?? ''}
               profileEtiology={workspace.snapshot?.user_profile_memory.etiology ?? ''}
               profileSeverity={workspace.snapshot?.user_profile_memory.severity ?? ''}
               queue={recorderQueue}
@@ -818,7 +830,7 @@ function LoginScreen({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.brandMark}>
-          <Text style={styles.brandMarkText}>V</Text>
+          <Text style={styles.brandMarkText}>{mobileBrand.mark}</Text>
         </View>
         <Text style={styles.loginTitle}>把想说的话，稳稳传达。</Text>
         <Text style={styles.loginCopy}>
@@ -945,7 +957,7 @@ function LoginScreen({
                 <Text style={styles.loginHint}>
                   {authMode === 'login'
                     ? '使用已经注册的手机号登录；未注册号码不会自动创建账号。'
-                    : '验证手机号后将创建新的 VoxFlame 账号。'}
+                    : `验证手机号后将创建新的${mobileBrand.name}账号。`}
                 </Text>
               )}
             </>
@@ -1057,7 +1069,7 @@ function AppHeader({ email, status }: { email: string; status: string }) {
   return (
     <View style={styles.header}>
       <View>
-        <Text style={styles.wordmark}>VoxFlame</Text>
+        <Text style={styles.wordmark}>{mobileBrand.name}</Text>
         <Text numberOfLines={1} style={styles.headerEmail}>{email}</Text>
       </View>
       <View style={styles.statusBadge}>
@@ -1691,6 +1703,8 @@ function PracticeScreen({
   practiceText,
   preparedExpression,
   preparedLines,
+  profileHasDialect,
+  profileDialectName,
   profileEtiology,
   profileSeverity,
   queue,
@@ -1707,6 +1721,8 @@ function PracticeScreen({
   practiceText: string
   preparedExpression: MobileWorkspaceSnapshotContract['prepared_expression']
   preparedLines: string[]
+  profileHasDialect: boolean
+  profileDialectName: string
   profileEtiology: string
   profileSeverity: string
   queue: ReturnType<typeof useNativeRecorderQueue>
@@ -1720,6 +1736,10 @@ function PracticeScreen({
   const activeCaptureRef = useRef<MobileTrainingCaptureSnapshot | null>(null)
   const [feedback, setFeedback] = useState<MobileTrainingFeedback | null>(null)
   const [pendingAttempt, setPendingAttempt] = useState<MobilePendingAttempt | null>(null)
+  const [pendingDialectTarget, setPendingDialectTarget] = useState<{
+    exercise: MobileTrainingExercise
+    utterancePairId: string
+  } | null>(null)
   const [attemptAction, setAttemptAction] = useState<MobileAttemptAction>('idle')
   const [assessmentAttempts, setAssessmentAttempts] = useState<MobileAssessmentAttempt[]>([])
   const [showRecordings, setShowRecordings] = useState(false)
@@ -1761,6 +1781,7 @@ function PracticeScreen({
         text: targetText,
         category: '自定义练习',
       }
+  const activeTargetText = pendingDialectTarget?.exercise.text ?? targetText
   const readingAssistanceKey = `${effectiveExercise.id}:${targetText}`
   const assessmentSummary = summarizeMobileAssessment(
     assessmentAttempts,
@@ -1772,6 +1793,12 @@ function PracticeScreen({
     understandsConsent: consentReady && hasCurrentLegalConsent,
   }, flow === 'assessment' ? '开始说这个词' : '开始说这句话')
   const attemptLocked = pendingAttempt !== null || attemptAction !== 'idle'
+  const dialectPairEnabled = shouldOfferMobileDialectPair({
+    hasDialect: profileHasDialect,
+    dialectName: profileDialectName,
+    isAssessment: flow === 'assessment',
+  })
+  const activeSpeechVariant: MobileTrainingSpeechVariant = pendingDialectTarget ? 'dialect' : 'mandarin'
   const selectionScopeKey = usesPreparedMaterial
     ? `prepared:${preparedExpression?.id ?? 'none'}`
     : catalog.selectedReadingArticle
@@ -1860,27 +1887,33 @@ function PracticeScreen({
     }
     const captureId = `mobile-training-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     if (!authUserId) return false
+    const speechVariant: MobileTrainingSpeechVariant = pendingDialectTarget ? 'dialect' : 'mandarin'
+    const utterancePairId = pendingDialectTarget?.utterancePairId
+      ?? (dialectPairEnabled ? createMobileUtterancePairId() : undefined)
+    const captureExercise = pendingDialectTarget?.exercise ?? effectiveExercise
     const captureSnapshot: MobileTrainingCaptureSnapshot = {
       captureId,
       contributorId: authUserId,
-      exercise: effectiveExercise,
+      exercise: captureExercise,
       exerciseIndex,
       preparedExpressionId: usesPreparedMaterial ? preparedExpression?.id : undefined,
+      speechVariant,
+      utterancePairId,
     }
     activeCaptureRef.current = captureSnapshot
     const connectionPromise = ensureTrainingConnection()
-    const started = await queue.startRecording(targetText, {
-      sentenceId: effectiveExercise.id,
+    const started = await queue.startRecording(captureExercise.text, {
+      sentenceId: captureExercise.id,
       source: flow === 'assessment' ? 'mobile_assessment' : usesPreparedMaterial ? 'mobile_prepared_material' : 'mobile_training_catalog',
       metadata: {
-        exercise_category: effectiveExercise.category,
+        exercise_category: captureExercise.category,
         training_flow: flow,
         collection_source: usesPreparedMaterial ? 'prepared_material' : 'catalog',
         collection_plan_id: flow === 'collection' ? collectionPlanId : undefined,
         reading_material_kind: catalog.selectedReadingArticle ? 'public_domain_classic' : undefined,
         reading_article_id: catalog.selectedReadingArticle?.id,
         reading_article_version: catalog.selectedReadingArticle?.version,
-        reading_segment_id: catalog.selectedReadingArticle ? effectiveExercise.id : undefined,
+        reading_segment_id: catalog.selectedReadingArticle ? captureExercise.id : undefined,
         reading_segment_index: catalog.selectedReadingArticle ? exerciseIndex : undefined,
         reading_segment_count: catalog.selectedReadingArticle?.segmentCount,
         client_capture_id: captureId,
@@ -1889,6 +1922,14 @@ function PracticeScreen({
         etiology: profileEtiology || undefined,
         severity: profileSeverity || undefined,
         reading_assistance_used: readingAssistanceKeysRef.current.has(readingAssistanceKey),
+        ...(profileHasDialect && profileDialectName.trim()
+          ? { dialect_name_user_reported: profileDialectName.trim(), label_source: 'user_reported' }
+          : {}),
+        ...buildMobileSpeechVariantMetadata({
+          speechVariant,
+          utterancePairId,
+          dialectName: profileDialectName,
+        }),
       },
     })
     if (!started) {
@@ -1945,6 +1986,11 @@ function PracticeScreen({
       ...(capture.preparedExpressionId
         ? { prepared_expression_id: capture.preparedExpressionId }
         : {}),
+      ...buildMobileSpeechVariantMetadata({
+        speechVariant: capture.speechVariant,
+        utterancePairId: capture.utterancePairId,
+        dialectName: profileDialectName,
+      }),
     })
     const assessmentAttempt = flow === 'assessment'
       ? {
@@ -1963,6 +2009,8 @@ function PracticeScreen({
       item: enrichedItem ?? item,
       feedback: nextFeedback,
       assessmentAttempt,
+      speechVariant: capture.speechVariant,
+      utterancePairId: capture.utterancePairId,
     })
     setAttemptAction('idle')
   }
@@ -1973,6 +2021,7 @@ function PracticeScreen({
     setSelectedExercise(visibleExercises[bounded] ?? null)
     onPracticeTextChange('')
     setFeedback(null)
+    setPendingDialectTarget(null)
     setExerciseSequenceStatus('active')
   }
 
@@ -1990,6 +2039,25 @@ function PracticeScreen({
           confirmedAttempt,
         ])
       }
+      if (pendingAttempt.speechVariant === 'mandarin' && dialectPairEnabled && pendingAttempt.utterancePairId) {
+        setPendingDialectTarget({
+          exercise: {
+            id: pendingAttempt.item.sentenceId ?? effectiveExercise.id,
+            text: pendingAttempt.item.text,
+            category: effectiveExercise.category,
+          },
+          utterancePairId: pendingAttempt.utterancePairId,
+        })
+        setPendingAttempt(null)
+        setFeedback(null)
+        Alert.alert(
+          '普通话录音已收下',
+          `接下来仍是同一句。可以用${profileDialectName || '方言'}自然地说一遍，也可以跳过。`,
+        )
+        setAttemptAction('idle')
+        return
+      }
+      setPendingDialectTarget(null)
       setPendingAttempt(null)
       setFeedback(null)
       const advance = decideMobileAdvance({
@@ -2015,6 +2083,34 @@ function PracticeScreen({
       }
     }
     setAttemptAction('idle')
+  }
+
+  const skipDialectAttempt = (): void => {
+    if (!pendingDialectTarget || attemptAction !== 'idle') return
+    setPendingDialectTarget(null)
+    setFeedback(null)
+    const advance = decideMobileAdvance({
+      currentIndex: exerciseIndex,
+      loadedCount: visibleExercises.length,
+      totalCount: visibleTotal,
+    })
+    if (advance.kind === 'select_loaded') {
+      selectExerciseAt(advance.index)
+    } else if (advance.kind === 'load_more' && !usesPreparedMaterial) {
+      void catalog.loadMore().then((nextPage) => {
+        const nextExercise = nextPage[0] ?? null
+        if (!nextExercise) {
+          setExerciseSequenceStatus('load_failed')
+          return
+        }
+        setExerciseIndex(advance.nextIndex)
+        setSelectedExercise(nextExercise)
+        onPracticeTextChange('')
+        setExerciseSequenceStatus('active')
+      })
+    } else {
+      setExerciseSequenceStatus('complete')
+    }
   }
 
   const discardPendingAttempt = async (): Promise<void> => {
@@ -2070,9 +2166,19 @@ function PracticeScreen({
           <View style={styles.trainingStage}>
             <View style={styles.trainingProgressRow}>
               <Text style={styles.cardLabel}>{usesPreparedMaterial ? '自定义材料' : catalog.selectedReadingArticle?.title ?? selectedCategory?.label ?? '训练题库'}</Text>
-              <Text style={styles.trainingProgressText}>{exerciseIndex + 1} / {visibleTotal || 1}</Text>
+              <View style={styles.trainingProgressMeta}>
+                {dialectPairEnabled ? (
+                  <Text style={[styles.variantBadge, activeSpeechVariant === 'dialect' ? styles.variantBadgeDialect : null]}>
+                    {activeSpeechVariant === 'dialect' ? `${profileDialectName || '方言'}表达` : '普通话表达'}
+                  </Text>
+                ) : null}
+                <Text style={styles.trainingProgressText}>{exerciseIndex + 1} / {visibleTotal || 1}</Text>
+              </View>
             </View>
-            <Text style={styles.trainingTarget}>{targetText}</Text>
+            <Text style={styles.trainingTarget}>{activeTargetText}</Text>
+            {activeSpeechVariant === 'dialect' ? (
+              <Text style={styles.dialectPrompt}>同一句用你最自然的方言说法表达，不要求逐字对应普通话。</Text>
+            ) : null}
             <View style={styles.preflightPanel}>
               <Text style={styles.preflightTitle}>{flow === 'assessment' ? '筛查前确认' : '录音前确认'}</Text>
               <Text style={styles.preflightCopy}>只需确认一次，本组录音期间保持有效。</Text>
@@ -2114,6 +2220,13 @@ function PracticeScreen({
               }}
               tone={queue.isRecording ? 'neutral' : 'accent'}
             />
+            {pendingDialectTarget && !queue.isRecording && !pendingAttempt ? (
+              <SecondaryButton
+                disabled={attemptAction !== 'idle'}
+                label="这句先跳过方言"
+                onPress={skipDialectAttempt}
+              />
+            ) : null}
             <View style={styles.readingAssistanceRow}>
               <Text style={styles.readingAssistancePrompt}>有字不认识？</Text>
               <SecondaryButton
@@ -2834,9 +2947,9 @@ function AccountScreen({
         <View style={styles.avatar}><Text style={styles.avatarText}>V</Text></View>
         <View style={styles.profileCopy}>
           <Text style={styles.profileEmail}>
-            {auth.user?.email ?? auth.user?.phone ?? 'VoxFlame 用户'}
+            {auth.user?.email ?? auth.user?.phone ?? `${mobileBrand.name}用户`}
           </Text>
-          <Text style={styles.mutedText}>VoxFlame 账户</Text>
+          <Text style={styles.mutedText}>{mobileBrand.name}账户</Text>
         </View>
       </View>
 
@@ -3410,8 +3523,12 @@ const styles = StyleSheet.create({
   smallInput: { backgroundColor: COLORS.surfaceMuted, borderColor: COLORS.border, borderRadius: 10, borderWidth: 1, color: COLORS.ink, minHeight: 42, paddingHorizontal: 10 },
   trainingStage: { backgroundColor: COLORS.ink, borderRadius: 24, gap: 18, padding: 22 },
   trainingProgressRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  trainingProgressMeta: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   trainingProgressText: { color: '#CFC7BF', fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800' },
+  variantBadge: { backgroundColor: '#DCE9F4', borderRadius: 999, color: '#244D68', fontSize: 11, fontWeight: '800', paddingHorizontal: 9, paddingVertical: 5 },
+  variantBadgeDialect: { backgroundColor: '#F3E2C5', color: '#7D4B17' },
   trainingTarget: { color: '#FFFFFF', fontSize: 30, fontWeight: '800', lineHeight: 43 },
+  dialectPrompt: { color: '#F3E2C5', fontSize: 13, lineHeight: 20 },
   readingAssistanceRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   readingAssistancePrompt: { color: '#E9E2DB', fontSize: 13, lineHeight: 20 },
   readingAssistanceStatus: { color: '#CFC7BF', fontSize: 12, lineHeight: 18 },

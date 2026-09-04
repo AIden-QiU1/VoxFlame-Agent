@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { ossService } from './oss.service'
+import { assessServerRecordingQuality } from './recording-quality.service'
 
 type JsonRecord = Record<string, unknown>
 
@@ -14,6 +15,8 @@ const UPLOAD_METADATA_KEYS = new Set([
   'language_tag', 'prompt_language', 'spoken_language', 'label_source', 'utterance_pair_id',
   'consent_scope', 'consent_version', 'consent_accepted_at', 'collection_plan_id',
   'admission_status', 'admission_version', 'admission_verified_at', 'object_etag',
+  'quality_status', 'quality_reasons', 'quality_assessment_version', 'quality_assessed_at',
+  'training_import_allowed',
   'reading_assistance_used',
   // Retry de-duplication and prompt lineage.
   'recording_id', 'session_id', 'prompt_group_key', 'prompt_fingerprint',
@@ -1220,6 +1223,11 @@ export class UploadArtifactService {
       recognized_text: firstNonEmptyString(payload.recognizedText, payload.metadata?.recognized_text),
       spoken_text: firstNonEmptyString(payload.metadata?.spoken_text, payload.recognizedText),
     })
+    const serverQuality = assessServerRecordingQuality(
+      sanitizedMetadata,
+      typeof payload.duration === 'number' ? payload.duration : 0,
+    )
+    Object.assign(sanitizedMetadata, serverQuality)
     const manifestEntry = buildRecordingManifestEntry(
       payload.contributorId,
       payload.audioPath,

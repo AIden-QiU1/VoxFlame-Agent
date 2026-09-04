@@ -27,7 +27,7 @@ import { getAccessToken } from '@/lib/supabase/client'
 import { useAuth } from './useAuth'
 import { config } from '@/lib/config'
 import { sanitizeTrainingUploadMetadata } from '@/lib/recording/upload-metadata'
-import { fetchUploadRequest } from '@/lib/recording/upload-request'
+import { fetchUploadRequest, fetchUploadRequestWithRetry } from '@/lib/recording/upload-request'
 
 interface UploadOptions {
   /** 录音对应的文本内容 */
@@ -277,7 +277,7 @@ export function useVoiceUpload() {
       // 2. 尝试上传到 OSS (通过后端签名)
       try {
         // Use config.api.baseUrl which handles rewrites (e.g. /api)
-        const signRes = await fetchUploadRequest(`${config.api.baseUrl}/upload/sign`, {
+        const signRes = await fetchUploadRequestWithRetry(`${config.api.baseUrl}/upload/sign`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -312,7 +312,7 @@ export function useVoiceUpload() {
       setUploadProgress(50)
 
       // 3. 通知后端完成 (DB写入 + OSS Manifest追加)
-      const completeRes = await fetchUploadRequest(`${config.api.baseUrl}/upload/complete`, {
+      const completeRes = await fetchUploadRequestWithRetry(`${config.api.baseUrl}/upload/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

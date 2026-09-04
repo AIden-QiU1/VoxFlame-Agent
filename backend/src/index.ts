@@ -17,10 +17,12 @@ import { memoryController } from './controllers/memory.controller'
 import { uploadRouter } from './controllers/upload.controller'
 import { phrasesController } from './controllers/phrases.controller'
 import { mobileDiagnosticsRouter } from './controllers/mobile-diagnostics.controller'
+import { qualityReviewRouter } from './controllers/quality-review.controller'
 import { handleSupabaseSendSmsHook } from './controllers/auth-hook.controller'
 import { errorHandler } from './middlewares/error.middleware'
 import { authMiddleware, validateUserId } from './middlewares/auth.middleware'
 import { TrainingReportMaintenanceService } from './services/training-report-maintenance.service'
+import { uploadCapacityService } from './services/upload-capacity.service'
 
 // 加载环境变量
 dotenv.config()
@@ -31,9 +33,11 @@ const trainingReportMaintenanceService = new TrainingReportMaintenanceService()
 
 const isProduction = process.env.NODE_ENV === 'production'
 const publicBaseUrl = (process.env.VOXFLAME_PUBLIC_BASE_URL || '').trim()
+const collectionPublicBaseUrl = (process.env.VOXFLAME_COLLECTION_PUBLIC_BASE_URL || '').trim()
 const allowedCorsOrigins = new Set(
   [
     publicBaseUrl,
+    collectionPublicBaseUrl,
     ...(process.env.VOXFLAME_ALLOWED_ORIGINS || '')
       .split(',')
       .map((origin) => origin.trim())
@@ -83,7 +87,8 @@ app.get('/health', (req, res) => {
     rtcOrchestration: {
       enabled: true,
       target: process.env.LIVEKIT_BROWSER_URL || process.env.LIVEKIT_URL || null,
-    }
+    },
+    uploadCapacity: uploadCapacityService.snapshot(),
   })
 })
 
@@ -125,6 +130,9 @@ app.use('/api/phrases', phrasesRouter)
 
 // Upload API 路由 (OSS 签名)
 app.use('/api/upload', authMiddleware, uploadRouter)
+
+// Human quality review is authenticated and additionally closed behind an exact email allowlist.
+app.use('/api/quality-review', authMiddleware, qualityReviewRouter)
 
 // Mobile release diagnostics: authenticated, strictly allow-listed, and text/audio-free.
 app.use('/api/mobile/diagnostics', authMiddleware, mobileDiagnosticsRouter)

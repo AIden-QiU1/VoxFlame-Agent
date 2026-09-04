@@ -177,7 +177,7 @@ sudo docker compose up -d livekit-server
 当前建议显式使用可追踪的官方镜像 tag，而不是镜像站的 `latest`。仓库默认已切到：
 
 ```bash
-LIVEKIT_SERVER_IMAGE=docker.m.daocloud.io/livekit/livekit-server:v1.10.1
+LIVEKIT_SERVER_IMAGE=docker.m.daocloud.io/livekit/livekit-server:v1.13.6
 ```
 
 这样做的原因是：当 `self-hosted livekit-server -> Agents worker registration` 出现异常时，我们需要先排除“镜像站 latest 漂移”这类基础设施噪音。

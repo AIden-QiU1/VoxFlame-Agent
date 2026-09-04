@@ -1,5 +1,18 @@
 # 当前任务状态
 
+## 2026-09-04 四项采集需求与阿里云扩容总执行入口
+
+- LiveKit 扩容单机保护已落代码：Worker 父进程以 active jobs、CPU、内存联合准入；当前 2 GiB Agent 容器默认 2 个 active jobs，ASR/LLM/TTS 各 2 个跨 Job 进程共享槽位；Agent 增加健康检查和 30 分钟 drain/stop grace。平台总容量仍必须依靠增加健康 Worker、恢复个性化 ASR 网关和确认 Provider 配额，不能把安全上限当成平台规模。
+- 已按官方源码/文档把 LiveKit Agents 从 `1.5.1` 升到 `1.7.1`、LiveKit Server 从 `1.10.1` 升到 `1.13.6`；Agent 升级覆盖内存统计、连接失败和 drain/指标，Server 升级覆盖 Agent 连接关闭、节点统计、负载和 TURN 配额/安全。Server 跨越 TURN TTL/权限变化，生产替换前必须做 RTC/TURN smoke 并保留 `pre-*` 回滚镜像。
+- 每周一 GitHub workflow 自动对比两个精确版本；发现新稳定版会创建/刷新“LiveKit 稳定版升级待评估”Issue 并让工作流标红。它不自动升级生产。
+- 个性化 ASR 8001 的 SSH 反向隧道已恢复，生产 Backend 签发逻辑、三名真实 Supabase 注册用户、8001 注册表和真实 WAV 推理四层一致：`2187054680/2307294809/3083029019` 分别命中 EXP-29/24/25，随机未注册键命中公共 `exp16l3-lambda025`；8000/18000 均无监听。新增 `npm run audit:asr-models` 作升级硬门。ASR 并发容量和高可用仍需模型服务至少双实例及阶梯压测。
+
+- 新增 `docs/VOICE_COLLECTION_FOUR_REQUIREMENTS_EXECUTION_2026-09-04.md`，统一记录方言配对、自动/人工质检、1,000–10,000 用户容量和第二品牌采集站的代码状态、Web/App 同步范围、部署顺序、验收门与回滚点。
+- 阿里云扩容明确按控制面、Backend 多实例硬门、单节点 LiveKit、双 Agent Worker、证据驱动的 LiveKit 集群逐步推进；第一批只建议开通同地域 VPC、两台 4c8g 控制面 ECS、ALB/CLB、ACR 和 SLS，不一次购买完整集群。
+- 当前主机基线为 4 vCPU、7.3 GiB RAM、2 GiB swap、59 GiB 系统盘（61% 已用）；Agent 容器 2 GiB。
+- 用户审批点：购买/升配资源、provider 配额、生产 migration、正式 DNS/流量、旧资源释放和 App 发布。第二品牌站还需域名、中文站名、Logo 和主色。
+- 下一开发动作：完成第二品牌站接线与全量验证；随后准备第一、二项的最小影响部署。Backend 多实例前必须实现持久事件队列，不能依赖进程内账号锁。
+
 ## 2026-09-04 训练数据导出硬闸门 Phase 2
 
 - 已把现役 `backend/scripts/export_audio_target_dataset.ts` 从“查询即下载”改为 fail-closed 训练导出：逐条复核当前 Auth 四项授权、服务端 `admitted` 版本、训练用途 scope、target/时长、对象大小/类型/ETag、DB upload receipt 与 OSS 活动 manifest；manifest tombstone、缺失对象、授权失效、明确低置信/重录/拒绝状态均不能进入训练快照，原始录音不删除。
@@ -196,9 +209,8 @@
 - `livekit_agent` 以 `X-Account-ID` 发送账户键；8001 独占用户注册、个性化/公共 fallback、线上最佳模型和实验晋升。以后新增或替换个性化模型只改模型服务注册表，不改 VoxFlame 代码、环境变量或容器。
 - HTTP 返回的 `account_id` 若与请求不一致会被拒绝；前端诊断只收到 `model_version / personalized / fallback`，不收到模型账户键。8001 失败继续回退 DashScope realtime ASR。
 - HTTP 客户端按 LiveKit 会话复用连接，避免每句话重复建立 TCP 连接；会话结束显式关闭。
-- 验证通过：LiveKit agent 全量 80 项（1 项 worker-only skip）、Backend TypeScript build、RTC/LiveKit 契约测试、compose 展开和 `git diff --check`。仓库搜索确认旧白名单与旧端口引用为 0。
-- 尚未完成：当前主机 `127.0.0.1:8001/health` 实测 connection refused。现有 `127.0.0.1:18000` 由外部 SSH 会话监听，health 正常，但用 2187054680、2307294809、3083029019 与未知账户分别做真实 WAV smoke 时都只返回转写正文，缺少 `account_id/model_version/personalized/fallback`，说明它仍是旧接口而非新账户网关。
-- 部署边界：暂不重启仍在服务的旧 `livekit-agent`，避免把线上从可用 18000 切到不可达 8001。先将远端新服务 8001 映射为本机可达的 8001，并确认三账户个性化与未知账户公共 fallback 契约，再执行 `sudo scripts/docker-rebuild-core-fast.sh backend`（若 backend 镜像包含本次 RTC 变更）和 `sudo scripts/docker-rebuild-core-fast.sh` 支持的 livekit-agent 最小重建路径；若脚本无 agent 单服务模式，则用 `sudo docker compose build livekit-agent && sudo docker compose up -d --no-deps livekit-agent`。
+- 2026-09-04 已完成生产账户对照和旧入口收口：8001 反向隧道可用，三名真实注册用户分别命中 EXP-29/24/25，未知键命中公共 `exp16l3-lambda025`；8000/18000 无监听。Agent 只信任 Backend 签名的 dispatch `authenticated_user_id/asr_account_id`，不再从 participant metadata/attributes 或认证 ID 兜底推导模型键；participant token 也不再携带认证用户 ID。可重复硬门为 `cd backend && env -u NODE_TLS_REJECT_UNAUTHORIZED npm run audit:asr-models`。
+- 未完成边界：8001 仍是单隧道/单 GPU 服务，尚未完成并发容量压测、双实例故障切换和 DashScope fallback 故障演练；这些未完成前不能把账户路由正确等同于 ASR 扩容完成。
 
 ## 2026-08-24 Web “重录这一句”替换语义修复
 

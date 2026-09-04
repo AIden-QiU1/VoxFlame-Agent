@@ -27,6 +27,31 @@ interface UploadDiscardResponse {
   success: boolean
 }
 
+const MOBILE_UPLOAD_REQUEST_ATTEMPTS = 3
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs))
+}
+
+async function fetchUploadApiWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit,
+): Promise<Response> {
+  let response: Response | null = null
+  for (let attempt = 0; attempt < MOBILE_UPLOAD_REQUEST_ATTEMPTS; attempt += 1) {
+    response = await fetch(input, init)
+    if ((response.status !== 429 && response.status !== 503) || attempt === MOBILE_UPLOAD_REQUEST_ATTEMPTS - 1) {
+      return response
+    }
+    const retryAfter = Number(response.headers.get('Retry-After'))
+    const delayMs = Number.isFinite(retryAfter) && retryAfter > 0
+      ? Math.min(10_000, retryAfter * 1000)
+      : Math.min(4_000, 500 * 2 ** attempt)
+    await wait(delayMs)
+  }
+  return response as Response
+}
+
 function buildApiUrl(apiBaseUrl: string, path: string): string {
   return `${apiBaseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`
 }
@@ -91,6 +116,15 @@ const TRAINING_METADATA_KEYS = new Set([
   'collection_plan_id',
   'reading_assistance_used',
   'etiology',
+  'speech_variant',
+  'dialect_name',
+  'dialect_name_user_reported',
+  'dialect_code',
+  'language_tag',
+  'prompt_language',
+  'spoken_language',
+  'label_source',
+  'utterance_pair_id',
   'severity',
   'age_band',
   'sex',
@@ -179,7 +213,7 @@ export async function uploadMobileRecorderQueueItem(
   const authHeaders = await getAuthorizationHeader(options.tokenProvider)
   const storagePath = buildMobileStoragePath(item)
   const contentType = contentTypeForFormat(item.recording.audio.format)
-  const signResponse = await fetch(
+  const signResponse = await fetchUploadApiWithRetry(
     buildApiUrl(options.apiBaseUrl, '/upload/sign'),
     {
       method: 'POST',
@@ -216,7 +250,7 @@ export async function uploadMobileRecorderQueueItem(
     throw new Error(`mobile_upload_put_${putResponse.status}`)
   }
 
-  const completeResponse = await fetch(
+  const completeResponse = await fetchUploadApiWithRetry(
     buildApiUrl(options.apiBaseUrl, '/upload/complete'),
     {
       method: 'POST',

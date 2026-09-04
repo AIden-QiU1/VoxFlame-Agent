@@ -31,6 +31,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Loader2, Mail, Lock, Smartphone } from 'lucide-react'
 import { toProductMessage } from '@/lib/ui/product-message'
 import { cn } from '@/lib/utils'
+import { SiteBrandMark } from '@/components/branding/SiteBrandMark'
+import { getSiteBrand } from '@/lib/site-branding'
 import {
     TRAINING_ETIOLOGY_OPTIONS,
     type TrainingEtiology,
@@ -38,6 +40,8 @@ import {
 
 type Mode = 'login' | 'register'
 type LoginMethod = 'email' | 'phone'
+
+const siteBrand = getSiteBrand()
 
 /**
  * 友好的错误提示映射
@@ -213,10 +217,14 @@ export default function LoginPage() {
             commercialUseAccepted,
         })
         const profileMetadata = buildRegistrationProfileMetadata(registrationProfile)
+        const emailRedirectTo = typeof window === 'undefined'
+            ? undefined
+            : `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
+                emailRedirectTo,
                 data: {
                     ...profileMetadata,
                     ...buildLegalConsentUserData(consentSnapshot),
@@ -383,11 +391,8 @@ export default function LoginPage() {
                 mode === 'register' ? 'max-w-2xl' : 'max-w-md',
             )}>
                 <CardHeader className="space-y-1">
-                    <div className="flex justify-center mb-4">
-                        <h1 className="text-balance text-4xl font-normal">
-                            <span className="text-amber-500">燃</span>
-                            <span className="text-orange-500">言</span>
-                        </h1>
+                    <div className="mb-4 flex justify-center">
+                        <SiteBrandMark brand={siteBrand} />
                     </div>
                     <CardTitle className="text-2xl font-bold text-center">
                         {mode === 'login' ? '欢迎回来' : '创建账户'}
@@ -691,7 +696,7 @@ export default function LoginPage() {
                                 <Label htmlFor="privacy-consent" className="space-y-1 text-sm font-normal leading-6 text-gray-700">
                                     <span className="block font-medium text-gray-900">我已阅读《用户隐私》并同意账号信息按说明处理</span>
                                     <span className="block text-pretty text-gray-600">
-                                        了解燃言会保存哪些账号信息、训练数据如何隔离，以及你能如何停止使用或删除数据。
+                                        了解{siteBrand.name}会保存哪些账号信息、训练数据如何隔离，以及你能如何停止使用或删除数据。
                                     </span>
                                     <Link href="/privacy" className="inline-flex text-amber-700 underline underline-offset-4">
                                         查看用户隐私

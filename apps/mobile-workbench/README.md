@@ -234,6 +234,26 @@ The app environment is public-client only. Before building for a real phone, set
 
 Remote EAS builds do not automatically receive your uncommitted local `.env`, so configure the `EXPO_PUBLIC_*` values in EAS before cloud builds. These values are public client configuration; never add service role keys, LiveKit API secrets, DashScope keys, or OSS secrets.
 
+### 独立品牌构建
+
+第二品牌与主 App 共用业务代码和 Backend/Auth/OSS 契约，但必须作为独立安装包发布。构建前设置以下公开品牌值和发布标识：
+
+```bash
+VOXFLAME_APP_FLAVOR=collection \
+EXPO_PUBLIC_APP_BRAND_NAME=<第二品牌名称> \
+EXPO_PUBLIC_APP_BRAND_ACCENT=<#RRGGBB> \
+VOXFLAME_COLLECTION_APP_ICON=<图标路径> \
+VOXFLAME_COLLECTION_ANDROID_ADAPTIVE_ICON=<Android 前景图路径> \
+VOXFLAME_COLLECTION_APP_SLUG=<独立 Expo slug> \
+VOXFLAME_COLLECTION_APP_SCHEME=<独立 URL scheme> \
+VOXFLAME_COLLECTION_ANDROID_PACKAGE=<独立 Android package> \
+VOXFLAME_COLLECTION_IOS_BUNDLE_IDENTIFIER=<独立 iOS Bundle ID> \
+VOXFLAME_COLLECTION_EAS_PROJECT_ID=<独立 EAS project ID> \
+npx expo config --type public
+```
+
+`app.config.js` 会在缺少任一独立标识时直接失败，防止误用 VoxFlame 名称、图标、包名、签名项目或发布渠道。第二品牌网站未配置自己的 App 下载地址时只显示“准备中”，不会分发现有 VoxFlame APK。
+
 This server currently has stale `HTTP_PROXY / HTTPS_PROXY` values and an unsafe `NODE_TLS_REJECT_UNAUTHORIZED` override. The repository's `eas:*` and `build:*` scripts unset them automatically. If you run EAS manually, prefix the command with `env -u HTTP_PROXY -u HTTPS_PROXY -u NODE_TLS_REJECT_UNAUTHORIZED`.
 
 `npm run eas:login` also uses `--no-browser` because this app is developed over VS Code / SSH. Browser login would send the callback to the developer computer's `localhost`, while EAS CLI is listening on the remote server.

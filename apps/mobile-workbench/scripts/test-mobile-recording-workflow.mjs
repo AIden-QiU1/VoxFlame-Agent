@@ -14,7 +14,7 @@ const transpiled = ts.transpileModule(source, {
 const outputDirectory = await mkdtemp(path.join(tmpdir(), 'voxflame-mobile-workflow-'))
 const outputPath = path.join(outputDirectory, 'mobile-recording-workflow.mjs')
 await writeFile(outputPath, transpiled)
-const { captureStillBelongsToContributor, createMobileSerialExecutor, decideMobileAdvance, reconcileMobileExerciseSelection } = await import(
+const { buildMobileSpeechVariantMetadata, captureStillBelongsToContributor, createMobileSerialExecutor, createMobileUtterancePairId, decideMobileAdvance, reconcileMobileExerciseSelection, shouldOfferMobileDialectPair } = await import(
   `${pathToFileURL(outputPath).href}?v=${Date.now()}`
 )
 
@@ -46,6 +46,17 @@ assert.equal(captureStillBelongsToContributor({ contributorId: 'account-a' }, 'a
 assert.equal(captureStillBelongsToContributor({ contributorId: 'account-a' }, 'account-b'), false)
 assert.equal(captureStillBelongsToContributor({ contributorId: 'account-a' }, null), false)
 
+const pairId = createMobileUtterancePairId(1_000, 0.5)
+assert.equal(shouldOfferMobileDialectPair({ hasDialect: true, dialectName: '粤语', isAssessment: false }), true)
+assert.equal(shouldOfferMobileDialectPair({ hasDialect: true, dialectName: '粤语', isAssessment: true }), false)
+assert.deepEqual(buildMobileSpeechVariantMetadata({ speechVariant: 'dialect', utterancePairId: pairId, dialectName: '粤语' }), {
+  speech_variant: 'dialect',
+  prompt_language: 'zh-CN',
+  spoken_language: 'zh-dialect',
+  utterance_pair_id: pairId,
+  dialect_name: '粤语',
+})
+
 const runSerially = createMobileSerialExecutor()
 const executionOrder = []
 await Promise.all([
@@ -72,6 +83,10 @@ for (const requiredField of [
   'collection_mode:',
   'consent_version:',
   'audio_quality_disposition:',
+  "'speech_variant'",
+  "'utterance_pair_id'",
+  'fetchUploadApiWithRetry',
+  "response.status !== 429 && response.status !== 503",
 ]) {
   assert.equal(
     uploadClientSource.includes(requiredField),

@@ -78,6 +78,7 @@ assert(packageJson.dependencies?.['@react-native-async-storage/async-storage'] =
 assert(packageJson.dependencies?.['expo-document-picker'], 'Expo document picker is required for native material import')
 assert(packageJson.scripts?.check === 'node scripts/check-mobile-workbench.mjs', 'mobile check script is missing')
 assert(packageJson.scripts?.['test:communication'] === 'node scripts/test-mobile-quick-expression.mjs', 'mobile communication regression script is missing')
+assert(packageJson.scripts?.['test:branding'] === 'node scripts/test-mobile-branding.mjs', 'mobile branding regression script is missing')
 assert(packageJson.scripts?.['test:training']?.includes('test-mobile-training-feedback.mjs'), 'mobile training feedback regression is missing')
 assert(packageJson.scripts?.['test:training']?.includes('test-mobile-attempt-confirmation.mjs'), 'mobile attempt confirmation regression is missing')
 assert(packageJson.scripts?.['test:training']?.includes('test-mobile-collection-controls.mjs'), 'mobile collection control regression is missing')
@@ -102,7 +103,9 @@ assert(packageJson.scripts?.['sync:android:latest'] === 'bash ../../scripts/rele
 assert(androidReleaseScript.includes('eas-cli@latest build'), 'android website release must run EAS Build')
 assert(androidReleaseScript.includes('VoxFlame-Android.apk'), 'android website release must publish the stable APK name')
 assert(androidReleaseScript.includes('VoxFlame-Android.previous.apk'), 'android website release must retain a rollback APK')
-assert(downloadPageSource.includes("const androidDownloadUrl = '/download/android'"), 'website Android download must use the permanent first-party URL')
+assert(downloadPageSource.includes("siteBrand.isCollectionSite ? '' : '/download/android'"), 'main website Android download must keep the permanent first-party URL')
+assert(composeSource.includes('NEXT_PUBLIC_VOXFLAME_COLLECTION_ANDROID_APP_DOWNLOAD_URL'), 'collection site must use its own Android package URL')
+assert(!caddySource.slice(caddySource.indexOf('# 第二品牌站')).includes('VoxFlame-Android.apk'), 'collection site must not serve the VoxFlame APK')
 assert(composeSource.includes('VOXFLAME_ANDROID_RELEASE_DIR:-./releases/android'), 'Caddy must mount the configurable Android release directory')
 assert(caddySource.includes('handle /download/android'), 'Caddy must own the permanent Android download route')
 assert(packageJson.scripts?.['build:ios:preview']?.includes('--platform ios'), 'ios preview build script is missing')
@@ -144,6 +147,21 @@ for (const publicEnvName of [
     `${publicEnvName} must use Expo-compatible static property access`,
   )
 }
+const mobileBrandingSource = readFileSync(
+  path.join(appRoot, 'src/config/mobile-branding.ts'),
+  'utf8',
+)
+for (const publicBrandEnvName of [
+  'EXPO_PUBLIC_APP_BRAND_NAME',
+  'EXPO_PUBLIC_APP_BRAND_ACCENT',
+]) {
+  assert(
+    mobileBrandingSource.includes(`process.env.${publicBrandEnvName}`),
+    `${publicBrandEnvName} must use Expo-compatible static property access`,
+  )
+}
+assert(!sourceText.includes('VoxFlame 用户'), 'user-visible account fallback must use mobile branding')
+assert(!sourceText.includes('VoxFlame 账户'), 'user-visible account label must use mobile branding')
 assert(
   !mobileConfigSource.includes('process?.env?.[name]')
   && !mobileConfigSource.includes('process.env[name]'),
@@ -238,13 +256,15 @@ for (const requiredToken of [
   "training_flow: flow",
   'characterEditDistance',
   "flow === 'collection' ? <View style={styles.customPracticePanel}",
-  'sentenceId: effectiveExercise.id',
+  'sentenceId: captureExercise.id',
   'recognizedText: item.recognizedText',
   'understandsConsent: consentReady',
   '我同意本次录音用于训练',
   'MOBILE_COLLECTION_PLANS',
   'collection_plan_id: flow === \'collection\' ? collectionPlanId : undefined',
   'reading_assistance_used: readingAssistanceKeysRef.current.has(readingAssistanceKey)',
+  'speechVariant: capture.speechVariant',
+  'utterancePairId: capture.utterancePairId',
   "label={isReadingAssistancePlaying ? '正在朗读' : '听一下'}",
   '/prepared-expressions/active',
   '/profile-memory',

@@ -1,9 +1,12 @@
 import Link from 'next/link'
+import { getSiteBrand } from '@/lib/site-branding'
+
+const siteBrand = getSiteBrand()
 
 const PRIVACY_ITEMS = [
   {
     title: '账号与身份',
-    body: '燃言会保存你的登录账号、基础身份标识和必要的会话信息，用来确保训练数据、沟通档案和个人设置只归你自己所有。',
+    body: `${siteBrand.name}会保存你的登录账号、基础身份标识和必要的会话信息，用来确保训练数据、沟通档案和个人设置只归你自己所有。`,
   },
   {
     title: '训练与沟通数据',
@@ -29,12 +32,12 @@ const PRIVACY_ITEMS = [
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,_#fffdf8_0%,_#fff9f1_56%,_#f6f5f0_100%)] px-4 py-10">
-      <div className="mx-auto max-w-3xl rounded-[32px] border border-stone-200 bg-white p-8 shadow-[0_24px_80px_rgba(120,53,15,0.08)]">
+    <main className="min-h-dvh bg-stone-50 px-4 py-10">
+      <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-8 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-amber-700">VoxFlame / 用户隐私</p>
-            <h1 className="mt-2 text-3xl font-semibold text-gray-900">你的账号、训练数据和沟通档案怎么分开保存</h1>
+            <p className="text-sm font-medium text-amber-700">{siteBrand.name} / 用户隐私</p>
+            <h1 className="mt-2 text-balance text-3xl font-semibold text-gray-900">你的账号、训练数据和沟通档案怎么分开保存</h1>
           </div>
           <Link href="/login" className="rounded-full border border-stone-300 px-4 py-2 text-sm text-gray-700 transition hover:border-stone-400 hover:bg-stone-50">
             返回登录
@@ -42,7 +45,7 @@ export default function PrivacyPage() {
         </div>
 
         <p className="mt-6 text-base leading-7 text-gray-600">
-          燃言的默认原则不是多拿数据，而是只拿完成当前功能真正需要的最小信息。注册时会分别征得隐私、敏感信息处理、数据采集和商业用途授权；不同意商业用途不会影响你查看基础功能，但不能进入需要该授权的训练采集链路。
+          {siteBrand.name}的默认原则不是多拿数据，而是只拿完成当前功能真正需要的最小信息。注册时会分别征得隐私、敏感信息处理、数据采集和商业用途授权；不同意商业用途不会影响你查看基础功能，但不能进入需要该授权的训练采集链路。
         </p>
 
         <div className="mt-8 space-y-4">

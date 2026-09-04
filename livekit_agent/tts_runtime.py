@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from capacity import ProcessSlotPool, ProviderCapacityExceeded, build_provider_pool
 from config import LiveKitAgentConfig
 
 logger = logging.getLogger("voxflame-livekit-agent.tts")
@@ -191,7 +192,13 @@ class DashScopeRealtimeTTSClient:
 
 
 class LiveKitAudioReplyRuntime:
-    def __init__(self, *, config: LiveKitAgentConfig, room: Any) -> None:
+    def __init__(
+        self,
+        *,
+        config: LiveKitAgentConfig,
+        room: Any,
+        capacity_pool: ProcessSlotPool | None = None,
+    ) -> None:
         from livekit import rtc
 
         self.config = config
@@ -207,6 +214,12 @@ class LiveKitAudioReplyRuntime:
         self.error_message: str | None = None
         self._tts_lock = asyncio.Lock()
         self._speaking = False
+        self.capacity_pool = capacity_pool or build_provider_pool(
+            provider="tts",
+            slots=config.provider_tts_max_concurrency,
+            wait_timeout_seconds=config.provider_tts_wait_timeout_seconds,
+            lock_directory=config.provider_capacity_directory,
+        )
         self.client = DashScopeRealtimeTTSClient(
             url=config.dashscope_tts_url,
             model=config.dashscope_tts_model,
@@ -240,21 +253,30 @@ class LiveKitAudioReplyRuntime:
             consumer = asyncio.create_task(self._consume_audio_queue())
 
             try:
-                await self.client.start(
-                    {
-                        "modalities": ["audio"],
-                        "voice": self.config.dashscope_tts_voice,
-                        "mode": "server_commit",
-                        "output_audio_format": "pcm",
-                        "sample_rate": self.config.dashscope_tts_sample_rate,
-                    }
+                async with self.capacity_pool.lease():
+                    await self.client.start(
+                        {
+                            "modalities": ["audio"],
+                            "voice": self.config.dashscope_tts_voice,
+                            "mode": "server_commit",
+                            "output_audio_format": "pcm",
+                            "sample_rate": self.config.dashscope_tts_sample_rate,
+                        }
+                    )
+                    await self.client.append_text(text)
+                    await self.client.commit_text()
+                    await asyncio.wait_for(
+                        self.done_event.wait(),
+                        timeout=self.config.dashscope_tts_request_timeout_seconds,
+                    )
+            except ProviderCapacityExceeded as exc:
+                self.error_message = str(exc)
+                logger.warning(
+                    "LiveKit TTS capacity unavailable provider=%s wait_timeout_ms=%s",
+                    exc.provider,
+                    round(exc.wait_timeout_seconds * 1000),
                 )
-                await self.client.append_text(text)
-                await self.client.commit_text()
-                await asyncio.wait_for(
-                    self.done_event.wait(),
-                    timeout=self.config.dashscope_tts_request_timeout_seconds,
-                )
+                return False
             except Exception as exc:
                 self.error_message = str(exc)
                 logger.warning("LiveKit TTS reply failed: %s", exc)

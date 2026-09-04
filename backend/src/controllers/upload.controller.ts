@@ -8,6 +8,7 @@ import {
     UploadAdmissionError,
     validateUploadSignInput,
 } from '../services/upload-admission.service';
+import { uploadCapacityMiddleware } from '../middlewares/upload-capacity.middleware';
 
 const router = Router();
 
@@ -71,7 +72,7 @@ router.post('/reading/reset', async (req, res) => {
  * POST /api/upload/sign
  * Generate a signed URL for client-side upload
  */
-router.post('/sign', async (req, res) => {
+router.post('/sign', uploadCapacityMiddleware('sign'), async (req, res) => {
     try {
         const { filename, contentType } = req.body ?? {};
         const contributorId = req.user?.id;
@@ -107,7 +108,7 @@ router.post('/sign', async (req, res) => {
  * 1. Insert into Database
  * 2. Append to OSS transcript manifest
  */
-router.post('/complete', async (req, res) => {
+router.post('/complete', uploadCapacityMiddleware('complete'), async (req, res) => {
     try {
         const {
             audioPath,

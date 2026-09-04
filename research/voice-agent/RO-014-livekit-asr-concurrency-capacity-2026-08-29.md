@@ -12,12 +12,16 @@ LiveKit Agents 官方文档说明 Job 使用隔离进程；默认按 5 秒 CPU �
 
 ## 当前工程事实
 
-已配置 `load_threshold=0.7`、2 个 idle processes、单 Job 450 MiB 告警/700 MiB 限制。`QWEN_HTTP_ASR_URL=http://127.0.0.1:8001/transcribe` 当前未在主机监听，实际 provider、ASR 外部并发配额、TURN/TLS 和带宽仍需验证。低风险 HTTP 健康压测不能证明 RTC 容量。
+已配置 `load_threshold=0.7`、2 个 idle processes、单 Job 450 MiB 告警/700 MiB 限制。2026-09-04 新增 active jobs/CPU/内存联合派单负载，当前 2 GiB Agent 容器默认最多 2 个 active jobs；ASR/LLM/TTS 各自通过跨 Job 进程文件锁提供 2 个单机槽位。官方 SDK reserved slots 会纳入有效负载，避免派单窗口超收，但不能代替 provider 配额控制。
+
+`QWEN_HTTP_ASR_URL=http://127.0.0.1:8001/transcribe` 当前未在主机监听，connection refused；现存 18000 为旧 SSH 网关且不满足新账户响应契约。当前回退 DashScope realtime ASR，实际个性化 ASR 实例数、集群 provider 配额、TURN/TLS 和带宽仍需验证。低风险 HTTP 健康压测不能证明 RTC 容量。
+
+版本专项对照结论：LiveKit Agents `1.7.1` 相比仓库原 `1.5.1` 包含扩容相关的进程内存统计修正、Worker 连接失败退出、drain/指标增强；LiveKit Server `1.13.6` 相比原 `1.10.1` 包含 Agent 连接关闭死锁修复、节点统计、负载修正及 TURN 配额/安全变化。仓库升级到这两个精确版本，但生产 Server 升级必须验证 1.12/1.13 引入的 TURN TTL 与受限网段权限变化。
 
 ## 分阶段实验与扩展
 
 1. **基线**：固定 5→10→20→50 路音频样本、测试账号和版本；同时采集 active jobs、Job 启动耗时、ASR/TTS/LLM P95/P99、429/5xx/timeout、丢包、CPU/RAM/FD。
-2. **隔离**：为 ASR/TTS/LLM 增加全局信号量、超时、熔断和排队指标；确认 8001 服务或切换 DashScope fallback；故障注入验证第二 Worker 接管。
+2. **隔离**：单机 Provider 槽位已实现；下一步以 Redis/集中配额控制多 Agent 服务器总配额，恢复 8001 新账户网关至少两个实例，并故障注入验证第二 Worker 接管。
 3. **扩展门**：仅当 50 路保护指标达标且第二 Worker、外部配额和 TURN 带宽通过，才做 100→200 路；1000 路必须拆分 Worker/ASR、增加可观测性并重新压测，不能由当前单机推算。
 
 ## 停止与回退

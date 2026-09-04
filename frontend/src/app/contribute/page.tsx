@@ -23,6 +23,7 @@ import {
   Volume2,
 } from 'lucide-react'
 import { MicrophoneInputFeedback } from '@/components/runtime/MicrophoneInputFeedback'
+import { SiteBrandMark } from '@/components/branding/SiteBrandMark'
 import { RecordingDurationSummary } from '@/components/recording/RecordingDurationSummary'
 import { useAuth } from '@/hooks/useAuth'
 import { useMandarinTrainingSession } from '@/hooks/useMandarinTrainingSession'
@@ -43,6 +44,7 @@ import {
   getExercisesByCategory,
 } from '@/lib/corpus/mandarin-training'
 import { cn } from '@/lib/utils'
+import { getSiteBrand } from '@/lib/site-branding'
 import type {
   VoxFlameConsentScope,
   VoxFlameRecordingEnvelope,
@@ -77,6 +79,13 @@ import {
   type TrainingSampleQuality,
 } from '@/lib/training/training-sample-quality'
 import { getNextExerciseAfterAcceptedRecording } from '@/lib/training/training-attempt-navigation'
+import {
+  buildSpeechVariantMetadata,
+  createUtterancePairId,
+  shouldOfferDialectPair,
+  type DialectCollectionTarget,
+  type TrainingSpeechVariant,
+} from '@/lib/training/dialect-collection'
 import { shouldDisableTrainingRecordingControl } from '@/lib/training/training-recording-control'
 import {
   calculateCharacterEditDistance,
@@ -107,6 +116,8 @@ import type { WorkspaceMemorySnapshot } from '@/lib/memory/workspace-snapshot'
 import type { MandarinReadingArticle } from '@/lib/corpus/reading-articles'
 import { shouldBlockTrainingPageForProgress } from '@/lib/training/training-page-loading'
 
+const siteBrand = getSiteBrand()
+
 type AttemptSaveTrigger = 'auto' | 'manual'
 type CollectionFlowStep = 'prepare' | 'record' | 'review'
 type ExerciseStatusFilter = 'unread' | 'read' | 'all'
@@ -135,6 +146,8 @@ interface PracticeAttempt {
   recording: VoxFlameRecordingEnvelope | null
   uploadStatus: TrainingAttemptUploadStatus
   uploadReceipt: UploadReceipt | null
+  speechVariant: TrainingSpeechVariant
+  utterancePairId?: string
 }
 
 interface NoticeState {
@@ -254,6 +267,8 @@ function buildUploadMetadata(
   collectionPlanId?: CollectionPlanId,
   readingArticle?: MandarinReadingArticle | null,
   readingRoundId?: string | null,
+  speechVariant: TrainingSpeechVariant = 'mandarin',
+  utterancePairId?: string,
 ): Record<string, unknown> {
   const lineage = buildTrainingSampleLineage(exercise, recording)
   const metadata: Record<string, unknown> = {
@@ -282,6 +297,11 @@ function buildUploadMetadata(
     consent_version: LEGAL_CONSENT_VERSION,
     collection_plan_id: collectionPlanId,
     reading_assistance_used: readingAssistanceUsed,
+    ...buildSpeechVariantMetadata({
+      speechVariant,
+      utterancePairId,
+      dialectName: uploadLabels?.dialectName,
+    }),
   }
 
   if (readingArticle) {
@@ -609,7 +629,7 @@ export default function ContributePage() {
   return (
     <div className="min-h-dvh bg-stone-50">
       <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-start justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
             <Link href="/practice" className="inline-flex min-h-11 items-center text-sm font-medium text-amber-700 hover:text-amber-800">
               ← 返回练习选择
@@ -617,6 +637,7 @@ export default function ContributePage() {
             <h1 className="text-balance text-2xl font-semibold text-gray-900">录下你真正会说的话</h1>
             <p className="mt-1 text-sm text-gray-600 text-pretty">选择一种方式开始。</p>
           </div>
+          <SiteBrandMark brand={siteBrand} compact />
         </div>
       </header>
 
@@ -799,6 +820,7 @@ export function TrainingRecorderPage({
   const [environmentReady, setEnvironmentReady] = useState(false)
   const [distanceReady, setDistanceReady] = useState(false)
   const [collectionFlowStep, setCollectionFlowStep] = useState<CollectionFlowStep>('prepare')
+  const [pendingDialectTarget, setPendingDialectTarget] = useState<DialectCollectionTarget<PracticeExercise> | null>(null)
   const [isReplacingAttempt, setIsReplacingAttempt] = useState(false)
   const [isMaterialEditorOpen, setIsMaterialEditorOpen] = useState(wantsNewMaterial)
   const [materialTitle, setMaterialTitle] = useState('')
@@ -812,8 +834,10 @@ export function TrainingRecorderPage({
   const disconnectRef = useRef(disconnect)
   disconnectRef.current = disconnect
   const discardedAttemptIdsRef = useRef<Set<number>>(new Set())
-  const pendingReplacementExerciseRef = useRef<PracticeExercise | null>(null)
+  const pendingReplacementExerciseRef = useRef<DialectCollectionTarget<PracticeExercise> | null>(null)
   const recordingExerciseRef = useRef<PracticeExercise | null>(null)
+  const recordingSpeechVariantRef = useRef<TrainingSpeechVariant>('mandarin')
+  const recordingUtterancePairIdRef = useRef<string | undefined>(undefined)
   const exerciseSelectionTouchedRef = useRef(false)
   const recordingReadingAssistanceRef = useRef(false)
   const readingAssistanceExerciseIdsRef = useRef<Set<string>>(new Set())
@@ -1136,6 +1160,16 @@ export function TrainingRecorderPage({
     workspaceSnapshot?.user_profile_memory?.etiology,
     workspaceSnapshot?.user_profile_memory?.severity,
   ])
+  const dialectPairEnabled = shouldOfferDialectPair({
+    hasDialect: Boolean(trainingUploadLabels.hasDialect),
+    dialectName: trainingUploadLabels.dialectName,
+    isAssessment: isAssessmentTopic,
+  })
+  const activeSpeechVariant = pendingDialectTarget?.speechVariant ?? 'mandarin'
+  const activeCollectionExercise = pendingDialectTarget?.exercise ?? currentExercise
+  const activeSpeechVariantLabel = activeSpeechVariant === 'dialect'
+    ? `${trainingUploadLabels.dialectName ?? '方言'}表达`
+    : '普通话表达'
   const recorderStatus = getRecorderStatusCopy(status, sessionError, isAssessmentTopic)
   const currentAttemptCharacterAccuracy = useMemo(() => {
     if (!attempt || !isAssessmentTopic || attempt.feedback.normalizedTarget.length === 0) {
@@ -1271,6 +1305,7 @@ export function TrainingRecorderPage({
     setVisibleInventoryLimit(DEFAULT_VISIBLE_SENTENCES)
     exerciseSelectionTouchedRef.current = false
     setAttempt(null)
+    setPendingDialectTarget(null)
     setCollectionFlowStep('prepare')
     void refreshLocalQueueCount()
   }, [refreshLocalQueueCount, topicId, userId])
@@ -1428,6 +1463,7 @@ export function TrainingRecorderPage({
     exerciseSelectionTouchedRef.current = true
     setSelectedExerciseId(visibleExercises[nextIndex].id)
     setAttempt(null)
+    setPendingDialectTarget(null)
   }, [currentExercise, isProcessing, isRecording, visibleExercises])
 
   const handleSelectExercise = useCallback((exerciseId: string) => {
@@ -1437,6 +1473,7 @@ export function TrainingRecorderPage({
     exerciseSelectionTouchedRef.current = true
     setSelectedExerciseId(exerciseId)
     setAttempt(null)
+    setPendingDialectTarget(null)
   }, [isProcessing, isRecording])
 
   const handleSelectPhonologyGroup = useCallback((groupId: PhonologyGroupId) => {
@@ -1449,6 +1486,7 @@ export function TrainingRecorderPage({
     setSelectedExerciseId('')
     setExerciseQuery('')
     setAttempt(null)
+    setPendingDialectTarget(null)
   }, [isProcessing, isRecording, selectedPhonologyGroupId])
 
   const handlePlayReadingAssistance = useCallback(() => {
@@ -1483,7 +1521,7 @@ export function TrainingRecorderPage({
   }, [currentExercise, isProcessing, isRecording])
 
   const handleStartRecording = useCallback(async () => {
-    if (!currentExercise || isProcessing) {
+    if (!activeCollectionExercise || isProcessing) {
       return
     }
 
@@ -1503,25 +1541,37 @@ export function TrainingRecorderPage({
       return
     }
 
+    const collectionTarget: DialectCollectionTarget<PracticeExercise> = pendingDialectTarget ?? {
+      exercise: activeCollectionExercise,
+      speechVariant: 'mandarin',
+      utterancePairId: dialectPairEnabled ? createUtterancePairId() : undefined,
+    }
     setAttempt(null)
     setNotice(null)
     setCollectionFlowStep('record')
-    recordingExerciseRef.current = currentExercise
-    recordingReadingAssistanceRef.current = readingAssistanceExerciseIdsRef.current.has(currentExercise.id)
+    recordingExerciseRef.current = collectionTarget.exercise
+    recordingSpeechVariantRef.current = collectionTarget.speechVariant
+    recordingUtterancePairIdRef.current = collectionTarget.utterancePairId
+    recordingReadingAssistanceRef.current = readingAssistanceExerciseIdsRef.current.has(collectionTarget.exercise.id)
 
     try {
       await startRecording()
     } catch (error) {
       recordingExerciseRef.current = null
+      recordingSpeechVariantRef.current = 'mandarin'
+      recordingUtterancePairIdRef.current = undefined
       console.error('[contribute] start recording failed:', error)
       setNotice({
         tone: 'error',
         message: '录音失败，请重试。',
       })
     }
-  }, [collectionPreflightReady, currentExercise, isProcessing, isReadingAssistancePlaying, startRecording])
+  }, [activeCollectionExercise, collectionPreflightReady, dialectPairEnabled, isProcessing, isReadingAssistancePlaying, pendingDialectTarget, startRecording])
 
   const removeAttemptFromProgress = useCallback((attemptToRemove: PracticeAttempt) => {
+    if (attemptToRemove.speechVariant === 'dialect') {
+      return
+    }
     setSessionPracticedExerciseIds((currentIds) => (
       currentIds.filter((exerciseId) => exerciseId !== attemptToRemove.exercise.id)
     ))
@@ -1534,12 +1584,15 @@ export function TrainingRecorderPage({
     }
   }, [isAssessmentTopic])
 
-  const startReplacementRecording = useCallback(async (exerciseToRetry: PracticeExercise) => {
+  const startReplacementRecording = useCallback(async (targetToRetry: DialectCollectionTarget<PracticeExercise>) => {
+    const exerciseToRetry = targetToRetry.exercise
     exerciseSelectionTouchedRef.current = true
     setSelectedExerciseId(exerciseToRetry.id)
     setAttempt(null)
     setCollectionFlowStep('record')
     recordingExerciseRef.current = exerciseToRetry
+    recordingSpeechVariantRef.current = targetToRetry.speechVariant
+    recordingUtterancePairIdRef.current = targetToRetry.utterancePairId
     recordingReadingAssistanceRef.current = readingAssistanceExerciseIdsRef.current.has(exerciseToRetry.id)
 
     try {
@@ -1550,6 +1603,8 @@ export function TrainingRecorderPage({
       })
     } catch (error) {
       recordingExerciseRef.current = null
+      recordingSpeechVariantRef.current = 'mandarin'
+      recordingUtterancePairIdRef.current = undefined
       console.error('[contribute] retry recording failed:', error)
       setNotice({
         tone: 'error',
@@ -1596,11 +1651,19 @@ export function TrainingRecorderPage({
 
     if (replacementPlan === 'start_without_discard' || !attemptToReplace?.recording) {
       setIsReplacingAttempt(true)
-      await startReplacementRecording(exerciseToRetry)
+      await startReplacementRecording({
+        exercise: exerciseToRetry,
+        speechVariant: attemptToReplace?.speechVariant ?? activeSpeechVariant,
+        utterancePairId: attemptToReplace?.utterancePairId ?? pendingDialectTarget?.utterancePairId,
+      })
       return
     }
 
-    pendingReplacementExerciseRef.current = exerciseToRetry
+    pendingReplacementExerciseRef.current = {
+      exercise: exerciseToRetry,
+      speechVariant: attemptToReplace?.speechVariant ?? activeSpeechVariant,
+      utterancePairId: attemptToReplace?.utterancePairId ?? pendingDialectTarget?.utterancePairId,
+    }
     setIsReplacingAttempt(true)
     discardedAttemptIdsRef.current.add(attemptToReplace.createdAt)
     setAttempt((current) => (
@@ -1647,25 +1710,75 @@ export function TrainingRecorderPage({
 
     discardedAttemptIdsRef.current.delete(attemptToReplace.createdAt)
     removeAttemptFromProgress(attemptToReplace)
-    await startReplacementRecording(exerciseToRetry)
+    await startReplacementRecording({
+      exercise: exerciseToRetry,
+      speechVariant: attemptToReplace?.speechVariant ?? activeSpeechVariant,
+      utterancePairId: attemptToReplace?.utterancePairId ?? pendingDialectTarget?.utterancePairId,
+    })
   }, [
     attempt,
+    activeSpeechVariant,
     collectionPreflightReady,
     currentExercise,
     discardUploadedRecording,
     isProcessing,
     isRecording,
     isReplacingAttempt,
+    pendingDialectTarget?.utterancePairId,
     removeAttemptFromProgress,
     startReplacementRecording,
     userId,
   ])
 
+  const advanceAfterCompletedPair = useCallback((completedExercise: PracticeExercise) => {
+    const nextExercise = getNextExerciseAfterAcceptedRecording({
+      accepted: true,
+      currentExerciseId: completedExercise.id,
+      activeExercises: matchingExercises,
+      fallbackExercises: !readingArticle && normalizedQuery.length === 0
+        ? categoryExercises
+        : [],
+    })
+    if (nextExercise && nextExercise.id !== completedExercise.id) {
+      exerciseSelectionTouchedRef.current = true
+      setSelectedExerciseId(nextExercise.id)
+    }
+    return nextExercise
+  }, [categoryExercises, matchingExercises, normalizedQuery.length, readingArticle])
+
   const handleContinueAfterAttempt = useCallback(() => {
+    if (attempt?.speechVariant === 'mandarin' && dialectPairEnabled && attempt.utterancePairId) {
+      setPendingDialectTarget({
+        exercise: attempt.exercise,
+        speechVariant: 'dialect',
+        utterancePairId: attempt.utterancePairId,
+      })
+      setAttempt(null)
+      setNotice({
+        tone: 'info',
+        message: `接下来仍是同一句，请用${trainingUploadLabels.dialectName ?? '方言'}自然地说一遍。`,
+      })
+      setCollectionFlowStep('record')
+      return
+    }
+
+    setPendingDialectTarget(null)
     setAttempt(null)
     setNotice(null)
     setCollectionFlowStep('record')
-  }, [])
+  }, [attempt, dialectPairEnabled, trainingUploadLabels.dialectName])
+
+  const handleSkipDialect = useCallback(() => {
+    if (!attempt || attempt.speechVariant !== 'mandarin') return
+    const nextExercise = advanceAfterCompletedPair(attempt.exercise)
+    setPendingDialectTarget(null)
+    setAttempt(null)
+    setCollectionFlowStep('record')
+    setNotice({
+      tone: 'success',
+      message: nextExercise ? '已跳过方言录音，继续下一句。' : '已跳过方言录音，这一组已经完成。',
+    })
+  }, [advanceAfterCompletedPair, attempt])
 
   const persistTrainingAttempt = useCallback(async (
     attemptToPersist: PracticeAttempt,
@@ -1727,6 +1840,8 @@ export function TrainingRecorderPage({
         collectionPlanId,
         readingArticle,
         effectiveReadingRoundId,
+        attemptToPersist.speechVariant,
+        attemptToPersist.utterancePairId,
       ),
     })
     void recordingProgress.refresh()
@@ -1940,6 +2055,8 @@ export function TrainingRecorderPage({
         recording: result.recording,
         transcriptLatencyMs: result.transcriptLatencyMs,
       })
+      const speechVariant = recordingSpeechVariantRef.current
+      const utterancePairId = recordingUtterancePairIdRef.current
       const nextAttempt: PracticeAttempt = {
         createdAt: Date.now(),
         clientCaptureId: result.clientCaptureId,
@@ -1956,6 +2073,8 @@ export function TrainingRecorderPage({
             : 'auth_required'
           : 'idle',
         uploadReceipt: null,
+        speechVariant,
+        utterancePairId,
       }
       const hasUsableAssessmentTranscript = !(isAssessmentTopic && transcript.length === 0)
 
@@ -1976,14 +2095,20 @@ export function TrainingRecorderPage({
           [recordedExercise.id]: nextAttempt,
         }))
       }
-      const nextExercise = getNextExerciseAfterAcceptedRecording({
-        accepted: Boolean(result.recording) && (!isAssessmentTopic || hasUsableAssessmentTranscript),
-        currentExerciseId: recordedExercise.id,
-        activeExercises: matchingExercises,
-        fallbackExercises: !readingArticle && normalizedQuery.length === 0
-          ? categoryExercises
-          : [],
-      })
+      const shouldWaitForDialect = Boolean(result.recording)
+        && hasUsableAssessmentTranscript
+        && speechVariant === 'mandarin'
+        && dialectPairEnabled
+      const nextExercise = shouldWaitForDialect
+        ? null
+        : getNextExerciseAfterAcceptedRecording({
+            accepted: Boolean(result.recording) && (!isAssessmentTopic || hasUsableAssessmentTranscript),
+            currentExerciseId: recordedExercise.id,
+            activeExercises: matchingExercises,
+            fallbackExercises: !readingArticle && normalizedQuery.length === 0
+              ? categoryExercises
+              : [],
+          })
 
       if (nextExercise && nextExercise.id !== recordedExercise.id) {
         exerciseSelectionTouchedRef.current = true
@@ -2000,6 +2125,8 @@ export function TrainingRecorderPage({
           ? '这次没有生成完整录音文件，请重新录一次。'
           : isAssessmentTopic && !hasUsableAssessmentTranscript
           ? '识别结果不完整，请放慢一点再录一次。'
+          : shouldWaitForDialect
+          ? `普通话录音已经收下。确认后可继续录${trainingUploadLabels.dialectName ?? '方言'}，也可以跳过。`
           : canSaveTrainingSample && result.recording
           ? nextExercise
             ? '录音已经收下，正在自动保存这条样本，并且已经切到下一句。'
@@ -2020,17 +2147,21 @@ export function TrainingRecorderPage({
       })
     } finally {
       recordingExerciseRef.current = null
+      recordingSpeechVariantRef.current = 'mandarin'
+      recordingUtterancePairIdRef.current = undefined
       recordingReadingAssistanceRef.current = false
     }
   }, [
     canSaveTrainingSample,
     categoryExercises,
+    dialectPairEnabled,
     isAssessmentTopic,
     matchingExercises,
     normalizedQuery.length,
     persistTrainingAttempt,
     readingArticle,
     stopRecording,
+    trainingUploadLabels.dialectName,
   ])
 
   if (isLoading || shouldBlockTrainingPageForProgress(Boolean(readingArticle), recordingProgress.isLoading)) {
@@ -2341,16 +2472,32 @@ export function TrainingRecorderPage({
             <section aria-labelledby="collection-record-heading" className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 id="collection-record-heading" className="text-balance text-2xl font-semibold text-stone-950">读出这一句</h2>
-                  <p className="mt-2 text-pretty text-sm text-stone-600">按平时说话的方式读，读完点停止。</p>
+                  <h2 id="collection-record-heading" className="text-balance text-2xl font-semibold text-stone-950">
+                    {activeSpeechVariant === 'dialect' ? `用${trainingUploadLabels.dialectName ?? '方言'}说同一句` : '读出这一句'}
+                  </h2>
+                  <p className="mt-2 text-pretty text-sm text-stone-600">
+                    {activeSpeechVariant === 'dialect'
+                      ? '按你平时最自然的说法表达。题面相同，不要求逐字对应普通话。'
+                      : '按平时说话的方式读，读完点停止。'}
+                  </p>
                 </div>
-                <span className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700">
-                  {isRecording ? formatRecordingTime(recordingSeconds) : recorderStatus.label}
-                </span>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {dialectPairEnabled ? (
+                    <span className={cn(
+                      'rounded-full px-3 py-2 text-sm font-semibold',
+                      activeSpeechVariant === 'dialect' ? 'bg-amber-100 text-amber-900' : 'bg-sky-100 text-sky-900',
+                    )}>
+                      {activeSpeechVariantLabel}
+                    </span>
+                  ) : null}
+                  <span className="rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700">
+                    {isRecording ? formatRecordingTime(recordingSeconds) : recorderStatus.label}
+                  </span>
+                </div>
               </div>
 
               <div className="mt-6 rounded-3xl bg-amber-50 px-5 py-7 text-center ring-1 ring-amber-200 sm:px-8 sm:py-9">
-                <p className="text-balance text-2xl font-semibold leading-relaxed text-stone-950 sm:text-3xl">{currentExercise.text}</p>
+                <p className="text-balance text-2xl font-semibold leading-relaxed text-stone-950 sm:text-3xl">{activeCollectionExercise?.text}</p>
                 {currentPhonologyTarget?.focus ? (
                   <p className="mt-3 text-pretty text-sm text-amber-900">本句重点：{currentPhonologyTarget.focus}</p>
                 ) : null}
@@ -2533,7 +2680,11 @@ export function TrainingRecorderPage({
                     id="collection-review-heading"
                     className={cn('text-balance text-xl font-semibold', isReplacingAttempt ? 'text-amber-950' : 'text-emerald-950')}
                   >
-                    {isReplacingAttempt ? '先撤回旧录音，再重新录这一句' : '很好，这一句已经完整收下了'}
+                    {isReplacingAttempt
+                      ? '先撤回旧录音，再重新录这一句'
+                      : attempt.speechVariant === 'dialect'
+                        ? `${trainingUploadLabels.dialectName ?? '方言'}录音已经完整收下`
+                        : '很好，这一句已经完整收下了'}
                   </h2>
                   <p className={cn('mt-1 text-pretty text-sm leading-6', isReplacingAttempt ? 'text-amber-900' : 'text-emerald-800')}>
                     {isReplacingAttempt
@@ -2579,7 +2730,7 @@ export function TrainingRecorderPage({
                   disabled={isReplacingAttempt}
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-700 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-stone-300"
                 >
-                  继续下一句
+                  {attempt.speechVariant === 'mandarin' && dialectPairEnabled ? `继续录${trainingUploadLabels.dialectName ?? '方言'}` : '继续下一句'}
                   <ChevronRight className="size-4" aria-hidden="true" />
                 </button>
                 <button
@@ -2592,6 +2743,16 @@ export function TrainingRecorderPage({
                   {isReplacingAttempt ? '正在撤回旧录音…' : '重录这一句'}
                 </button>
               </div>
+              {attempt.speechVariant === 'mandarin' && dialectPairEnabled ? (
+                <button
+                  type="button"
+                  onClick={handleSkipDialect}
+                  disabled={isReplacingAttempt}
+                  className="mt-3 min-h-11 w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition-colors duration-150 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  这句先跳过方言
+                </button>
+              ) : null}
               <p className="mt-3 text-pretty text-xs leading-5 text-stone-500">
                 重录会先撤回当前版本，再保存新录音，不会同时留下两条。
               </p>
