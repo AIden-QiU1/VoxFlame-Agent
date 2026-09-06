@@ -2,7 +2,7 @@
 
 > 本文只保留当前产品定义、代码现状判断和下一步执行计划。
 >
-> 已完成的迁移、上线前 blocker、训练页拆层、音频设置、移动端 skeleton、训练语料整理等历史任务，不再放在本文当作未来计划。最近 3 天流水状态仍以 [../.tasks/current.md](../.tasks/current.md) 为准。
+> 已完成的迁移、上线前 blocker、训练页拆层、音频设置、移动端 skeleton、训练语料整理等历史任务，不再放在本文当作未来计划。最近 3 天流水状态仍以 [当前任务](../../.tasks/current.md) 为准。
 
 ## 1. 产品定义
 
@@ -313,23 +313,24 @@ P1 本机 v0 已支持这些出口：
 
 短期执行状态：
 
-- [../.tasks/current.md](../.tasks/current.md)
+- [当前任务](../../.tasks/current.md)
 
 App / Mobile Workbench 技术路线：
 
-- [App / Mobile Workbench 最佳实践与机会](../research/product-engineering/VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
+- [App / Mobile Workbench 最佳实践与机会](VOXFLAME_APP_COMPANION_BEST_PRACTICES_AND_OPPORTUNITY_2026-05-04.md)
 
 分病因疗法锚点：
 
-- [分病因疗法锚点与产品化边界](../research/speech-health/VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
+- [分病因疗法锚点与产品化边界](../speech-health/VOXFLAME_REHAB_THERAPY_PRODUCT_MAPPING_BY_ETIOLOGY_2026-05-15.md)
 
 Voiceitt 对标与设置启发：
 
-- [Voiceitt 功能设置与 VoxFlame 启发](../research/product-psychology/VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
+- [Voiceitt 功能设置与 VoxFlame 启发](../product-psychology/VOICEITT_FEATURE_SETTINGS_ANALYSIS_AND_VOXFLAME_INSPIRATION_2026-05-15.md)
 
 录音、上传与训练资产 contract：
 
-- [VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
+- [语音采集产品规范](../speech-health/VOXFLAME_VOICE_COLLECTION_PRODUCT_SPEC_2026-08-18.md)
+- [采集、扩容与控制面](VOICE_COLLECTION_SCALING_CONTROL_PLANE_2026-09-04.md)
 ## 2026-08-13 UI/UX parity 收口补充
 
 - Web 与 Mobile 共享同一业务能力和后端事实源，但按设备优化交互，不要求桌面布局像素级复制。

@@ -59,6 +59,7 @@ import {
   type MandarinTrainingFeedback,
   analyzeMandarinAttempt,
 } from '@/lib/training/mandarin-feedback'
+import { mergeCaptureBoundResult } from '@/lib/training/final-transcript'
 import {
   appendUploadedTrainingRecord,
   getUploadedTrainingExerciseIds,
@@ -139,6 +140,7 @@ interface PracticeAttempt {
   clientCaptureId: string
   exercise: PracticeExercise
   transcript: string
+  transcriptStatus: 'pending' | 'complete'
   transcriptLatencyMs: number
   feedback: MandarinTrainingFeedback
   sampleQuality: TrainingSampleQuality
@@ -430,11 +432,20 @@ function getRecorderStatusCopy(
 function getAssessmentTranscriptNotice(
   transcript: string,
   hasRecording: boolean,
+  transcriptStatus: PracticeAttempt['transcriptStatus'] = 'complete',
 ): {
   heardText: string
   helperText: string
   tone: 'sky' | 'amber'
 } {
+  if (transcriptStatus === 'pending') {
+    return {
+      heardText: '正在后台完成识别…',
+      helperText: '录音已经收下，你可以继续操作，不需要等待识别完成。',
+      tone: 'sky',
+    }
+  }
+
   if (transcript.trim()) {
     return {
       heardText: transcript,
@@ -1188,7 +1199,11 @@ export function TrainingRecorderPage({
   const assessmentTranscriptNotice = useMemo(
     () => (
       isAssessmentTopic && attempt
-        ? getAssessmentTranscriptNotice(attempt.transcript, Boolean(attempt.recording))
+        ? getAssessmentTranscriptNotice(
+            attempt.transcript,
+            Boolean(attempt.recording),
+            attempt.transcriptStatus,
+          )
         : null
     ),
     [attempt, isAssessmentTopic],
@@ -1641,6 +1656,18 @@ export function TrainingRecorderPage({
       Boolean(attemptToReplace?.recording),
     )
 
+    if (attemptToReplace?.transcriptStatus === 'pending') {
+      discardedAttemptIdsRef.current.add(attemptToReplace.createdAt)
+      removeAttemptFromProgress(attemptToReplace)
+      setIsReplacingAttempt(true)
+      await startReplacementRecording({
+        exercise: exerciseToRetry,
+        speechVariant: attemptToReplace.speechVariant,
+        utterancePairId: attemptToReplace.utterancePairId,
+      })
+      return
+    }
+
     if (replacementPlan === 'wait_for_discard') {
       setNotice({
         tone: 'info',
@@ -1976,6 +2003,21 @@ export function TrainingRecorderPage({
       return
     }
 
+    if (attempt.transcriptStatus === 'pending') {
+      discardedAttemptIdsRef.current.add(attempt.createdAt)
+      removeAttemptFromProgress(attempt)
+      setAttempt((current) => (
+        current?.createdAt === attempt.createdAt
+          ? { ...current, uploadStatus: 'discarded' }
+          : current
+      ))
+      setNotice({
+        tone: 'success',
+        message: '已取消收录，后台识别完成后也不会上传这条录音。',
+      })
+      return
+    }
+
     setAttempt((current) => (
       current?.createdAt === attempt.createdAt
         ? {
@@ -2046,39 +2088,53 @@ export function TrainingRecorderPage({
       return
     }
 
+    const speechVariant = recordingSpeechVariantRef.current
+    const utterancePairId = recordingUtterancePairIdRef.current
+    const readingAssistanceUsed = recordingReadingAssistanceRef.current
+
     try {
       const result = await stopRecording()
-      const transcript = result.transcript.trim()
-      const feedback = analyzeMandarinAttempt(recordedExercise, transcript)
-      const sampleQuality = assessTrainingSampleQuality({
-        feedback,
-        recording: result.recording,
-        transcriptLatencyMs: result.transcriptLatencyMs,
-      })
-      const speechVariant = recordingSpeechVariantRef.current
-      const utterancePairId = recordingUtterancePairIdRef.current
-      const nextAttempt: PracticeAttempt = {
-        createdAt: Date.now(),
-        clientCaptureId: result.clientCaptureId,
-        exercise: recordedExercise,
-        transcript,
-        transcriptLatencyMs: result.transcriptLatencyMs,
-        feedback,
-        sampleQuality,
-        readingAssistanceUsed: recordingReadingAssistanceRef.current,
-        recording: result.recording,
-        uploadStatus: result.recording
-          ? canSaveTrainingSample
-            ? 'saving'
-            : 'auth_required'
-          : 'idle',
-        uploadReceipt: null,
-        speechVariant,
-        utterancePairId,
-      }
-      const hasUsableAssessmentTranscript = !(isAssessmentTopic && transcript.length === 0)
+      const createdAt = Date.now()
+      const buildAttempt = (
+        transcript: string,
+        transcriptLatencyMs: number,
+        transcriptStatus: PracticeAttempt['transcriptStatus'],
+      ): PracticeAttempt => {
+        const feedback = analyzeMandarinAttempt(recordedExercise, transcript)
+        const sampleQuality = assessTrainingSampleQuality({
+          feedback,
+          recording: result.recording,
+          transcriptLatencyMs,
+        })
 
-      if (hasUsableAssessmentTranscript) {
+        return {
+          createdAt,
+          clientCaptureId: result.clientCaptureId,
+          exercise: recordedExercise,
+          transcript,
+          transcriptStatus,
+          transcriptLatencyMs,
+          feedback,
+          sampleQuality,
+          readingAssistanceUsed,
+          recording: result.recording,
+          uploadStatus: result.recording
+            ? canSaveTrainingSample
+              ? 'saving'
+              : 'auth_required'
+            : 'idle',
+          uploadReceipt: null,
+          speechVariant,
+          utterancePairId,
+        }
+      }
+      const nextAttempt = buildAttempt(
+        result.immediateTranscript.trim(),
+        0,
+        'pending',
+      )
+
+      if (!isAssessmentTopic && result.recording) {
         setSessionPracticedExerciseIds((currentIds) => (
           currentIds.includes(recordedExercise.id)
             ? currentIds
@@ -2089,20 +2145,13 @@ export function TrainingRecorderPage({
       if (!isAssessmentTopic) {
         setCollectionFlowStep(result.recording ? 'review' : 'record')
       }
-      if (isAssessmentTopic && hasUsableAssessmentTranscript) {
-        setAssessmentAttemptsByExercise((current) => ({
-          ...current,
-          [recordedExercise.id]: nextAttempt,
-        }))
-      }
       const shouldWaitForDialect = Boolean(result.recording)
-        && hasUsableAssessmentTranscript
         && speechVariant === 'mandarin'
         && dialectPairEnabled
       const nextExercise = shouldWaitForDialect
         ? null
         : getNextExerciseAfterAcceptedRecording({
-            accepted: Boolean(result.recording) && (!isAssessmentTopic || hasUsableAssessmentTranscript),
+            accepted: Boolean(result.recording),
             currentExerciseId: recordedExercise.id,
             activeExercises: matchingExercises,
             fallbackExercises: !readingArticle && normalizedQuery.length === 0
@@ -2116,29 +2165,63 @@ export function TrainingRecorderPage({
       }
 
       setNotice({
-        tone: !result.recording || (isAssessmentTopic && !hasUsableAssessmentTranscript)
+        tone: !result.recording
           ? 'error'
           : canSaveTrainingSample && result.recording
             ? 'info'
             : 'success',
         message: !result.recording
           ? '这次没有生成完整录音文件，请重新录一次。'
-          : isAssessmentTopic && !hasUsableAssessmentTranscript
-          ? '识别结果不完整，请放慢一点再录一次。'
           : shouldWaitForDialect
-          ? `普通话录音已经收下。确认后可继续录${trainingUploadLabels.dialectName ?? '方言'}，也可以跳过。`
+          ? `普通话录音已经收下，识别和保存会在后台完成。确认后可继续录${trainingUploadLabels.dialectName ?? '方言'}，也可以跳过。`
           : canSaveTrainingSample && result.recording
           ? nextExercise
-            ? '录音已经收下，正在自动保存这条样本，并且已经切到下一句。'
-            : '录音已经收下，正在自动保存这条样本。'
+            ? '录音已经收下，识别和保存正在后台进行，并且已经切到下一句。'
+            : '录音已经收下，识别和保存正在后台进行。'
           : nextExercise
             ? '录音已经收下，已经切到下一句继续练。'
-            : '录音已经收下，可以直接看系统听到的结果。',
+            : '录音已经收下，识别结果会在后台补上。',
       })
 
-      if (nextAttempt.recording && canSaveTrainingSample && hasUsableAssessmentTranscript) {
-        void persistTrainingAttempt(nextAttempt, 'auto')
-      }
+      void result.transcriptCompletion.then(({ transcript, transcriptLatencyMs }) => {
+        if (discardedAttemptIdsRef.current.has(createdAt)) {
+          discardedAttemptIdsRef.current.delete(createdAt)
+          return
+        }
+
+        const finalizedAttempt = buildAttempt(
+          transcript.trim(),
+          transcriptLatencyMs,
+          'complete',
+        )
+        const hasUsableAssessmentTranscript = !isAssessmentTopic || transcript.trim().length > 0
+
+        setAttempt((current) => (
+          mergeCaptureBoundResult(current, finalizedAttempt)
+        ))
+        if (isAssessmentTopic && hasUsableAssessmentTranscript) {
+          setSessionPracticedExerciseIds((currentIds) => (
+            currentIds.includes(recordedExercise.id)
+              ? currentIds
+              : [...currentIds, recordedExercise.id]
+          ))
+          setAssessmentAttemptsByExercise((current) => ({
+            ...current,
+            [recordedExercise.id]: finalizedAttempt,
+          }))
+        }
+
+        if (finalizedAttempt.recording && canSaveTrainingSample && hasUsableAssessmentTranscript) {
+          void persistTrainingAttempt(finalizedAttempt, 'auto')
+        }
+      }).catch((completionError: unknown) => {
+        console.error('[contribute] transcript finalization failed:', completionError)
+        setAttempt((current) => (
+          current?.clientCaptureId === result.clientCaptureId
+            ? { ...current, transcriptStatus: 'complete' }
+            : current
+        ))
+      })
     } catch (error) {
       console.error('[contribute] stop recording failed:', error)
       setNotice({
@@ -2707,7 +2790,11 @@ export function TrainingRecorderPage({
                 </div>
                 <div className="grid gap-1 py-4 sm:grid-cols-[5rem_1fr] sm:gap-4">
                   <dt className="text-sm font-medium text-stone-500">系统听到</dt>
-                  <dd className="text-pretty text-base leading-7 text-stone-950">{attempt.transcript || '这次没有拿到稳定的识别文本，但录音仍可回听。'}</dd>
+                  <dd className="text-pretty text-base leading-7 text-stone-950">
+                    {attempt.transcriptStatus === 'pending'
+                      ? '正在后台完成识别…'
+                      : attempt.transcript || '这次没有拿到稳定的识别文本，但录音仍可回听。'}
+                  </dd>
                 </div>
               </dl>
 
@@ -3541,7 +3628,9 @@ export function TrainingRecorderPage({
                       <dd className="text-base leading-7 text-gray-950">
                         {isAssessmentTopic
                           ? assessmentTranscriptNotice?.heardText
-                          : attempt.transcript || '这次还没有稳定拿到最终结果。'}
+                          : attempt.transcriptStatus === 'pending'
+                            ? '正在后台完成识别…'
+                            : attempt.transcript || '这次还没有稳定拿到最终结果。'}
                       </dd>
                     </div>
                   </dl>
@@ -3565,7 +3654,9 @@ export function TrainingRecorderPage({
 
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                     <p className="max-w-xl text-sm leading-6 text-gray-700">
-                      {isAssessmentTopic && !attempt.transcript
+                      {attempt.transcriptStatus === 'pending'
+                        ? '录音已经收下，你可以继续操作，不需要等待识别完成。'
+                        : isAssessmentTopic && !attempt.transcript
                         ? '识别结果为空，请重新录制。'
                         : isAssessmentTopic
                           ? assessmentTranscriptNotice?.helperText

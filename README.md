@@ -8,7 +8,7 @@ VoxFlame 是面向构音障碍沟通场景的主动沟通助手。当前目标�
 
 当前产品判断已经明确吸收“创始人即用户”的一手研究：真正决定成败的，不只是识别准确率，而是用户在面试、工作协作、医疗沟通、陌生人求助这些高压时刻，能不能不被打断、不被忽视、不被别人替他说话。
 
-继续开发默认以本 README、[产品 PRD](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](/home/ubuntu/VoxFlame-Agent/.tasks/current.md) 为现役入口。研究统一看 [VoxFlame Research](/home/ubuntu/VoxFlame-Agent/research/README.md)，会影响应用的结论统一进入 [研究到应用回流登记](/home/ubuntu/VoxFlame-Agent/research/APPLICATION_FEEDBACK_REGISTRY.md)；模型代码与原始实验记录由 [CLEAR-VOX-MODEL](/home/ubuntu/VoxFlame-Agent/references/clear-vox-model) submodule 承接。
+继续开发默认以本 README、[产品 PRD](/home/ubuntu/VoxFlame-Agent/research/product-engineering/VOXFLAME_PRODUCT_PRD_2026-03-24.md) 和 [当前任务状态](/home/ubuntu/VoxFlame-Agent/.tasks/current.md) 为现役入口。全部项目文档统一看 [VoxFlame Research](/home/ubuntu/VoxFlame-Agent/research/README.md)，会影响应用的研究结论统一进入 [研究到应用回流登记](/home/ubuntu/VoxFlame-Agent/research/APPLICATION_FEEDBACK_REGISTRY.md)；模型代码与原始实验记录由 [CLEAR-VOX-MODEL](/home/ubuntu/VoxFlame-Agent/references/clear-vox-model) submodule 承接。
 
 ## 开发标准
 
@@ -68,16 +68,12 @@ Frontend LiveKit RTC/Data
    继续提升沟通页、训练页、记忆页的真实可用性和可验证性。
 2. `App / Mobile Workbench 接入`
    在复用 `workspace snapshot / recording envelope / upload receipt` 的前提下，推进完整移动端工作台和桌面 companion。
-   当前移动端 Phase 0 已落在 [apps/mobile-workbench](/home/ubuntu/VoxFlame-Agent/apps/mobile-workbench)，已接入 Supabase React Native auth adapter 与只读 `workspace snapshot`。App 不依赖 Web/Next.js 运行时，而是和 Web 作为两个 sibling client 共同依赖 backend-owned contracts；执行 RFC 见 [Mobile Workbench Phase 0 RFC](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)。
+   当前移动端已落在 [apps/mobile-workbench](/home/ubuntu/VoxFlame-Agent/apps/mobile-workbench)，App 不依赖 Web/Next.js 运行时，而是和 Web 作为两个 sibling client 共同依赖 backend-owned contracts；真机门见 [Mobile Workbench 真机验证手册](/home/ubuntu/VoxFlame-Agent/research/product-engineering/VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)。
 3. `硬件接入`
    先做 BLE / USB / 外接麦克风 / 一键控制桥，再决定是否走更重的硬件形态。
-   第一版硬件开发路线、购买清单、ESP32-S3 / BLE / I2S / LiveKit 边界见 [硬件桥接开发手册](docs/VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md)。
+   第一版硬件开发路线、购买清单、ESP32-S3 / BLE / I2S / LiveKit 边界见 [硬件桥接开发手册](research/product-engineering/VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md)。
 4. `自主语音 agent 架构`
    继续把 `livekit_agent` 演进成 provider-neutral、可解释、可验证的语音 runtime，而不是一上来整套重写。
-
-详细方向见：
-
-- [VoxFlame 开源协作方向（2026-04-21）](docs/VOXFLAME_OPEN_SOURCE_COLLABORATION_DIRECTION_2026-04-21.md)
 
 ## 快速开始
 
@@ -152,7 +148,6 @@ VoxFlame-Agent/
 │   └── src/
 ├── livekit_agent/
 ├── scripts/
-├── docs/
 ├── research/
 ├── references/
 │   └── clear-vox-model/  # Git submodule
@@ -174,7 +169,7 @@ VoxFlame-Agent/
 - 当前任务：[.tasks/current.md](/home/ubuntu/VoxFlame-Agent/.tasks/current.md)
 - 项目摘要：[.claude-summary.md](/home/ubuntu/VoxFlame-Agent/.claude-summary.md)
 - 工程规范：[AGENTS.md](/home/ubuntu/VoxFlame-Agent/AGENTS.md)
-- 产品主文档：[docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
+- 产品主文档：[research/product-engineering/VOXFLAME_PRODUCT_PRD_2026-03-24.md](/home/ubuntu/VoxFlame-Agent/research/product-engineering/VOXFLAME_PRODUCT_PRD_2026-03-24.md)
 - 研究入口：[research/README.md](/home/ubuntu/VoxFlame-Agent/research/README.md)
 - 应用回流登记：[research/APPLICATION_FEEDBACK_REGISTRY.md](/home/ubuntu/VoxFlame-Agent/research/APPLICATION_FEEDBACK_REGISTRY.md)
 - 模型与实验上游：[references/clear-vox-model](/home/ubuntu/VoxFlame-Agent/references/clear-vox-model)
@@ -258,7 +253,7 @@ VoxFlame-Agent/
   https://theten.ai/docs/ten_framework/extension/
 
 - 本项目文档导航  
-  [docs/README.md](docs/README.md)
+  [research/README.md](research/README.md)
 
 ---
 

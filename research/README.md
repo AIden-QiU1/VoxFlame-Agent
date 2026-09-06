@@ -1,14 +1,19 @@
-# VoxFlame Research
+# VoxFlame 文档与研究
 
-`research/` 是当前应用的研究唯一入口。这里不复制模型仓库的实验原始事实，而是回答一个更严格的问题：**哪些证据足以改变 VoxFlame 的产品、模型接入、临床边界或工程实现？**
+`research/` 是仓库唯一文档根，统一承接产品、运行时、工程、运维、合规、任务模板和应用研究。模型仓库的实验原始事实仍留在 `references/clear-vox-model`。
 
-## 两层事实源
+## 现役入口
 
 - 上游实验事实源：[CLEAR-VOX-MODEL](../references/clear-vox-model/) submodule。模型代码、数据处理、实验配置、逐实验记录和原始结果都留在那里。
-- 应用研究事实源：本目录。这里只保存经审阅的综合研究、VoxFlame 映射、决策状态和验证要求。
-- 产品与运行时事实源仍是 [产品 PRD](../docs/VOXFLAME_PRODUCT_PRD_2026-03-24.md)、[当前任务](../.tasks/current.md) 和实际代码；研究结论不能自行变成运行时能力。
+- 产品与运行时：[产品 PRD](product-engineering/VOXFLAME_PRODUCT_PRD_2026-03-24.md)、[采集/扩容/控制面](product-engineering/VOICE_COLLECTION_SCALING_CONTROL_PLANE_2026-09-04.md)、[数据库 schema](product-engineering/database/supabase-schema.sql)、[当前任务](../.tasks/current.md) 和实际代码。
+- 工程协作：[AI 工程系统](AI_ENGINEERING_SYSTEM.md)、[Harness 入口](aiprompts/HARNESS_ENTRY_CONTRACT.md)、[执行计划模板](templates/AI_EXECUTION_PLAN_TEMPLATE.md)。
+- 移动端与设备：[真机验证手册](product-engineering/VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)、[硬件桥接手册](product-engineering/VOXFLAME_HARDWARE_BRIDGE_DEVELOPMENT_GUIDE_2026-05-05.md)。
+- 数据采集：[产品规范](speech-health/VOXFLAME_VOICE_COLLECTION_PRODUCT_SPEC_2026-08-18.md)、[设备验收](speech-health/VOXFLAME_VOICE_COLLECTION_DEVICE_ACCEPTANCE_CHECKLIST_2026-08-18.md)、[普通话覆盖基线](speech-health/MANDARIN_LINGUISTIC_COVERAGE_AND_COLLECTION_BASELINE_2026-08-22.md)。
+- 安全合规：[内部整改记录](product-engineering/NETWORK_SECURITY_REMEDIATION_2026_267.md)、[正式整改报告](product-engineering/上海生声不息科技有限公司网络安全整改报告_沪浦网信安通2026_267号.md)、[WAIC 安全清单](product-engineering/WAIC_SECURITY_CHECKLIST_2026-07-08.md)。
 
-## 五大主题
+研究结论不能自行变成运行时能力；仍须进入应用回流登记、指定 owner 并完成验证。
+
+## 五个研究主题
 
 | 主题 | 目录 | 研究问题 |
 | --- | --- | --- |

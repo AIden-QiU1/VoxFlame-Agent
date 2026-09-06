@@ -4,9 +4,9 @@
 
 VoxFlame 面向构音障碍者，第一原则是提升系统对用户意图的理解，而不是纠正用户的声音。
 
-本文件是仓库级入口，也是 Harness 的第一跳。它只保存长期稳定的协作规则、任务分流、运行时边界、工具路由和权威文档入口。历史故障、单次部署结果、压测数字和临时决策必须放在 `.claude-summary.md`、`.tasks/current.md`、`research/` 或专项 `docs/`，不得回填这里。
+本文件是仓库级入口，也是 Harness 的第一跳。它只保存长期稳定的协作规则、任务分流、运行时边界、工具路由和权威文档入口。历史故障、单次部署结果、压测数字和临时决策必须放在 `.claude-summary.md`、`.tasks/current.md` 或 `research/`，不得回填这里。
 
-详细方法论以 [docs/AI_ENGINEERING_SYSTEM.md](docs/AI_ENGINEERING_SYSTEM.md) 为准。
+详细方法论以 [research/AI_ENGINEERING_SYSTEM.md](research/AI_ENGINEERING_SYSTEM.md) 为准。
 
 ## Session Start
 
@@ -16,18 +16,18 @@ VoxFlame 面向构音障碍者，第一原则是提升系统对用户意图的�
 2. `.tasks/current.md`
 3. 本文件
 
-其余文档按任务触发，不要一次性加载整个 `docs/`、`research/`、`ideas/` 或 `frontend/`。
+其余文档按任务触发，不要一次性加载整个 `research/`、`ideas/` 或 `frontend/`。
 
 ## 文件边界
 
 - 根 `AGENTS.md` 只放仓库级规则和入口索引，不放产品百科、排障实录、研究报告或任务流水。
 - 只有对某个目录树长期稳定且独有的规则，才新增子目录 `AGENTS.md`。
 - 运行时 agent prompt、memory 写入规则和产品功能指令必须维护在 runtime 文档或配置中，不直接写入本文件。
-- 发现某类规则、命令或验证方式反复出现时，优先沉淀到 `docs/`、`scripts/` 或模板，再在这里保留链接。
+- 发现某类规则、命令或验证方式反复出现时，优先沉淀到 `research/`、`scripts/` 或模板，再在这里保留链接。
 
 ## Operating Model
 
-- 每个任务先按 [Harness 入口契约](docs/aiprompts/HARNESS_ENTRY_CONTRACT.md) 分流：回答/诊断、变更/构建、研究闭环或高风险副作用；不能把“已分析”直接当成“已实施”。
+- 每个任务先按 [Harness 入口契约](research/aiprompts/HARNESS_ENTRY_CONTRACT.md) 分流：回答/诊断、变更/构建、研究闭环或高风险副作用；不能把“已分析”直接当成“已实施”。
 - 先稳定单链路和单 agent workflow，再考虑 handoff 或多 agent。
 - 任何改动先看代码、配置、日志和现状；复杂任务先形成计划，再做最小可运行切片。
 - 涉及迁移、统一、兼容层、废弃路径或新旧并存时，先盘点入口层、服务层、存储层和旁路层，明确唯一事实源。
@@ -36,7 +36,7 @@ VoxFlame 面向构音障碍者，第一原则是提升系统对用户意图的�
 
 ## UI 全局指导
 
-- UI 改动先读 `docs/aiprompts/design-language.md`。
+- UI 改动先读 `research/aiprompts/design-language.md`。
 - 表单使用窄阅读宽度，卡片/工作台使用自适应宽度，不全仓统一 `max-width`。
 - 中文优先，避免过大英文 tracking、重复标题和挤压式统计卡。
 - 渐变只作弱氛围层；主表面默认使用实体底色，避免 `bg-white/80`、`backdrop-blur` 造成层级和遮挡错觉。
@@ -84,21 +84,19 @@ VoxFlame 面向构音障碍者，第一原则是提升系统对用户意图的�
 
 ## Reference Map
 
-- 系统规则：[docs/AI_ENGINEERING_SYSTEM.md](docs/AI_ENGINEERING_SYSTEM.md)
-- 执行计划：[docs/AI_EXECUTION_PLAN_TEMPLATE.md](docs/AI_EXECUTION_PLAN_TEMPLATE.md)
-- AI workflow 入口：[docs/aiprompts/README.md](docs/aiprompts/README.md)
-- 工具路由：[docs/aiprompts/SKILL_ROUTING_GUIDE.md](docs/aiprompts/SKILL_ROUTING_GUIDE.md)
-- Playwright：[docs/aiprompts/PLAYWRIGHT_VERIFICATION_GUIDE.md](docs/aiprompts/PLAYWRIGHT_VERIFICATION_GUIDE.md)
+- 系统规则：[research/AI_ENGINEERING_SYSTEM.md](research/AI_ENGINEERING_SYSTEM.md)
+- 执行计划：[research/templates/AI_EXECUTION_PLAN_TEMPLATE.md](research/templates/AI_EXECUTION_PLAN_TEMPLATE.md)
+- AI workflow 入口：[research/aiprompts/README.md](research/aiprompts/README.md)
+- 工具路由：[research/aiprompts/SKILL_ROUTING_GUIDE.md](research/aiprompts/SKILL_ROUTING_GUIDE.md)
+- Playwright：[research/aiprompts/PLAYWRIGHT_VERIFICATION_GUIDE.md](research/aiprompts/PLAYWRIGHT_VERIFICATION_GUIDE.md)
 - Research：[research/README.md](research/README.md)
 - Research Harness：[research/RESEARCH_HARNESS.md](research/RESEARCH_HARNESS.md)
-- Harness 入口契约：[docs/aiprompts/HARNESS_ENTRY_CONTRACT.md](docs/aiprompts/HARNESS_ENTRY_CONTRACT.md)
+- Harness 入口契约：[research/aiprompts/HARNESS_ENTRY_CONTRACT.md](research/aiprompts/HARNESS_ENTRY_CONTRACT.md)
 - Harness 规则：[research/HARNESS_RULES.yaml](research/HARNESS_RULES.yaml)
 - 应用回流：[research/APPLICATION_FEEDBACK_REGISTRY.md](research/APPLICATION_FEEDBACK_REGISTRY.md)
-- 当前能力 registry：[docs/capability-registry.md](docs/capability-registry.md)
-- 运行时控制面：[docs/control-plane.md](docs/control-plane.md)
+- 采集、扩容与运行时控制面：[research/product-engineering/VOICE_COLLECTION_SCALING_CONTROL_PLANE_2026-09-04.md](research/product-engineering/VOICE_COLLECTION_SCALING_CONTROL_PLANE_2026-09-04.md)
 - 前端边界：[frontend/README.md](frontend/README.md)
-- Mobile Phase 0：[docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md](docs/VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
-- 统一协作手册：[docs/VOXFLAME_REFACTOR_COLLABORATION_PLAYBOOK_2026-03-24.md](docs/VOXFLAME_REFACTOR_COLLABORATION_PLAYBOOK_2026-03-24.md)
+- Mobile 真机验证：[research/product-engineering/VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md](research/product-engineering/VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)
 
 ## Anti-Patterns
 
@@ -114,6 +112,6 @@ VoxFlame 面向构音障碍者，第一原则是提升系统对用户意图的�
 
 当架构、协作流程或 agent 工程规范发生实质变化时：
 
-1. 先更新 `docs/AI_ENGINEERING_SYSTEM.md`。
+1. 先更新 `research/AI_ENGINEERING_SYSTEM.md`。
 2. 再同步本文件、`CLAUDE.md` 和 `.github/copilot-instructions.md` 的入口描述。
 3. 最后更新 `.claude-summary.md` 和 `.tasks/current.md`。

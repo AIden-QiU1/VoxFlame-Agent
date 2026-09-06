@@ -13,7 +13,7 @@
 
 ## 1. 本轮升级要解决什么
 
-过去我们已经完成了第一轮 `Harness Engineering` 化：把入口文件缩短、把深规则移到 `docs/`、把最小验证和状态同步纳入仓库。当前入口进一步收口为：根 `AGENTS.md` 负责任务分流，`docs/aiprompts/HARNESS_ENTRY_CONTRACT.md` 负责交付契约，`research/HARNESS_RULES.yaml` 负责机器可读阈值和动作边界。
+过去我们已经完成了第一轮 `Harness Engineering` 化：把入口文件缩短、把深规则移到统一文档根 `research/`、把最小验证和状态同步纳入仓库。当前入口进一步收口为：根 `AGENTS.md` 负责任务分流，`research/aiprompts/HARNESS_ENTRY_CONTRACT.md` 负责交付契约，`research/HARNESS_RULES.yaml` 负责机器可读阈值和动作边界。
 
 但这只解决了“不要把 prompt 写成百科全书”。
 
@@ -33,7 +33,7 @@
 
 ## 2. 关键原则
 
-普通话录音语料的候选筛选、覆盖统计和质量状态遵循 [`research/speech-health/MANDARIN_RECORDING_CORPUS_EVIDENCE_GATE.md`](../research/speech-health/MANDARIN_RECORDING_CORPUS_EVIDENCE_GATE.md)。其中来源、整词/整句读音、文本污染、长度/重复和目标映射是可复现硬规则；没有量表和一致性证据的自然度/产品判断不得成为录音前置硬门。
+普通话录音语料的候选筛选、覆盖统计和质量状态遵循 [`speech-health/MANDARIN_RECORDING_CORPUS_EVIDENCE_GATE.md`](speech-health/MANDARIN_RECORDING_CORPUS_EVIDENCE_GATE.md)。其中来源、整词/整句读音、文本污染、长度/重复和目标映射是可复现硬规则；没有量表和一致性证据的自然度/产品判断不得成为录音前置硬门。
 
 用户录音进入云端原始语料层时，Backend 必须以 `research/HARNESS_RULES.yaml` 的 `upload_admission` 为机器事实源执行基础准入：授权从已验证 Auth 用户读取，不能信任请求自报；完成登记前核验对象存在、非空、大小和 Content-Type，并绑定账号路径、稳定 recording ID、非空 target 与正时长。客户端质量字段只用于补充诊断，不能替代服务端对象事实。
 
@@ -46,7 +46,7 @@
 VoxFlame 落地：
 
 - 入口文件继续保持短规则和地图。
-- 深层规则进入 `docs/`。
+- 深层规则、产品与工程文档统一进入 `research/`。
 - 守卫优先放进模板、脚本、lint、CI 和验证流程。
 
 ### 2.2 治理不是重写，而是收口
@@ -399,8 +399,8 @@ compat 层必须同时具备：
 
 - 项目级规则：`AGENTS.md` / `CLAUDE.md` / `.github/copilot-instructions.md`
 - 体系文档：本文档
-- 任务模板：`docs/AI_EXECUTION_PLAN_TEMPLATE.md`
-- 治理 Prompt 模板：`docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md`
+- 任务模板：`research/templates/AI_EXECUTION_PLAN_TEMPLATE.md`
+- 治理 Prompt 模板：`research/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md`
 - 守卫：lint / CI / 脚本 / deprecated 日志
 
 当前仓库中的最小机械守卫已经落到：
@@ -477,7 +477,7 @@ compat 层必须同时具备：
 
 ### 6.1.1 Harness 入口与规则单一事实源
 
-- 每轮任务先读取根 `AGENTS.md`，再按 `docs/aiprompts/HARNESS_ENTRY_CONTRACT.md` 判断是回答、诊断、变更、研究、遥测触发还是高风险变更。
+- 每轮任务先读取根 `AGENTS.md`，再按 `research/aiprompts/HARNESS_ENTRY_CONTRACT.md` 判断是回答、诊断、变更、研究、遥测触发还是高风险变更。
 - 研究生命周期和证据门只写在 `research/RESEARCH_HARNESS.md`；阈值、状态集合、自动动作和人工确认边界只写在 `research/HARNESS_RULES.yaml`。
 - `scripts/research/` 只能读取并执行上述规则，禁止复制一套隐藏阈值或自行改变研究状态。
 - 动态事实放摘要/任务/研究条目；长期规则放入口/体系文档；运行时配置放代码与部署文件。三者必须通过脚本和文档检查保持可追溯。
@@ -487,8 +487,8 @@ compat 层必须同时具备：
 研究系统同样必须防止平级事实源扩散：
 
 - `references/clear-vox-model` 是模型代码、实验配置、逐实验记录和原始结果的上游 Git submodule，不在应用仓库复制或改写实验事实。
-- `research/` 是应用侧研究唯一入口，只承接五类主题综合、证据限制、应用决策和验证门槛；其中 `agent-systems/` 负责通用 Agent 机制、工程架构、产品化和场景落地，并为 `voice-agent/` 提供跨模态对照。
-- `docs/` 继续承接产品、运行时、工程规则与运维，不再新增平级研究稿。
+- `research/` 是仓库唯一文档根，同时承接应用研究、产品、运行时、工程规则、运维、合规和模板。五类主题目录仍负责研究综合、证据限制、应用决策和验证门槛；`aiprompts/` 与 `templates/` 负责协作流程，不参与研究状态判定。
+- 不再恢复平级 `docs/` 目录；旧计划被现役事实源吸收后直接删除，由 Git 历史保留。
 - 每条会影响应用的研究结论必须进入 `research/APPLICATION_FEEDBACK_REGISTRY.md`，固定到上游 commit / 来源版本，并标记 `adopt / validate / hold / reject`。
 - 任何学术/专利/公开成果、产品默认能力或范围扩展都必须先通过 `research/evidence/*#authority_gate`；来源、独立复核、反证、边界和回退缺一不可。
 - `planned`、`blocked`、`diagnostic-only` 和低于实验阈值的候选不得直接变成部署配置或用户承诺。
@@ -528,7 +528,7 @@ compat 层必须同时具备：
 当 agent 不确定该用什么资料或什么工具时，默认按下面顺序升级：
 
 1. 代码与仓库文档
-- 先读代码、`AGENTS.md`、`.tasks/current.md`、`docs/README.md` 和相关权威主文。
+- 先读代码、`AGENTS.md`、`.tasks/current.md`、`research/README.md` 和相关权威主文。
 
 2. 专业官方文档
 - 库、框架、SDK、浏览器 / 平台 API 不确定时，优先 `Context7`。
@@ -564,10 +564,10 @@ compat 层必须同时具备：
 当 AI 协作机制、治理规则或安全默认值发生实质变化时，按下面顺序更新：
 
 1. 本文档
-2. `docs/AI_EXECUTION_PLAN_TEMPLATE.md`
-3. `docs/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md`
-4. `docs/aiprompts/SKILL_ROUTING_GUIDE.md`
-5. `docs/README.md`
+2. `research/templates/AI_EXECUTION_PLAN_TEMPLATE.md`
+3. `research/aiprompts/GOVERNANCE_PROMPT_TEMPLATE.md`
+4. `research/aiprompts/SKILL_ROUTING_GUIDE.md`
+5. `research/README.md`
 6. `AGENTS.md`
 7. `CLAUDE.md`
 8. `.github/copilot-instructions.md`

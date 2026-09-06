@@ -34,12 +34,12 @@
 
 | 能力 | 现有代码 | 当前状态 |
 |---|---|---|
-| Web 选择麦克风 | [`frontend/src/app/settings/audio/page.tsx`](../frontend/src/app/settings/audio/page.tsx)、[`frontend/src/lib/audio/microphone-preferences.ts`](../frontend/src/lib/audio/microphone-preferences.ts) | 可枚举输入设备、保存首选麦克风、现场电平测试 |
-| Web 训练录音 | [`frontend/src/hooks/useMandarinTrainingSession.ts`](../frontend/src/hooks/useMandarinTrainingSession.ts)、[`frontend/src/app/contribute/page.tsx`](../frontend/src/app/contribute/page.tsx) | 可录音、回听、上传，并记录麦克风和音质 metadata |
-| Web LiveKit 沟通 | [`frontend/src/lib/realtime-audio/session-audio.ts`](../frontend/src/lib/realtime-audio/session-audio.ts) | LiveKit 发布麦克风轨道时使用首选麦克风 |
-| Mobile 原生录音 | [`apps/mobile-workbench/src/queue/use-native-recorder-queue.ts`](../apps/mobile-workbench/src/queue/use-native-recorder-queue.ts) | 可真机录音、回放、本地 queue、删除、上传 |
-| Mobile 上传 | [`apps/mobile-workbench/src/api/mobile-upload-client.ts`](../apps/mobile-workbench/src/api/mobile-upload-client.ts) | 已走 `/upload/sign -> OSS PUT -> /upload/complete` |
-| Mobile LiveKit | [`apps/mobile-workbench/src/realtime/use-livekit-room-connection.ts`](../apps/mobile-workbench/src/realtime/use-livekit-room-connection.ts) | 已有 room 连接和麦克风发布切片，仍需真机 smoke |
+| Web 选择麦克风 | [`frontend/src/app/settings/audio/page.tsx`](../../frontend/src/app/settings/audio/page.tsx)、[`frontend/src/lib/audio/microphone-preferences.ts`](../../frontend/src/lib/audio/microphone-preferences.ts) | 可枚举输入设备、保存首选麦克风、现场电平测试 |
+| Web 训练录音 | [`frontend/src/hooks/useMandarinTrainingSession.ts`](../../frontend/src/hooks/useMandarinTrainingSession.ts)、[`frontend/src/app/contribute/page.tsx`](../../frontend/src/app/contribute/page.tsx) | 可录音、回听、上传，并记录麦克风和音质 metadata |
+| Web LiveKit 沟通 | [`frontend/src/lib/realtime-audio/session-audio.ts`](../../frontend/src/lib/realtime-audio/session-audio.ts) | LiveKit 发布麦克风轨道时使用首选麦克风 |
+| Mobile 原生录音 | [`apps/mobile-workbench/src/queue/use-native-recorder-queue.ts`](../../apps/mobile-workbench/src/queue/use-native-recorder-queue.ts) | 可真机录音、回放、本地 queue、删除、上传 |
+| Mobile 上传 | [`apps/mobile-workbench/src/api/mobile-upload-client.ts`](../../apps/mobile-workbench/src/api/mobile-upload-client.ts) | 已走 `/upload/sign -> OSS PUT -> /upload/complete` |
+| Mobile LiveKit | [`apps/mobile-workbench/src/realtime/use-livekit-room-connection.ts`](../../apps/mobile-workbench/src/realtime/use-livekit-room-connection.ts) | 已有 room 连接和麦克风发布切片，仍需真机 smoke |
 
 当前还没有：
 
@@ -220,9 +220,8 @@ ESP32-S3 local wav
 
 ### VoxFlame 内部文档
 
-1. [Mobile Workbench Phase 0 RFC](VOXFLAME_MOBILE_WORKBENCH_PHASE0_RFC_2026-05-04.md)
-2. [Mobile Workbench 真机验证手册](VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)
-3. [Dataset schema 和 recorder pipeline](VOXFLAME_DATASET_SCHEMA_AND_RECORDER_PIPELINE_IMPLEMENTATION_2026-03-23.md)
+1. [Mobile Workbench 真机验证手册](VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md)
+2. [语音采集产品规范](../speech-health/VOXFLAME_VOICE_COLLECTION_PRODUCT_SPEC_2026-08-18.md)
 
 ### 官方文档
 

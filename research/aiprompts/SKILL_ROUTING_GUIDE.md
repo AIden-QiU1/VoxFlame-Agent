@@ -14,7 +14,7 @@
 
 ### 先看本地
 
-- 仓库代码、注释、测试、`AGENTS.md`、`.tasks/current.md`、`docs/README.md`
+- 仓库代码、注释、测试、`AGENTS.md`、`.tasks/current.md`、`research/README.md`
 - 如果问题其实是“仓库现在怎么实现的”，不要先去外部搜索
 
 ### 再看官方文档

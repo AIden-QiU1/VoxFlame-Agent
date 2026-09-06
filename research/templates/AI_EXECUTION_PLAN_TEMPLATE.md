@@ -102,7 +102,7 @@
 - `frontend/...`
 - `backend/...`
 - `ten_agent/...`
-- `docs/...`
+- `research/...`
 - CI / lint / script：
 - 受影响的表 / 缓存 / 事件：
 - 受影响的旁路系统：

@@ -19,7 +19,7 @@
 - 命令执行流水账
 - 产品运行时 prompt
 
-## 什么时候下沉到 docs/aiprompts
+## 什么时候下沉到 research/aiprompts
 
 当内容更像下面这些东西时，优先下沉：
 

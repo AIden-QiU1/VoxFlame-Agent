@@ -229,14 +229,48 @@ EXPO_PUBLIC_API_BASE_URL=http://<your-lan-ip>:3001/api
 
 如果网络环境复杂，可以后续改用 HTTPS tunnel，但不要把 service role key、LiveKit API secret、DashScope key 放进 App 环境变量。
 
-## 5. 当前下一步
+## 5. Android / iPhone 完整业务验收
 
-建议下一刀：
+> 适用版本：`0.1.7 (8)` 起。Android 与 iPhone 必须分别执行；只打开页面、只跑模拟器或只完成 bundle 构建都不算通过。
 
-1. 用 `npm run build:android:development` 或 `npm run build:android:preview` 生成 Android APK 安装链接。
-2. 用一台 Android 手机验证登录、workspace read、录音、回放。
-3. 用 `npm run build:ios:development` 或 `npm run build:ios:preview` 生成 iPhone 内测安装链接，并在真机重复相同链路。
-4. 再验证上传 receipt。
-5. 最后验证 LiveKit quick talk room。
+自动化门：
 
-在这四步跑通前，不进入正式商店上架准备。
+```bash
+cd apps/mobile-workbench
+npm run smoke:device-env
+npm run test:communication
+npm run test:training
+npm run test:memory
+npm run check
+npm run typecheck
+npm run export:android
+npm run export:ios
+cd ../../backend && npm run build
+cd .. && bash scripts/check_ai_docs.sh
+```
+
+每个平台完整走通：
+
+1. 真实账号登录；退出后仍能进入快速表达。
+2. 快速表达完成短句/自定义文字朗读、复制和大字展示；不创建 RTC、不上传声音。
+3. 语音助手连接 LiveKit、发布麦克风、接收并编辑确认文字、发送给 Agent、结束连接。
+4. 训练首页可进入马上录、自己的材料、8 个主题和现代文章朗读。
+5. 从系统文件选择器导入 `.txt/.md`，保存、切换材料，逐句清单与 Web/Backend 一致。
+6. 停止录音后先确认；回听正常，确认收录后才上传并进入下一句。
+7. 重录时旧录音撤回成功后才开始新录音；撤回失败不得开始。
+8. 不收录会删除本机录音；已上传录音同时撤回云端资产，失败时保留可重试状态。
+9. 场景模板和系统重点词/开口句可查看、启用和停用。
+10. 自定义重点词新增、编辑、删除后，Web、App 和下一次 RTC workspace 一致。
+11. 沟通画像、材料和常用短句完成新增、修改、删除或清空，并确认 Web 同源。
+12. 录音中断网仍能停止并保留本机文件；恢复网络后上传成功，重试不产生重复 manifest。
+13. 验证麦克风拒绝、重新授权、蓝牙/有线输入断开后的安全回退。
+
+复制 `apps/mobile-workbench/device-acceptance.example.json`，分别保存 Android 和 iOS 结果。不得写真实姓名、完整手机号、表达正文或音频地址。每项必须有非空证据；`fail` 不能通过，`conditional` 必须说明问题。
+
+```bash
+cd apps/mobile-workbench
+npm run validate:device-acceptance -- android-result.json
+npm run validate:device-acceptance -- ios-result.json
+```
+
+只有两条命令都退出码为 0，才可宣称 App 通过双平台完整真机验收。缺实体设备、Apple 签名或真实账号时必须保持 `pending`。

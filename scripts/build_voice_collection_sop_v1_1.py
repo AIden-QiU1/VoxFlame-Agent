@@ -9,7 +9,7 @@ from docx.shared import Cm, Pt, RGBColor
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "docs" / "燃言_构音障碍普通话语音采集标准化SOP_v1.1_Web对齐版.md"
+SOURCE = ROOT / "research" / "speech-health" / "燃言_构音障碍普通话语音采集标准化SOP_v1.1_Web对齐版.md"
 OUTPUT = ROOT / "燃言_构音障碍普通话语音采集标准化SOP_v1.1_Web对齐版.docx"
 
 

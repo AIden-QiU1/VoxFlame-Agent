@@ -124,7 +124,7 @@ npm run smoke:device-env
 
 For a physical phone, `EXPO_PUBLIC_API_BASE_URL` should usually point at your computer's LAN address, for example `http://<lan-ip>:3001/api`, not `http://127.0.0.1:3001/api`.
 
-See [Mobile Workbench Device Verification Runbook](../../docs/VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md).
+See [Mobile Workbench Device Verification Runbook](../../research/product-engineering/VOXFLAME_MOBILE_WORKBENCH_DEVICE_VERIFICATION_RUNBOOK_2026-05-05.md).
 
 ## Real Account Smoke
 

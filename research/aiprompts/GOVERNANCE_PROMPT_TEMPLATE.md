@@ -67,7 +67,7 @@
 
 - 项目级：提炼成 `AGENTS.md` / `CLAUDE.md` / AI 编辑器项目规则
 - 模块级：按模块再补充唯一事实源、旁路系统和目录约束
-- 任务级：在复杂迁移任务中配合 `docs/AI_EXECUTION_PLAN_TEMPLATE.md`
+- 任务级：在复杂迁移任务中配合 `research/templates/AI_EXECUTION_PLAN_TEMPLATE.md`
 
 ## 注意
 

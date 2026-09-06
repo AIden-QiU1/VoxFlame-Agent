@@ -32,7 +32,7 @@ AGENTS.md
 
 ## 3. 唯一事实源
 
-- 规则入口：`AGENTS.md`；深层协作方法：`docs/AI_ENGINEERING_SYSTEM.md`。
+- 规则入口：`AGENTS.md`；深层协作方法：`research/AI_ENGINEERING_SYSTEM.md`。
 - 研究索引：`research/PIPELINE.yaml`；反馈索引：`research/FEEDBACK_REGISTRY.yaml`。
 - 研究阈值：`research/HARNESS_RULES.yaml`；执行器：`scripts/research/`。
 - 应用回流：`research/APPLICATION_FEEDBACK_REGISTRY.md`。
